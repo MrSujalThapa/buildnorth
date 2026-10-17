@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "npm install && uv sync",
     "dev": "npm run dev --workspace @personal-markets/web -- --host 0.0.0.0",
-    "dev:api": "uv run uvicorn personal_markets.main:app --app-dir apps/api/src --reload --host 0.0.0.0 --port 8000",
+    "dev:api": "uv run python -m personal_markets --host 0.0.0.0 --port 8000",
     "lint": "npm run lint --workspace @personal-markets/web && uv run ruff check .",
     "typecheck": "npm run typecheck --workspace @personal-markets/web && uv run mypy",
     "test": "npm run test --workspace @personal-markets/web && uv run pytest",

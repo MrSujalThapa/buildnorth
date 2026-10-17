@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { publishedHistoryPoints } from "../adapters/marketViewModel";
 import { api, type WorkflowSnapshot } from "../api/client";
 import { EvidenceSourceWorkspace, formatProbability } from "../features/goals/EvidenceSourceWorkspace";
 
@@ -20,7 +21,7 @@ export function EvidenceRoute() {
     enabled: Boolean(goalId),
   });
 
-  const latestProbability = history.data?.length ? history.data[history.data.length - 1]?.probability : null;
+  const latestProbability = publishedHistoryPoints(history.data ?? []).at(-1)?.probability ?? null;
 
   if (goal.isLoading || history.isLoading) {
     return (
@@ -39,6 +40,19 @@ export function EvidenceRoute() {
           <div className="unpriced-state">
             <strong>Goal not found</strong>
             <span>Goal {goalId} is unavailable.</span>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (history.isError) {
+    return (
+      <main className="evidence-page">
+        <div className="evidence-shell">
+          <div className="unpriced-state">
+            <strong>History unavailable</strong>
+            <span>Could not load published forecast history for this goal.</span>
           </div>
         </div>
       </main>

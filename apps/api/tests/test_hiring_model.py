@@ -248,6 +248,139 @@ def test_inputs_builder_routes_hiring_goals_only() -> None:
     assert build_numeric_inputs(non_hiring, habit_proposal, evidence) is None
 
 
+def test_successive_application_snapshots_are_not_summed() -> None:
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=6,
+            summary="stock",
+            observed_at=now - timedelta(days=1),
+        ),
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=18,
+            summary="stock",
+            observed_at=now,
+        ),
+    ]
+    state = aggregate_funnel_from_evidence(evidence, now=now)
+    assert state.applications == 18
+
+
+def test_identical_application_increments_on_different_days_are_summed() -> None:
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="increment",
+            numeric_value=1,
+            summary="sent one",
+            observed_at=now - timedelta(days=1),
+        ),
+        _evidence(
+            metric="applications_submitted",
+            event_type="increment",
+            numeric_value=1,
+            summary="sent one",
+            observed_at=now,
+        ),
+    ]
+    state = aggregate_funnel_from_evidence(evidence, now=now)
+    assert state.applications == 2
+
+
+def test_later_increments_add_to_latest_snapshot() -> None:
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=6,
+            summary="stock",
+            observed_at=now - timedelta(days=2),
+        ),
+        _evidence(
+            metric="applications_submitted",
+            event_type="increment",
+            numeric_value=1,
+            summary="sent one",
+            observed_at=now,
+        ),
+    ]
+    state = aggregate_funnel_from_evidence(evidence, now=now)
+    assert state.applications == 7
+
+
+def test_later_snapshot_replaces_earlier_increments() -> None:
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="increment",
+            numeric_value=1,
+            summary="sent one",
+            observed_at=now - timedelta(days=2),
+        ),
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=18,
+            summary="stock",
+            observed_at=now,
+        ),
+    ]
+    state = aggregate_funnel_from_evidence(evidence, now=now)
+    assert state.applications == 18
+
+
+def test_snapshot_aggregation_reprices_eighteen_not_the_sum() -> None:
+    now = datetime.now(UTC)
+    goal = _goal(deadline=now + timedelta(weeks=26))
+    proposal = _proposal(goal)
+    sequential = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=6,
+            summary="stock",
+            observed_at=now - timedelta(days=1),
+        ),
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=18,
+            summary="stock",
+            observed_at=now,
+        ),
+    ]
+    eighteen = [
+        _evidence(
+            metric="applications_submitted",
+            event_type="manual_state_entry",
+            numeric_value=18,
+            summary="stock",
+            observed_at=now,
+        )
+    ]
+    sequential_numeric = build_hiring_numeric_inputs(goal, proposal, sequential, now=now)
+    eighteen_numeric = build_hiring_numeric_inputs(goal, proposal, eighteen, now=now)
+    twenty_four_numeric = funnel_state_to_numeric_inputs(
+        goal, HiringFunnelState(applications=24), now=now
+    )
+    assert sequential_numeric is not None and eighteen_numeric is not None
+    assert twenty_four_numeric is not None
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    sequential_price = service.compute(goal, proposal, ["a", "b"], {}, [], sequential_numeric)
+    eighteen_price = service.compute(goal, proposal, ["c"], {}, [], eighteen_numeric)
+    twenty_four_price = service.compute(goal, proposal, ["d"], {}, [], twenty_four_numeric)
+    assert sequential_price.raw_probability == pytest.approx(eighteen_price.raw_probability)
+    assert sequential_price.raw_probability != pytest.approx(twenty_four_price.raw_probability)
+    assert sequential_numeric.state["funnel"]["applications"] == 18
+
+
 def test_receipt_includes_funnel_transforms_not_strength_scores() -> None:
     goal = _goal()
     numeric = build_hiring_numeric_inputs(

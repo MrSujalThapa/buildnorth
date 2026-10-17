@@ -87,6 +87,22 @@ class WhatIfService:
         state = build_baseline_state(goal, evidence)
         if demo_fixtures_enabled() and is_demo_goal(goal_id):
             return patch_baseline_state(state)
+        return await self._overlay_published_baseline(UUID(goal_id), state)
+
+    async def _overlay_published_baseline(
+        self, goal_id: UUID, state: WhatIfBaselineState
+    ) -> WhatIfBaselineState:
+        history = await self._repository.history(goal_id)
+        published = [point for point in history if point.source_kind == "published_forecast"]
+        if published:
+            latest = published[-1]
+            return state.model_copy(
+                update={
+                    "priced": True,
+                    "status": latest.forecast_status,
+                    "current_probability": latest.probability,
+                }
+            )
         return state
 
     async def simulate(self, request: WhatIfRequest) -> WhatIfResult:

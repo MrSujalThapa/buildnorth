@@ -39,6 +39,8 @@ def hiring_requirements() -> tuple[StateRequirement, ...]:
                 "application_count",
                 "applications_sent",
                 "job_applications",
+                "job_applications_submitted",
+                "apps_submitted",
             ),
             example="24",
             suggested_sources=(

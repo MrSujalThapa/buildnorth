@@ -8,6 +8,7 @@ type Props = {
   onAddEvidence: () => void;
   onConnectSource: () => void;
   submitting?: boolean;
+  error?: string | null;
 };
 
 /**
@@ -21,6 +22,7 @@ export default function MissingStatePanel({
   onAddEvidence,
   onConnectSource,
   submitting,
+  error,
 }: Props) {
   const [values, setValues] = useState<Record<string, string>>({});
 
@@ -80,6 +82,8 @@ export default function MissingStatePanel({
           Already known: {priceability.satisfied.map((item) => item.label).join(", ")}.
         </p>
       ) : null}
+
+      {error ? <p className="meta" role="alert">{error}</p> : null}
 
       <div className="missing-state-actions">
         <button

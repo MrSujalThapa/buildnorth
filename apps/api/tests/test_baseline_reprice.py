@@ -72,10 +72,10 @@ async def test_manual_state_reprice_publishes_when_priceable() -> None:
     forecasts = BaselineForecastService(InMemoryBaselineForecastRepository())
     service = BaselineRepriceService(GoalService(goals_repo), evidence, forecasts)
     status = await service.publish_if_priceable(goal.goal_id)
-    assert status in {"completed", "limited"}
+    assert status.status in {"completed", "limited"}
     history = forecasts.history(goal.goal_id)
     assert history
     assert history[-1].probability > 0
 
     second = await service.publish_if_priceable(goal.goal_id)
-    assert second == "unchanged"
+    assert second.status == "unchanged"

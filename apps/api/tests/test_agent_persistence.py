@@ -1,10 +1,10 @@
-import os
 from uuid import uuid4
 
 import pytest
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import text
 
+from helpers import isolated_postgres_url
 from personal_markets.agents.graph import LangGraphAgentWorkflow
 from personal_markets.agents.state import AgentDependencies
 from personal_markets.core.config import Settings
@@ -29,7 +29,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.mark.asyncio
 async def test_postgres_checkpointer_survives_new_workflow_instance() -> None:
-    url = os.environ.get("PM_TEST_DATABASE_URL")
+    url = isolated_postgres_url()
     if not url:
         pytest.skip("PM_TEST_DATABASE_URL is not configured")
     thread_id = uuid4()

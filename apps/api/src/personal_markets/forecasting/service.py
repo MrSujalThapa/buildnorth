@@ -14,6 +14,7 @@ from personal_markets.forecasting.repository import (
     BaselineForecastRepository,
     InMemoryBaselineForecastRepository,
     PublishedBaseline,
+    history_point,
 )
 from personal_markets.goals.domain import GoalContract
 from personal_markets.ports import (
@@ -132,10 +133,28 @@ class BaselineForecastService:
             }
         )
         published = pricing.model_copy(update={"receipt": receipt})
+        point = history_point(goal, published)
+        if point is not None:
+            history = await self.published_history(goal.goal_id)
+            if any(
+                item.material_hash == point.material_hash
+                or item.evidence_watermark == point.evidence_watermark
+                for item in history
+            ):
+                return "unchanged"
         await self._repository.publish(goal, published, critic)
         return "limited" if critic.decision == "publish_with_limitations" else "completed"
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:
+        return self._repository.history(goal_id)
+
+    async def published_history(self, goal_id: UUID) -> list[PublishedBaseline]:
+        loader = getattr(self._repository, "load_history", None)
+        if loader is not None:
+            loaded = loader(goal_id)
+            if hasattr(loaded, "__await__"):
+                return await loaded
+            return list(loaded)
         return self._repository.history(goal_id)
 
 

@@ -44,6 +44,7 @@ type Props = {
   onAddEvidence?: () => void;
   onConnectSource?: () => void;
   submittingState?: boolean;
+  stateError?: string | null;
 };
 
 function TuneSlider({
@@ -129,6 +130,7 @@ export default function ImpactWorkspace({
   onAddEvidence,
   onConnectSource,
   submittingState,
+  stateError,
 }: Props) {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const axes = DEFAULT_IMPACT_AXES;
@@ -159,6 +161,7 @@ export default function ImpactWorkspace({
         onSubmit={onSubmitMissingState}
         onAddEvidence={() => onAddEvidence?.()}
         onConnectSource={() => onConnectSource?.()}
+        error={stateError}
       />
     );
   } else if (preview.currentOdds !== null) {

@@ -63,6 +63,10 @@ def demo_fixtures_enabled() -> bool:
 
     from personal_markets.core.config import _REPO_ROOT
 
+    environment = os.environ.get("PM_ENVIRONMENT", "").strip().lower()
+    if environment in {"production", "prod"}:
+        return False
+
     raw = os.environ.get("PM_DEV_DEMO_FIXTURES")
     if raw is not None:
         return raw.lower() in {"1", "true", "yes", "on"}

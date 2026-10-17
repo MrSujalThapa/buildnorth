@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from personal_markets.evidence.domain import NormalizedEvidence
+from personal_markets.evidence.metrics import ObservationKind, observation_kind, reduce_stock_value
 from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.goals.domain import GoalContract
 from personal_markets.ports import GoalArchitectProposal
@@ -104,10 +105,18 @@ def aggregate_funnel_from_evidence(
     now: datetime | None = None,
 ) -> HiringFunnelState:
     clock = now or datetime.now(UTC)
-    state = HiringFunnelState()
     rejections: dict[str, int] = {}
     last_activity: datetime | None = None
     practice_hours = 0.0
+    stocks: dict[str, list[tuple[datetime, float, ObservationKind]]] = {
+        "application": [],
+        "response": [],
+        "phone_screen": [],
+        "oa": [],
+        "technical": [],
+        "final": [],
+        "offer": [],
+    }
 
     for item in evidence:
         metric = item.metric.lower()
@@ -118,32 +127,27 @@ def aggregate_funnel_from_evidence(
         if last_activity is None or observed > last_activity:
             last_activity = observed
 
-        count = _event_count(item)
+        count = float(_event_count(item))
+        kind = observation_kind(item.metric, item.event_type)
         stage = _resolve_stage(metric, event_type, category, summary)
-        if stage == "offer":
-            state = replace(state, offers=state.offers + count)
-            continue
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)
-            rejections[rejection_stage] = rejections.get(rejection_stage, 0) + count
+            rejections[rejection_stage] = rejections.get(rejection_stage, 0) + int(count)
             continue
-        if stage == "application":
-            state = replace(state, applications=state.applications + count)
-        elif stage == "response":
-            state = replace(state, responses=state.responses + count)
-        elif stage == "phone_screen":
-            state = replace(state, phone_screens=state.phone_screens + count)
-        elif stage == "oa":
-            state = replace(state, oas=state.oas + count)
-        elif stage == "technical":
-            state = replace(state, technicals=state.technicals + count)
-        elif stage == "final":
-            state = replace(state, finals=state.finals + count)
-        elif stage == "practice":
+        if stage == "practice":
             practice_hours += float(item.numeric_value or 0.0)
+            continue
+        if stage in stocks:
+            stocks[stage].append((observed, count, kind))
 
-    return replace(
-        state,
+    return HiringFunnelState(
+        applications=int(round(reduce_stock_value(stocks["application"]))),
+        responses=int(round(reduce_stock_value(stocks["response"]))),
+        phone_screens=int(round(reduce_stock_value(stocks["phone_screen"]))),
+        oas=int(round(reduce_stock_value(stocks["oa"]))),
+        technicals=int(round(reduce_stock_value(stocks["technical"]))),
+        finals=int(round(reduce_stock_value(stocks["final"]))),
+        offers=int(round(reduce_stock_value(stocks["offer"]))),
         rejections=rejections,
         practice_hours=practice_hours,
         last_activity_at=last_activity,

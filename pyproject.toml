@@ -47,11 +47,12 @@ package = true
 packages = ["apps/api/src/personal_markets"]
 
 [tool.pytest.ini_options]
-pythonpath = ["apps/api/src"]
+pythonpath = ["apps/api/src", "apps/api/tests"]
 testpaths = ["apps/api/tests"]
-addopts = "-q"
+addopts = "-q --import-mode=importlib --confcutdir=."
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+norecursedirs = [".git", ".venv", "node_modules", "dist", "playitout-submission-clean"]
 markers = ["integration: requires a migrated Postgres database"]
 
 [tool.ruff]

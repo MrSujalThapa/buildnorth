@@ -65,7 +65,6 @@ class PostgresBaselineForecastRepository:
     async def publish(
         self, goal: GoalContract, pricing: PricingResult, critic: CriticArtifact
     ) -> PublishedBaseline | None:
-        await self._memory.publish(goal, pricing, critic)
         point = history_point(goal, pricing)
         if point is None:
             return None
@@ -75,11 +74,11 @@ class PostgresBaselineForecastRepository:
                 insert into market_forecast_history (
                   goal_id, probability, forecast_status, evidence_watermark,
                   model_family, model_version, assumption_hash, material_hash,
-                  simulation_artifact_id, source_kind
+                  simulation_artifact_id, source_kind, receipt_json
                 ) values (
                   :goal_id, :probability, :forecast_status, :evidence_watermark,
                   :model_family, :model_version, :assumption_hash, :material_hash,
-                  null, 'published_forecast'
+                  null, 'published_forecast', cast(:receipt as jsonb)
                 ) on conflict (goal_id, material_hash) do nothing
                 """),
                 {
@@ -91,12 +90,32 @@ class PostgresBaselineForecastRepository:
                     "model_version": point.model_version,
                     "assumption_hash": point.assumption_hash,
                     "material_hash": point.material_hash,
+                    "receipt": json.dumps(point.receipt),
                 },
             )
+        await self._memory.publish(goal, pricing, critic)
         return point
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:
         return self._memory.history(goal_id)
+
+    async def load_history(self, goal_id: UUID) -> list[PublishedBaseline]:
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        "select * from market_forecast_history "
+                        "where goal_id=:id and source_kind='published_forecast' "
+                        "order by created_at"
+                    ),
+                    {"id": goal_id},
+                )
+            ).mappings()
+            points = [_published_from_row(dict(row)) for row in rows]
+        memory = self._memory._history.setdefault(goal_id, {})
+        for point in points:
+            memory[point.material_hash] = point
+        return points
 
 
 def material_hash(payload: dict[str, Any]) -> str:
@@ -145,4 +164,22 @@ def history_point(goal: GoalContract, pricing: PricingResult) -> PublishedBaseli
         material_hash=hashed,
         source_kind="published_forecast",
         receipt=dict(pricing.receipt),
+    )
+
+
+def _published_from_row(row: dict[str, Any]) -> PublishedBaseline:
+    receipt = row.get("receipt_json") or {}
+    if not isinstance(receipt, dict):
+        receipt = {}
+    return PublishedBaseline(
+        goal_id=row["goal_id"],
+        probability=float(row["probability"]),
+        forecast_status=str(row["forecast_status"]),
+        evidence_watermark=str(row["evidence_watermark"]),
+        model_family=str(row["model_family"]),
+        model_version=str(row["model_version"]),
+        assumption_hash=str(row["assumption_hash"]),
+        material_hash=str(row["material_hash"]),
+        source_kind=str(row.get("source_kind") or "published_forecast"),
+        receipt=receipt,
     )

@@ -27,11 +27,14 @@ from personal_markets.ports import InferenceRequest, InferenceResponse
 
 
 class UnconfiguredOpenAIInferenceProvider:
-    async def complete_structured(self, request: InferenceRequest) -> InferenceResponse:
-        del request
-        raise ProviderNotConfiguredError(
+    def __init__(self, message: str | None = None) -> None:
+        self._message = message or (
             "OpenAI inference is not configured; set PM_OPENAI_API_KEY to enable product agents"
         )
+
+    async def complete_structured(self, request: InferenceRequest) -> InferenceResponse:
+        del request
+        raise ProviderNotConfiguredError(self._message)
 
 
 class OpenAIInferenceProvider:

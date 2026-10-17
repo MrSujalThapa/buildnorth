@@ -45,6 +45,14 @@ scripts/_diag_mc.py
 scripts/_probe.py
 scripts/_probe_missing_state.py
 scripts/_probe_whatif.py
+scripts/_phase0_db_probe.py
+scripts/_phase0_env_probe.py
+scripts/_phase0_setup_testdb.py
+scripts/_phase0_key_names.py
+scripts/_phase0_test_db_status.py
+scripts/_phase0_spur_models.py
+scripts/_phase0_e2e.py
+scripts/_phase0_db_receipts.py
 
 # Runtime artifacts
 .artifacts/

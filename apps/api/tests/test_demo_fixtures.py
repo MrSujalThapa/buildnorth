@@ -1,5 +1,6 @@
 from personal_markets.demo_fixtures import (
     DEMO_GOAL_IDS,
+    demo_fixtures_enabled,
     fixture_compare,
     fixture_futures,
     fixture_simulate,
@@ -11,6 +12,13 @@ from personal_markets.demo_fixtures import (
 def test_demo_goal_ids() -> None:
     assert len(DEMO_GOAL_IDS) == 5
     assert is_demo_goal("20000000-0000-0000-0000-000000000002")
+    assert not is_demo_goal("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+
+def test_demo_fixtures_disabled_in_production(monkeypatch) -> None:
+    monkeypatch.setenv("PM_ENVIRONMENT", "production")
+    monkeypatch.setenv("PM_DEV_DEMO_FIXTURES", "true")
+    assert demo_fixtures_enabled() is False
 
 
 def test_career_simulate_fixture_is_marked_demo_seed() -> None:

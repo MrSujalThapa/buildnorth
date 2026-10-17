@@ -3,6 +3,12 @@ from uuid import UUID, uuid4
 
 from personal_markets.core.errors import ResourceNotFoundError
 from personal_markets.evidence.domain import EvidenceCommit, NormalizedEvidence
+from personal_markets.evidence.metrics import (
+    canonicalize_event,
+    observation_kind,
+    parse_observed_at,
+    period_key,
+)
 from personal_markets.evidence.repository import EvidenceRepository
 from personal_markets.ports import EvidenceEventProposal
 
@@ -33,10 +39,13 @@ class EvidenceService:
             raise ResourceNotFoundError(f"Goal {goal_id} was not found")
         normalized: list[NormalizedEvidence] = []
         for event in events:
-            fingerprint = evidence_fingerprint(user_id, event)
+            event = canonicalize_event(event)
+            fingerprint = evidence_fingerprint(user_id, event, goal_id=goal_id)
             existing = await self._repository.find_fingerprint(user_id, fingerprint)
-            if existing:
-                normalized.append(existing)
+            if existing and existing.evidence_id is not None:
+                await self._repository.link_goal(goal_id, existing.evidence_id)
+                recorded = await self._repository.record_corroboration(existing, event)
+                normalized.append(recorded)
                 continue
             stored = await self._repository.insert(
                 user_id=user_id,
@@ -50,17 +59,23 @@ class EvidenceService:
         return EvidenceCommit(events=normalized, conflicts=conflicts)
 
 
-def evidence_fingerprint(user_id: UUID, event: EvidenceEventProposal) -> str:
+def evidence_fingerprint(
+    user_id: UUID, event: EvidenceEventProposal, goal_id: UUID | None = None
+) -> str:
+    event = canonicalize_event(event)
+    kind = observation_kind(event.metric, event.event_type)
+    observed = parse_observed_at(event.observed_at)
+    # Source, event type and summary are provenance, not identity. Period/day
+    # keys keep distinct increments and weekly/monthly readings from collapsing.
     canonical = "|".join(
         [
             str(user_id),
-            event.source_type,
-            event.event_type,
+            str(goal_id or ""),
+            kind,
             event.metric,
-            event.observed_at,
+            period_key(kind, event.metric, observed),
             "" if event.numeric_value is None else f"{event.numeric_value:.6f}",
             event.categorical_value or "",
-            event.summary.strip().lower(),
         ]
     )
     return hashlib.sha256(canonical.encode()).hexdigest()

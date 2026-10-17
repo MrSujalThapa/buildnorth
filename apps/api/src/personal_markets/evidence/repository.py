@@ -23,3 +23,9 @@ class EvidenceRepository(Protocol):
         agent_run_id: UUID | None,
         conflict: str,
     ) -> NormalizedEvidence: ...
+
+    async def link_goal(self, goal_id: UUID, evidence_id: UUID) -> None: ...
+
+    async def record_corroboration(
+        self, existing: NormalizedEvidence, event: EvidenceEventProposal
+    ) -> NormalizedEvidence: ...

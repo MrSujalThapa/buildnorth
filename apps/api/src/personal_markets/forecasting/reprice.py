@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 from personal_markets.agents.critic import deterministic_critic_decision
@@ -12,6 +14,14 @@ from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
 from personal_markets.ports import CriticArtifact, EvidenceEventProposal, GoalArchitectProposal
 from personal_markets.what_if.baseline_state import proposal_from_goal
+
+
+@dataclass(frozen=True, slots=True)
+class RepriceResult:
+    status: str
+    reason: str | None = None
+    probability: float | None = None
+    receipt: dict[str, Any] | None = None
 
 
 def _evidence_proposals(events: list[NormalizedEvidence]) -> list[EvidenceEventProposal]:
@@ -37,7 +47,6 @@ def _evidence_proposals(events: list[NormalizedEvidence]) -> list[EvidenceEventP
 
 def _research_ids(goal: GoalContract, proposal: GoalArchitectProposal, numeric) -> list[str]:
     from personal_markets.forecasting.finance import is_finance_goal
-    from personal_markets.forecasting.hiring import is_hiring_goal
     from personal_markets.forecasting.running import is_running_goal
     from personal_markets.forecasting.startup import is_startup_goal
 
@@ -66,13 +75,13 @@ class BaselineRepriceService:
         self._evidence = evidence
         self._forecasts = forecasts
 
-    async def publish_if_priceable(self, goal_id: UUID) -> str:
+    async def publish_if_priceable(self, goal_id: UUID) -> RepriceResult:
         goal = await self._goals.get_goal(goal_id)
         proposal = proposal_from_goal(goal)
         events = await self._evidence.list_for_goal(goal_id)
         evidence_ids = [str(item.evidence_id) for item in events if item.evidence_id]
         if not evidence_ids:
-            return "no_evidence"
+            return RepriceResult(status="no_evidence", reason="No evidence is linked to this goal.")
 
         numeric = build_numeric_inputs(goal, proposal, events)
         pricing = self._forecasts.compute(
@@ -84,7 +93,16 @@ class BaselineRepriceService:
             numeric,
         )
         if not pricing.priced or pricing.raw_probability is None:
-            return "not_priced"
+            reason = (
+                pricing.limitations[0]
+                if pricing.limitations
+                else "The model could not price this goal."
+            )
+            return RepriceResult(
+                status="not_priced",
+                reason=reason,
+                receipt=dict(pricing.receipt),
+            )
 
         issues = self._forecasts.deterministic_issues(
             _evidence_proposals(events),
@@ -100,12 +118,35 @@ class BaselineRepriceService:
                 required_actions=[],
             )
         if critic.decision == "withhold":
-            return "withheld"
+            return RepriceResult(
+                status="withheld",
+                reason=critic.issues[0] if critic.issues else "The critic withheld publication.",
+                receipt=dict(pricing.receipt),
+            )
 
         point = history_point(goal, pricing)
         if point is not None:
-            history = self._forecasts.history(goal_id)
-            if any(item.material_hash == point.material_hash for item in history):
-                return "unchanged"
+            history = await self._forecasts.published_history(goal_id)
+            if any(
+                item.material_hash == point.material_hash
+                or item.evidence_watermark == point.evidence_watermark
+                for item in history
+            ):
+                matched = next(
+                    item
+                    for item in history
+                    if item.material_hash == point.material_hash
+                    or item.evidence_watermark == point.evidence_watermark
+                )
+                return RepriceResult(
+                    status="unchanged",
+                    probability=matched.probability,
+                    receipt=dict(pricing.receipt),
+                )
 
-        return await self._forecasts.publish(goal, pricing, critic)
+        status = await self._forecasts.publish(goal, pricing, critic)
+        return RepriceResult(
+            status=status,
+            probability=pricing.raw_probability,
+            receipt=dict(pricing.receipt),
+        )

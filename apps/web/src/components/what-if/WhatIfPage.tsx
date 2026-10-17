@@ -98,6 +98,8 @@ type Props = {
 
   submittingState?: boolean;
 
+  stateError?: string | null;
+
   onAddEvidence?: () => void;
 
   onConnectSource?: () => void;
@@ -313,6 +315,8 @@ export default function WhatIfPage({
   onSubmitMissingState,
 
   submittingState,
+
+  stateError,
 
   onAddEvidence,
 
@@ -665,6 +669,8 @@ export default function WhatIfPage({
               onSubmitMissingState={onSubmitMissingState}
 
               submittingState={submittingState}
+
+              stateError={stateError}
 
               onAddEvidence={onAddEvidence}
 

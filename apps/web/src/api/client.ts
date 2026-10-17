@@ -329,6 +329,7 @@ export interface Health {
   status: string;
   service: string;
   version: string;
+  database?: string;
 }
 
 export interface ClarificationQuestion {
@@ -428,7 +429,13 @@ export const api = {
     goalId: string,
     entries: { key: string; label: string; value: number; unit: string }[],
   ) =>
-    request<EvidenceEvent[]>(`/api/v1/goals/${goalId}/evidence/manual`, {
+    request<{
+      events: EvidenceEvent[];
+      reprice_status: string;
+      priced: boolean;
+      reason: string | null;
+      probability: number | null;
+    }>(`/api/v1/goals/${goalId}/evidence/manual`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entries }),

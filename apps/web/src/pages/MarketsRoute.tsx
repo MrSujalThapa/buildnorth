@@ -19,9 +19,13 @@ export function MarketsRoute() {
 
   const markets = useMemo(() => {
     if (!goals.data) return [];
-    return goals.data.map((goal, index) =>
-      toMarketCard(goal, historyQueries[index]?.data ?? []),
-    );
+    return goals.data.map((goal, index) => {
+      const query = historyQueries[index];
+      return {
+        ...toMarketCard(goal, query?.data ?? []),
+        historyUnavailable: Boolean(query?.isError),
+      };
+    });
   }, [goals.data, historyQueries]);
 
   if (goals.isLoading) {

@@ -5,6 +5,13 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class CorroboratingSource(BaseModel):
+    source_type: str
+    event_type: str = ""
+    summary: str = ""
+    observed_at: str | None = None
+
+
 class Provenance(BaseModel):
     source_type: Literal["manual", "github", "csv", "mcp_sync"]
     source_authority: Literal["self_report", "platform_public", "user_file"]
@@ -14,6 +21,7 @@ class Provenance(BaseModel):
     conflict_status: Literal["none", "flagged"]
     raw_event_id: str | None = None
     external_event_id: str | None = None
+    corroborating_sources: list[CorroboratingSource] = Field(default_factory=list)
 
 
 class NormalizedEvidence(BaseModel):

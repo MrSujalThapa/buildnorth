@@ -10,6 +10,7 @@ from typing import Any, Literal
 import numpy as np
 
 from personal_markets.evidence.domain import NormalizedEvidence
+from personal_markets.evidence.metrics import latest_metric_value
 from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.targets import resolve_target_duration_seconds, target_direction
@@ -155,7 +156,6 @@ def aggregate_running_from_evidence(
 ) -> RunningState:
     clock = now or datetime.now(UTC)
     observations: list[RunObservation] = []
-    weekly_distance: float | None = None
     missed_sessions = 0
     target_distance = goal_distance_km(goal) if goal else None
 
@@ -167,13 +167,12 @@ def aggregate_running_from_evidence(
             missed_sessions += 1
             continue
         if metric in {"weekly_distance_km", "weekly_mileage_km", "weekly_distance"}:
-            if item.numeric_value is not None:
-                weekly_distance = float(item.numeric_value)
             continue
         parsed = _parse_run_observation(item, observed)
         if parsed is not None:
             observations.append(parsed)
 
+    weekly_distance = latest_metric_value(evidence, "weekly_distance_km")
     observations.sort(key=lambda item: item.observed_at)
     if target_distance is not None:
         observations = _normalize_to_goal_distance(

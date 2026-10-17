@@ -23,9 +23,9 @@ from personal_markets.ports import (
 )
 from personal_markets.wiring import (
     get_agent_workflow,
+    get_baseline_reprice_service,
     get_evidence_service,
     get_github_cursor_store,
-    get_baseline_reprice_service,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["agents"])
@@ -38,6 +38,7 @@ class CreateThreadBody(BaseModel):
     evidence_text: str | None = None
     github_login: str | None = None
     mcp_records: list[dict[str, Any]] | None = None
+    evidence_events: list[EvidenceEventProposal] | None = None
 
 
 class ResumeBody(BaseModel):
@@ -58,6 +59,7 @@ async def start_thread(
         evidence_text=body.evidence_text,
         github_login=body.github_login,
         mcp_records=body.mcp_records,
+        evidence_events=body.evidence_events,
         user_id=get_settings().default_user_id,
     )
     return await workflow.start(request)
@@ -103,6 +105,7 @@ async def add_manual_evidence(
             kind="add_evidence",
             goal_id=goal_id,
             evidence_text=body.evidence_text or body.intent,
+            evidence_events=body.evidence_events,
             user_id=get_settings().default_user_id,
         )
     )
@@ -121,13 +124,21 @@ class ManualStateBody(BaseModel):
     entries: list[ManualStateEntry] = Field(min_length=1)
 
 
-@router.post("/goals/{goal_id}/evidence/manual")
+class ManualStateResponse(BaseModel):
+    events: list[dict[str, Any]]
+    reprice_status: str
+    priced: bool
+    reason: str | None = None
+    probability: float | None = None
+
+
+@router.post("/goals/{goal_id}/evidence/manual", response_model=ManualStateResponse)
 async def add_manual_state(
     goal_id: UUID,
     body: ManualStateBody,
     evidence: Annotated[Any, Depends(get_evidence_service)],
     reprice: Annotated[Any, Depends(get_baseline_reprice_service)],
-) -> list[dict[str, Any]]:
+) -> ManualStateResponse:
     """Commit numbers the user entered directly against a declared state requirement.
 
     A typed number is user data, not an agent proposal, so it does not go through the
@@ -156,8 +167,17 @@ async def add_manual_state(
         agent_run_id=None,
         conflicts=[],
     )
-    await reprice.publish_if_priceable(goal_id)
-    return [row.model_dump(mode="json") for row in commit.events]
+    outcome = await reprice.publish_if_priceable(goal_id)
+    priced = (
+        outcome.status in {"completed", "limited", "unchanged"} and outcome.probability is not None
+    )
+    return ManualStateResponse(
+        events=[row.model_dump(mode="json") for row in commit.events],
+        reprice_status=outcome.status,
+        priced=priced,
+        reason=outcome.reason,
+        probability=outcome.probability,
+    )
 
 
 @router.post("/goals/{goal_id}/github-sync", response_model=WorkflowSnapshot)

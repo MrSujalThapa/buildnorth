@@ -1,8 +1,17 @@
 import asyncio
 import os
 import sys
+from pathlib import Path
 
 import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+assert (_REPO_ROOT / "pyproject.toml").exists()
+sys.path[:] = [
+    entry
+    for entry in sys.path
+    if "playitout-submission-clean" not in Path(entry or ".").resolve().as_posix()
+]
 
 os.environ["PM_ENVIRONMENT"] = "test"
 os.environ["PM_COMPOSIO_ENABLED"] = "false"

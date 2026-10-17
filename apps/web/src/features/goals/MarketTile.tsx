@@ -6,6 +6,18 @@ import { toMarketCardViewModel } from "./marketViewModel";
 
 export function MarketTile({ goal }: { goal: Goal }) {
   const history = useQuery({ queryKey: ["market-history", goal.goal_id], queryFn: ({ signal }) => api.marketHistory(goal.goal_id, signal) });
+  if (history.isError) {
+    return (
+      <li className="market-card-item">
+        <div className="market-card">
+          <div className="unpriced-state">
+            <strong>History unavailable</strong>
+            <span>Could not load published forecast history.</span>
+          </div>
+        </div>
+      </li>
+    );
+  }
   const market = toMarketCardViewModel(goal, history.data ?? []);
   const signedReturn = market.todayReturn == null ? null : `${market.todayReturn >= 0 ? "+" : ""}${market.todayReturn.toFixed(1)}% today`;
   return (

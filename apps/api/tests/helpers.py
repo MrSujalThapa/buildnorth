@@ -1,4 +1,6 @@
+import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -19,10 +21,24 @@ from personal_markets.wiring import (
 )
 
 
-def isolated_app() -> FastAPI:
+def isolated_postgres_url() -> str | None:
+    explicit = os.environ.get("PM_TEST_DATABASE_URL") or os.environ.get("PM_PHASE0_DATABASE_URL")
+    if explicit:
+        return explicit
+    from sqlalchemy.engine import make_url
+
+    from personal_markets.core.config import Settings
+
+    raw = Settings().database_url
+    if not raw:
+        return None
+    return make_url(raw).set(database="playitout_phase0_test").render_as_string(hide_password=False)
+
+
+def isolated_app(*, inference: Any | None = None) -> FastAPI:
     get_integration_repository.cache_clear()
     repository = InMemoryGoalRepository()
-    workflow = build_in_memory_workflow(goal_repository=repository)
+    workflow = build_in_memory_workflow(inference=inference, goal_repository=repository)
     app = create_app()
 
     @asynccontextmanager
@@ -44,4 +60,5 @@ def isolated_app() -> FastAPI:
     app.state.agent_workflow = workflow
     app.state.evidence_service = workflow._inner._deps.evidence
     app.state.github_cursor_store = InMemoryGithubCursorStore()
+    app.state.goal_repository = repository
     return app

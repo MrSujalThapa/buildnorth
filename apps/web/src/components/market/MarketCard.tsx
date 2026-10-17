@@ -37,8 +37,8 @@ export default function MarketCard({
         </div>
 
         <div className="market-card-odds">
-          {market.odds === null
-            ? "ΓÇö"
+          {market.historyUnavailable || market.odds === null
+            ? "—"
             : `${market.odds.toFixed(
                 0,
               )}%`}
@@ -58,14 +58,21 @@ export default function MarketCard({
       </div>
 
       <div className="market-card-chart">
-        <WealthsimpleAreaChart
-          data={
-            market.history
-          }
-          interactive={
-            false
-          }
-        />
+        {market.historyUnavailable ? (
+          <div className="unpriced-state">
+            <strong>History unavailable</strong>
+            <span>Could not load published forecast history.</span>
+          </div>
+        ) : (
+          <WealthsimpleAreaChart
+            data={
+              market.history
+            }
+            interactive={
+              false
+            }
+          />
+        )}
       </div>
     </button>
   );

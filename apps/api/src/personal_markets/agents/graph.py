@@ -25,6 +25,7 @@ from personal_markets.ports import (
     GoalArchitectProposal,
     InterruptPayload,
     ResearchArtifact,
+    ResearchClaim,
     ResearchQuery,
     ResumePayload,
     WorkflowRequest,
@@ -97,7 +98,10 @@ class LangGraphAgentWorkflow:
             "resume_answers": {},
             "cancelled": False,
             "committed_evidence_ids": [],
-            "debug": {"user_id": str(user_id)},
+            "debug": {
+                "user_id": str(user_id),
+                "structured_evidence": bool(request.evidence_events),
+            },
             "github_records": [],
             "mcp_records": list(request.mcp_records or []),
             "evidence_proposal": {
@@ -338,13 +342,18 @@ class LangGraphAgentWorkflow:
             if event.numeric_value is None and not event.categorical_value:
                 errors.append(f"Event {event.summary} needs a numeric or categorical value.")
         retries = int(state.get("evidence_retries") or 0)
-        if errors:
+        structured = bool((state.get("debug") or {}).get("structured_evidence"))
+        if errors and not structured:
             retries += 1
-        return {
+        status = "failed" if errors and structured else state.get("status")
+        payload: dict[str, Any] = {
             "validation_errors": errors,
             "evidence_retries": retries,
             "current_step": "validate_evidence",
         }
+        if status:
+            payload["status"] = status
+        return payload
 
     def _after_validate_evidence(self, state: AgentGraphState) -> str:
         errors = state.get("validation_errors") or []
@@ -352,6 +361,8 @@ class LangGraphAgentWorkflow:
         proposal = EvidenceAgentProposal.model_validate(
             state.get("evidence_proposal") or {"events": []}
         )
+        if errors and (state.get("debug") or {}).get("structured_evidence"):
+            return END
         if errors and retries < MAX_SEMANTIC_RETRIES:
             return "normalize_evidence"
         if proposal.ambiguities:
@@ -449,29 +460,33 @@ class LangGraphAgentWorkflow:
             goal_type=proposal.goal_type,
         )
         retrieved = await self._deps.research.search(query)
-        payload = {
-            "snippets": retrieved.claims,
-            "reference_class_candidates": [
+        claims: list[dict[str, Any]] = []
+        for item in retrieved.claims:
+            payload = dict(item)
+            payload.setdefault("retrieved_at", datetime.now(UTC).isoformat())
+            payload.setdefault("source_type", "frozen")
+            payload.setdefault("evidence_class", "mechanistic")
+            try:
+                claims.append(ResearchClaim.model_validate(payload).model_dump(mode="json"))
+            except Exception:
+                continue
+        limitations = [
+            item.get("detail") or item.get("status")
+            for item in retrieved.provenance
+            if item.get("status") == "not_configured" or item.get("detail")
+        ]
+        artifact = ResearchArtifact(
+            claims=claims,
+            reference_class_candidates=[
                 item.get("source", "") for item in retrieved.provenance if item.get("source")
             ],
-            "limitations": [
-                item.get("detail") or item.get("status")
-                for item in retrieved.provenance
-                if item.get("status") == "not_configured" or item.get("detail")
-            ],
-        }
-        artifact, run_id = await complete_agent(
-            self._deps, state, "research", ResearchArtifact, payload, 0
+            limitations=limitations or ["Frozen reference artifacts only."],
         )
-        ids = dict(state.get("agent_run_ids") or {})
-        ids["research"] = run_id
-        if not artifact.get("limitations"):
-            artifact["limitations"] = payload["limitations"] or ["Frozen reference artifacts only."]
         return {
-            "research": artifact,
+            "research": artifact.model_dump(mode="json"),
             "current_step": "research_agent",
             "progress": mark_progress(state, "research_agent"),
-            "agent_run_ids": ids,
+            "agent_run_ids": dict(state.get("agent_run_ids") or {}),
         }
 
     async def _compute_forecast(self, state: AgentGraphState) -> dict[str, Any]:
@@ -481,13 +496,7 @@ class LangGraphAgentWorkflow:
         goal_id = UUID(state["goal_id"])
         goal = await self._deps.goals.get_goal(goal_id)
         evidence = await self._deps.evidence.list_for_goal(goal_id)
-        committed = set(state.get("committed_evidence_ids") or [])
-        if committed:
-            evidence = [
-                item
-                for item in evidence
-                if item.evidence_id is not None and str(item.evidence_id) in committed
-            ]
+        evidence_ids = [str(item.evidence_id) for item in evidence if item.evidence_id]
         numeric = build_numeric_inputs(goal, proposal, evidence)
         research_ids = [
             claim.get("source", "")
@@ -513,7 +522,7 @@ class LangGraphAgentWorkflow:
         pricing = self._deps.baseline_forecasts.compute(
             goal,
             proposal,
-            list(state.get("committed_evidence_ids") or []),
+            evidence_ids,
             dict(state.get("agent_run_ids") or {}),
             research_ids,
             numeric,
@@ -538,6 +547,15 @@ class LangGraphAgentWorkflow:
         from personal_markets.agents.critic import deterministic_critic_decision
 
         deterministic = deterministic_critic_decision(issues, pricing)
+        if deterministic is None:
+            # Match BaselineRepriceService: a priced mathematical forecast does not
+            # wait on an LLM critic to persist a receipt.
+            deterministic = CriticArtifact(
+                decision="publish",
+                issues=[],
+                limitations=pricing.limitations,
+                required_actions=[],
+            )
         if deterministic is not None:
             receipt = dict(pricing.receipt)
             receipt["critic_decision"] = deterministic.decision

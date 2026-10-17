@@ -8,7 +8,7 @@ export type ChartPoint = {
 export type MarketEvent = {
   id: string;
   label: string;
-  impact: number;
+  impact: number | null;
   occurredAt: string;
   icon: "code" | "x" | "rocket" | "people" | "book";
 };
@@ -25,6 +25,7 @@ export type Market = {
   totalReturn: number | null;
   events: MarketEvent[];
   history: ChartPoint[];
+  historyUnavailable?: boolean;
 };
 
 export type WhatIfMode = "impact" | "futures" | "compare" | "paths";

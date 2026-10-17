@@ -24,7 +24,8 @@ export function marketCategory(goal: Goal): string {
 }
 
 export function toMarketCardViewModel(goal: Goal, points: MarketHistoryPoint[]): MarketCardViewModel {
-  const history = points.map((point, index) => ({
+  const published = points.filter((point) => point.source_kind !== "synthetic_demo");
+  const history = published.map((point, index) => ({
     timestamp: point.created_at ? Date.parse(point.created_at) : index,
     value: point.probability * 100,
   }));

@@ -1,7 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from personal_markets.evidence.domain import NormalizedEvidence, Provenance, metadata_for
+from personal_markets.evidence.domain import (
+    CorroboratingSource,
+    NormalizedEvidence,
+    Provenance,
+    metadata_for,
+)
 from personal_markets.ports import EvidenceEventProposal
 
 
@@ -46,4 +51,36 @@ def proposal_to_normalized(
         ),
         summary=event.summary,
         fingerprint=fingerprint,
+    )
+
+
+def corroborating_source(event: EvidenceEventProposal) -> CorroboratingSource:
+    return CorroboratingSource(
+        source_type=event.source_type,
+        event_type=event.event_type,
+        summary=event.summary,
+        observed_at=event.observed_at or None,
+    )
+
+
+def with_corroboration(
+    existing: NormalizedEvidence, event: EvidenceEventProposal
+) -> NormalizedEvidence:
+    extra = corroborating_source(event)
+    already = any(
+        item.source_type == extra.source_type and item.summary == extra.summary
+        for item in existing.provenance.corroborating_sources
+    )
+    if already or (
+        existing.provenance.source_type == extra.source_type and existing.summary == extra.summary
+    ):
+        return existing
+    return existing.model_copy(
+        update={
+            "provenance": existing.provenance.model_copy(
+                update={
+                    "corroborating_sources": [*existing.provenance.corroborating_sources, extra]
+                }
+            )
+        }
     )

@@ -50,6 +50,19 @@ export function GoalDetailRoute() {
     );
   }
 
+  if (history.isError) {
+    return (
+      <main className="market-page">
+        <section className="market-shell">
+          <div className="unpriced-state">
+            <strong>History unavailable</strong>
+            <span>Could not load published forecast history for this goal.</span>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   const market = toMarketDetail(goal.data, history.data ?? [], evidence.data ?? []);
 
   return (

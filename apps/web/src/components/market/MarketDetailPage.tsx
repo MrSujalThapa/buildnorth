@@ -231,19 +231,20 @@ export default function MarketDetailPage({
           <h2>Recent events</h2>
           <div className="event-list">
             {market.events.map((event) => {
-              const positive = event.impact >= 0;
+              const unknown = event.impact == null;
+              const positive = (event.impact ?? 0) >= 0;
 
               return (
                 <div className="event-row" key={event.id}>
-                  <div className={`event-icon ${positive ? "positive" : "negative"}`}>
+                  <div className={`event-icon ${unknown ? "" : positive ? "positive" : "negative"}`.trim()}>
                     <EventIcon event={event} />
                   </div>
                   <div className="event-main">
                     <div className="event-label">{event.label}</div>
                     <div className="event-time">{event.occurredAt}</div>
                   </div>
-                  <div className={`event-impact ${positive ? "positive" : "negative"}`}>
-                    {signedPercent(event.impact)} odds
+                  <div className={`event-impact ${unknown ? "" : positive ? "positive" : "negative"}`.trim()}>
+                    {event.impact == null ? "—" : `${signedPercent(event.impact)} odds`}
                   </div>
                 </div>
               );

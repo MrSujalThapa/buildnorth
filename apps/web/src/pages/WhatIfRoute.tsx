@@ -137,6 +137,17 @@ export function WhatIfRoute() {
     [paths],
   );
 
+  if (history.isError) {
+    return (
+      <main className="what-if-page">
+        <div className="unpriced-state">
+          <strong>History unavailable</strong>
+          <span>Could not load published forecast history for this goal.</span>
+        </div>
+      </main>
+    );
+  }
+
   if (goal.isLoading || !goal.data || !market || !effectivePlan) {
     return (
       <main className="what-if-page">
@@ -174,6 +185,13 @@ export function WhatIfRoute() {
       defaultQuestion={defaultQuestionForMarket(market)}
       onSubmitMissingState={(entries) => manualState.mutate(entries)}
       submittingState={manualState.isPending}
+      stateError={
+        manualState.data && !manualState.data.priced
+          ? manualState.data.reason
+          : manualState.error instanceof Error
+            ? manualState.error.message
+            : null
+      }
       onAddEvidence={() => { void navigate(`/goals/${goalId}?add=evidence`); }}
       onConnectSource={() => { void navigate(`/goals/${goalId}?add=source`); }}
       onBack={() => { void navigate(`/goals/${goalId}`); }}

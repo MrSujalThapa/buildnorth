@@ -196,6 +196,16 @@ def test_riegel_conversion_is_deterministic() -> None:
     assert converted == pytest.approx(1500 * (2.0**ref.riegel_exponent))
 
 
+def test_weekly_mileage_uses_latest_period_not_insert_order() -> None:
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence("weekly_distance_km", 40, unit="km", observed_at=now),
+        _evidence("weekly_distance_km", 32, unit="km", observed_at=now - timedelta(days=8)),
+    ]
+    state = aggregate_running_from_evidence(evidence, goal=_goal())
+    assert state.weekly_distance_km == pytest.approx(40)
+
+
 def test_weekly_mileage_does_not_create_fitness_score() -> None:
     goal = _goal()
     evidence = [

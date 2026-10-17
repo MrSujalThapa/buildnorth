@@ -1,11 +1,11 @@
 import json
-import os
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import bindparam, text
 
+from helpers import isolated_postgres_url
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresSeedRepository
 from personal_markets.seeding import load_seed
@@ -17,7 +17,7 @@ SEED_PATH = Path(__file__).resolve().parents[3] / "seeds" / "demo.json"
 
 @pytest.mark.asyncio
 async def test_seed_is_transactional_idempotent_and_persists_raw_events() -> None:
-    url = os.environ.get("PM_TEST_DATABASE_URL")
+    url = isolated_postgres_url()
     if not url:
         pytest.skip("PM_TEST_DATABASE_URL is not configured")
     engine = create_engine(url)
@@ -45,8 +45,8 @@ async def test_seed_is_transactional_idempotent_and_persists_raw_events() -> Non
                 text("select raw_payload_json from raw_source_events where id = :id"),
                 {"id": event_ids[0]},
             )
-        assert goals == 4
-        assert events == 15
+        assert goals == len(goal_ids)
+        assert events == len(event_ids)
         assert isinstance(raw, dict)
         assert json.dumps(raw)
     finally:
@@ -55,7 +55,7 @@ async def test_seed_is_transactional_idempotent_and_persists_raw_events() -> Non
 
 @pytest.mark.asyncio
 async def test_simulation_artifacts_are_idempotent_and_immutable() -> None:
-    url = os.environ.get("PM_TEST_DATABASE_URL")
+    url = isolated_postgres_url()
     if not url:
         pytest.skip("PM_TEST_DATABASE_URL is not configured")
     engine = create_engine(url)

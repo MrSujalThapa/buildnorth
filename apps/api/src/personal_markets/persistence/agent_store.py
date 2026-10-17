@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.agents.budget import InMemoryUsageStore
 from personal_markets.evidence.domain import NormalizedEvidence
-from personal_markets.evidence.mapping import proposal_to_normalized
+from personal_markets.evidence.mapping import proposal_to_normalized, with_corroboration
 from personal_markets.persistence.database import transaction
 from personal_markets.ports import EvidenceEventProposal, WorkflowSnapshot
 
@@ -34,6 +34,11 @@ class InMemoryEvidenceRepository:
         evidence_id = self._by_fingerprint.get((user_id, fingerprint))
         return self._events.get(evidence_id) if evidence_id else None
 
+    async def link_goal(self, goal_id: UUID, evidence_id: UUID) -> None:
+        links = self._goal_links.setdefault(goal_id, [])
+        if evidence_id not in links:
+            links.append(evidence_id)
+
     async def insert(
         self,
         user_id: UUID,
@@ -46,13 +51,23 @@ class InMemoryEvidenceRepository:
         del agent_run_id
         existing = await self.find_fingerprint(user_id, fingerprint)
         if existing:
-            return existing
+            if existing.evidence_id is not None:
+                await self.link_goal(goal_id, existing.evidence_id)
+            return await self.record_corroboration(existing, event)
         stored = proposal_to_normalized(event, fingerprint, conflict=conflict)
         assert stored.evidence_id is not None
         self._events[stored.evidence_id] = stored
         self._by_fingerprint[(user_id, fingerprint)] = stored.evidence_id
         self._goal_links.setdefault(goal_id, []).append(stored.evidence_id)
         return stored
+
+    async def record_corroboration(
+        self, existing: NormalizedEvidence, event: EvidenceEventProposal
+    ) -> NormalizedEvidence:
+        updated = with_corroboration(existing, event)
+        if updated.evidence_id is not None:
+            self._events[updated.evidence_id] = updated
+        return updated
 
 
 class InMemoryThreadStore:
@@ -159,6 +174,17 @@ class PostgresEvidenceRepository:
             ).mappings()
         return [self._to_domain(dict(row)) for row in rows]
 
+    async def link_goal(self, goal_id: UUID, evidence_id: UUID) -> None:
+        async with transaction(self._engine) as connection:
+            await connection.execute(
+                text("""
+                insert into goal_evidence (goal_id, evidence_id, relevance_metadata_json)
+                values (:goal_id, :evidence_id, '{}'::jsonb)
+                on conflict do nothing
+                """),
+                {"goal_id": goal_id, "evidence_id": evidence_id},
+            )
+
     async def find_fingerprint(self, user_id: UUID, fingerprint: str) -> NormalizedEvidence | None:
         async with self._engine.connect() as connection:
             row = (
@@ -189,7 +215,9 @@ class PostgresEvidenceRepository:
     ) -> NormalizedEvidence:
         existing = await self.find_fingerprint(user_id, fingerprint)
         if existing:
-            return existing
+            if existing.evidence_id is not None:
+                await self.link_goal(goal_id, existing.evidence_id)
+            return await self.record_corroboration(existing, event)
         stored = proposal_to_normalized(event, fingerprint, conflict=conflict)
         assert stored.evidence_id is not None
         payload = stored.model_dump(mode="json")
@@ -229,6 +257,26 @@ class PostgresEvidenceRepository:
                 {"goal_id": goal_id, "evidence_id": stored.evidence_id},
             )
         return stored
+
+    async def record_corroboration(
+        self, existing: NormalizedEvidence, event: EvidenceEventProposal
+    ) -> NormalizedEvidence:
+        updated = with_corroboration(existing, event)
+        if updated is existing or updated.evidence_id is None:
+            return existing
+        payload = updated.provenance.model_dump(mode="json")
+        payload["fingerprint"] = updated.fingerprint
+        payload["summary"] = updated.summary
+        async with transaction(self._engine) as connection:
+            await connection.execute(
+                text("""
+                update evidence_events
+                set provenance_json = cast(:provenance as jsonb)
+                where id = :id
+                """),
+                {"id": updated.evidence_id, "provenance": json_dumps(payload)},
+            )
+        return updated
 
     @staticmethod
     def _to_domain(row: dict[str, Any]) -> NormalizedEvidence:

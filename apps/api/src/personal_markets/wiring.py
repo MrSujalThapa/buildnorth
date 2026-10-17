@@ -11,7 +11,6 @@ from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.agents.state import AgentDependencies
 from personal_markets.core.config import Settings, get_settings
 from personal_markets.evidence.service import EvidenceService
-from personal_markets.integrations.goal_sync_service import GoalSyncService
 from personal_markets.forecasting.repository import (
     InMemoryBaselineForecastRepository,
     PostgresBaselineForecastRepository,
@@ -21,13 +20,17 @@ from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.repository import GoalRepository
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
+from personal_markets.integrations.gateway import UnifiedIntegrationGateway
+from personal_markets.integrations.goal_sync_service import GoalSyncService
+from personal_markets.integrations.mcp_repository import (
+    InMemoryIntegrationRepository,
+    PostgresIntegrationRepository,
+)
+from personal_markets.integrations.mcp_service import IntegrationGatewayService
 from personal_markets.integrations.openai import (
     OpenAIInferenceProvider,
     UnconfiguredOpenAIInferenceProvider,
 )
-from personal_markets.integrations.gateway import UnifiedIntegrationGateway
-from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository, PostgresIntegrationRepository
-from personal_markets.integrations.mcp_service import IntegrationGatewayService
 from personal_markets.integrations.research import (
     CompositeResearchProvider,
     FrozenReferenceProvider,
@@ -142,13 +145,14 @@ def get_baseline_forecast_service() -> BaselineForecastService:
     return BaselineForecastService(get_baseline_forecast_repository())
 
 
-def get_baseline_reprice_service() -> Any:
+def get_baseline_reprice_service(request: Request) -> Any:
     from personal_markets.forecasting.reprice import BaselineRepriceService
 
+    deps = _workflow_deps(request)
     return BaselineRepriceService(
-        get_goal_service(),
-        get_evidence_service(),
-        get_baseline_forecast_service(),
+        deps.goals,
+        deps.evidence,
+        deps.baseline_forecasts,
     )
 
 
@@ -174,23 +178,86 @@ def get_simulation_repository() -> Any:
 
 
 def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
-    if not settings.openai_api_key:
-        return UnconfiguredOpenAIInferenceProvider()
+    selected = (settings.inference_provider or "auto").strip().lower()
+    spur_ready = bool(settings.spur_api_key)
+    openai_ready = bool(settings.openai_api_key)
     budget = TokenBudget(
         usage_store,
         settings.openai_daily_token_budget_high_volume,
         settings.openai_daily_token_budget_premium,
         settings.openai_max_cost_usd,
     )
-    return OpenAIInferenceProvider(
-        api_key=settings.openai_api_key,
-        default_model=settings.openai_goal_model,
-        budget=budget,
-        timeout_seconds=settings.openai_timeout_seconds,
-        max_retries=settings.openai_max_retries,
-        max_concurrency=settings.openai_max_concurrency,
-        max_output_tokens=settings.openai_max_output_tokens,
-    )
+
+    if selected == "none":
+        return UnconfiguredOpenAIInferenceProvider(
+            "Inference is disabled; set PM_INFERENCE_PROVIDER to spur or openai"
+        )
+    if selected == "spur":
+        if not spur_ready:
+            return UnconfiguredOpenAIInferenceProvider(
+                "Spur inference is not configured; set SPUR_API_KEY to enable product agents"
+            )
+        from personal_markets.core.errors import ProviderNotConfiguredError
+        from personal_markets.integrations.spur import SpurInferenceProvider
+
+        try:
+            default_model = settings.resolved_spur_model()
+        except ProviderNotConfiguredError as error:
+            return UnconfiguredOpenAIInferenceProvider(str(error))
+        return SpurInferenceProvider(
+            api_key=settings.spur_api_key or "",
+            base_url=settings.spur_base_url,
+            default_model=default_model,
+            budget=budget,
+            timeout_seconds=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
+            max_concurrency=settings.openai_max_concurrency,
+            max_output_tokens=settings.openai_max_output_tokens,
+        )
+    if selected == "openai":
+        if not openai_ready:
+            return UnconfiguredOpenAIInferenceProvider()
+        return OpenAIInferenceProvider(
+            api_key=settings.openai_api_key or "",
+            default_model=settings.openai_goal_model,
+            budget=budget,
+            timeout_seconds=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
+            max_concurrency=settings.openai_max_concurrency,
+            max_output_tokens=settings.openai_max_output_tokens,
+        )
+
+    # auto: prefer Spur when its key is present. Never substitute OpenAI if Spur is selected
+    # or is the auto-chosen provider.
+    if spur_ready:
+        from personal_markets.core.errors import ProviderNotConfiguredError
+        from personal_markets.integrations.spur import SpurInferenceProvider
+
+        try:
+            default_model = settings.resolved_spur_model()
+        except ProviderNotConfiguredError as error:
+            return UnconfiguredOpenAIInferenceProvider(str(error))
+        return SpurInferenceProvider(
+            api_key=settings.spur_api_key or "",
+            base_url=settings.spur_base_url,
+            default_model=default_model,
+            budget=budget,
+            timeout_seconds=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
+            max_concurrency=settings.openai_max_concurrency,
+            max_output_tokens=settings.openai_max_output_tokens,
+        )
+    if openai_ready:
+        return OpenAIInferenceProvider(
+            api_key=settings.openai_api_key or "",
+            default_model=settings.openai_goal_model,
+            budget=budget,
+            timeout_seconds=settings.openai_timeout_seconds,
+            max_retries=settings.openai_max_retries,
+            max_concurrency=settings.openai_max_concurrency,
+            max_output_tokens=settings.openai_max_output_tokens,
+        )
+    return UnconfiguredOpenAIInferenceProvider()
 
 
 def build_in_memory_workflow(

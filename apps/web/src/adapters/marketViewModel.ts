@@ -15,8 +15,12 @@ export function marketCategory(goal: Goal): string {
   return CATEGORY_PATTERNS.find(([pattern]) => pattern.test(searchable))?.[1] ?? "Personal";
 }
 
+export function publishedHistoryPoints(points: MarketHistoryPoint[]): MarketHistoryPoint[] {
+  return points.filter((point) => point.source_kind !== "synthetic_demo");
+}
+
 function historyToChart(points: MarketHistoryPoint[]): ChartPoint[] {
-  return points.map((point, index) => ({
+  return publishedHistoryPoints(points).map((point, index) => ({
     timestamp: point.created_at ? Date.parse(point.created_at) : index,
     value: point.probability * 100,
   }));
@@ -69,7 +73,7 @@ export function evidenceToEvents(items: EvidenceEvent[]): MarketEvent[] {
   return items.slice(-6).reverse().map((item, index) => ({
     id: `${item.metric}-${index}`,
     label: item.summary || item.metric,
-    impact: 0,
+    impact: null,
     occurredAt: new Date(item.observed_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
     icon: evidenceIcon(item.summary || item.metric),
   }));

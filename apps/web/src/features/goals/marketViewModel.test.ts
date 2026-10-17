@@ -28,4 +28,23 @@ describe("toMarketCardViewModel", () => {
     expect(toMarketCardViewModel(goal, []).odds).toBeNull();
     expect(toMarketCardViewModel(goal, []).history).toEqual([]);
   });
+
+  it("does not treat synthetic_demo points as published odds", () => {
+    const points = [
+      {
+        id: "demo-1",
+        probability: 0.41,
+        forecast_status: "EXPLORATORY",
+        evidence_watermark: "none",
+        model_family: "demo",
+        model_version: "ui",
+        assumption_hash: "demo",
+        simulation_run_id: null,
+        source_kind: "synthetic_demo",
+        created_at: "2026-08-01T00:00:00Z",
+      },
+    ] as MarketHistoryPoint[];
+    expect(toMarketCardViewModel(goal, points).odds).toBeNull();
+    expect(toMarketCardViewModel(goal, points).history).toEqual([]);
+  });
 });

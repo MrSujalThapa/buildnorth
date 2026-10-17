@@ -1,13 +1,14 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+import structlog
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from personal_markets.agents.api import router as agents_router
-from personal_markets.core.config import get_settings
+from personal_markets.core.config import get_settings, safe_database_identity
 from personal_markets.core.errors import (
     DomainError,
     PermanentProviderError,
@@ -19,6 +20,7 @@ from personal_markets.core.errors import (
 from personal_markets.core.event_loop import configure_windows_selector_event_loop
 from personal_markets.core.logging import configure_logging
 from personal_markets.core.request_context import request_context_middleware
+from personal_markets.evidence.source_api import router as evidence_sources_router
 from personal_markets.goals.api import router as goals_router
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.api import router as integrations_router
@@ -27,7 +29,6 @@ from personal_markets.integrations.research import (
     FrozenReferenceProvider,
     MonidResearchProvider,
 )
-from personal_markets.evidence.source_api import router as evidence_sources_router
 from personal_markets.what_if.api import router as what_if_router
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
@@ -43,6 +44,10 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+
+
+class HealthDetailsResponse(HealthResponse):
+    database: str
 
 
 def _status_for(error: DomainError) -> int:
@@ -65,6 +70,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     checkpointer_cm = None
     use_postgres = bool(settings.database_url) and settings.environment not in {"test", "pytest"}
+    identity = safe_database_identity(settings.database_url) if use_postgres else "memory"
+    application.state.database_identity = identity
+    structlog.get_logger("personal_markets").info(
+        "api_database",
+        identity=identity,
+        environment=settings.environment,
+    )
     if use_postgres:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
@@ -147,9 +159,35 @@ def create_app() -> FastAPI:
             headers={"x-request-id": request.headers.get("x-request-id", "")},
         )
 
+    def _database_identity(request: Request) -> str:
+        identity = getattr(request.app.state, "database_identity", None)
+        if identity is not None:
+            return str(identity)
+        current = get_settings()
+        use_postgres = (
+            bool(current.database_url) and current.environment not in {"test", "pytest"}
+        )
+        return safe_database_identity(current.database_url) if use_postgres else "memory"
+
     @application.get("/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
-        return HealthResponse(status="ok", service="personal-markets-api", version="0.1.0")
+        return HealthResponse(
+            status="ok",
+            service="personal-markets-api",
+            version="0.1.0",
+        )
+
+    @application.get("/health/details", response_model=HealthDetailsResponse, tags=["system"])
+    async def health_details(request: Request) -> HealthDetailsResponse:
+        current = get_settings()
+        if current.environment in {"production", "prod"}:
+            raise HTTPException(status_code=404, detail="Not found")
+        return HealthDetailsResponse(
+            status="ok",
+            service="personal-markets-api",
+            version="0.1.0",
+            database=_database_identity(request),
+        )
 
     application.include_router(goals_router)
     application.include_router(agents_router)
