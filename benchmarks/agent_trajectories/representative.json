@@ -1,0 +1,297 @@
+[
+  {
+    "name": "create_clear",
+    "status": "limited",
+    "progress": [
+      "Understanding goal",
+      "Researching reference class",
+      "Pricing market",
+      "Checking forecast"
+    ],
+    "interrupt": null,
+    "critic": {
+      "decision": "publish_with_limitations",
+      "issues": [],
+      "limitations": [
+        "No calibrated model applies; probability withheld."
+      ],
+      "required_actions": []
+    },
+    "pricing_priced": false,
+    "agent_run_ids": {
+      "goal_architect": "002742bf-ea7c-55a0-8cc8-725c1b74c9c8",
+      "research": "e98e161a-122a-552d-b662-127983fc8cc3",
+      "critic": "c15eee86-3370-5edb-835a-a909ffd1b3a9"
+    },
+    "runs": [
+      {
+        "id": "002742bf-ea7c-55a0-8cc8-725c1b74c9c8",
+        "thread_id": "714eed9b-5f4f-4cfe-93a0-cda4ed75b6b5",
+        "agent_type": "goal_architect",
+        "agent_version": "goal_architect/v1",
+        "model_provider": "scripted",
+        "model_name": "gpt-5.4-mini",
+        "prompt_version": "goal_architect/v1",
+        "prompt_checksum": "3825745d68133ddd1576c401bbfa599946c6c8cc765c372d564a6178177e4d14",
+        "input_refs": [
+          "intent",
+          "user_answers",
+          "previous_validation_errors"
+        ],
+        "output": {
+          "ready_to_commit": true,
+          "title": "Receive an SWE/FDE offer from a target company",
+          "goal_type": "deadline_event",
+          "success_metric": "offer_received",
+          "success_operator": "==",
+          "success_target": "swe_or_fde_offer",
+          "deadline": "2027-08-31",
+          "state_dimensions": [
+            "interview_outcomes",
+            "practice_volume",
+            "applications_submitted"
+          ],
+          "hours_per_week": 10.0,
+          "model_family_compatibility": "exploratory_hiring",
+          "clarifications_required": [],
+          "notes": "Measurable hiring goal."
+        },
+        "validation_status": "ok",
+        "retry_count": 0,
+        "duration_ms": 1,
+        "token_usage": "[redacted]",
+        "estimated_cost": 0,
+        "tool_trace": [],
+        "status": "completed"
+      },
+      {
+        "id": "e98e161a-122a-552d-b662-127983fc8cc3",
+        "thread_id": "714eed9b-5f4f-4cfe-93a0-cda4ed75b6b5",
+        "agent_type": "research",
+        "agent_version": "research/v1",
+        "model_provider": "scripted",
+        "model_name": "gpt-5.4-mini",
+        "prompt_version": "research/v1",
+        "prompt_checksum": "f6d8e93e2b24540029c5949108b57e9fe999385427f844dc983893239a823ee4",
+        "input_refs": [
+          "snippets",
+          "reference_class_candidates",
+          "limitations"
+        ],
+        "output": {
+          "claims": [
+            {
+              "claim": "",
+              "source": "frozen://hiring_process.json",
+              "retrieved_at": "2026-08-29T05:27:08.007827+00:00",
+              "source_type": "frozen",
+              "evidence_class": "mechanistic"
+            },
+            {
+              "claim": "",
+              "source": "frozen://hiring_process.json",
+              "retrieved_at": "2026-08-29T05:27:08.007827+00:00",
+              "source_type": "frozen",
+              "evidence_class": "assumption"
+            },
+            {
+              "claim": "",
+              "source": "frozen://oulad_reference_class.json",
+              "retrieved_at": "2026-08-29T05:27:08.007827+00:00",
+              "source_type": "dataset",
+              "evidence_class": "reference_rule"
+            },
+            {
+              "claim": "",
+              "source": "frozen://waterloo_admissions.json",
+              "retrieved_at": "2026-08-29T05:27:08.007827+00:00",
+              "source_type": "frozen",
+              "evidence_class": "official_rule"
+            },
+            {
+              "claim": "",
+              "source": "frozen://waterloo_admissions.json",
+              "retrieved_at": "2026-08-29T05:27:08.007827+00:00",
+              "source_type": "frozen",
+              "evidence_class": "assumption"
+            }
+          ],
+          "reference_class_candidates": [
+            "hiring_process.json",
+            "oulad_reference_class.json",
+            "waterloo_admissions.json",
+            "monid",
+            "monid"
+          ],
+          "limitations": [
+            "not_configured",
+            "Application Monid OAuth credentials are not provisioned."
+          ]
+        },
+        "validation_status": "ok",
+        "retry_count": 0,
+        "duration_ms": 1,
+        "token_usage": "[redacted]",
+        "estimated_cost": 0,
+        "tool_trace": [],
+        "status": "completed"
+      },
+      {
+        "id": "c15eee86-3370-5edb-835a-a909ffd1b3a9",
+        "thread_id": "714eed9b-5f4f-4cfe-93a0-cda4ed75b6b5",
+        "agent_type": "critic",
+        "agent_version": "critic/v1",
+        "model_provider": "scripted",
+        "model_name": "gpt-5.4",
+        "prompt_version": "critic/v1",
+        "prompt_checksum": "fb0094d9f7458eae195a74d9174f62525a4be4f920b209f2e0ae86eb64732348",
+        "input_refs": [
+          "goal",
+          "pricing",
+          "research",
+          "deterministic_issues",
+          "evidence_ids"
+        ],
+        "output": {
+          "decision": "publish_with_limitations",
+          "issues": [],
+          "limitations": [
+            "No calibrated model applies; probability withheld."
+          ],
+          "required_actions": []
+        },
+        "validation_status": "ok",
+        "retry_count": 0,
+        "duration_ms": 1,
+        "token_usage": "[redacted]",
+        "estimated_cost": 0,
+        "tool_trace": [],
+        "status": "completed"
+      }
+    ]
+  },
+  {
+    "name": "create_rich",
+    "status": "needs_input",
+    "progress": [
+      "Understanding goal"
+    ],
+    "interrupt": {
+      "type": "confirm_contract",
+      "questions": [],
+      "proposal": {
+        "ready_to_commit": true,
+        "title": "Reach a defined net worth",
+        "goal_type": "continuous_target",
+        "success_metric": "net_worth_usd",
+        "success_operator": ">=",
+        "success_target": "net worth 1000000",
+        "deadline": "2035-12-31",
+        "state_dimensions": [
+          "net_worth_usd",
+          "savings_rate"
+        ],
+        "hours_per_week": null,
+        "model_family_compatibility": "anchored_finance",
+        "clarifications_required": [],
+        "notes": "Formalized after clarification."
+      },
+      "message": "Confirm this goal contract to create the market."
+    },
+    "critic": null,
+    "pricing_priced": false,
+    "agent_run_ids": {
+      "goal_architect": "13aaee6e-62f4-5a56-a658-fdccdf52f69c"
+    },
+    "runs": [
+      {
+        "id": "59e039e8-dd31-5c52-b1ef-a45a20819496",
+        "thread_id": "0ee1cf4d-fd05-42e8-938c-c3ba31fd4c81",
+        "agent_type": "goal_architect",
+        "agent_version": "goal_architect/v1",
+        "model_provider": "scripted",
+        "model_name": "gpt-5.4-mini",
+        "prompt_version": "goal_architect/v1",
+        "prompt_checksum": "3825745d68133ddd1576c401bbfa599946c6c8cc765c372d564a6178177e4d14",
+        "input_refs": [
+          "intent",
+          "user_answers",
+          "previous_validation_errors"
+        ],
+        "output": {
+          "ready_to_commit": false,
+          "title": "Needs clarification",
+          "goal_type": "continuous_target",
+          "success_metric": "unspecified",
+          "success_operator": ">=",
+          "success_target": "unspecified",
+          "deadline": "2099-01-01",
+          "state_dimensions": [
+            "unspecified"
+          ],
+          "hours_per_week": null,
+          "model_family_compatibility": "none",
+          "clarifications_required": [
+            {
+              "id": "rich_definition",
+              "question": "What does rich mean \u2014 net worth or income, and what amount?",
+              "why_needed": "The success metric is undefined."
+            },
+            {
+              "id": "deadline",
+              "question": "By what date should this be achieved?",
+              "why_needed": "A forecastable goal needs a deadline."
+            }
+          ],
+          "notes": "Intent is underspecified."
+        },
+        "validation_status": "ok",
+        "retry_count": 0,
+        "duration_ms": 1,
+        "token_usage": "[redacted]",
+        "estimated_cost": 0,
+        "tool_trace": [],
+        "status": "completed"
+      },
+      {
+        "id": "13aaee6e-62f4-5a56-a658-fdccdf52f69c",
+        "thread_id": "0ee1cf4d-fd05-42e8-938c-c3ba31fd4c81",
+        "agent_type": "goal_architect",
+        "agent_version": "goal_architect/v1",
+        "model_provider": "scripted",
+        "model_name": "gpt-5.4-mini",
+        "prompt_version": "goal_architect/v1",
+        "prompt_checksum": "3825745d68133ddd1576c401bbfa599946c6c8cc765c372d564a6178177e4d14",
+        "input_refs": [
+          "intent",
+          "user_answers",
+          "previous_validation_errors"
+        ],
+        "output": {
+          "ready_to_commit": true,
+          "title": "Reach a defined net worth",
+          "goal_type": "continuous_target",
+          "success_metric": "net_worth_usd",
+          "success_operator": ">=",
+          "success_target": "net worth 1000000",
+          "deadline": "2035-12-31",
+          "state_dimensions": [
+            "net_worth_usd",
+            "savings_rate"
+          ],
+          "hours_per_week": null,
+          "model_family_compatibility": "anchored_finance",
+          "clarifications_required": [],
+          "notes": "Formalized after clarification."
+        },
+        "validation_status": "ok",
+        "retry_count": 0,
+        "duration_ms": 1,
+        "token_usage": "[redacted]",
+        "estimated_cost": 0,
+        "tool_trace": [],
+        "status": "completed"
+      }
+    ]
+  }
+]

@@ -1,0 +1,422 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
+
+from personal_markets.core.config import Settings
+from personal_markets.integrations.mcp_domain import MCPToolDescriptor, MCPResourceDescriptor
+
+
+@dataclass(frozen=True)
+class CatalogPage:
+    items: list[dict[str, Any]]
+    next_cursor: str | None
+    total_items: int | None
+
+
+@dataclass(frozen=True)
+class ConnectInitResult:
+    auth_config_id: str
+    connection_request_id: str
+    redirect_url: str
+    status: str = "pending_auth"
+
+
+@dataclass(frozen=True)
+class ConnectedAccountStatus:
+    connected_account_id: str | None
+    status: str
+    account_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ComposioConnectedAccount:
+    connected_account_id: str
+    toolkit_slug: str
+    status: str
+    account_label: str | None = None
+    created_at: str | None = None
+
+
+class ComposioIntegrationGateway:
+    """Generic Composio Platform gateway — no provider-specific business logic."""
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._client: Any | None = None
+        if settings.composio_enabled and settings.composio_api_key:
+            from composio import Composio
+
+            self._client = Composio(api_key=settings.composio_api_key)
+
+    @property
+    def available(self) -> bool:
+        return self._client is not None
+
+    async def search_toolkits(
+        self,
+        *,
+        search: str | None = None,
+        cursor: str | None = None,
+        limit: int = 20,
+    ) -> CatalogPage:
+        if self._client is None:
+            return CatalogPage(items=[], next_cursor=None, total_items=0)
+
+        def _call() -> CatalogPage:
+            params: dict[str, Any] = {"limit": limit}
+            if cursor:
+                params["cursor"] = cursor
+            response = self._client.toolkits.list(**params)
+            items = []
+            for item in getattr(response, "items", []) or []:
+                meta = getattr(item, "meta", None) or {}
+                slug = getattr(item, "slug", "")
+                name = getattr(item, "name", "")
+                description = meta.get("description") if isinstance(meta, dict) else getattr(meta, "description", "")
+                if search:
+                    haystack = f"{slug} {name} {description}".lower()
+                    if search.lower() not in haystack:
+                        continue
+                items.append(
+                    {
+                        "slug": slug,
+                        "name": name,
+                        "description": description,
+                        "logo": meta.get("logo") if isinstance(meta, dict) else getattr(meta, "logo", None),
+                        "categories": meta.get("categories") if isinstance(meta, dict) else [],
+                        "tools_count": meta.get("tools_count") if isinstance(meta, dict) else None,
+                        "auth_schemes": list(getattr(item, "auth_schemes", []) or []),
+                    }
+                )
+            return CatalogPage(
+                items=items[:limit],
+                next_cursor=getattr(response, "next_cursor", None),
+                total_items=getattr(response, "total_items", None),
+            )
+
+        return await asyncio.to_thread(_call)
+
+    async def ensure_auth_config(self, toolkit_slug: str) -> str:
+        assert self._client is not None
+
+        def _call() -> str:
+            existing = self._client.auth_configs.list(search=toolkit_slug)
+            for item in getattr(existing, "items", []) or []:
+                slug = getattr(getattr(item, "toolkit", None), "slug", None)
+                if slug == toolkit_slug:
+                    return str(item.id)
+            created = self._client.auth_configs.create(
+                toolkit=toolkit_slug,
+                options={"type": "use_composio_managed_auth", "name": f"PlayItOut {toolkit_slug}"},
+            )
+            return str(created.id)
+
+        return await asyncio.to_thread(_call)
+
+    async def initiate_connection(self, user_id: UUID, toolkit_slug: str) -> ConnectInitResult:
+        auth_config_id = await self.ensure_auth_config(toolkit_slug)
+
+        def _call() -> ConnectInitResult:
+            assert self._client is not None
+            link = self._client.connected_accounts.link(
+                user_id=str(user_id),
+                auth_config_id=auth_config_id,
+            )
+            return ConnectInitResult(
+                auth_config_id=auth_config_id,
+                connection_request_id=str(link.id),
+                redirect_url=str(link.redirect_url),
+                status="pending_auth",
+            )
+
+        return await asyncio.to_thread(_call)
+
+    @staticmethod
+    def _toolkit_slug(item: Any) -> str | None:
+        toolkit = getattr(item, "toolkit", None)
+        slug = getattr(toolkit, "slug", None) if toolkit is not None else None
+        if slug:
+            return str(slug)
+        return str(getattr(item, "toolkit_slug", "") or "") or None
+
+    @staticmethod
+    def _account_label(item: Any) -> str | None:
+        return (
+            getattr(item, "account_name", None)
+            or getattr(item, "app_name", None)
+            or getattr(item, "account_id", None)
+        )
+
+    @staticmethod
+    def _created_at(item: Any) -> str | None:
+        created = getattr(item, "created_at", None)
+        return str(created) if created is not None else None
+
+    @staticmethod
+    def _is_active_status(status: str) -> bool:
+        return status.upper() == "ACTIVE"
+
+    def _to_connected_account(self, item: Any) -> ComposioConnectedAccount | None:
+        status = str(getattr(item, "status", "")).upper()
+        if not self._is_active_status(status):
+            return None
+        toolkit_slug = self._toolkit_slug(item)
+        if not toolkit_slug:
+            return None
+        return ComposioConnectedAccount(
+            connected_account_id=str(item.id),
+            toolkit_slug=toolkit_slug,
+            status=status,
+            account_label=self._account_label(item),
+            created_at=self._created_at(item),
+        )
+
+    async def list_active_connected_accounts(self, user_id: UUID) -> dict[str, list[ComposioConnectedAccount]]:
+        if self._client is None:
+            return {}
+
+        def _call() -> dict[str, list[ComposioConnectedAccount]]:
+            assert self._client is not None
+            grouped: dict[str, list[ComposioConnectedAccount]] = {}
+            cursor: str | None = None
+            while True:
+                params: dict[str, Any] = {"user_ids": [str(user_id)], "limit": 50}
+                if cursor:
+                    params["cursor"] = cursor
+                accounts = self._client.connected_accounts.list(**params)
+                for item in getattr(accounts, "items", []) or []:
+                    account = self._to_connected_account(item)
+                    if account is None:
+                        continue
+                    grouped.setdefault(account.toolkit_slug, []).append(account)
+                cursor = getattr(accounts, "next_cursor", None)
+                if not cursor:
+                    break
+            return grouped
+
+        return await asyncio.to_thread(_call)
+
+    async def connected_account_status(
+        self,
+        user_id: UUID,
+        toolkit_slug: str,
+        *,
+        connection_request_id: str | None = None,
+        preferred_connected_account_id: str | None = None,
+    ) -> ConnectedAccountStatus:
+        if self._client is None:
+            return ConnectedAccountStatus(connected_account_id=None, status="unavailable")
+
+        def _call() -> ConnectedAccountStatus:
+            assert self._client is not None
+            if connection_request_id:
+                try:
+                    request = self._client.connected_accounts.wait_for_connection(
+                        connection_request_id,
+                        timeout=0.1,
+                    )
+                    if request is not None:
+                        account = self._to_connected_account(request)
+                        if account is not None:
+                            return ConnectedAccountStatus(
+                                connected_account_id=account.connected_account_id,
+                                status="connected",
+                                account_label=account.account_label,
+                            )
+                except Exception:
+                    pass
+            accounts = self._client.connected_accounts.list(
+                user_ids=[str(user_id)],
+                toolkit_slugs=[toolkit_slug],
+            )
+            active: list[ComposioConnectedAccount] = []
+            for item in getattr(accounts, "items", []) or []:
+                account = self._to_connected_account(item)
+                if account is not None:
+                    active.append(account)
+            if not active:
+                return ConnectedAccountStatus(connected_account_id=None, status="pending_auth")
+            selected = self._select_active_account(
+                active,
+                preferred_connected_account_id=preferred_connected_account_id,
+            )
+            return ConnectedAccountStatus(
+                connected_account_id=selected.connected_account_id,
+                status="connected",
+                account_label=selected.account_label,
+            )
+
+        return await asyncio.to_thread(_call)
+
+    @staticmethod
+    def _select_active_account(
+        accounts: list[ComposioConnectedAccount],
+        *,
+        preferred_connected_account_id: str | None = None,
+    ) -> ComposioConnectedAccount:
+        if preferred_connected_account_id:
+            for account in accounts:
+                if account.connected_account_id == preferred_connected_account_id:
+                    return account
+        if len(accounts) == 1:
+            return accounts[0]
+        return sorted(
+            accounts,
+            key=lambda item: item.created_at or "",
+            reverse=True,
+        )[0]
+
+    async def list_tools(self, user_id: UUID, toolkit_slug: str, *, limit: int = 200) -> list[MCPToolDescriptor]:
+        if self._client is None:
+            return []
+
+        def _call() -> list[MCPToolDescriptor]:
+            assert self._client is not None
+            tools = self._client.tools.get(str(user_id), toolkits=[toolkit_slug], limit=limit)
+            rows: list[MCPToolDescriptor] = []
+            for item in tools:
+                if isinstance(item, dict):
+                    fn = item.get("function") or {}
+                    name = str(fn.get("name") or "")
+                    description = str(fn.get("description") or "")
+                    schema = fn.get("parameters") or {}
+                else:
+                    name = str(getattr(item, "slug", getattr(item, "name", "")))
+                    description = str(getattr(item, "description", ""))
+                    schema = getattr(item, "input_parameters", {}) or {}
+                rows.append(
+                    MCPToolDescriptor(
+                        name=name,
+                        description=description,
+                        input_schema=schema if isinstance(schema, dict) else {},
+                        read_only_hint=None,
+                    )
+                )
+            return rows
+
+        return await asyncio.to_thread(_call)
+
+    async def list_resources(
+        self,
+        user_id: UUID,
+        toolkit_slug: str,
+        *,
+        connected_account_id: str | None,
+    ) -> list[MCPResourceDescriptor]:
+        """Discover selectable resources via approved read tools where available."""
+        tools = await self.list_tools(user_id, toolkit_slug)
+        resource_tools = [
+            tool
+            for tool in tools
+            if any(
+                token in tool.name.lower()
+                for token in (
+                    "list_repositories",
+                    "list_repos",
+                    "list_pages",
+                    "list_databases",
+                    "list_spreadsheets",
+                    "list_sheets",
+                    "list_calendars",
+                    "list_files",
+                    "list_folders",
+                    "list_labels",
+                    "list_threads",
+                )
+            )
+        ]
+        if not resource_tools:
+            return [
+                MCPResourceDescriptor(
+                    uri=f"composio://{toolkit_slug}/default",
+                    name=f"{toolkit_slug} default scope",
+                    description="Use toolkit default read scope for this goal.",
+                )
+            ]
+        tool = resource_tools[0]
+        payload = await self.execute_tool(
+            user_id,
+            tool.name,
+            {},
+            connected_account_id=connected_account_id,
+        )
+        resources: list[MCPResourceDescriptor] = []
+        rows = payload.get("records") or payload.get("items") or payload.get("data") or []
+        if isinstance(rows, dict):
+            rows = rows.get("items") or rows.get("repositories") or rows.get("results") or []
+        if not isinstance(rows, list):
+            return resources
+        for row in rows[:50]:
+            if not isinstance(row, dict):
+                continue
+            resource_id = str(
+                row.get("full_name")
+                or row.get("id")
+                or row.get("name")
+                or row.get("slug")
+                or row.get("url")
+                or row.get("title")
+            )
+            label = str(row.get("full_name") or row.get("name") or row.get("title") or resource_id)
+            resource_type = str(
+                row.get("object")
+                or row.get("type")
+                or row.get("kind")
+                or row.get("mimeType")
+                or "resource"
+            )
+            description = str(
+                row.get("description")
+                or row.get("about")
+                or row.get("subtitle")
+                or row.get("query")
+                or ""
+            )
+            resources.append(
+                MCPResourceDescriptor(
+                    uri=f"composio://{toolkit_slug}/{resource_id}",
+                    name=label,
+                    description=description,
+                    mime_type=str(row.get("url") or row.get("mimeType") or ""),
+                    resource_type=resource_type,
+                    metadata={
+                        key: value
+                        for key, value in row.items()
+                        if key in {"full_name", "default_branch", "parent", "database_id", "spreadsheet_id"}
+                        and value is not None
+                    },
+                )
+            )
+        return resources
+
+    async def execute_tool(
+        self,
+        user_id: UUID,
+        tool_slug: str,
+        arguments: dict[str, Any],
+        *,
+        connected_account_id: str | None,
+    ) -> dict[str, Any]:
+        if self._client is None:
+            raise RuntimeError("Composio is not configured")
+
+        def _call() -> dict[str, Any]:
+            assert self._client is not None
+            kwargs: dict[str, Any] = {"arguments": arguments, "dangerously_skip_version_check": True}
+            if connected_account_id:
+                kwargs["connected_account_id"] = connected_account_id
+            result = self._client.tools.execute(tool_slug, user_id=str(user_id), **kwargs)
+            if isinstance(result, dict):
+                data = result.get("data") or result.get("response_data") or result
+                if isinstance(data, dict):
+                    return data
+                return {"records": data}
+            data = getattr(result, "data", result)
+            if isinstance(data, dict):
+                return data
+            return {"records": data}
+
+        return await asyncio.to_thread(_call)

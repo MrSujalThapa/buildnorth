@@ -1,0 +1,137 @@
+{
+  "benchmark": "jth_offer_v1",
+  "seed": 20260830,
+  "split_hash_prefix": "20260830",
+  "source": {
+    "zenodo_record": "21390581",
+    "url": "https://zenodo.org/records/21390581",
+    "license": "CC BY-NC 4.0",
+    "code": "https://github.com/Aunsiels/JTH"
+  },
+  "outcome": {
+    "goal": "Will this application receive a job offer by end of process?",
+    "y": "1 iff job_offer_proposed_date is not null",
+    "unit": "application_id (candidate_id + job_id trajectory row)"
+  },
+  "checkpoints": {
+    "day_offsets_from_process_start": [
+      0,
+      7,
+      14,
+      30
+    ],
+    "stage_snapshots": [
+      "after_start",
+      "after_shortlist",
+      "after_1st_interview"
+    ],
+    "rule": "Day checkpoints at process_start + {0,7,14,30} only if checkpoint_date <= process_end. Stage snapshots: after_start, after_shortlist, after_1st_interview using funnel dates that occurred on or before t."
+  },
+  "feature_schema_version": "jth-offer-temporal-v1",
+  "feature_columns": [
+    "cand_years_experience_ord",
+    "cand_skill_count",
+    "cand_hard_skill_count",
+    "cand_soft_skill_count",
+    "cand_diploma_ord",
+    "cand_seniority_ord",
+    "cand_management_experience",
+    "cand_from_top_university",
+    "cand_previous_positions",
+    "cand_unique_employers",
+    "job_years_experience_ord",
+    "job_skill_count",
+    "job_seniority_ord",
+    "job_required_diploma_ord",
+    "job_required_years",
+    "job_is_startup",
+    "job_is_large_company",
+    "job_remote_possible",
+    "job_salary_log1p",
+    "days_since_start",
+    "reached_spontaneous",
+    "reached_shortlist",
+    "reached_qualification",
+    "reached_resume_sent",
+    "reached_1st_interview",
+    "reached_2nd_interview",
+    "reached_3rd_interview",
+    "reached_4th_interview",
+    "interviews_completed_by_t",
+    "checkpoint_day",
+    "is_stage_after_start",
+    "is_stage_after_shortlist",
+    "is_stage_after_1st_interview"
+  ],
+  "meta_columns": [
+    "application_id",
+    "candidate_id",
+    "job_id",
+    "checkpoint_type",
+    "checkpoint_key",
+    "checkpoint_date",
+    "process_start",
+    "process_end",
+    "end_of_process_imputed",
+    "outcome",
+    "split"
+  ],
+  "cache_key": "172f61daf65176fa",
+  "feature_artifact": "features-172f61daf65176fa.pkl",
+  "feature_artifact_sha256": "fe2150d1d4fa3d11855dee0c7c9de5935a2cba3ec9321eb69b8b2150f68e1b98",
+  "raw_checksums": {
+    "candidates.csv": "4328ceb1678757ce19b62105e97cca70759f38c332bef13cf9746badbbf3f692",
+    "jobs.csv": "5bcd9e4379e558b98418e2242d321757612a96887b934e0d3ece6eb4a9952628",
+    "history.csv": "0348bb0017156a91fe40fdd4346846982587940a0796dae3941da55312ade2a3"
+  },
+  "split_candidates": {
+    "train": 15645,
+    "val": 3900,
+    "cal": 3892,
+    "test": 2664
+  },
+  "split_applications": {
+    "cal": 6297,
+    "test": 4371,
+    "train": 25356,
+    "val": 6264
+  },
+  "split_checkpoint_rows": {
+    "train": 142012,
+    "cal": 35230,
+    "val": 35040,
+    "test": 24390
+  },
+  "split_offer_counts": {
+    "cal": {
+      "offers": 130,
+      "applications": 6297
+    },
+    "test": {
+      "offers": 82,
+      "applications": 4371
+    },
+    "train": {
+      "offers": 555,
+      "applications": 25356
+    },
+    "val": {
+      "offers": 132,
+      "applications": 6264
+    }
+  },
+  "base_rate_offer_proposed": 0.021258986000756715,
+  "feature_rows": 236672,
+  "split_manifest_sha256": "95a94358ba3d0875c37033dcc470bf31290f1833097312c360e22a7fa98d7c9b",
+  "leakage_controls": {
+    "excluded_from_features_at_t": [
+      "job_offer_proposed_date",
+      "job_offer_accepted_date",
+      "last_stage_reached",
+      "any funnel date strictly after checkpoint t",
+      "days_until_end / process_end as a predictive feature"
+    ],
+    "process_end_imputation": "When end_of_process_date is null, process_end = max(recorded event dates); never used as an X feature."
+  },
+  "process_end_imputed_applications": 31240
+}

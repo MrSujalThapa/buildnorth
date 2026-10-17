@@ -1,0 +1,82 @@
+{
+  "A_prevalence": {
+    "system": "prevalence",
+    "n": 3433,
+    "brier": 0.11860494096216,
+    "log_loss": 0.40046116504234575,
+    "ece_10": 0.004371560325593132,
+    "mean_p": 0.13311751628378637,
+    "base_rate": 0.13748907660937956,
+    "roc_auc": 0.5
+  },
+  "C_logistic": {
+    "system": "logistic_calibrated",
+    "n": 3433,
+    "brier": 0.10294456032881491,
+    "log_loss": 0.34433094475657916,
+    "ece_10": 0.011920430905721232,
+    "mean_p": 0.1383729353549371,
+    "base_rate": 0.13748907660937956,
+    "roc_auc": 0.7694534599511159
+  },
+  "G_hgb": {
+    "system": "hgb_calibrated",
+    "n": 3433,
+    "brier": 0.09506255504820466,
+    "log_loss": 0.31972566695707055,
+    "ece_10": 0.021714590347924796,
+    "mean_p": 0.13496488266745255,
+    "base_rate": 0.13748907660937956,
+    "roc_auc": 0.8253084591211168
+  },
+  "decay_ablation": {
+    "selected_half_life_days_on_validation": 14,
+    "validation_brier_proxy": 0.08307835589968739,
+    "G_with_decay": {
+      "system": "hgb_decay",
+      "n": 3433,
+      "brier": 0.09506255504820466,
+      "log_loss": 0.31972566695707055,
+      "ece_10": 0.021714590347924796,
+      "mean_p": 0.13496488266745255,
+      "base_rate": 0.13748907660937956,
+      "roc_auc": 0.8253084591211168
+    },
+    "G_without_decay": {
+      "system": "hgb_no_decay",
+      "n": 3433,
+      "brier": 0.09484092474988409,
+      "log_loss": 0.3187164894725246,
+      "ece_10": 0.02117967940370759,
+      "mean_p": 0.13506277207862796,
+      "base_rate": 0.13748907660937956,
+      "roc_auc": 0.8271641509109955
+    },
+    "relative_brier_change_removing_decay": -0.002331415331811543
+  },
+  "feature_columns": [
+    "km_ytd",
+    "minutes_ytd",
+    "sessions_ytd",
+    "active_weeks",
+    "km_last_4w",
+    "km_last_8w",
+    "minutes_last_4w",
+    "minutes_last_8w",
+    "mean_pace_min_per_km_h1",
+    "pace_last_4w",
+    "pace_last_8w",
+    "km_per_day_ytd",
+    "sessions_per_week_ytd",
+    "days_elapsed",
+    "decay_km_hl14",
+    "decay_km_hl28",
+    "decay_km_hl56",
+    "decay_min_hl14",
+    "decay_min_hl28",
+    "decay_min_hl56",
+    "gender",
+    "age_group",
+    "country"
+  ]
+}

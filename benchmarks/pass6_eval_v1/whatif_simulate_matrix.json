@@ -1,0 +1,853 @@
+{
+  "captured_at": "2026-08-30T17:50:18.169221+00:00",
+  "goal_ids_available": [
+    "20000000-0000-0000-0000-000000000005",
+    "20000000-0000-0000-0000-000000000001",
+    "20000000-0000-0000-0000-000000000003",
+    "20000000-0000-0000-0000-000000000002",
+    "20000000-0000-0000-0000-000000000004"
+  ],
+  "cases": [
+    {
+      "id": "linkedin",
+      "text": "What if I post on LinkedIn 4 times a week?",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Increase LinkedIn posting frequency to 4 posts per week over the planning horizon.",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "linkedin_posts_per_week",
+            "operation": "set",
+            "value": 4.0,
+            "unit": "posts/week",
+            "frequency": "weekly",
+            "scope": "pipeline_activity",
+            "provenance": "USER_ASSUMPTION"
+          },
+          {
+            "metric": "execution_probability",
+            "operation": "set",
+            "value": 0.72,
+            "unit": "probability",
+            "frequency": null,
+            "scope": "execution",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "visibility",
+            "description": "More frequent posts can increase profile and project visibility to recruiters, peers, and weak-tie network contacts."
+          },
+          {
+            "variable": "networking_events_per_week",
+            "description": "Posting may create more inbound/outbound conversations that function like lightweight networking touchpoints."
+          },
+          {
+            "variable": "applications_per_week",
+            "description": "Improved visibility and network activation could indirectly raise future application volume through referrals or more opportunities surfaced."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "Sustaining a 4x/week posting cadence depends on follow-through and content production consistency."
+          }
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ],
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "The intervention is best treated as a pipeline/activity change rather than a directly priced outcome lever.",
+          "LinkedIn posting frequency is represented as an activity/input, but outcome effects are not calibratable from the supplied state."
+        ],
+        "unsupported": [
+          "No supplied model metric directly maps LinkedIn posting frequency to offer probability or stage conversion rates.",
+          "The available metrics do not include a calibrated visibility-to-application or visibility-to-interview conversion link.",
+          "Any effect on hiring outcomes would be indirect and unpriced in the current state.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "agent_run_id": "6bd95a10-95f4-543c-8105-02eb6e8b63a2"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.8355641599026948,
+        "scenario_probability": 0.8355641597749848,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.008288446617868407,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 1,
+        "assumptions_provenance": [
+          {
+            "id": "weekly_application_rate",
+            "source": "USER_ASSUMPTION",
+            "value": 2.0
+          },
+          {
+            "id": "periods_remaining",
+            "source": "USER_ASSUMPTION",
+            "value": 105.0
+          },
+          {
+            "id": "stage_rate_application_to_response",
+            "source": "USER_ASSUMPTION",
+            "value": 0.12
+          },
+          {
+            "id": "stage_rate_response_to_phone_screen",
+            "source": "USER_ASSUMPTION",
+            "value": 0.45
+          },
+          {
+            "id": "stage_rate_phone_screen_to_oa",
+            "source": "USER_ASSUMPTION",
+            "value": 0.55
+          },
+          {
+            "id": "stage_rate_oa_to_technical",
+            "source": "USER_ASSUMPTION",
+            "value": 0.38
+          },
+          {
+            "id": "stage_rate_technical_to_final",
+            "source": "USER_ASSUMPTION",
+            "value": 0.32
+          },
+          {
+            "id": "stage_rate_final_to_offer",
+            "source": "USER_ASSUMPTION",
+            "value": 0.52
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 174.36770000495017
+      }
+    },
+    {
+      "id": "mock-interviews",
+      "text": "What if I do 3 mock interviews a week?",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Increase interview prep to 3 mock interviews per week for the full remaining horizon.",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "mock_interviews_per_week",
+            "operation": "set",
+            "value": 3.0,
+            "unit": "interviews/week",
+            "frequency": "weekly",
+            "scope": "pipeline_activity",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "mock_interviews_per_week",
+            "description": "Direct increase in weekly interview practice volume."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "If the plan is actually sustained, the added prep can improve consistency of preparation and interview performance over time."
+          },
+          {
+            "variable": "flow",
+            "description": "More practice can reduce anxiety and improve performance smoothness during technical interview stages."
+          },
+          {
+            "variable": "technical_interview",
+            "description": "Stronger interview performance may improve progression through technical rounds."
+          }
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ],
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "The intervention can be represented as preparation volume, but not translated into a defensible numeric gain in offer odds without additional calibration.",
+          "State dimensions like technical_interview and consistency are part of the goal context, but are not exposed as editable metrics in the allowed metric set."
+        ],
+        "unsupported": [
+          "The allowed metrics include mock_interviews_per_week, so the activity change is mappable; however, the repository does not provide a calibrated causal effect from mock interview volume to offer probability or to specific funnel conversion metrics.",
+          "No explicit model metric exists for downstream interview-stage conversion changes, so those effects are only mechanistic and not priced.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "agent_run_id": "ca8f530d-9263-5fd2-a3d8-e4afe6b28935"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.8355638792848225,
+        "scenario_probability": 0.8355638791716897,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.008288452298084595,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 1,
+        "assumptions_provenance": [
+          {
+            "id": "weekly_application_rate",
+            "source": "USER_ASSUMPTION",
+            "value": 2.0
+          },
+          {
+            "id": "periods_remaining",
+            "source": "USER_ASSUMPTION",
+            "value": 105.0
+          },
+          {
+            "id": "stage_rate_application_to_response",
+            "source": "USER_ASSUMPTION",
+            "value": 0.12
+          },
+          {
+            "id": "stage_rate_response_to_phone_screen",
+            "source": "USER_ASSUMPTION",
+            "value": 0.45
+          },
+          {
+            "id": "stage_rate_phone_screen_to_oa",
+            "source": "USER_ASSUMPTION",
+            "value": 0.55
+          },
+          {
+            "id": "stage_rate_oa_to_technical",
+            "source": "USER_ASSUMPTION",
+            "value": 0.38
+          },
+          {
+            "id": "stage_rate_technical_to_final",
+            "source": "USER_ASSUMPTION",
+            "value": 0.32
+          },
+          {
+            "id": "stage_rate_final_to_offer",
+            "source": "USER_ASSUMPTION",
+            "value": 0.52
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 112.71999997552484
+      }
+    },
+    {
+      "id": "applications",
+      "text": "What if I send 15 more applications a week?",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Increase the future application pipeline by sending 15 more job applications per week for the remaining horizon.",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "weekly_application_rate",
+            "operation": "add",
+            "value": 15.0,
+            "unit": "applications/week",
+            "frequency": "per week",
+            "scope": "pipeline_activity",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "applications_per_week",
+            "description": "Directly increases the volume of applications submitted each week, which raises top-of-funnel exposure to recruiters and hiring systems."
+          },
+          {
+            "variable": "application_to_response",
+            "description": "More applications create more opportunities for responses, assuming stage conversion rates remain unchanged."
+          },
+          {
+            "variable": "response_to_phone_screen",
+            "description": "Any additional responses can propagate through later funnel stages, potentially increasing downstream interviews and offer opportunities."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "The effect depends on whether the higher application cadence is sustained over time."
+          }
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ],
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "The mapping from additional applications to downstream hiring outcomes is mechanistic, not a calibrated causal estimate.",
+          "Stage conversion rates are not changed by this intervention unless separately specified."
+        ],
+        "unsupported": [
+          "No explicit separate model metric for response volume, interview volume, or offer probability can be directly updated from the supplied allowed metrics without making additional assumptions.",
+          "The provided intervention text changes application volume only; it does not specify changes to resume quality, targeting quality, or stage conversion rates.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "agent_run_id": "a4f95d10-20a5-5417-9b1e-b710bba22203"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.8355637157595509,
+        "scenario_probability": 0.8355637156487329,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.008288455608254664,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 1,
+        "assumptions_provenance": [
+          {
+            "id": "weekly_application_rate",
+            "source": "USER_ASSUMPTION",
+            "value": 2.0
+          },
+          {
+            "id": "periods_remaining",
+            "source": "USER_ASSUMPTION",
+            "value": 105.0
+          },
+          {
+            "id": "stage_rate_application_to_response",
+            "source": "USER_ASSUMPTION",
+            "value": 0.12
+          },
+          {
+            "id": "stage_rate_response_to_phone_screen",
+            "source": "USER_ASSUMPTION",
+            "value": 0.45
+          },
+          {
+            "id": "stage_rate_phone_screen_to_oa",
+            "source": "USER_ASSUMPTION",
+            "value": 0.55
+          },
+          {
+            "id": "stage_rate_oa_to_technical",
+            "source": "USER_ASSUMPTION",
+            "value": 0.38
+          },
+          {
+            "id": "stage_rate_technical_to_final",
+            "source": "USER_ASSUMPTION",
+            "value": 0.32
+          },
+          {
+            "id": "stage_rate_final_to_offer",
+            "source": "USER_ASSUMPTION",
+            "value": 0.52
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 111.16919992491603
+      }
+    },
+    {
+      "id": "running",
+      "text": "What if I run 40 km a week?",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Increase weekly running volume to 40 km per week.",
+        "pricing_status": "PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "weekly_distance_km",
+            "operation": "set",
+            "value": 40.0,
+            "unit": "km/week",
+            "frequency": "weekly",
+            "scope": "running_state",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "weekly_distance_km",
+            "description": "Raise planned weekly training volume from the current 35 km/week to 40 km/week."
+          },
+          {
+            "variable": "training_consistency",
+            "description": "If the added volume is sustained, it may increase consistency of aerobic stimulus and weekly running habit adherence."
+          },
+          {
+            "variable": "recovery",
+            "description": "Higher mileage can also increase recovery load; if the athlete is near their capacity, this could offset some training benefit."
+          },
+          {
+            "variable": "flow",
+            "description": "More training volume may improve the running trend/flow metric if it translates into better recent performance trajectories."
+          }
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ],
+        "limitations": [
+          "The intervention can be mapped cleanly to weekly_distance_km, but the dataset does not provide a calibrated transfer function from mileage to race-time improvement.",
+          "Any downstream effect on performance-related metrics would be exploratory and should not be treated as priced here."
+        ],
+        "unsupported": [
+          "No supplied metric directly maps added weekly distance to a priced change in 5k_time_seconds or execution_probability.",
+          "The research snippets provided are about hiring funnels and do not apply to running volume interventions."
+        ],
+        "agent_run_id": "710f6959-02a1-520d-9f81-a261a39d4642"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.995,
+        "scenario_probability": 1.0,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.0,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 12,
+        "assumptions_provenance": [
+          {
+            "id": "flow",
+            "source": "USER_ASSUMPTION",
+            "value": -20.867966493587776
+          },
+          {
+            "id": "growth_mean",
+            "source": "USER_ASSUMPTION",
+            "value": 0.0
+          },
+          {
+            "id": "growth_volatility",
+            "source": "USER_ASSUMPTION",
+            "value": 0.06235543851567333
+          },
+          {
+            "id": "shock_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.02
+          },
+          {
+            "id": "shock_fraction",
+            "source": "USER_ASSUMPTION",
+            "value": 0.08
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 308.02490003407
+      }
+    },
+    {
+      "id": "finance",
+      "text": "What if I invest $1500 per month?",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Increase the recurring monthly contribution toward the net worth goal to $1,500 per month.",
+        "pricing_status": "PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "flow",
+            "operation": "set",
+            "value": 1500.0,
+            "unit": "currency/month",
+            "frequency": "monthly",
+            "scope": "monthly_flow",
+            "provenance": "USER_ASSUMPTION"
+          },
+          {
+            "metric": "monthly_contribution",
+            "operation": "set",
+            "value": 1500.0,
+            "unit": "currency/month",
+            "frequency": "monthly",
+            "scope": "monthly_contribution",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "monthly_contribution",
+            "description": "A higher recurring investment contribution increases the monthly cash flowing into the wealth-building path, which should mechanically raise net worth accumulation over time if all else is unchanged."
+          },
+          {
+            "variable": "flow",
+            "description": "The model\u2019s monthly flow assumption is the closest supplied metric for recurring contribution; the intervention maps directly to reducing or replacing the current planned flow with a $1,500/month contribution."
+          },
+          {
+            "variable": "net_worth",
+            "description": "Over the 113-period horizon, higher contribution flow can increase the tracked net worth trajectory via additional invested capital and any associated growth on those contributions."
+          }
+        ],
+        "research_claims": [],
+        "limitations": [
+          "The intervention text is finance-related and maps cleanly to the supplied recurring contribution/flow metric.",
+          "No explicit model metric is provided for intermediate portfolio return or compounding effect size, so only the contribution flow is updated directly.",
+          "No probability or uplift estimate is reported here by design."
+        ],
+        "unsupported": [],
+        "agent_run_id": "cba53fd8-acb1-583b-9212-3dd1c4d2e6b7"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.0068,
+        "scenario_probability": 0.011,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.002332273568859365,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 12,
+        "assumptions_provenance": [
+          {
+            "id": "flow",
+            "source": "USER_ASSUMPTION",
+            "value": 3100.0
+          },
+          {
+            "id": "growth_mean",
+            "source": "USER_ASSUMPTION",
+            "value": 0.005833333333333334
+          },
+          {
+            "id": "growth_volatility",
+            "source": "USER_ASSUMPTION",
+            "value": 0.04330127018922193
+          },
+          {
+            "id": "shock_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.02
+          },
+          {
+            "id": "shock_fraction",
+            "source": "USER_ASSUMPTION",
+            "value": 0.08
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 414.1009000595659
+      }
+    },
+    {
+      "id": "novel-research",
+      "text": "What if I attend two industry networking events every month for the next quarter?",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "baseline_status": 200,
+      "baseline_priced": true,
+      "baseline_probability_hint": null,
+      "parse_status": 200,
+      "parse": {
+        "understood_action": "Attend two industry networking events per month for the next quarter (about 3 months), i.e. roughly 6 total networking events over that period.",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "changes": [
+          {
+            "metric": "networking_events_per_week",
+            "operation": "set",
+            "value": 0.5,
+            "unit": "events/week",
+            "frequency": "weekly over next quarter",
+            "scope": "pipeline_activity",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "mechanism": [
+          {
+            "variable": "networking_events_per_week",
+            "description": "Raise networking activity from zero/unspecified to a sustained cadence that is equivalent to about 0.5 events per week during the next quarter."
+          },
+          {
+            "variable": "application_pipeline",
+            "description": "Networking may increase access to referrals, recruiter visibility, and warm introductions, which can improve future application flow and downstream funnel entry."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "If attending events requires sustained follow-through, execution may affect whether the networking cadence is actually maintained."
+          }
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ],
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "Any downstream impact on applications or offer probability would be exploratory and is not defensibly mapped from the provided state alone."
+        ],
+        "unsupported": [
+          "No supplied metric directly captures referral rate, recruiter outreach, or warm-introduction quality, so the main causal effect of networking cannot be priced into the available model metrics without extra assumptions.",
+          "The provided allowed metrics include networking_events_per_week, but no calibrated mapping from networking events to applications, screens, or offers is supplied.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "agent_run_id": "5d341c47-1d53-5e04-97ea-80a8bf820d23"
+      },
+      "simulate_status": 200,
+      "simulate": {
+        "priced": true,
+        "status": "EXPLORATORY",
+        "baseline_probability": 0.8355630901229537,
+        "scenario_probability": 0.8355630899857771,
+        "uplift": null,
+        "uncertainty": {
+          "mc_error": 0.008288468273426558,
+          "n_draws": 2000,
+          "converged": true
+        },
+        "distribution_bins": 1,
+        "assumptions_provenance": [
+          {
+            "id": "weekly_application_rate",
+            "source": "USER_ASSUMPTION",
+            "value": 2.0
+          },
+          {
+            "id": "periods_remaining",
+            "source": "USER_ASSUMPTION",
+            "value": 105.0
+          },
+          {
+            "id": "stage_rate_application_to_response",
+            "source": "USER_ASSUMPTION",
+            "value": 0.12
+          },
+          {
+            "id": "stage_rate_response_to_phone_screen",
+            "source": "USER_ASSUMPTION",
+            "value": 0.45
+          },
+          {
+            "id": "stage_rate_phone_screen_to_oa",
+            "source": "USER_ASSUMPTION",
+            "value": 0.55
+          },
+          {
+            "id": "stage_rate_oa_to_technical",
+            "source": "USER_ASSUMPTION",
+            "value": 0.38
+          },
+          {
+            "id": "stage_rate_technical_to_final",
+            "source": "USER_ASSUMPTION",
+            "value": 0.32
+          },
+          {
+            "id": "stage_rate_final_to_offer",
+            "source": "USER_ASSUMPTION",
+            "value": 0.52
+          },
+          {
+            "id": "execution_probability",
+            "source": "USER_ASSUMPTION",
+            "value": 0.72
+          }
+        ],
+        "receipt_keys": [
+          "assumption_hash",
+          "assumptions",
+          "baseline_state",
+          "conditional_on_full_execution_probability",
+          "convergence",
+          "critic_decision",
+          "draws",
+          "execution_probability",
+          "final_expected_probability",
+          "forecast_status",
+          "fragility_pp",
+          "goal_id",
+          "intervention",
+          "llm_used",
+          "model",
+          "opportunity_cost",
+          "quantiles",
+          "raw_probability",
+          "receipt_version",
+          "run_kind",
+          "seed",
+          "sensitivity"
+        ],
+        "limitations": null,
+        "total_latency_ms": 125.84530003368855
+      }
+    }
+  ]
+}

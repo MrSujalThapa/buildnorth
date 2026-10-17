@@ -1,0 +1,74 @@
+{
+  "isolated_negative_event": {
+    "status": "observed",
+    "selection": "largest final-model error among rows matching frozen criteria",
+    "case": {
+      "code_module": "EEE",
+      "code_presentation": "2013J",
+      "id_student": 594246,
+      "checkpoint_day": 70,
+      "outcome": 0,
+      "assessment_mean_score": 92.5,
+      "assessment_score_change": -7.0,
+      "vle_active_days": 26.0,
+      "vle_click_trend_7d": 89.0,
+      "vle_days_since_active": 1.0,
+      "logistic_probability": 0.9528301886792453,
+      "final_probability": 0.9587990863176691
+    }
+  },
+  "repeated_correlated_deterioration": {
+    "status": "observed",
+    "selection": "largest final-model error among rows matching frozen criteria",
+    "case": {
+      "code_module": "EEE",
+      "code_presentation": "2013J",
+      "id_student": 594246,
+      "checkpoint_day": 105,
+      "outcome": 0,
+      "assessment_mean_score": 92.5,
+      "assessment_score_change": -7.0,
+      "vle_active_days": 34.0,
+      "vle_click_trend_7d": -175.0,
+      "vle_days_since_active": 7.0,
+      "logistic_probability": 0.8888888888888888,
+      "final_probability": 0.9251013325215004
+    }
+  },
+  "sparse_evidence": {
+    "status": "observed",
+    "selection": "largest final-model error among rows matching frozen criteria",
+    "case": {
+      "code_module": "DDD",
+      "code_presentation": "2013J",
+      "id_student": 123598,
+      "checkpoint_day": 35,
+      "outcome": 1,
+      "assessment_mean_score": 0.0,
+      "assessment_score_change": 0.0,
+      "vle_active_days": 1.0,
+      "vle_click_trend_7d": 0.0,
+      "vle_days_since_active": 28.0,
+      "logistic_probability": 0.03463203463203463,
+      "final_probability": 0.013263902631510975
+    }
+  },
+  "conflicting_evidence": {
+    "status": "observed",
+    "selection": "largest final-model error among rows matching frozen criteria",
+    "case": {
+      "code_module": "CCC",
+      "code_presentation": "2014J",
+      "id_student": 634193,
+      "checkpoint_day": 35,
+      "outcome": 0,
+      "assessment_mean_score": 97.0,
+      "assessment_score_change": -6.0,
+      "vle_active_days": 5.0,
+      "vle_click_trend_7d": -53.0,
+      "vle_days_since_active": 7.0,
+      "logistic_probability": 0.806060606060606,
+      "final_probability": 0.8519874102199646
+    }
+  }
+}

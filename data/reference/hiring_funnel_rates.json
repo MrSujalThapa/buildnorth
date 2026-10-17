@@ -1,0 +1,37 @@
+{
+  "title": "Software hiring funnel stage rates",
+  "domain": "hiring",
+  "version": "2026-08-29.v1",
+  "checksum": "hiring-funnel-rates-v1",
+  "population": "Large-company SWE/FDE pipelines (mechanistic prior, not personalized calibration)",
+  "definition": "Independent-candidate stage pass rates used to propagate an active pipeline toward an offer. Rates are associative/mechanistic priors, not fitted personal offer probabilities.",
+  "limitations": [
+    "No frozen public dataset calibrates personal offer probability for an arbitrary target-company set.",
+    "Parallel processes are treated as independent; correlated rejections are not modeled.",
+    "Practice volume is activity evidence only and does not inject a latent strength score."
+  ],
+  "causal_label": "associative",
+  "permitted_use": "baseline hazard derivation and exploratory scenario perturbation",
+  "status": "ANCHORED",
+  "stage_rates": {
+    "application_to_response": 0.12,
+    "response_to_phone_screen": 0.45,
+    "phone_screen_to_oa": 0.55,
+    "oa_to_technical": 0.38,
+    "technical_to_final": 0.32,
+    "final_to_offer": 0.52
+  },
+  "defaults": {
+    "weekly_application_rate": 2.0,
+    "recency_half_life_days": 21.0,
+    "recency_floor": 0.65
+  },
+  "claims": [
+    {
+      "claim": "Stage rates are frozen mechanistic priors for funnel propagation; they are not LLM-assigned probabilities.",
+      "source": "frozen://hiring_funnel_rates.json",
+      "source_type": "frozen",
+      "evidence_class": "mechanistic"
+    }
+  ]
+}

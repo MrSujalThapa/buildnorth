@@ -1,0 +1,79 @@
+{
+  "artifact": "hackathon_proof_v1_domain_inventory",
+  "captured_at": "2026-08-30T18:30:00+00:00",
+  "rule": "Do not fabricate resolved outcome labels. Macro-average pricing Brier requires resolved y in {0,1} per domain.",
+  "domains": [
+    {
+      "domain": "education",
+      "resolved_pricing_labels": true,
+      "dataset": "oulad_completion_v1",
+      "source": "Open University Learning Analytics Dataset (public)",
+      "n_shared_gpt_comparison": 200,
+      "n_full_test": 13252,
+      "horizons_days": [14, 35, 70, 105],
+      "label_definition": "Pass/Distinction vs Fail/Withdrawn by course end",
+      "leakage_controls": "checkpoint event_day <= t; no final result / future VLE / future assessments",
+      "status": "INCLUDED_IN_PRICING_BENCHMARK"
+    },
+    {
+      "domain": "career",
+      "resolved_pricing_labels": false,
+      "candidates_considered": [
+        "Public hiring funnel panels with offer outcomes (generally private / proprietary)",
+        "LeetCode contest rankings (not a personal goal contract with deadline + binary success)"
+      ],
+      "status": "AGENT_AND_WHAT_IF_ONLY",
+      "evaluation_without_labels": [
+        "Goal Architect schema / no invented odds",
+        "Intervention mechanism / NOT_PRICED honesty",
+        "Source Planner relevance ranking",
+        "Model-consistent policy regret under hiring simulator (not causal ATE)"
+      ]
+    },
+    {
+      "domain": "finance",
+      "resolved_pricing_labels": false,
+      "candidates_considered": [
+        "Lending Club / consumer loan default (population credit risk, not personal net-worth goal contracts)",
+        "Public market OHLC (asset price, not individual savings-goal resolution)"
+      ],
+      "status": "AGENT_AND_MECHANISTIC_WHAT_IF_ONLY",
+      "note": "Product uses mechanistic net-worth simulation; no held-out personal savings-goal panel loaded."
+    },
+    {
+      "domain": "running",
+      "resolved_pricing_labels": false,
+      "candidates_considered": [
+        "Public race results without individual training history at prediction time t",
+        "Strava / Garmin exports (private user data; not a frozen public labeled panel)"
+      ],
+      "status": "AGENT_AND_MECHANISTIC_WHAT_IF_ONLY"
+    },
+    {
+      "domain": "startup",
+      "resolved_pricing_labels": false,
+      "candidates_considered": [
+        "Crunchbase funding outcomes (firm-level; sparse personal goal contracts; severe selection bias)"
+      ],
+      "status": "AGENT_ONLY_FOR_NOW"
+    },
+    {
+      "domain": "habits",
+      "resolved_pricing_labels": false,
+      "candidates_considered": [
+        "Habit-tracking app dumps (typically private; outcome definitions inconsistent)"
+      ],
+      "status": "AGENT_ONLY_FOR_NOW"
+    }
+  ],
+  "macro_average_pricing": {
+    "computable": false,
+    "reason": "Only education has resolved binary goal outcomes under a frozen no-leakage protocol.",
+    "honest_reporting": "Report education pricing metrics separately; report agent/decision metrics by domain; do not claim K/K domain pricing wins."
+  },
+  "action_impact_causal": {
+    "computable": false,
+    "reason": "No randomized or credible quasi-experimental personal-action panel with treatment variation and outcomes is loaded.",
+    "proxy_used": "Model-consistent What If uplift + policy regret under the product's numerical simulator, clearly labeled non-causal."
+  }
+}

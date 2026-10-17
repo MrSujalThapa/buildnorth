@@ -1,0 +1,392 @@
+{
+  "captured_at": "2026-08-30T06:19:53.863886+00:00",
+  "branch": "codex/pass-6-end-to-end-product",
+  "repo": "MrSujalThapa/playitout",
+  "before": {
+    "label": "before",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "recipe": {
+    "status_code": 200,
+    "body": {
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "plugin_connection_id": "c2bc832e-315f-49a1-abb0-1628ec21aa5e",
+      "plugin_id": "github",
+      "label": "MrSujalThapa/playitout",
+      "steps": [
+        {
+          "capability_id": "github.dynamic.github_list_commits.read",
+          "tool_name": "GITHUB_LIST_COMMITS",
+          "resource_uri": "composio://github/MrSujalThapa/playitout",
+          "arguments": {
+            "owner": "MrSujalThapa",
+            "repo": "playitout",
+            "resource_id": "MrSujalThapa/playitout",
+            "sha": "codex/pass-6-end-to-end-product"
+          }
+        }
+      ],
+      "approved": true,
+      "schema_version": 1,
+      "provenance": {
+        "approved_via": "goal_evidence_workspace"
+      },
+      "status": "approved",
+      "last_successful_sync_at": null,
+      "user_approved_at": "2026-08-30T06:19:55.989406Z"
+    }
+  },
+  "what_if": [
+    {
+      "text": "What if I do LeetCode 2 hours a day?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I do LeetCode 2 hours a day?",
+        "changes": [
+          {
+            "metric": "daily_practice_problems",
+            "operation": "add",
+            "value": 0.0,
+            "unit": "problems/day",
+            "frequency": "daily",
+            "scope": "skill_practice",
+            "provenance": "EXPLORATION_ASSUMPTION"
+          },
+          {
+            "metric": "execution_probability",
+            "operation": "add",
+            "value": 0.0,
+            "unit": "probability",
+            "frequency": "weekly",
+            "scope": "execution",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "unsupported": [
+          "No supplied metric directly maps LeetCode hours/day to a calibrated effect on offer probability or interview-stage conversion rates.",
+          "The only defensible state change from the prompt is increased practice activity/consistency, not a priced uplift to hiring outcomes.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "effect_assigned": false,
+        "understood_action": "Increase LeetCode practice to 2 hours per day, making coding practice a sustained weekly habit over the remaining horizon.",
+        "mechanism": [
+          {
+            "variable": "daily_practice_problems",
+            "description": "More daily LeetCode time should increase the volume of solved practice problems and coding reps."
+          },
+          {
+            "variable": "flow",
+            "description": "Repeated practice may improve problem-solving fluency, recall, and interview performance under time pressure."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "A daily habit can raise the likelihood the practice plan is actually sustained over time."
+          },
+          {
+            "variable": "practice_hours",
+            "description": "Observed practice time would increase if this behavior is followed, which can serve as activity evidence."
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "agent_run_id": "5320d8c9-8966-5709-91d5-2d95d1e4eb86",
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "Without a calibrated mapping from practice volume to interview conversion, the impact cannot be priced into hiring success metrics.",
+          "The prompt does not specify current baseline practice volume, so any numeric change to practice problems is not defensible."
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ]
+      }
+    },
+    {
+      "text": "What if I post on LinkedIn 4 times a week?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I post on LinkedIn 4 times a week?",
+        "changes": [
+          {
+            "metric": "linkedin_posts_per_week",
+            "operation": "set",
+            "value": 4.0,
+            "unit": "posts/week",
+            "frequency": "weekly",
+            "scope": "visibility/branding",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "unsupported": [
+          "No supplied model metric directly maps LinkedIn posting frequency to offer probability or funnel conversion rates.",
+          "The only explicit editable activity metric in the supplied state that matches this intervention is linkedin_posts_per_week; downstream effects on applications, interviews, or offers are not defensibly priced from the provided context.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "effect_assigned": false,
+        "understood_action": "Increase LinkedIn posting frequency to 4 posts per week for the remaining planning horizon.",
+        "mechanism": [
+          {
+            "variable": "linkedin_posts_per_week",
+            "description": "Direct increase in visible professional content output on LinkedIn."
+          },
+          {
+            "variable": "project_signal",
+            "description": "More frequent posts may strengthen public evidence of activity, domain interest, and portfolio narrative."
+          },
+          {
+            "variable": "networking_events_per_week",
+            "description": "Posts may increase inbound/outbound engagement and create more networking touchpoints."
+          },
+          {
+            "variable": "applications_per_week",
+            "description": "Indirectly, higher visibility could modestly support more referrals or recruiter inbound, which could translate into more applications or higher-quality pipeline activity."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "Sustaining a 4-post/week cadence requires consistent follow-through and content production; adherence may move execution probability if the plan is hard to maintain."
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "agent_run_id": "097eb3ee-fd95-5df0-a893-0afa8321924c",
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "Any impact of LinkedIn posting on project signal, networking, recruiter response, or applications would be exploratory and unpriced without a supplied conversion model.",
+          "No numeric uplift, odds, or probability change is asserted because the context does not provide a calibrated mapping from posting cadence to hiring outcomes."
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ]
+      }
+    },
+    {
+      "text": "What if I do 3 mock interviews a week?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I do 3 mock interviews a week?",
+        "changes": [
+          {
+            "metric": "mock_interviews_per_week",
+            "operation": "set",
+            "value": 3.0,
+            "unit": "interviews/week",
+            "frequency": "weekly",
+            "scope": "prep_activity",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "unsupported": [
+          "No supplied model metric directly maps mock interviews to offer probability or stage conversion rates.",
+          "The provided allowed metrics do not include interview performance or offer conversion variables that could be defensibly adjusted from this intervention alone.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "effect_assigned": false,
+        "understood_action": "Increase mock interview practice to 3 mock interviews per week for the remaining horizon.",
+        "mechanism": [
+          {
+            "variable": "mock_interviews_per_week",
+            "description": "More mock interviews should increase interview familiarity, reduce mistakes under pressure, and improve performance in real technical and behavioral interviews."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "If mock interviews are part of the intended prep plan, sustaining 3 per week could make the broader preparation regimen more likely to be followed consistently."
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "agent_run_id": "255b3995-75a5-5ad7-a772-801ac678661b",
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "The prompt asks only for semantic understanding, so no probability or uplift can be inferred from 3 mock interviews per week without an explicit calibrated mapping.",
+          "If desired, the closest editable proxy may be execution_probability, but changing it would be an assumption rather than a directly supported effect of mock interviews."
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ]
+      }
+    },
+    {
+      "text": "What if I send 15 more applications a week?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I send 15 more applications a week?",
+        "changes": [
+          {
+            "metric": "weekly_application_rate",
+            "operation": "add",
+            "value": 15.0,
+            "unit": "applications/week",
+            "frequency": "per week",
+            "scope": "pipeline_activity",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "unsupported": [],
+        "effect_assigned": false,
+        "understood_action": "Increase future application pipeline activity by sending 15 more applications per week.",
+        "mechanism": [
+          {
+            "variable": "application_pipeline",
+            "description": "Higher outbound application volume increases the number of opportunities entering the funnel, which can raise downstream responses, screens, interviews, and eventual offers if conversion rates hold."
+          },
+          {
+            "variable": "visibility",
+            "description": "More applications can increase recruiter/ATS exposure and the chance of being seen by target companies."
+          },
+          {
+            "variable": "flow",
+            "description": "Sustained application cadence may improve pipeline flow and reduce idle time between submissions and responses."
+          }
+        ],
+        "pricing_status": "PRICED",
+        "agent_run_id": "8d3c57c3-ccb7-5413-a18d-19c4409b72b9",
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "I can map the intervention cleanly to application volume, but not defensibly to downstream offer probability without additional calibrated assumptions or a fitted effect model."
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ]
+      }
+    },
+    {
+      "text": "What if I run 40 km a week?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I run 40 km a week?",
+        "changes": [
+          {
+            "metric": "execution_probability",
+            "operation": "add",
+            "value": 0.0,
+            "unit": "probability",
+            "frequency": "ongoing",
+            "scope": "plan_follow_through",
+            "provenance": "EXPLORATION_ASSUMPTION"
+          },
+          {
+            "metric": "sleep_hours_per_night",
+            "operation": "add",
+            "value": 0.0,
+            "unit": "hours/night",
+            "frequency": "ongoing",
+            "scope": "recovery",
+            "provenance": "EXPLORATION_ASSUMPTION"
+          }
+        ],
+        "unsupported": [
+          "There is no supplied model metric that directly maps running 40 km/week to offer probability or to the hiring funnel stages.",
+          "The intervention does not directly specify changes to any allowed pipeline metric such as applications_per_week, mock_interviews_per_week, or daily_practice_problems.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "effect_assigned": false,
+        "understood_action": "Increase weekly running volume to 40 km/week as a training intervention, presumably to improve fitness and interview performance indirectly.",
+        "mechanism": [
+          {
+            "variable": "flow",
+            "description": "Running volume may improve general energy, mood, and routine structure, which could support consistency in the job-search process."
+          },
+          {
+            "variable": "sleep_hours_per_night",
+            "description": "If the added training load is too high, recovery demands may reduce sleep; if well-managed, sleep may be unchanged or improve through better routine."
+          },
+          {
+            "variable": "execution_probability",
+            "description": "A sustainable training plan could either help discipline and follow-through, or hurt execution if fatigue/time pressure crowds out job-search activities."
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "agent_run_id": "3c3f0a8f-bfa6-5c9a-b0b8-a9b803f18ecd",
+        "limitations": [
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "The effect of running volume on hiring outcomes is indirect and not priced from the provided context.",
+          "If you want this intervention mapped quantitatively, provide an explicit link such as reduced sleep, changed practice volume, or changed application rate. "
+        ],
+        "research_claims": [
+          "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set."
+        ]
+      }
+    },
+    {
+      "text": "What if I invest $1500 per month?",
+      "status_code": 200,
+      "body": {
+        "raw_text": "What if I invest $1500 per month?",
+        "changes": [
+          {
+            "metric": "monthly_contribution",
+            "operation": "set",
+            "value": 1500.0,
+            "unit": "currency/month",
+            "frequency": "month",
+            "scope": "goal_state",
+            "provenance": "USER_ASSUMPTION"
+          }
+        ],
+        "unsupported": [],
+        "effect_assigned": false,
+        "understood_action": "What if I invest $1500 per month?",
+        "mechanism": [],
+        "pricing_status": "PRICED",
+        "agent_run_id": null,
+        "limitations": [
+          "Regex fast-path used after agent returned no defensible changes."
+        ],
+        "research_claims": []
+      }
+    }
+  ],
+  "first_sync": {
+    "status_code": 200,
+    "body": {
+      "status": "no_new_records",
+      "records_synced": 0
+    }
+  },
+  "after_first": {
+    "label": "after_first_sync",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "second_sync": {
+    "status_code": 200,
+    "body": {
+      "status": "no_new_records",
+      "records_synced": 0
+    }
+  },
+  "after_second": {
+    "label": "after_second_sync",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "raw_delta_first": 0,
+  "raw_delta_second": 0,
+  "events_delta_first": 0,
+  "events_delta_second": 0,
+  "history_delta_first": 0,
+  "history_delta_second": 0
+}

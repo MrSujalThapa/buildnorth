@@ -1,0 +1,59 @@
+{
+  "artifact": "hackathon_proof_v2_domain_inventory",
+  "captured_at": "2026-08-30T19:10:26.559333+00:00",
+  "rule": "No fabricated labels. Only domains with resolved y in {0,1} under frozen no-leakage contracts.",
+  "domains": [
+    {
+      "domain": "education",
+      "resolved_pricing_labels": true,
+      "dataset": "oulad_completion_v1",
+      "n_shared_gpt": 200,
+      "status": "INCLUDED"
+    },
+    {
+      "domain": "finance",
+      "resolved_pricing_labels": true,
+      "dataset": "shed_emergency_savings_v1",
+      "source": "Federal Reserve SHED 2022\u21922023 panel (shedid overlap)",
+      "n_panel": 3870,
+      "n_shared_gpt": 40,
+      "outcome": "EF1==Yes in 2023 (3-month emergency funds)",
+      "status": "INCLUDED"
+    },
+    {
+      "domain": "running",
+      "resolved_pricing_labels": true,
+      "dataset": "running_volume_2019_v1",
+      "source": "Figshare DOI 10.6084/m9.figshare.16620238",
+      "outcome": ">=1500 km logged in 2019",
+      "n_shared_gpt": 40,
+      "note": "major column excluded (retrospective tag). Volume goal is training-consistency proxy, not race finish time.",
+      "status": "INCLUDED_WITH_LIMITATIONS"
+    },
+    {
+      "domain": "career",
+      "resolved_pricing_labels": true,
+      "dataset": "jth_offer_v1",
+      "source": "Zenodo 21390581 JTH CC BY-NC 4.0",
+      "outcome": "job_offer_proposed_date not null",
+      "n_shared_gpt": 40,
+      "base_rate_approx": 0.021,
+      "status": "INCLUDED"
+    },
+    {
+      "domain": "habits",
+      "resolved_pricing_labels": false,
+      "status": "EXCLUDED_NO_STRONG_PUBLIC_PANEL",
+      "candidates_rejected": [
+        "Medication adherence Mendeley (download blocked)",
+        "StudentLife (host unreachable this run)",
+        "Osteoporosis adherence (cross-sectional, weak temporal contract)"
+      ]
+    },
+    {
+      "domain": "startup",
+      "resolved_pricing_labels": false,
+      "status": "EXCLUDED_NO_DEFENSIBLE_PERSONAL_PANEL"
+    }
+  ]
+}

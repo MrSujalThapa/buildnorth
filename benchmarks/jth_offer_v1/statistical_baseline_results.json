@@ -1,0 +1,21 @@
+{
+  "calibration": "isotonic",
+  "models": {
+    "logistic": {
+      "brier": 0.020040553863003827,
+      "logloss": 0.09591585419919248,
+      "ece": 0.0021855969006767317,
+      "auc": 0.6863442637805053,
+      "n_test_rows": 24390,
+      "test_positive_rate": 0.02107421074210742
+    },
+    "hist_gradient_boosting": {
+      "brier": 0.02016300719382377,
+      "logloss": 0.0947371821628579,
+      "ece": 0.0011213205196757507,
+      "auc": 0.6986776034153113,
+      "n_test_rows": 24390,
+      "test_positive_rate": 0.02107421074210742
+    }
+  }
+}

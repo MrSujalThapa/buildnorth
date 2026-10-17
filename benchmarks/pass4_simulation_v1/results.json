@@ -1,0 +1,48 @@
+{
+  "evaluation_name": "pass4_simulation_and_optimization",
+  "evaluation_version": "2026-08-29.v1",
+  "created_at": "2026-08-29T15:08:28.215884+00:00",
+  "seed": 20260829,
+  "simulation": {
+    "same_seed_reproducible": true,
+    "probabilities_in_range": true,
+    "draws": 6000,
+    "achieved_mc_error": 0.00639499804534763,
+    "converged": true
+  },
+  "common_random_numbers": {
+    "replications": 30,
+    "paired_variance": 0.00016735660919540226,
+    "independent_variance": 0.0002233474137931031,
+    "variance_ratio": 0.7493107099526674,
+    "crn_reduced_variance": true
+  },
+  "optimizer": {
+    "known_answer_cases": 6,
+    "passed": 6,
+    "source": "apps/api/tests/test_pass4_remaining.py",
+    "pareto_known_points": {
+      "a": false,
+      "b": true,
+      "c": false
+    }
+  },
+  "reverse_search": {
+    "known_answer_cases": 7,
+    "passed": 7,
+    "source": "apps/api/tests/test_pass4_remaining.py"
+  },
+  "latency": {
+    "historical_pass3_full_flow_ms": 21822,
+    "first_what_if_ms": 30.678600014653057,
+    "assumption_rerun_p50_ms": 27.179100026842207,
+    "assumption_rerun_p95_ms": 33.94749999279156,
+    "samples": 11,
+    "llm_calls_per_rerun": 0
+  },
+  "deterministic_critic": {
+    "cases": 4,
+    "llm_calls_avoided": 3,
+    "avoidance_rate": 0.75
+  }
+}

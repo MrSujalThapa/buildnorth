@@ -1,0 +1,132 @@
+{
+  "captured_at": "2026-08-30T19:48:52.234440+00:00",
+  "label": "NON-CAUSAL / MODEL-CONSISTENT",
+  "status": "ok",
+  "n": 12,
+  "gpt_top1": 0.08333333333333333,
+  "greedy_top1": 0.0,
+  "oracle_top1": 1.0,
+  "note": "GPT asked to pick one action under the hours budget. Oracle is the hiring simulator from action_policy_results.json, not a randomized trial. Greedy is uplift/hour from the same simulator (Play It Out numerical policy).",
+  "rows": [
+    {
+      "case_id": "career_rate2_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "response_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.0011949999999999999
+    },
+    {
+      "case_id": "career_rate2_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.00103
+    },
+    {
+      "case_id": "career_rate2_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "applications",
+      "gpt_match_oracle": true,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001375
+    },
+    {
+      "case_id": "career_rate2_scale1_budget8",
+      "budget_hours": 8.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "response_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001075
+    },
+    {
+      "case_id": "career_rate2_scale1_budget12",
+      "budget_hours": 12.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.0013
+    },
+    {
+      "case_id": "career_rate2_scale1_budget20",
+      "budget_hours": 20.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001075
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget8",
+      "budget_hours": 8.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "response_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001405
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget12",
+      "budget_hours": 12.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.00106
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget20",
+      "budget_hours": 20.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001045
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "response_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001555
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.00106
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "oracle": "applications",
+      "greedy": "offer_rate",
+      "gpt": "tech_rate",
+      "gpt_match_oracle": false,
+      "greedy_match_oracle": false,
+      "estimated_cost_usd": 0.001135
+    }
+  ]
+}

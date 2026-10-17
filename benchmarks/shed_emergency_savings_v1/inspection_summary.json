@@ -1,0 +1,25 @@
+{
+  "n_panel": 3870,
+  "base_rate_ef1_2023": 0.5658914728682171,
+  "split_counts": {
+    "train": 2368,
+    "validation": 574,
+    "calibration": 554,
+    "test": 374
+  },
+  "ef1_2022_base_rate": 0.5596899224806201,
+  "feature_columns": [
+    "ef1_2022",
+    "ef7_band_2022",
+    "ppage",
+    "ppgender",
+    "ppeducat",
+    "ppinc7",
+    "pphhsize",
+    "ppmarit5",
+    "ppemploy",
+    "pprent",
+    "ppmsacat"
+  ],
+  "feature_schema_version": "shed-ef1-2022to2023-v1"
+}

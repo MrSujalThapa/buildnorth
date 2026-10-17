@@ -1,0 +1,58 @@
+{
+  "before": {
+    "label": "before",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "first_sync": {
+    "status_code": 200,
+    "body": {
+      "status": "no_new_records",
+      "records_synced": 0
+    }
+  },
+  "after_first": {
+    "label": "after_first_sync",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "second_sync": {
+    "status_code": 200,
+    "body": {
+      "status": "no_new_records",
+      "records_synced": 0
+    }
+  },
+  "after_second": {
+    "label": "after_second_sync",
+    "raw_source_events": 14,
+    "duplicate_external_ids": 0,
+    "goal_evidence_events": 5,
+    "history_count": 10,
+    "latest_history": {
+      "probability": 0.41,
+      "source_kind": "synthetic_demo",
+      "created_at": "2026-03-12 12:00:00+00:00"
+    }
+  },
+  "raw_delta_first": 0,
+  "raw_delta_second": 0,
+  "events_delta_first": 0,
+  "events_delta_second": 0,
+  "history_delta_first": 0,
+  "history_delta_second": 0
+}

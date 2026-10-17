@@ -1,0 +1,134 @@
+{
+  "suite_version": "pass6_eval_v1",
+  "frozen_cases": {
+    "version": "pass6_eval_v1",
+    "domains": [
+      "career",
+      "education",
+      "running",
+      "finance",
+      "startup",
+      "habits"
+    ],
+    "goal_architect": [
+      {
+        "id": "internship",
+        "intent": "Get a tech internship by summer 2027",
+        "domain": "career"
+      },
+      {
+        "id": "10k-sub45",
+        "intent": "Run a sub-45 minute 10K by December 2027",
+        "domain": "running"
+      },
+      {
+        "id": "savings-100k",
+        "intent": "Reach $100k savings by 2030",
+        "domain": "finance"
+      },
+      {
+        "id": "mrr-10k",
+        "intent": "Grow my startup to $10k MRR by June 2028",
+        "domain": "startup"
+      },
+      {
+        "id": "waterloo",
+        "intent": "Get into Waterloo Engineering for Fall 2027",
+        "domain": "education"
+      },
+      {
+        "id": "read-100",
+        "intent": "Read consistently for 100 days",
+        "domain": "habits"
+      }
+    ],
+    "interventions": [
+      {
+        "id": "linkedin-career",
+        "goal_domain": "career",
+        "text": "What if I post on LinkedIn 4 times a week?"
+      },
+      {
+        "id": "mock-interviews",
+        "goal_domain": "career",
+        "text": "What if I do 3 mock interviews a week?"
+      },
+      {
+        "id": "mileage-running",
+        "goal_domain": "running",
+        "text": "What if I increase weekly mileage to 40 km?"
+      },
+      {
+        "id": "sleep-running",
+        "goal_domain": "running",
+        "text": "What if I sleep 2 extra hours per night?"
+      },
+      {
+        "id": "users-startup",
+        "goal_domain": "startup",
+        "text": "What if I talk to 10 users per week?"
+      },
+      {
+        "id": "rent-finance",
+        "goal_domain": "finance",
+        "text": "What if my rent drops $500 per month?"
+      }
+    ],
+    "source_planner": [
+      {
+        "goal_family": "career",
+        "expect_relevant": [
+          "github",
+          "gmail",
+          "calendar",
+          "notion"
+        ],
+        "expect_low": []
+      },
+      {
+        "goal_family": "running",
+        "expect_relevant": [
+          "strava",
+          "calendar",
+          "notion"
+        ],
+        "expect_low": [
+          "github"
+        ]
+      }
+    ]
+  },
+  "agent_eval": {
+    "goal_architect": {
+      "n": 25,
+      "schema_valid": 25,
+      "clarification_correct": 23,
+      "unnecessary_clarification": 1,
+      "necessary_clarification_missed": 1,
+      "goal_type_ok": 25
+    },
+    "evidence_agent": {
+      "n": 10,
+      "schema_valid": 10,
+      "event_count_matches": 10,
+      "provenance_retained": 10
+    },
+    "critic": {
+      "n": 5,
+      "decision_matches": 5,
+      "false_veto": 0
+    },
+    "ablations": {
+      "raw_llm_blob_contains_odds": true,
+      "structured_evidence_schema_valid": true,
+      "critic_without_checks_would_publish": true,
+      "critic_with_checks_vetoes_leakage": true
+    },
+    "note": "Scripted/deterministic evaluation. Not a live LLM leaderboard."
+  },
+  "ablation": {},
+  "notes": [
+    "Intervention and source-planner live scoring require OPENAI_API_KEY and are run via scripts/evaluate_agents.py.",
+    "Numerical forecast metrics remain on OULAD benchmark; no fabricated cross-domain labels."
+  ]
+}

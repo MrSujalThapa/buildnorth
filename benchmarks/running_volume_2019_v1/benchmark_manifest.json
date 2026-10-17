@@ -1,0 +1,40 @@
+{
+  "benchmark_id": "running_volume_2019_v1",
+  "dataset_source": "A public dataset on long-distance running training in 2019 and 2020",
+  "doi": "10.6084/m9.figshare.16620238",
+  "outcome_definition": "Total 2019 logged distance >= 1500.0 km",
+  "prediction_timestamp_definition": "2019-03-31 / 06-30 / 09-30; features from weeks <= t",
+  "split_method": "athlete-disjoint SHA256(20260830:athlete) 60/15/15/10",
+  "leakage_controls": [
+    "Features use only weeks with datetime <= checkpoint",
+    "Year-end total is label only",
+    "`major` never used (retrospective, not future-resolved)",
+    "Athlete-disjoint splits"
+  ],
+  "sample_count": {
+    "n_cases": 109236,
+    "n_athletes": 36412,
+    "volume_threshold_km": 1500.0,
+    "base_rate_athlete": 0.4204932439854993,
+    "cases_by_checkpoint": {
+      "0": 36412,
+      "1": 36412,
+      "2": 36412
+    },
+    "split_case_counts": {
+      "train": 65742,
+      "validation": 16332,
+      "calibration": 16230,
+      "test": 10932
+    },
+    "major_column_usage": "EXCLUDED \u2014 retrospective profile tag, not a future label"
+  },
+  "checksums_sha256": {
+    "run_ww_2019_w.parquet": "3ffe5e9c29cf69c951471647f0bf1e8ea0f4d941f5db89e22d7ab507aa9b5f6b"
+  },
+  "known_limitations": [
+    "Volume goal proxies training consistency, not race finish time",
+    "Scraped training logs; selection bias",
+    "Weekly aggregation loses session-level structure"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "openai_probability_baseline_v1",
+  "status": "executed",
+  "purpose": "Optional frozen comparison baseline; never a production forecast model.",
+  "model_env": "PM_OPENAI_MODEL",
+  "input": {
+    "case_id": "string",
+    "checkpoint_day": "integer",
+    "features": "object containing only the frozen temporal feature schema"
+  },
+  "system_prompt": "Estimate the probability that this anonymized online-course enrollment ends in Pass or Distinction. Use only the supplied pre-checkpoint features. Return one JSON object matching the schema. Do not invent evidence.",
+  "output_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["probability"],
+    "properties": {"probability": {"type": "number", "minimum": 0, "maximum": 1}}
+  },
+  "batch_size": 25,
+  "max_concurrency": 4,
+  "max_cases": 200,
+  "estimated_cost_guard_usd": 5.0,
+  "failure_policy": "Fail closed on missing credentials, invalid structured output, incomplete coverage, or cost guard breach. Never substitute predictions."
+}

@@ -1,0 +1,19 @@
+{
+  "title": "University of Waterloo undergraduate admission reference",
+  "domain": "admissions",
+  "keywords": ["waterloo", "admission", "engineering", "undergraduate"],
+  "claims": [
+    {
+      "claim": "Waterloo Engineering undergraduate admission is competitive and program-specific; an offer is a binary deadline event, not a generic university acceptance.",
+      "source": "frozen://waterloo_admissions.json",
+      "source_type": "frozen",
+      "evidence_class": "official_rule"
+    },
+    {
+      "claim": "This frozen artifact does not contain current cut-offs or applicant-level calibration. Live official pages would be required for current rules.",
+      "source": "frozen://waterloo_admissions.json",
+      "source_type": "frozen",
+      "evidence_class": "assumption"
+    }
+  ]
+}

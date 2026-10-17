@@ -1,0 +1,41 @@
+{
+  "title": "Running performance trend and distance conversion assumptions",
+  "domain": "running",
+  "version": "2026-08-29.v1",
+  "checksum": "running-performance-v1",
+  "population": "Recreational distance runners (mechanistic prior, not personalized physiology)",
+  "definition": "Riegel-style distance scaling and default measurement noise for threshold race-time forecasts when direct goal-distance evidence is sparse.",
+  "limitations": [
+    "Riegel conversion is a population heuristic; it is not calibrated to an individual athlete.",
+    "Sparse or cross-distance-only evidence remains EXPLORATORY.",
+    "Weekly mileage is activity context only and does not inject a fitness score.",
+    "Missed sessions are recorded when explicitly observed but do not map to recovery scores."
+  ],
+  "causal_label": "mechanistic",
+  "permitted_use": "baseline threshold_trend pricing and exploratory What If perturbation",
+  "status": "EXPLORATORY",
+  "models": {
+    "distance_conversion": {
+      "name": "riegel",
+      "formula": "T2 = T1 * (D2/D1)^exponent",
+      "exponent": 1.06,
+      "source": "frozen://running_performance_assumptions.json",
+      "conversion_uncertainty_seconds": 45.0
+    }
+  },
+  "defaults": {
+    "measurement_noise_seconds": 35.0,
+    "min_measurement_noise_seconds": 15.0,
+    "trend_uncertainty_seconds_per_day": 2.5,
+    "adherence": 1.0,
+    "goal_distance_tolerance_km": 0.75
+  },
+  "claims": [
+    {
+      "claim": "Distance conversion uses an explicit Riegel exponent; it does not claim personalized physiology.",
+      "source": "frozen://running_performance_assumptions.json",
+      "source_type": "frozen",
+      "evidence_class": "mechanistic"
+    }
+  ]
+}

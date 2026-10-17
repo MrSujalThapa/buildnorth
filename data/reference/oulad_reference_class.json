@@ -1,0 +1,13 @@
+{
+  "title": "OULAD course completion reference class",
+  "domain": "academic",
+  "keywords": ["oulad", "course", "completion", "online learning"],
+  "claims": [
+    {
+      "claim": "The frozen OULAD completion benchmark prices Pass/Distinction vs Fail/Withdrawn at days 14, 35, 70, and 105 for Open University module presentations. It does not transfer to unrelated personal goals.",
+      "source": "frozen://oulad_reference_class.json",
+      "source_type": "dataset",
+      "evidence_class": "reference_rule"
+    }
+  ]
+}

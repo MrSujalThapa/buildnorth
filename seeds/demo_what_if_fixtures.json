@@ -1,0 +1,179 @@
+{
+  "version": "2026-08-30.v1",
+  "provenance": "DEMO_SEED",
+  "compare_candidates": {
+    "20000000-0000-0000-0000-000000000002": [
+      {"id": "more-applications", "label": "More applications"},
+      {"id": "more-interview-prep", "label": "More interview prep"},
+      {"id": "balanced-plan", "label": "Balanced plan"}
+    ]
+  },
+  "futures": {
+    "20000000-0000-0000-0000-000000000002": {
+      "outcomes": [
+        {
+          "label": "Startup path wins",
+          "probability": 0.34,
+          "parameter_source": "REFERENCE",
+          "median": 0.48,
+          "p10": 0.31,
+          "p90": 0.62,
+          "downside": false
+        },
+        {
+          "label": "Big Tech offer lands",
+          "probability": 0.28,
+          "parameter_source": "REFERENCE",
+          "median": 0.55,
+          "p10": 0.39,
+          "p90": 0.68,
+          "downside": false
+        },
+        {
+          "label": "Long search, delayed offer",
+          "probability": 0.22,
+          "parameter_source": "REFERENCE",
+          "median": 0.36,
+          "p10": 0.22,
+          "p90": 0.49,
+          "downside": true
+        },
+        {
+          "label": "Pivot to contract / FDE consulting",
+          "probability": 0.16,
+          "parameter_source": "REFERENCE",
+          "median": 0.44,
+          "p10": 0.28,
+          "p90": 0.57,
+          "downside": false
+        }
+      ]
+    }
+  },
+  "compare": {
+    "20000000-0000-0000-0000-000000000002": {
+      "paths": [
+        {
+          "id": "more-applications",
+          "label": "More applications",
+          "primary_goal_probability": 0.47,
+          "expected_outcome": 0.47,
+          "median": 0.47,
+          "p10": 0.34,
+          "p90": 0.59,
+          "downside_probability": 0.28,
+          "fragility_pp": 4.2,
+          "resource_cost": {"hours_per_week": 6, "money": 0, "energy": 0.2},
+          "execution_probability": 0.74,
+          "model_status": "DEMO_SEED",
+          "secondary_outcomes": {}
+        },
+        {
+          "id": "more-interview-prep",
+          "label": "More interview prep",
+          "primary_goal_probability": 0.56,
+          "expected_outcome": 0.56,
+          "median": 0.56,
+          "p10": 0.41,
+          "p90": 0.68,
+          "downside_probability": 0.22,
+          "fragility_pp": 5.8,
+          "resource_cost": {"hours_per_week": 12, "money": 0, "energy": 0.35},
+          "execution_probability": 0.68,
+          "model_status": "DEMO_SEED",
+          "secondary_outcomes": {}
+        },
+        {
+          "id": "balanced-plan",
+          "label": "Balanced plan",
+          "primary_goal_probability": 0.52,
+          "expected_outcome": 0.52,
+          "median": 0.52,
+          "p10": 0.38,
+          "p90": 0.64,
+          "downside_probability": 0.24,
+          "fragility_pp": 3.6,
+          "resource_cost": {"hours_per_week": 9, "money": 0, "energy": 0.28},
+          "execution_probability": 0.76,
+          "model_status": "DEMO_SEED",
+          "secondary_outcomes": {}
+        }
+      ]
+    }
+  },
+  "paths": {
+    "20000000-0000-0000-0000-000000000002": {
+      "target_probability": 0.7,
+      "current_probability": 0.41,
+      "gap_pp": 29.0,
+      "paths": [
+        {
+          "label": "Double application volume + weekly mock interviews",
+          "action_ids": ["applications_2x", "mock_interviews"],
+          "resulting_probability": 0.58,
+          "resource_cost": {"hours_per_week": 14, "money": 0, "energy": 0.4},
+          "fragility_pp": 5.1,
+          "valid_because": "Higher pipeline throughput with structured interview reps.",
+          "model_provenance": {"family": "demo_fixture", "version": "ui-parity-v1"}
+        },
+        {
+          "label": "LeetCode sprint + targeted referrals",
+          "action_ids": ["leetcode_sprint", "referrals"],
+          "resulting_probability": 0.64,
+          "resource_cost": {"hours_per_week": 16, "money": 0, "energy": 0.45},
+          "fragility_pp": 6.4,
+          "valid_because": "Technical readiness plus warm intros improves conversion.",
+          "model_provenance": {"family": "demo_fixture", "version": "ui-parity-v1"}
+        },
+        {
+          "label": "Portfolio project + niche role focus",
+          "action_ids": ["portfolio_push", "niche_focus"],
+          "resulting_probability": 0.55,
+          "resource_cost": {"hours_per_week": 11, "money": 0, "energy": 0.32},
+          "fragility_pp": 4.0,
+          "valid_because": "Stronger signal for applied AI / FDE roles without max hours.",
+          "model_provenance": {"family": "demo_fixture", "version": "ui-parity-v1"}
+        }
+      ],
+      "frontier": {
+        "points": [
+          {
+            "id": "path-balanced",
+            "label": "Balanced plan",
+            "resource_cost": 9,
+            "expected_uplift_pp": 11.0,
+            "dominated": false,
+            "action_ids": ["applications_2x"],
+            "opportunity_costs": ["Less startup time"],
+            "assumptions": ["DEMO_SEED"],
+            "provenance": ["DEMO_SEED"]
+          },
+          {
+            "id": "path-intensive",
+            "label": "LeetCode sprint",
+            "resource_cost": 16,
+            "expected_uplift_pp": 23.0,
+            "dominated": false,
+            "action_ids": ["leetcode_sprint"],
+            "opportunity_costs": ["Less networking", "Less recovery time"],
+            "assumptions": ["DEMO_SEED"],
+            "provenance": ["DEMO_SEED"]
+          },
+          {
+            "id": "path-light",
+            "label": "Light touch",
+            "resource_cost": 5,
+            "expected_uplift_pp": 4.0,
+            "dominated": true,
+            "action_ids": ["applications_1x"],
+            "opportunity_costs": [],
+            "assumptions": ["DEMO_SEED"],
+            "provenance": ["DEMO_SEED"]
+          }
+        ],
+        "frontier_ids": ["path-balanced", "path-intensive"],
+        "selected_id": "path-intensive"
+      }
+    }
+  }
+}

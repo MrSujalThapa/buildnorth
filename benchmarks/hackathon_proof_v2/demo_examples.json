@@ -1,0 +1,35 @@
+{
+  "pricing": [
+    {
+      "domain": "education",
+      "note": "Reuse OULAD shared-200 narrative from v1",
+      "gpt_brier": 0.22279949999999998,
+      "pio_brier": 0.15799360362599907,
+      "claim": "29.1% lower probabilistic forecasting error than GPT"
+    },
+    {
+      "domain": "finance",
+      "goal": "Have emergency/rainy-day funds covering 3 months of expenses by the next annual survey",
+      "n": 40,
+      "gpt_brier": 0.192315,
+      "pio_brier": 0.16747098066911972,
+      "claim": "12.9% lower probabilistic forecasting error than GPT on the same resolved forecasts."
+    },
+    {
+      "domain": "career",
+      "goal": "This job application receives a job offer by the end of the recruiting process",
+      "n": 40,
+      "gpt_auc": 0.66,
+      "pio_auc": 0.7285714285714285,
+      "note": "Rare-offer setting: Brier nearly tied; ranking (AUC) favors Play It Out"
+    },
+    {
+      "domain": "running",
+      "goal": "Accumulate at least 1500 km of logged running distance by 2019-12-31",
+      "n": 40,
+      "gpt_brier": 0.010973925,
+      "pio_brier": 0.014157758605781886,
+      "note": "Near-ceiling volume task on March checkpoint sample; GPT edged PIO. Full-test HGB still crushes prevalence."
+    }
+  ]
+}

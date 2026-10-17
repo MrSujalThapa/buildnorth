@@ -1,0 +1,105 @@
+{
+  "benchmark": "oulad_completion_v1",
+  "seed": 20260828,
+  "target": {
+    "success": [
+      "Pass",
+      "Distinction"
+    ],
+    "failure": [
+      "Fail",
+      "Withdrawn"
+    ]
+  },
+  "checkpoints_days": [
+    14,
+    35,
+    70,
+    105
+  ],
+  "half_life_candidates_days": [
+    7,
+    14,
+    28
+  ],
+  "feature_schema_version": "oulad-temporal-v1",
+  "cache_key": "727475a392063b4b",
+  "feature_artifact": "features-727475a392063b4b.pkl",
+  "feature_artifact_sha256": "ab35228dafacde6b869575f7c8bd2eccaf497f3d62e2ea3d457594061ac63877",
+  "split_students": {
+    "train": 17258,
+    "validation": 4306,
+    "calibration": 4299,
+    "test": 2922
+  },
+  "split_checkpoint_rows": {
+    "train": 78120,
+    "validation": 19604,
+    "calibration": 19396,
+    "test": 13252
+  },
+  "split_target_frequency": {
+    "calibration": {
+      "0": 10180,
+      "1": 9216
+    },
+    "test": {
+      "0": 6972,
+      "1": 6280
+    },
+    "train": {
+      "0": 41396,
+      "1": 36724
+    },
+    "validation": {
+      "0": 10284,
+      "1": 9320
+    }
+  },
+  "split_manifest_sha256": "c8fccbd9601d023628fe47d8173618b7b6d75520477dcfc2457643f32cf16544",
+  "feature_rows": 130372,
+  "feature_columns": [
+    "code_module",
+    "code_presentation",
+    "id_student",
+    "num_of_prev_attempts",
+    "studied_credits",
+    "module_presentation_length",
+    "outcome",
+    "checkpoint_day",
+    "vle_total_clicks",
+    "vle_active_days",
+    "vle_unique_sites",
+    "vle_last_active_day",
+    "vle_clicks_7d",
+    "vle_clicks_previous_7d",
+    "vle_clicks_28d",
+    "vle_decayed_clicks_hl7",
+    "vle_decayed_clicks_hl14",
+    "vle_decayed_clicks_hl28",
+    "vle_days_since_active",
+    "vle_click_trend_7d",
+    "vle_daily_click_std",
+    "assessment_submissions",
+    "assessment_mean_score",
+    "assessment_score_std",
+    "assessment_weight_submitted",
+    "assessment_weighted_score_sum",
+    "assessment_on_time_rate",
+    "assessment_last_submission_day",
+    "assessment_score_change",
+    "assessment_days_since_submission",
+    "split"
+  ],
+  "leakage_exclusions": [
+    "final_result",
+    "date_unregistration",
+    "gender",
+    "region",
+    "highest_education",
+    "imd_band",
+    "age_band",
+    "disability",
+    "all events after each checkpoint"
+  ]
+}

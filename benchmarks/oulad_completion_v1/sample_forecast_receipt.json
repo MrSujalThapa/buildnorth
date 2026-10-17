@@ -1,0 +1,136 @@
+{
+  "receipt_version": 1,
+  "forecast_id": "benchmark-sample-forecast",
+  "goal_id": "oulad-course-completion",
+  "goal_contract_version": 1,
+  "case_id": "DDD-2013J-8462-14",
+  "as_of_day": 14,
+  "evidence_watermark": "course-day-14",
+  "relevant_evidence_ids": [
+    "aggregated-assessment-events",
+    "aggregated-vle-events"
+  ],
+  "state_snapshot_id": "state-8462-14",
+  "state_snapshot_version": 1,
+  "run_id": "oulad-heldout-20260828",
+  "raw_probability": 0.6201512424697595,
+  "calibrated_probability": 0.6314219028909855,
+  "forecast_status": "CALIBRATED",
+  "model": {
+    "family": "hist_gradient_boosting",
+    "version": "oulad-completion-v1"
+  },
+  "calibration": {
+    "method": "platt",
+    "split": "calibration"
+  },
+  "feature_schema_version": "oulad-temporal-v1",
+  "feature_snapshot": {
+    "code_module": "DDD",
+    "code_presentation": "2013J",
+    "num_of_prev_attempts": 0,
+    "studied_credits": 90,
+    "module_presentation_length": 261,
+    "checkpoint_day": 14,
+    "vle_total_clicks": 233.0,
+    "vle_active_days": 10.0,
+    "vle_unique_sites": 71.0,
+    "vle_clicks_7d": 152.0,
+    "vle_clicks_28d": 233.0,
+    "vle_decayed_clicks_hl14": 159.44889053541758,
+    "vle_days_since_active": 0.0,
+    "vle_click_trend_7d": 122.0,
+    "vle_daily_click_std": 42.290135440260244,
+    "assessment_submissions": 0.0,
+    "assessment_mean_score": 0.0,
+    "assessment_score_std": 0.0,
+    "assessment_score_change": 0.0,
+    "assessment_weight_submitted": 0.0,
+    "assessment_weighted_score_sum": 0.0,
+    "assessment_on_time_rate": 0.0,
+    "assessment_days_since_submission": 0.0
+  },
+  "transformations": {
+    "time_decay_half_life_days": 14,
+    "future_filter": "event_day <= checkpoint_day"
+  },
+  "training_dataset": {
+    "name": "OULAD",
+    "version": "oulad_completion_v1"
+  },
+  "assumptions": [
+    "OULAD cohort represents only the benchmark population"
+  ],
+  "contributions": [
+    {
+      "feature": "numeric__assessment_weighted_score_sum",
+      "transformed_value": -0.7300567252057403,
+      "coefficient": 2.496533554357074,
+      "log_odds_contribution": -1.8226111110601724
+    },
+    {
+      "feature": "numeric__assessment_weight_submitted",
+      "transformed_value": -0.761482993425406,
+      "coefficient": -1.931650829176157,
+      "log_odds_contribution": 1.4709192556537276
+    },
+    {
+      "feature": "numeric__checkpoint_day",
+      "transformed_value": -1.2121830534626528,
+      "coefficient": -0.8421653347834909,
+      "log_odds_contribution": 1.0208585470382492
+    },
+    {
+      "feature": "numeric__vle_clicks_7d",
+      "transformed_value": 1.4518531671945387,
+      "coefficient": 0.6963200558957101,
+      "log_odds_contribution": 1.010954478533265
+    },
+    {
+      "feature": "categorical__code_module_DDD",
+      "transformed_value": 1.0,
+      "coefficient": -0.7054255517200463,
+      "log_odds_contribution": -0.7054255517200463
+    },
+    {
+      "feature": "numeric__vle_click_trend_7d",
+      "transformed_value": 1.7111817220821377,
+      "coefficient": -0.3012618764035533,
+      "log_odds_contribution": -0.5155138164619284
+    },
+    {
+      "feature": "numeric__vle_unique_sites",
+      "transformed_value": 1.7537846136208546,
+      "coefficient": 0.27259636640910173,
+      "log_odds_contribution": 0.4780753131372354
+    },
+    {
+      "feature": "numeric__assessment_submissions",
+      "transformed_value": -0.8738159674117898,
+      "coefficient": 0.38836893781508985,
+      "log_odds_contribution": -0.33936297910958196
+    },
+    {
+      "feature": "categorical__code_presentation_2013J",
+      "transformed_value": 1.0,
+      "coefficient": 0.33335125153075257,
+      "log_odds_contribution": 0.33335125153075257
+    },
+    {
+      "feature": "numeric__assessment_mean_score",
+      "transformed_value": -1.1073655697476636,
+      "coefficient": 0.23132545886922512,
+      "log_odds_contribution": -0.25616184855785923
+    }
+  ],
+  "provenance": {
+    "benchmark": "oulad_completion_v1",
+    "split": "test"
+  },
+  "limitations": [
+    "OULAD population only",
+    "observational benchmark",
+    "not transportable without validation"
+  ],
+  "created_at": "2026-08-29T04:08:52.297271Z"
+}

@@ -1,0 +1,410 @@
+{
+  "sha": "289316f2367f2a68901aedbc0361c49534572a77",
+  "http_status": 200,
+  "workflow": {
+    "thread_id": "25eb71c0-78e4-4c56-b7a7-a5f273b8716a",
+    "kind": "add_evidence",
+    "status": "limited",
+    "current_step": "publish",
+    "progress": [
+      "Reading evidence",
+      "Researching reference class",
+      "Pricing market",
+      "Checking forecast"
+    ],
+    "interrupt": null,
+    "goal": {
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "title": "Receive a Big Tech or FDE offer",
+      "goal_type": "deadline_event",
+      "success_definition": {
+        "event": "signed_offer",
+        "role_families": [
+          "SWE",
+          "FDE"
+        ],
+        "employment_type": "full_time"
+      },
+      "deadline": "2028-08-31T23:59:59Z",
+      "target_probability": null,
+      "resource_constraints": {
+        "hours_per_week": 20.0,
+        "budget_amount": 1200.0,
+        "budget_currency": "CAD"
+      },
+      "state_dimensions": [
+        "technical_interview",
+        "project_signal",
+        "application_pipeline",
+        "consistency"
+      ],
+      "model_requirements": {
+        "requires_reference_class": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    },
+    "evidence": [
+      {
+        "event_type": "commit_synced",
+        "domain": "github",
+        "metric": "commit_sha",
+        "numeric_value": null,
+        "categorical_value": "289316f2367f2a68901aedbc0361c49534572a77",
+        "unit": null,
+        "observed_at": "unknown",
+        "source_type": "manual",
+        "summary": "GitHub commit synced from MrSujalThapa/playitout (sha=289316f2367f2a68901aedbc0361c49534572a77): \"Add unique Pass 6 sync marker for fresh GitHub evidence ingest.\""
+      }
+    ],
+    "research": {
+      "claims": [
+        {
+          "claim": "Stage rates are frozen mechanistic priors for funnel propagation; they are not LLM-assigned probabilities.",
+          "source": "frozen://hiring_funnel_rates.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "frozen",
+          "evidence_class": "mechanistic"
+        },
+        {
+          "claim": "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+          "source": "frozen://hiring_process.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "frozen",
+          "evidence_class": "mechanistic"
+        },
+        {
+          "claim": "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set.",
+          "source": "frozen://hiring_process.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "frozen",
+          "evidence_class": "assumption"
+        },
+        {
+          "claim": "The frozen OULAD completion benchmark prices Pass/Distinction vs Fail/Withdrawn at days 14, 35, 70, and 105 for Open University module presentations. It does not transfer to unrelated personal goals.",
+          "source": "frozen://oulad_reference_class.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "dataset",
+          "evidence_class": "reference_rule"
+        },
+        {
+          "claim": "Waterloo Engineering undergraduate admission is competitive and program-specific; an offer is a binary deadline event, not a generic university acceptance.",
+          "source": "frozen://waterloo_admissions.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "frozen",
+          "evidence_class": "official_rule"
+        },
+        {
+          "claim": "This frozen artifact does not contain current cut-offs or applicant-level calibration. Live official pages would be required for current rules.",
+          "source": "frozen://waterloo_admissions.json",
+          "retrieved_at": "2026-08-30T17:49:01.879647+00:00",
+          "source_type": "frozen",
+          "evidence_class": "assumption"
+        }
+      ],
+      "reference_class_candidates": [
+        "hiring_funnel_rates.json",
+        "hiring_process.json",
+        "oulad_reference_class.json",
+        "waterloo_admissions.json",
+        "monid",
+        "monid"
+      ],
+      "limitations": [
+        "not_configured",
+        "Application Monid OAuth credentials are not provisioned.",
+        "Current cut-offs and applicant-level calibration are unavailable in the frozen artifact.",
+        "The supplied snippets do not include a live or matched personal applicant dataset for calibration.",
+        "The OULAD benchmark applies to Open University module presentations and does not transfer to unrelated personal goals."
+      ]
+    },
+    "pricing": {
+      "priced": true,
+      "forecast_status": "ANCHORED",
+      "raw_probability": 0.327416171022457,
+      "calibrated_probability": null,
+      "model_version": "deadline_event_hazard@1.0.0",
+      "limitations": [
+        "coefficients must cover the requested horizon",
+        "unsupported metric: None",
+        "unsupported checkpoint day: -1"
+      ],
+      "receipt": {
+        "receipt_version": 1,
+        "forecast_kind": "baseline",
+        "priced": true,
+        "goal_id": "20000000-0000-0000-0000-000000000002",
+        "goal_contract_version": 1,
+        "goal_metric": null,
+        "goal_type": "deadline_event",
+        "forecast_status": "ANCHORED",
+        "model": {
+          "family": "deadline_event_hazard",
+          "version": "1.0.0",
+          "simulation_method": "discrete_time_logistic_hazard",
+          "maximum_status": "ANCHORED"
+        },
+        "model_registry_family": "deadline_event_hazard",
+        "model_registry_version": "1.0.0",
+        "normalized_evidence_ids": [
+          "25b2c9bd-1eae-4655-816e-a5329f590e3f"
+        ],
+        "evidence_watermark": "25b2c9bd-1eae-4655-816e-a5329f590e3f",
+        "state_snapshot_id": "unavailable",
+        "state_snapshot_version": 0,
+        "research_source_ids": [
+          "frozen://hiring_funnel_rates.json",
+          "frozen://hiring_process.json",
+          "frozen://hiring_process.json",
+          "frozen://oulad_reference_class.json",
+          "frozen://waterloo_admissions.json",
+          "frozen://waterloo_admissions.json",
+          "hiring_funnel_rates.json"
+        ],
+        "reference_versions": [
+          {
+            "id": "frozen://hiring_funnel_rates.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "frozen://hiring_process.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "frozen://hiring_process.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "frozen://oulad_reference_class.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "frozen://waterloo_admissions.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "frozen://waterloo_admissions.json",
+            "source": "REFERENCE_DATA"
+          },
+          {
+            "id": "hiring_funnel_rates.json",
+            "source": "REFERENCE_DATA"
+          }
+        ],
+        "agent_run_ids": {
+          "evidence": "32421876-fc7d-5e92-8e5e-1f1dd8c8e303",
+          "research": "cde11a36-0411-5f88-b978-cb372f298383",
+          "critic": "9289e9ec-06a6-5898-9226-57a95dd878a5"
+        },
+        "assumptions": [
+          {
+            "id": "baseline_logit",
+            "name": "baseline_logit",
+            "value": [
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935,
+              -5.5768261962545935
+            ],
+            "source": "REFERENCE",
+            "unit": "logit"
+          }
+        ],
+        "feature_transforms": {
+          "funnel_state": {
+            "applications": 1,
+            "responses": 0,
+            "phone_screens": 0,
+            "oas": 0,
+            "technicals": 0,
+            "finals": 0,
+            "offers": 0,
+            "rejections": {},
+            "practice_hours": 0.0
+          },
+          "periods_remaining": 105,
+          "pipeline_offer_probability": 0.0018779895615917844,
+          "expected_new_pipeline_offer_probability": 0.32615068905040423,
+          "combined_offer_probability": 0.32741617102245335,
+          "weekly_application_rate": 2.0,
+          "reference_version": "2026-08-29.v1",
+          "stage_rates": {
+            "application_to_response": 0.12,
+            "response_to_phone_screen": 0.45,
+            "phone_screen_to_oa": 0.55,
+            "oa_to_technical": 0.38,
+            "technical_to_final": 0.32,
+            "final_to_offer": 0.52
+          },
+          "practice_hours_observed": 0.0
+        },
+        "calibration": {
+          "method": null,
+          "applied": false,
+          "reason": "no valid calibrator"
+        },
+        "raw_probability": 0.327416171022457,
+        "calibrated_probability": null,
+        "final_probability": null,
+        "critic_decision": "publish_with_limitations",
+        "publication": "priced",
+        "limitations": [
+          "coefficients must cover the requested horizon",
+          "unsupported metric: None",
+          "unsupported checkpoint day: -1"
+        ],
+        "created_at": "2026-08-30T17:49:05.124448+00:00",
+        "run_id": "cc4c8409-8ea4-4393-81cb-a3223fd0be6f",
+        "llm_used_for_probability": false,
+        "critic_run_id": "9289e9ec-06a6-5898-9226-57a95dd878a5"
+      }
+    },
+    "critic": {
+      "decision": "publish_with_limitations",
+      "issues": [
+        "The receipt explicitly reports no valid calibrator and `calibrated_probability` is null, so the forecast is anchored rather than calibrated.",
+        "Model/pricing limitations are present: unsupported metric `None`, unsupported checkpoint day `-1`, and coefficients must cover the requested horizon.",
+        "The research notes that no frozen public dataset calibrates personal offer probability for an arbitrary target-company set, so the estimate relies on mechanistic funnel priors rather than target-specific evidence.",
+        "Reference artifacts include unrelated or non-transferable benchmarks (OULAD, Waterloo) that do not directly support this personal Big Tech/FDE offer goal.",
+        "Evidence is sparse and appears to reflect a generic hiring funnel state rather than applicant-specific progress beyond one application and zero interview progression."
+      ],
+      "limitations": [
+        "Do not interpret this as a calibrated personal offer forecast.",
+        "The number is only valid as an anchored mechanistic estimate under the current frozen funnel assumptions.",
+        "It should not be generalized across target-company sets, geographies, or applicant profiles without new calibration.",
+        "No live or matched personal applicant dataset was available in the receipt."
+      ],
+      "required_actions": [
+        "If publication requires calibration, obtain a valid calibrator or matched personal applicant dataset.",
+        "If the goal\u2019s metric or checkpointing must be explicit, define the success metric and checkpoint day(s) so the model can price it without unsupported placeholders.",
+        "If target-company specificity matters, add evidence tied to the actual application pipeline and target set rather than generic funnel priors."
+      ]
+    },
+    "agent_run_ids": {
+      "evidence": "32421876-fc7d-5e92-8e5e-1f1dd8c8e303",
+      "research": "cde11a36-0411-5f88-b978-cb372f298383",
+      "critic": "9289e9ec-06a6-5898-9226-57a95dd878a5"
+    },
+    "debug": {
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "steps": [
+        "Reading evidence",
+        "Researching reference class",
+        "Pricing market",
+        "Checking forecast"
+      ]
+    }
+  },
+  "evidence_before": 5,
+  "evidence_after": 6,
+  "evidence_delta": 1,
+  "history_before": 10,
+  "history_after": 11,
+  "history_delta": 1,
+  "latest_history": {
+    "probability": 0.327416171022457,
+    "source_kind": "published_forecast",
+    "created_at": "2026-08-30 17:49:09.123543+00:00"
+  }
+}

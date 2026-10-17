@@ -1,0 +1,42 @@
+{
+  "benchmark_id": "running_pace_improve_2019_v1",
+  "dataset_source": "A public dataset on long-distance running training in 2019 and 2020",
+  "doi": "10.6084/m9.figshare.16620238",
+  "outcome_definition": "Jul\u2013Dec 2019 mean pace (min/km) <= Jan\u2013Jun 2019 mean pace * 0.95 (at least 5% faster)",
+  "prediction_timestamp_definition": "2019-06-30; features from weeks <= t only",
+  "split_method": "athlete-disjoint SHA256(20260830:athlete) 60/15/15/10",
+  "leakage_controls": [
+    "Features use only weeks with datetime <= 2019-06-30",
+    "H2 distance and pace are label-only; never encoded as features",
+    "`major` never used (retrospective, not future-resolved)",
+    "Athlete-disjoint splits",
+    "Eligibility requires distance>0 in both halves so pace is defined"
+  ],
+  "sample_count": {
+    "n_cases": 34122,
+    "n_athletes": 34122,
+    "n_valid_pace_both_halves": 34122,
+    "prediction_time": "2019-06-30T00:00:00",
+    "pace_improve_fraction": 0.05,
+    "base_rate_athlete": 0.13469315983822755,
+    "split_case_counts": {
+      "train": 20565,
+      "validation": 5074,
+      "calibration": 5050,
+      "test": 3433
+    },
+    "mean_pace_h1_median": 5.539935123005442,
+    "label_pace_h2_median": 5.596054320372769,
+    "major_column_usage": "EXCLUDED \u2014 retrospective profile tag, not a future label",
+    "leakage_note": "Features use only weeks with datetime <= 2019-06-30; H2 distance/pace are labels only"
+  },
+  "checksums_sha256": {
+    "run_ww_2019_w.parquet": "3ffe5e9c29cf69c951471647f0bf1e8ea0f4d941f5db89e22d7ab507aa9b5f6b"
+  },
+  "known_limitations": [
+    "Pace from weekly aggregates (duration/distance); not race-certified times",
+    "5% threshold is a product goal proxy, not a physiology claim",
+    "Scraped training logs; selection bias",
+    "Athletes who stop logging in H2 are excluded (distance>0 filter)"
+  ]
+}

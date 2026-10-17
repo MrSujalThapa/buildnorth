@@ -1,0 +1,63 @@
+{
+  "benchmark_id": "shed_emergency_savings_v1",
+  "dataset_source": "Federal Reserve Board Survey of Household Economics and Decisionmaking",
+  "dataset_url": "https://www.federalreserve.gov/consumerscommunities/shed_data.htm",
+  "citation": "Board of Governors of the Federal Reserve System, Survey of Household Economics and Decisionmaking",
+  "license": "Public use microdata; cite Fed SHED",
+  "prediction_time": "2022 SHED wave",
+  "deadline_resolution": "2023 SHED wave",
+  "outcome_definition": "EF1==Yes in 2023 (3-month emergency/rainy-day funds)",
+  "features_at_t": [
+    "ef1_2022",
+    "ef7_band_2022",
+    "ppage",
+    "ppgender",
+    "ppeducat",
+    "ppinc7",
+    "pphhsize",
+    "ppmarit5",
+    "ppemploy",
+    "pprent",
+    "ppmsacat"
+  ],
+  "leakage_controls": [
+    "No 2023 survey fields used as predictors",
+    "Panel linked only via shedid present in both waves",
+    "Person-disjoint splits by shedid"
+  ],
+  "split_method": "SHA256(20260830:shedid) \u2192 60/15/15/10 train/val/cal/test",
+  "sample_count": {
+    "n_panel": 3870,
+    "base_rate_ef1_2023": 0.5658914728682171,
+    "split_counts": {
+      "train": 2368,
+      "validation": 574,
+      "calibration": 554,
+      "test": 374
+    },
+    "ef1_2022_base_rate": 0.5596899224806201,
+    "feature_columns": [
+      "ef1_2022",
+      "ef7_band_2022",
+      "ppage",
+      "ppgender",
+      "ppeducat",
+      "ppinc7",
+      "pphhsize",
+      "ppmarit5",
+      "ppemploy",
+      "pprent",
+      "ppmsacat"
+    ],
+    "feature_schema_version": "shed-ef1-2022to2023-v1"
+  },
+  "checksums_sha256": {
+    "SHED_2022.zip": "304528910345fa25809222d6b12bcbd97dae07e9ed7364357c63d1dafb9c5e0c",
+    "SHED_2023.zip": "8467284631ad649037b7d5e4a535db1b15cfdbc45c3dba14bc21188ed11efb08"
+  },
+  "known_limitations": [
+    "Annual survey waves (not continuous monitoring)",
+    "Self-reported emergency savings, not verified balances",
+    "Panel attriters excluded; not representative of full SHED cross-section"
+  ]
+}

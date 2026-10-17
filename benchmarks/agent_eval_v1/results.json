@@ -1,0 +1,28 @@
+{
+  "goal_architect": {
+    "n": 25,
+    "schema_valid": 25,
+    "clarification_correct": 23,
+    "unnecessary_clarification": 1,
+    "necessary_clarification_missed": 1,
+    "goal_type_ok": 25
+  },
+  "evidence_agent": {
+    "n": 10,
+    "schema_valid": 10,
+    "event_count_matches": 10,
+    "provenance_retained": 10
+  },
+  "critic": {
+    "n": 5,
+    "decision_matches": 5,
+    "false_veto": 0
+  },
+  "ablations": {
+    "raw_llm_blob_contains_odds": true,
+    "structured_evidence_schema_valid": true,
+    "critic_without_checks_would_publish": true,
+    "critic_with_checks_vetoes_leakage": true
+  },
+  "note": "Scripted/deterministic evaluation. Not a live LLM leaderboard."
+}

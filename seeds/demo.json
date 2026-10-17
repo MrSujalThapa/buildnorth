@@ -1,0 +1,1249 @@
+{
+  "version": "2026-08-30.v1",
+  "users": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "persona": "waterloo_applicant"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000002",
+      "persona": "fde_candidate"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000003",
+      "persona": "wealth_builder"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000004",
+      "persona": "10k_runner"
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000005",
+      "persona": "startup_founder"
+    }
+  ],
+  "goals": [
+    {
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "title": "Get into Waterloo Engineering",
+      "goal_type": "deadline_event",
+      "success_definition": {
+        "event": "admission_offer",
+        "institution": "University of Waterloo",
+        "program": "Engineering"
+      },
+      "deadline": "2028-05-31T23:59:59Z",
+      "resource_constraints": {
+        "hours_per_week": 18
+      },
+      "state_dimensions": [
+        "academic_performance",
+        "supplementary_application",
+        "consistency"
+      ],
+      "model_requirements": {
+        "requires_reference_class": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    },
+    {
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "title": "Receive a Big Tech or FDE offer",
+      "goal_type": "deadline_event",
+      "success_definition": {
+        "event": "signed_offer",
+        "role_families": [
+          "SWE",
+          "FDE"
+        ],
+        "employment_type": "full_time"
+      },
+      "deadline": "2028-08-31T23:59:59Z",
+      "resource_constraints": {
+        "hours_per_week": 20,
+        "budget_amount": 1200,
+        "budget_currency": "CAD"
+      },
+      "state_dimensions": [
+        "technical_interview",
+        "project_signal",
+        "application_pipeline",
+        "consistency"
+      ],
+      "model_requirements": {
+        "requires_reference_class": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    },
+    {
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "title": "Reach $1M net worth",
+      "goal_type": "continuous_target",
+      "success_definition": {
+        "metric": "net_worth",
+        "operator": ">=",
+        "amount": 1000000,
+        "currency": "CAD"
+      },
+      "deadline": "2035-12-31T23:59:59Z",
+      "resource_constraints": {
+        "hours_per_week": 12,
+        "budget_amount": 2500,
+        "budget_currency": "CAD"
+      },
+      "state_dimensions": [
+        "liquid_assets",
+        "income",
+        "expenses",
+        "illiquid_equity"
+      ],
+      "model_requirements": {
+        "requires_mechanistic_model": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    },
+    {
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "title": "Run a sub-20 minute 5K",
+      "goal_type": "threshold",
+      "success_definition": {
+        "metric": "5k_time_seconds",
+        "operator": "<=",
+        "value": 1200
+      },
+      "deadline": "2028-06-30T23:59:59Z",
+      "resource_constraints": {
+        "hours_per_week": 6
+      },
+      "state_dimensions": [
+        "recent_race_time",
+        "weekly_distance",
+        "training_consistency",
+        "recovery"
+      ],
+      "model_requirements": {
+        "requires_longitudinal_performance": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    },
+    {
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "title": "Build a profitable startup",
+      "goal_type": "multi_outcome",
+      "success_definition": {
+        "metric": "startup_outcome",
+        "target": "raise_external_funding"
+      },
+      "deadline": "2028-12-31T23:59:59Z",
+      "resource_constraints": {
+        "hours_per_week": 50,
+        "budget_amount": 500,
+        "budget_currency": "CAD"
+      },
+      "state_dimensions": [
+        "mrr",
+        "runway",
+        "fundraising"
+      ],
+      "model_requirements": {
+        "requires_mechanistic_model": true
+      },
+      "forecast_status": "EXPLORATORY",
+      "version": 1
+    }
+  ],
+  "market_history": [
+    {
+      "id": "40000000-0000-4000-8000-000000000001",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.6,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-10-01",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-10-01",
+      "created_at": "2025-10-01T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000002",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.57,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-10-19",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-10-19",
+      "created_at": "2025-10-19T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000003",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.52,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-11-06",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-11-06",
+      "created_at": "2025-11-06T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000004",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.58,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-11-24",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-11-24",
+      "created_at": "2025-11-24T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000005",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.51,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-12-12",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-12-12",
+      "created_at": "2025-12-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000006",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.56,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2025-12-30",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2025-12-30",
+      "created_at": "2025-12-30T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000007",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.55,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2026-01-17",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2026-01-17",
+      "created_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000008",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.5,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2026-02-04",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2026-02-04",
+      "created_at": "2026-02-04T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000009",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.57,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2026-02-22",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2026-02-22",
+      "created_at": "2026-02-22T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000010",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "probability": 0.54,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:waterloo:2026-03-12",
+      "model_family": "demo_reference_class",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-waterloo-a",
+      "material_hash": "seed-waterloo-2026-03-12",
+      "created_at": "2026-03-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000011",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.47,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-10-01",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-10-01",
+      "created_at": "2025-10-01T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000012",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.44,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-10-19",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-10-19",
+      "created_at": "2025-10-19T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000013",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.39,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-11-06",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-11-06",
+      "created_at": "2025-11-06T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000014",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.45,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-11-24",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-11-24",
+      "created_at": "2025-11-24T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000015",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.38,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-12-12",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-12-12",
+      "created_at": "2025-12-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000016",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.43,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2025-12-30",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2025-12-30",
+      "created_at": "2025-12-30T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000017",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.42,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2026-01-17",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2026-01-17",
+      "created_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000018",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.37,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2026-02-04",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2026-02-04",
+      "created_at": "2026-02-04T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000019",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.44,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2026-02-22",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2026-02-22",
+      "created_at": "2026-02-22T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000020",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "probability": 0.41,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:fde:2026-03-12",
+      "model_family": "demo_pipeline",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-fde-a",
+      "material_hash": "seed-fde-2026-03-12",
+      "created_at": "2026-03-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000021",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.33,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-10-01",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-10-01",
+      "created_at": "2025-10-01T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000022",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.3,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-10-19",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-10-19",
+      "created_at": "2025-10-19T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000023",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.25,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-11-06",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-11-06",
+      "created_at": "2025-11-06T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000024",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.31,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-11-24",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-11-24",
+      "created_at": "2025-11-24T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000025",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.24,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-12-12",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-12-12",
+      "created_at": "2025-12-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000026",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.29,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2025-12-30",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2025-12-30",
+      "created_at": "2025-12-30T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000027",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.28,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2026-01-17",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2026-01-17",
+      "created_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000028",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.23,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2026-02-04",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2026-02-04",
+      "created_at": "2026-02-04T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000029",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.3,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2026-02-22",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2026-02-22",
+      "created_at": "2026-02-22T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000030",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "probability": 0.27,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:wealth:2026-03-12",
+      "model_family": "demo_mechanistic",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-wealth-a",
+      "material_hash": "seed-wealth-2026-03-12",
+      "created_at": "2026-03-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000031",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.52,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-10-01",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-10-01",
+      "created_at": "2025-10-01T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000032",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.49,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-10-19",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-10-19",
+      "created_at": "2025-10-19T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000033",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.44,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-11-06",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-11-06",
+      "created_at": "2025-11-06T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000034",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.5,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-11-24",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-11-24",
+      "created_at": "2025-11-24T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000035",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.43,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-12-12",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-12-12",
+      "created_at": "2025-12-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000036",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.48,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2025-12-30",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2025-12-30",
+      "created_at": "2025-12-30T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000037",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.47,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2026-01-17",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2026-01-17",
+      "created_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000038",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.42,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2026-02-04",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2026-02-04",
+      "created_at": "2026-02-04T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000039",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.49,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2026-02-22",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2026-02-22",
+      "created_at": "2026-02-22T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000040",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "probability": 0.46,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:run:2026-03-12",
+      "model_family": "demo_longitudinal",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-run-a",
+      "material_hash": "seed-run-2026-03-12",
+      "created_at": "2026-03-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000041",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.28,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-10-01",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-10-01",
+      "created_at": "2025-10-01T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000042",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.25,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-10-19",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-10-19",
+      "created_at": "2025-10-19T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000043",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.2,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-11-06",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-11-06",
+      "created_at": "2025-11-06T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000044",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.26,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-11-24",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-11-24",
+      "created_at": "2025-11-24T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000045",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.19,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-12-12",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-12-12",
+      "created_at": "2025-12-12T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000046",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.24,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2025-12-30",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2025-12-30",
+      "created_at": "2025-12-30T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000047",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.23,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2026-01-17",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2026-01-17",
+      "created_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000048",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.18,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2026-02-04",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2026-02-04",
+      "created_at": "2026-02-04T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000049",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.25,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2026-02-22",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2026-02-22",
+      "created_at": "2026-02-22T12:00:00Z"
+    },
+    {
+      "id": "40000000-0000-4000-8000-000000000050",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "probability": 0.22,
+      "forecast_status": "EXPLORATORY",
+      "evidence_watermark": "seed:startup:2026-03-12",
+      "model_family": "demo_multi_outcome",
+      "model_version": "seed-v1",
+      "assumption_hash": "seed-startup-a",
+      "material_hash": "seed-startup-2026-03-12",
+      "created_at": "2026-03-12T12:00:00Z"
+    }
+  ],
+  "raw_source_events": [
+    {
+      "id": "30000000-0000-0000-0000-000000000001",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "source_type": "manual",
+      "external_event_id": "waterloo-grade-01",
+      "observed_at": "2026-02-15T17:00:00Z",
+      "payload": {
+        "metric": "calculus_grade",
+        "value": 94,
+        "unit": "percent"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "source_type": "manual",
+      "external_event_id": "waterloo-grade-02",
+      "observed_at": "2026-04-15T17:00:00Z",
+      "payload": {
+        "metric": "physics_grade",
+        "value": 91,
+        "unit": "percent"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "source_type": "manual",
+      "external_event_id": "waterloo-grade-03",
+      "observed_at": "2026-06-15T17:00:00Z",
+      "payload": {
+        "metric": "calculus_test",
+        "value": 61,
+        "unit": "percent",
+        "context": "isolated_bad_event_after_strong_history"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "source_type": "manual",
+      "external_event_id": "waterloo-grade-04",
+      "observed_at": "2026-07-15T17:00:00Z",
+      "payload": {
+        "metric": "calculus_test",
+        "value": 64,
+        "unit": "percent",
+        "context": "potential_regime_change"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "source_type": "github",
+      "external_event_id": "fde-release-01",
+      "observed_at": "2026-03-10T18:00:00Z",
+      "payload": {
+        "event": "project_release",
+        "repository": "public-demo",
+        "milestone": "v1"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000006",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "source_type": "csv",
+      "external_event_id": "fde-interview-01",
+      "observed_at": "2026-05-10T18:00:00Z",
+      "payload": {
+        "stage": "technical_screen",
+        "result": "advanced"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000007",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "source_type": "csv",
+      "external_event_id": "fde-interview-02",
+      "observed_at": "2026-06-10T18:00:00Z",
+      "payload": {
+        "stage": "onsite",
+        "result": "rejected",
+        "context": "negative_event"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000008",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "source_type": "manual",
+      "external_event_id": "fde-choice-01",
+      "observed_at": "2026-07-01T18:00:00Z",
+      "payload": {
+        "choice": "allocate_weekly_hours",
+        "options": [
+          "interview_practice",
+          "project_work",
+          "applications"
+        ],
+        "budget_hours": 20
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000009",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "source_type": "csv",
+      "external_event_id": "wealth-snapshot-01",
+      "observed_at": "2026-01-31T23:00:00Z",
+      "payload": {
+        "liquid_assets": 38000,
+        "debt": 9000,
+        "currency": "CAD"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000010",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "source_type": "csv",
+      "external_event_id": "wealth-cashflow-01",
+      "observed_at": "2026-04-30T23:00:00Z",
+      "payload": {
+        "monthly_income": 7200,
+        "monthly_expenses": 4100,
+        "currency": "CAD"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000011",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "source_type": "manual",
+      "external_event_id": "wealth-choice-01",
+      "observed_at": "2026-06-30T23:00:00Z",
+      "payload": {
+        "choice": "allocate_surplus",
+        "options": [
+          "index_fund",
+          "education",
+          "startup_runway"
+        ],
+        "currency": "CAD"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000012",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "source_type": "csv",
+      "external_event_id": "run-10k-01",
+      "observed_at": "2026-02-01T13:00:00Z",
+      "payload": {
+        "distance_km": 10,
+        "duration_seconds": 3290
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000013",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "source_type": "csv",
+      "external_event_id": "run-10k-02",
+      "observed_at": "2026-04-01T13:00:00Z",
+      "payload": {
+        "distance_km": 10,
+        "duration_seconds": 3160
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000014",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "source_type": "calendar",
+      "external_event_id": "run-missed-01",
+      "observed_at": "2026-05-01T13:00:00Z",
+      "payload": {
+        "scheduled_session": "tempo_run",
+        "completion": "missed",
+        "context": "isolated_bad_event_after_strong_history"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000015",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "source_type": "calendar",
+      "external_event_id": "run-missed-02",
+      "observed_at": "2026-05-08T13:00:00Z",
+      "payload": {
+        "scheduled_session": "long_run",
+        "completion": "missed",
+        "context": "potential_regime_change"
+      }
+    },
+    {
+      "id": "30000000-0000-0000-0000-000000000016",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "source_type": "manual",
+      "external_event_id": "startup-mrr-01",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "payload": {
+        "metric": "mrr",
+        "value": 9000,
+        "unit": "USD/month"
+      }
+    }
+  ],
+  "evidence_events": [
+    {
+      "id": "50000000-0000-0000-0000-000000000001",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "event_type": "observation",
+      "domain": "career",
+      "metric": "applications_submitted",
+      "numeric_value": 18,
+      "unit": "count",
+      "observed_at": "2026-05-01T18:00:00Z",
+      "source_type": "manual",
+      "summary": "18 applications submitted",
+      "fingerprint": "seed:career:applications:12"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000002",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "event_type": "observation",
+      "domain": "career",
+      "metric": "responses_received",
+      "numeric_value": 4,
+      "unit": "count",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "source_type": "manual",
+      "summary": "4 recruiter responses",
+      "fingerprint": "seed:career:responses:4"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000003",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "event_type": "observation",
+      "domain": "career",
+      "metric": "phone_screens_completed",
+      "numeric_value": 2,
+      "unit": "count",
+      "observed_at": "2026-05-20T18:00:00Z",
+      "source_type": "csv",
+      "summary": "2 phone screens completed",
+      "fingerprint": "seed:career:phone:2"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000004",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "event_type": "observation",
+      "domain": "career",
+      "metric": "technical_interviews_completed",
+      "numeric_value": 4,
+      "unit": "count",
+      "observed_at": "2026-06-01T18:00:00Z",
+      "source_type": "csv",
+      "summary": "4 technical screens completed",
+      "fingerprint": "seed:career:tech:1"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000005",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "event_type": "observation",
+      "domain": "finance",
+      "metric": "liquid_assets",
+      "numeric_value": 38000,
+      "unit": "CAD",
+      "observed_at": "2026-01-31T23:00:00Z",
+      "source_type": "csv",
+      "summary": "Liquid assets snapshot",
+      "fingerprint": "seed:finance:liquid:38000"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000006",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "event_type": "observation",
+      "domain": "finance",
+      "metric": "debt",
+      "numeric_value": 9000,
+      "unit": "CAD",
+      "observed_at": "2026-01-31T23:00:00Z",
+      "source_type": "csv",
+      "summary": "Outstanding debt",
+      "fingerprint": "seed:finance:debt:9000"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000007",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "event_type": "observation",
+      "domain": "finance",
+      "metric": "monthly_income",
+      "numeric_value": 7200,
+      "unit": "CAD/month",
+      "observed_at": "2026-04-30T23:00:00Z",
+      "source_type": "csv",
+      "summary": "Monthly income",
+      "fingerprint": "seed:finance:income:7200"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000008",
+      "goal_id": "20000000-0000-0000-0000-000000000003",
+      "user_id": "10000000-0000-0000-0000-000000000003",
+      "event_type": "observation",
+      "domain": "finance",
+      "metric": "monthly_expenses",
+      "numeric_value": 4100,
+      "unit": "CAD/month",
+      "observed_at": "2026-04-30T23:00:00Z",
+      "source_type": "csv",
+      "summary": "Monthly expenses",
+      "fingerprint": "seed:finance:expenses:4100"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000009",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "event_type": "observation",
+      "domain": "running",
+      "metric": "10k_time_seconds",
+      "numeric_value": 3290,
+      "unit": "seconds",
+      "observed_at": "2026-02-01T13:00:00Z",
+      "source_type": "csv",
+      "summary": "10K race 54:50",
+      "fingerprint": "seed:run:10k:3290"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000010",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "event_type": "observation",
+      "domain": "running",
+      "metric": "10k_time_seconds",
+      "numeric_value": 3160,
+      "unit": "seconds",
+      "observed_at": "2026-04-01T13:00:00Z",
+      "source_type": "csv",
+      "summary": "10K race 52:40",
+      "fingerprint": "seed:run:10k:3160"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000011",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "event_type": "observation",
+      "domain": "running",
+      "metric": "weekly_distance_km",
+      "numeric_value": 35,
+      "unit": "km/week",
+      "observed_at": "2026-04-15T13:00:00Z",
+      "source_type": "manual",
+      "summary": "35 km weekly volume",
+      "fingerprint": "seed:run:weekly:35"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000012",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "event_type": "observation",
+      "domain": "startup",
+      "metric": "mrr",
+      "numeric_value": 9000,
+      "unit": "USD/month",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "source_type": "manual",
+      "summary": "MRR snapshot",
+      "fingerprint": "seed:startup:mrr:9000"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000013",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "event_type": "observation",
+      "domain": "startup",
+      "metric": "runway_months",
+      "numeric_value": 8,
+      "unit": "months",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "source_type": "manual",
+      "summary": "8 months runway",
+      "fingerprint": "seed:startup:runway:8"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000014",
+      "goal_id": "20000000-0000-0000-0000-000000000002",
+      "user_id": "10000000-0000-0000-0000-000000000002",
+      "event_type": "observation",
+      "domain": "career",
+      "metric": "final_rounds_reached",
+      "numeric_value": 1,
+      "unit": "count",
+      "observed_at": "2026-06-15T18:00:00Z",
+      "source_type": "csv",
+      "summary": "Reached 1 final round",
+      "fingerprint": "seed:career:final:1"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000015",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "event_type": "observation",
+      "domain": "education",
+      "metric": "average_grade",
+      "numeric_value": 92,
+      "unit": "percent",
+      "observed_at": "2026-06-01T17:00:00Z",
+      "source_type": "manual",
+      "summary": "Current average grade 92%",
+      "fingerprint": "seed:waterloo:avg:92"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000016",
+      "goal_id": "20000000-0000-0000-0000-000000000001",
+      "user_id": "10000000-0000-0000-0000-000000000001",
+      "event_type": "observation",
+      "domain": "education",
+      "metric": "contest_rank",
+      "numeric_value": 120,
+      "unit": "rank",
+      "observed_at": "2026-05-01T17:00:00Z",
+      "source_type": "manual",
+      "summary": "CCC Senior ranking ~120",
+      "fingerprint": "seed:waterloo:ccc:120"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000017",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "event_type": "observation",
+      "domain": "running",
+      "metric": "5k_time_seconds",
+      "numeric_value": 1285,
+      "unit": "seconds",
+      "observed_at": "2026-05-01T13:00:00Z",
+      "source_type": "csv",
+      "summary": "Recent 5K 21:25",
+      "fingerprint": "seed:run:5k:1285"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000018",
+      "goal_id": "20000000-0000-0000-0000-000000000004",
+      "user_id": "10000000-0000-0000-0000-000000000004",
+      "event_type": "observation",
+      "domain": "running",
+      "metric": "training_sessions_per_week",
+      "numeric_value": 4,
+      "unit": "count/week",
+      "observed_at": "2026-05-08T13:00:00Z",
+      "source_type": "manual",
+      "summary": "4 training sessions per week",
+      "fingerprint": "seed:run:sessions:4"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000019",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "event_type": "observation",
+      "domain": "startup",
+      "metric": "active_users",
+      "numeric_value": 820,
+      "unit": "count",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "source_type": "manual",
+      "summary": "820 active users",
+      "fingerprint": "seed:startup:users:820"
+    },
+    {
+      "id": "50000000-0000-0000-0000-000000000020",
+      "goal_id": "20000000-0000-0000-0000-000000000005",
+      "user_id": "10000000-0000-0000-0000-000000000005",
+      "event_type": "observation",
+      "domain": "startup",
+      "metric": "mrr_growth_mom",
+      "numeric_value": 0.11,
+      "unit": "ratio",
+      "observed_at": "2026-05-15T18:00:00Z",
+      "source_type": "manual",
+      "summary": "11% MoM MRR growth",
+      "fingerprint": "seed:startup:growth:0.11"
+    }
+  ]
+}

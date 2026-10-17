@@ -1,0 +1,543 @@
+{
+  "captured_at": "2026-08-30T17:51:23.536934+00:00",
+  "suite": "pass6_eval_v1_live_ablation",
+  "models": {
+    "baseline": "gpt-5.4",
+    "goal": "gpt-5.4-mini",
+    "evidence": "gpt-5.4-nano",
+    "research": "gpt-5.4-mini",
+    "critic": "gpt-5.4-mini"
+  },
+  "A_raw_gpt": [
+    {
+      "id": "internship",
+      "output": {
+        "answer": "Estimated probability of success: 70%.\n\nReasoning: \u201cGet a tech internship by summer 2027\u201d is a realistic goal with a fairly long runway, which helps a lot. If you\u2019re actively building relevant skills, doing projects, applying broadly, and preparing for interviews, your odds are solid. The biggest variables are your current experience level, school/background, location/work authorization, and how consistently you execute over the next year or two.\n\nRough heuristic:\n- 80\u201390% if you already have some projects, decent grades, and start applying early and widely.\n- 60\u201375% if you\u2019re still building experience but have time to improve.\n- 30\u201350% if you delay preparation, apply narrowly, or have major constraints.\n\nSo as a general estimate with limited info: about 70%."
+      },
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 64,
+        "output_tokens": 191
+      },
+      "latency_ms": 3829,
+      "retries": 0,
+      "request_id": "resp_062fc1ba753561c1006a946d99883887d2b94291c59e11bf98",
+      "estimated_cost_usd": 0.003025,
+      "contains_probability_claim": true
+    },
+    {
+      "id": "10k-sub45",
+      "output": {
+        "answer": "Estimated probability of success: 70%\n\nReasoning: A sub-45 minute 10K is a solid but very achievable goal for many recreational runners over a long timeline. With more than a year to train, success is likely if you stay healthy, build mileage gradually, follow a structured plan, and race specifically for the goal. The biggest variables are your current fitness level, injury history, age, consistency, and whether you already run shorter distances near the needed pace.\n\nRough guide:\n- If you can already run 10K in under 50 minutes: ~80\u201390%\n- If you\u2019re around 50\u201355 minutes now: ~65\u201380%\n- If you\u2019re above 55 minutes or not running consistently yet: ~40\u201365%\n\nWhat would raise the odds: consistent weekly running, tempo/threshold work, interval sessions, long runs, strength training, and staying injury-free."
+      },
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 69,
+        "output_tokens": 207
+      },
+      "latency_ms": 3379,
+      "retries": 0,
+      "request_id": "resp_096ff0ca3c6d92c5006a946d9ed14087d2b5c014226162570f",
+      "estimated_cost_usd": 0.0032774999999999996,
+      "contains_probability_claim": true
+    },
+    {
+      "id": "savings-100k",
+      "output": {
+        "answer": "Estimated probability of success: 65%.\n\nReasoning: Reaching $100k in savings by 2030 is achievable for many people, but the likelihood depends heavily on current savings, income, savings rate, debt, and investment returns. If the person is starting from little or no savings, they would need to save roughly $14k\u2013$17k per year over about 6\u20137 years, depending on growth. That is realistic for some households but difficult for others, so a moderate probability like 65% seems reasonable absent more specifics."
+      },
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 64,
+        "output_tokens": 128
+      },
+      "latency_ms": 5230,
+      "retries": 0,
+      "request_id": "resp_0ce081fc8bd31223006a946da3a03487d2a90b48f9642aa004",
+      "estimated_cost_usd": 0.00208,
+      "contains_probability_claim": true
+    },
+    {
+      "id": "mrr-10k",
+      "output": {
+        "answer": "Estimated probability of success: 55%.\n\nReasoning: Hitting $10k MRR by June 2028 is achievable for a startup, especially with multiple years of runway to iterate, but it is still far from guaranteed. The odds depend heavily on factors like founder experience, market demand, speed of execution, distribution, and whether you can find a repeatable acquisition channel. If you already have a product, clear niche, and early customer traction, the probability could be higher; if you are still at the idea stage, it may be lower.\n\nA rough range would be 40%\u201370%, with 55% as a reasonable midpoint estimate."
+      },
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 69,
+        "output_tokens": 151
+      },
+      "latency_ms": 2247,
+      "retries": 0,
+      "request_id": "resp_06996062ec6b1cb2006a946da98f4087d28c2395e721cea626",
+      "estimated_cost_usd": 0.0024375,
+      "contains_probability_claim": true
+    }
+  ],
+  "B_structured_gpt": [
+    {
+      "id": "internship",
+      "output": {
+        "ready_to_commit": false,
+        "title": "Get a tech internship by summer 2027",
+        "goal_type": "deadline_event",
+        "success_metric": "Offer accepted for a tech internship",
+        "success_operator": "contains",
+        "success_target": "tech internship",
+        "deadline": "2027-08-31",
+        "state_dimensions": [
+          "Internship offer status",
+          "Internship type"
+        ],
+        "hours_per_week": null,
+        "model_family_compatibility": "binary event model",
+        "clarifications_required": [
+          {
+            "id": "c1",
+            "question": "What counts as 'by summer 2027' for the deadline: the end of June 2027, end of August 2027, or a different date?",
+            "why_needed": "The deadline is ambiguous and must be an exact ISO-8601 date."
+          },
+          {
+            "id": "c2",
+            "question": "What counts as a 'tech internship' for this goal: any internship at a tech company, or a specific role/type (for example software engineering, data, product, or IT)?",
+            "why_needed": "The success metric needs to be precise and observable."
+          }
+        ],
+        "notes": "I preserved your wording as much as possible, but the deadline and internship definition are still ambiguous."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 539,
+        "output_tokens": 243
+      },
+      "latency_ms": 2091,
+      "retries": 0,
+      "request_id": "resp_0547565ea1a36f11006a946d9cc7a487d28d4d39f883777f53",
+      "estimated_cost_usd": 0.0006044000000000001,
+      "schema_valid": true
+    },
+    {
+      "id": "10k-sub45",
+      "output": {
+        "ready_to_commit": true,
+        "title": "Run a sub-45 minute 10K by December 2027",
+        "goal_type": "threshold",
+        "success_metric": "10K race time (minutes)",
+        "success_operator": "<=",
+        "success_target": "45",
+        "deadline": "2027-12-31",
+        "state_dimensions": [
+          "10K race time in minutes"
+        ],
+        "hours_per_week": null,
+        "model_family_compatibility": "time-series performance model for race outcomes",
+        "clarifications_required": [],
+        "notes": "Interpreted 'sub-45 minute' as a threshold of 45 minutes or less. Deadline set to the last day of December 2027."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 544,
+        "output_tokens": 141
+      },
+      "latency_ms": 1130,
+      "retries": 0,
+      "request_id": "resp_07b2a4c0b64349c6006a946da235ec87d29e394497fbfaf4a6",
+      "estimated_cost_usd": 0.00044320000000000004,
+      "schema_valid": true
+    },
+    {
+      "id": "savings-100k",
+      "output": {
+        "ready_to_commit": false,
+        "title": "Reach $100k savings by 2030",
+        "goal_type": "deadline_event",
+        "success_metric": "savings balance",
+        "success_operator": ">=",
+        "success_target": "100000",
+        "deadline": "2030-12-31",
+        "state_dimensions": [
+          "savings account balance in USD"
+        ],
+        "hours_per_week": null,
+        "model_family_compatibility": "time-series / balance-tracking model",
+        "clarifications_required": [],
+        "notes": "Interpreted as reaching a savings balance of at least $100,000 by the end of 2030."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 539,
+        "output_tokens": 126
+      },
+      "latency_ms": 1015,
+      "retries": 0,
+      "request_id": "resp_008574fb9da99147006a946da88f0487d2a32d8a9ab5125e93",
+      "estimated_cost_usd": 0.00041720000000000006,
+      "schema_valid": true
+    },
+    {
+      "id": "mrr-10k",
+      "output": {
+        "ready_to_commit": true,
+        "title": "Grow my startup to $10k MRR by June 2028",
+        "goal_type": "threshold",
+        "success_metric": "MRR",
+        "success_operator": ">=",
+        "success_target": "10000 USD",
+        "deadline": "2028-06-30",
+        "state_dimensions": [
+          "monthly recurring revenue (USD)"
+        ],
+        "hours_per_week": null,
+        "model_family_compatibility": "time-series forecasting model for startup revenue",
+        "clarifications_required": [],
+        "notes": "Interpreted 'June 2028' as the last day of the month (2028-06-30)."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 544,
+        "output_tokens": 131
+      },
+      "latency_ms": 1464,
+      "retries": 0,
+      "request_id": "resp_05c8c8bb73742092006a946dabd1e887d2aa8d04512230817c",
+      "estimated_cost_usd": 0.00042720000000000003,
+      "schema_valid": true
+    }
+  ],
+  "C_statistical_note": "OULAD shared-200 remains the statistical baseline (Brier 0.1579936 selected numerical vs 0.2227995 GPT).",
+  "D_agent_evidence": [
+    {
+      "text": "I solved 14 LeetCode mediums this week and failed a Meta phone screen.",
+      "output": {
+        "events": [
+          {
+            "event_type": "solve_completed",
+            "domain": "LeetCode",
+            "metric": "problems_solved",
+            "numeric_value": 14,
+            "categorical_value": null,
+            "unit": "count",
+            "observed_at": "unknown",
+            "source_type": "manual",
+            "summary": "From input: solved 14 LeetCode mediums this week (observed_at not specified)."
+          },
+          {
+            "event_type": "screen_result",
+            "domain": "Meta phone screen",
+            "metric": "result",
+            "numeric_value": null,
+            "categorical_value": "failed",
+            "unit": null,
+            "observed_at": "unknown",
+            "source_type": "manual",
+            "summary": "From input: failed a Meta phone screen (observed_at not specified)."
+          }
+        ],
+        "ambiguities": [
+          {
+            "id": "ambig_1",
+            "question": "What does 'this week' correspond to as a specific date range or week start/end (time zone)?",
+            "why_needed": "To normalize observed_at instead of leaving it as unknown."
+          }
+        ],
+        "conflicts": []
+      },
+      "model": "gpt-5.4-nano",
+      "usage": {
+        "input_tokens": 655,
+        "output_tokens": 198
+      },
+      "latency_ms": 1786,
+      "retries": 0,
+      "request_id": "resp_060062feca42e57f006a946dad4bfc87d290fddab982bad2d4",
+      "estimated_cost_usd": 0.0001447,
+      "schema_valid": true,
+      "event_count": 2,
+      "hallucinated_probability": false
+    },
+    {
+      "text": "Ran 8km this morning",
+      "output": {
+        "events": [
+          {
+            "event_type": "run_distance",
+            "domain": "fitness",
+            "metric": "distance",
+            "numeric_value": 8,
+            "categorical_value": null,
+            "unit": "km",
+            "observed_at": "unknown",
+            "source_type": "manual",
+            "summary": "Manual evidence: Ran 8km this morning."
+          }
+        ],
+        "ambiguities": [],
+        "conflicts": []
+      },
+      "model": "gpt-5.4-nano",
+      "usage": {
+        "input_tokens": 645,
+        "output_tokens": 77
+      },
+      "latency_ms": 1397,
+      "retries": 0,
+      "request_id": "resp_00186c565d36cd0b006a946daf17ac87d2b6d79d46c35ec102",
+      "estimated_cost_usd": 9.53e-05,
+      "schema_valid": true,
+      "event_count": 1,
+      "hallucinated_probability": false
+    },
+    {
+      "text": "I maybe kind of did some practice",
+      "output": {
+        "events": [],
+        "ambiguities": [
+          {
+            "id": "ambig_1",
+            "question": "What kind of practice was done (e.g., coding, interview prep, learning) and how would you like it quantified (time, number of sessions, or just a qualitative claim)?",
+            "why_needed": "The text is too vague to normalize into a structured, typed metric without inventing details."
+          },
+          {
+            "id": "ambig_2",
+            "question": "Was this practice a completed activity or only an intention/possibility?",
+            "why_needed": "The wording (\u201cmaybe kind of did\u201d) is ambiguous and could be either an actual observation or a future intent; we need clarity to record the correct evidence."
+          }
+        ],
+        "conflicts": []
+      },
+      "model": "gpt-5.4-nano",
+      "usage": {
+        "input_tokens": 646,
+        "output_tokens": 152
+      },
+      "latency_ms": 1684,
+      "retries": 0,
+      "request_id": "resp_0a82f3ba62e4301d006a946db0799887d2ae7e72433e92757b",
+      "estimated_cost_usd": 0.0001254,
+      "schema_valid": true,
+      "event_count": 0,
+      "hallucinated_probability": false
+    }
+  ],
+  "E_intervention_with_schema": [
+    {
+      "text": "What if I post on LinkedIn 4 times a week?",
+      "output": {
+        "understood_action": "Increase LinkedIn posting frequency to 4 posts per week.",
+        "mechanism": [
+          {
+            "variable": "linkedin visibility",
+            "description": "More frequent posts can increase profile and content visibility to recruiters, peers, and hiring managers."
+          },
+          {
+            "variable": "network engagement",
+            "description": "Regular posting can create more likes, comments, and profile visits, expanding reach over time."
+          },
+          {
+            "variable": "opportunity flow",
+            "description": "Greater visibility may lead to more inbound conversations, referrals, and job leads that could support the application pipeline."
+          }
+        ],
+        "changes": [
+          {
+            "metric": "linkedin_posts_per_week",
+            "operation": "set",
+            "value": 4,
+            "unit": "posts/week",
+            "frequency": "weekly",
+            "scope": "user",
+            "provenance": "USER_ASSUMPTION",
+            "strength": "CALIBRATED"
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "unsupported": [
+          "The provided metric set does not include a direct measure for LinkedIn visibility, engagement, inbound leads, or application outcomes.",
+          "No supplied metric directly links LinkedIn posting frequency to weekly application rate or offer attainment in a way that can be defensibly quantified."
+        ],
+        "research_claims": [],
+        "limitations": [
+          "Only one allowed metric maps directly to the intervention: linkedin_posts_per_week.",
+          "Any downstream effect on application_pipeline or weekly_application_rate would be speculative without an explicit model link or additional measured state variables.",
+          "No numeric effect on the career offer goal is estimated."
+        ],
+        "notes": "This intervention is best represented as a behavioral input change (posting frequency). Downstream career effects are plausible but not priced with the available metric set."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 716,
+        "output_tokens": 315
+      },
+      "latency_ms": 2461,
+      "retries": 0,
+      "request_id": "resp_07983c7087d0380d006a946db22c5c87d282f261ea22c4848f",
+      "estimated_cost_usd": 0.0007903999999999999,
+      "schema_valid": true,
+      "pricing_status": "NOT_PRICED",
+      "change_count": 1,
+      "claims_unsupported": true,
+      "assigns_numeric_odds": false
+    },
+    {
+      "text": "What if I do 3 mock interviews a week?",
+      "output": {
+        "understood_action": "Increase mock interview practice to 3 sessions per week.",
+        "mechanism": [
+          {
+            "variable": "mock_interviews_per_week",
+            "description": "Direct increase in interview practice volume, which can improve interview readiness, answer quality, and performance in real interviews."
+          }
+        ],
+        "changes": [
+          {
+            "metric": "mock_interviews_per_week",
+            "operation": "set",
+            "value": 3,
+            "unit": "interviews/week",
+            "frequency": "weekly",
+            "scope": "self",
+            "provenance": "USER_ASSUMPTION",
+            "strength": "CALIBRATED"
+          }
+        ],
+        "pricing_status": "NOT_PRICED",
+        "unsupported": [
+          "No supplied metric directly captures interview readiness, offer conversion, or application pipeline progression from mock interview practice.",
+          "The state dimension 'application_pipeline' is too coarse to map mock interviews into a calibrated downstream state change without additional model definitions."
+        ],
+        "research_claims": [],
+        "limitations": [
+          "I can represent the practice-volume change, but not defensibly translate it into downstream career-offer effects with the metrics provided.",
+          "No research snippets were supplied to anchor a downstream effect estimate."
+        ],
+        "notes": "The intervention is well-defined as an input action. Only the directly observed practice metric can be updated; downstream career outcome effects remain unpriced."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 714,
+        "output_tokens": 248
+      },
+      "latency_ms": 1513,
+      "retries": 0,
+      "request_id": "resp_0897a8b579e19cc7006a946db49e8887d2b2b90f77883b9ff1",
+      "estimated_cost_usd": 0.0006824000000000001,
+      "schema_valid": true,
+      "pricing_status": "NOT_PRICED",
+      "change_count": 1,
+      "claims_unsupported": true,
+      "assigns_numeric_odds": false
+    },
+    {
+      "text": "What if I increase weekly mileage to 40 km?",
+      "output": {
+        "understood_action": "Increase weekly running mileage to 40 km.",
+        "mechanism": [
+          {
+            "variable": "training_volume",
+            "description": "Raising weekly mileage increases physical training load and time spent running."
+          },
+          {
+            "variable": "fatigue_recovery_balance",
+            "description": "Higher training volume may increase fatigue and recovery demand, which can compete with time, energy, and focus available for career-search activities."
+          },
+          {
+            "variable": "career_search_capacity",
+            "description": "If the added training load reduces available bandwidth, it could indirectly affect job-search execution such as applications or interview preparation."
+          }
+        ],
+        "changes": [],
+        "pricing_status": "NOT_PRICED",
+        "unsupported": [
+          "The intervention is about running mileage, but the supplied allowed metrics are career-search metrics: weekly_application_rate, linkedin_posts_per_week, and mock_interviews_per_week.",
+          "No direct, defensible mapping from weekly mileage to any supplied career metric is provided in the context.",
+          "The goal is a career offer, but the intervention operates on an unrelated domain without an explicit mechanism into the modeled metrics."
+        ],
+        "research_claims": [],
+        "limitations": [
+          "Could be relevant only through indirect time/energy tradeoffs, but those effects are not quantifiable from the supplied metrics.",
+          "No baseline state was provided, so any modeled change would require assumptions not grounded in the context."
+        ],
+        "notes": "Interpreted literally as increasing running mileage rather than a career-search variable. If you intended a different metric, please restate the intervention in terms of the allowed career metrics."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 714,
+        "output_tokens": 300
+      },
+      "latency_ms": 1930,
+      "retries": 0,
+      "request_id": "resp_019b9f1c14ab4756006a946db624c887d283e09e9c45431c12",
+      "estimated_cost_usd": 0.0007656,
+      "schema_valid": true,
+      "pricing_status": "NOT_PRICED",
+      "change_count": 0,
+      "claims_unsupported": true,
+      "assigns_numeric_odds": false
+    },
+    {
+      "text": "What if I sleep 2 extra hours per night?",
+      "output": {
+        "understood_action": "Increase sleep by 2 hours per night on a regular basis.",
+        "mechanism": [
+          {
+            "variable": "sleep_duration",
+            "description": "More sleep may improve alertness, emotional regulation, and cognitive performance, which could indirectly affect job-search consistency and execution."
+          },
+          {
+            "variable": "energy_and_focus",
+            "description": "Higher daytime energy could support better follow-through on applications, networking, and interview preparation."
+          },
+          {
+            "variable": "application_pipeline",
+            "description": "If the user feels less fatigued, they may sustain job-search activity more consistently."
+          }
+        ],
+        "changes": [],
+        "pricing_status": "NOT_PRICED",
+        "unsupported": [
+          "No supplied model metric directly captures sleep duration, energy, focus, or recovery.",
+          "The available metrics are weekly_application_rate, linkedin_posts_per_week, and mock_interviews_per_week, but the intervention does not defensibly map to a specific directional change in any of them without additional assumptions.",
+          "No research claims were provided to anchor a quantified or metric-specific effect."
+        ],
+        "research_claims": [],
+        "limitations": [
+          "This intervention is upstream of the provided job-search metrics, so any effect on weekly applications, LinkedIn posting, or mock interviews would be speculative.",
+          "The baseline state is empty, so there is no individualized context for calibration.",
+          "A causal link from extra sleep to job-search output is plausible but not directly priced here."
+        ],
+        "notes": "If you want, I can help translate sleep-related changes into a more specific intervention on one of the allowed metrics, such as application volume or interview practice."
+      },
+      "model": "gpt-5.4-mini",
+      "usage": {
+        "input_tokens": 714,
+        "output_tokens": 306
+      },
+      "latency_ms": 2418,
+      "retries": 0,
+      "request_id": "resp_05d44b2d04186781006a946db83c3c87d292fee6611b5ced4a",
+      "estimated_cost_usd": 0.0007752000000000001,
+      "schema_valid": true,
+      "pricing_status": "NOT_PRICED",
+      "change_count": 0,
+      "claims_unsupported": true,
+      "assigns_numeric_odds": false
+    }
+  ],
+  "F_critic_validation": {
+    "deterministic_issues": [
+      "Future leakage: evidence observed_at is after now."
+    ],
+    "merged_decision": "withhold",
+    "vetoes_leakage": true
+  },
+  "G_full_play_it_out_pointer": "benchmarks/pass6_eval_v1/github_evidence_forecast.json + whatif_simulate_matrix.json",
+  "summary": {
+    "A_probability_claim_rate": 1.0,
+    "B_schema_valid_rate": 1.0,
+    "D_schema_valid_rate": 1.0,
+    "D_hallucinated_probability_rate": 0.0,
+    "E_effect_assigned_rate": 0.0,
+    "E_unsupported_claim_rate": 1.0,
+    "F_critic_vetoes_leakage": true
+  }
+}

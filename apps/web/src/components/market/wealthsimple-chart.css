@@ -1,0 +1,28 @@
+﻿.ws-chart {
+  position: relative;
+
+  width: 100%;
+  height: 100%;
+
+  overflow: hidden;
+
+  user-select: none;
+}
+
+.ws-chart-interaction-layer {
+  position: absolute;
+  inset: 0;
+
+  z-index: 5;
+
+  cursor: crosshair;
+
+  /*
+    Pointer Events lets this work for
+    mouse, touch and pen.
+
+    pan-y means vertical page scrolling
+    can still work naturally.
+  */
+  touch-action: pan-y;
+}

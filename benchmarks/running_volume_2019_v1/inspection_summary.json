@@ -1,0 +1,18 @@
+{
+  "n_cases": 109236,
+  "n_athletes": 36412,
+  "volume_threshold_km": 1500.0,
+  "base_rate_athlete": 0.4204932439854993,
+  "cases_by_checkpoint": {
+    "0": 36412,
+    "1": 36412,
+    "2": 36412
+  },
+  "split_case_counts": {
+    "train": 65742,
+    "validation": 16332,
+    "calibration": 16230,
+    "test": 10932
+  },
+  "major_column_usage": "EXCLUDED \u2014 retrospective profile tag, not a future label"
+}

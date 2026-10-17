@@ -1,0 +1,19 @@
+{
+  "title": "Software hiring process reference",
+  "domain": "hiring",
+  "keywords": ["offer", "swe", "fde", "interview", "leetcode", "phone screen"],
+  "claims": [
+    {
+      "claim": "A typical large-company software hiring funnel includes application, recruiter/phone screen, technical interviews, and an offer decision. Completing practice problems is activity evidence, not a causal effect size.",
+      "source": "frozen://hiring_process.json",
+      "source_type": "frozen",
+      "evidence_class": "mechanistic"
+    },
+    {
+      "claim": "No frozen public dataset in this repository calibrates personal offer probability for an arbitrary target-company set.",
+      "source": "frozen://hiring_process.json",
+      "source_type": "frozen",
+      "evidence_class": "assumption"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "title": "Early-stage startup outcome priors",
+  "domain": "startup",
+  "version": "2026-08-29.v1",
+  "checksum": "startup-outcome-priors-v1",
+  "population": "Pre-seed to seed-stage software startups (exploratory reference, not personalized VC calibration)",
+  "definition": "Mutually exclusive outcome buckets for multi_outcome startup path goals. Weights shift with observed revenue, runway, and fundraising signals but never from LLM intuition.",
+  "limitations": [
+    "Not calibrated to a specific founder, market, or vintage year.",
+    "Geography and sector are not modeled unless future reference artifacts add them.",
+    "No latent startup-quality score is produced."
+  ],
+  "causal_label": "associative",
+  "permitted_use": "multi_outcome baseline pricing and Possible Futures weight authority when evidence is sparse",
+  "status": "EXPLORATORY",
+  "outcome_taxonomy": [
+    "shutdown_before_traction",
+    "side_project",
+    "bootstrap_sustainable",
+    "raise_external_funding",
+    "high_growth_trajectory",
+    "other"
+  ],
+  "base_weights": {
+    "shutdown_before_traction": 0.18,
+    "side_project": 0.22,
+    "bootstrap_sustainable": 0.20,
+    "raise_external_funding": 0.14,
+    "high_growth_trajectory": 0.08,
+    "other": 0.18
+  },
+  "signal_adjustments": {
+    "term_sheet_received": {"raise_external_funding": 0.25, "high_growth_trajectory": 0.10},
+    "fundraising_conversation": {"raise_external_funding": 0.08},
+    "mrr_above_target_band": {"bootstrap_sustainable": 0.12, "high_growth_trajectory": 0.08},
+    "runway_under_3_months": {"shutdown_before_traction": 0.15},
+    "positive_revenue_growth": {"bootstrap_sustainable": 0.06, "high_growth_trajectory": 0.04}
+  },
+  "seed_round_hazard": {
+    "baseline_logit": -2.2,
+    "term_sheet_logit_boost": 1.4,
+    "runway_months_under_3_logit_penalty": -0.8,
+    "mrr_logit_per_1k": 0.02
+  },
+  "claims": [
+    {
+      "claim": "Outcome weights are frozen exploratory priors adjusted only by typed evidence signals.",
+      "source": "frozen://startup_outcome_priors.json",
+      "source_type": "frozen",
+      "evidence_class": "assumption"
+    }
+  ]
+}

@@ -1,0 +1,1641 @@
+{
+  "artifact_version": "oulad-shared-200-v1",
+  "benchmark": "oulad_completion_v1",
+  "n": 200,
+  "case_ids_sha256": "cf95bb0cd74bb2c4dbd019e310e2a61c6a50302d48c78c65a498957846cf9e0d",
+  "case_ids": [
+    "DDD-2013J-8462-14",
+    "DDD-2014J-8462-14",
+    "DDD-2013J-8462-35",
+    "DDD-2014J-8462-35",
+    "DDD-2013J-8462-70",
+    "DDD-2014J-8462-70",
+    "DDD-2013J-8462-105",
+    "DDD-2014J-8462-105",
+    "DDD-2014J-25572-14",
+    "DDD-2014J-25572-35",
+    "DDD-2014J-25572-70",
+    "DDD-2014J-25572-105",
+    "GGG-2013J-26023-14",
+    "GGG-2013J-26023-35",
+    "GGG-2013J-26023-70",
+    "GGG-2013J-26023-105",
+    "BBB-2013J-27759-14",
+    "BBB-2013J-27759-35",
+    "BBB-2013J-27759-70",
+    "BBB-2013J-27759-105",
+    "AAA-2013J-28400-14",
+    "AAA-2013J-28400-35",
+    "AAA-2013J-28400-70",
+    "AAA-2013J-28400-105",
+    "GGG-2014B-29985-14",
+    "GGG-2014B-29985-35",
+    "GGG-2014B-29985-70",
+    "GGG-2014B-29985-105",
+    "FFF-2014B-30531-14",
+    "FFF-2014B-30531-35",
+    "FFF-2014B-30531-70",
+    "FFF-2014B-30531-105",
+    "BBB-2013B-31663-14",
+    "BBB-2013B-31663-35",
+    "BBB-2013B-31663-70",
+    "BBB-2013B-31663-105",
+    "FFF-2013J-32221-14",
+    "FFF-2013J-32221-35",
+    "FFF-2013J-32221-70",
+    "FFF-2013J-32221-105",
+    "DDD-2013J-33897-14",
+    "DDD-2014J-33897-14",
+    "DDD-2013J-33897-35",
+    "DDD-2014J-33897-35",
+    "DDD-2013J-33897-70",
+    "DDD-2014J-33897-70",
+    "DDD-2013J-33897-105",
+    "DDD-2014J-33897-105",
+    "BBB-2013B-34431-14",
+    "BBB-2014J-34431-14",
+    "BBB-2013B-34431-35",
+    "BBB-2014J-34431-35",
+    "BBB-2013B-34431-70",
+    "BBB-2014J-34431-70",
+    "BBB-2013B-34431-105",
+    "BBB-2014J-34431-105",
+    "BBB-2013B-34694-14",
+    "BBB-2013B-34694-35",
+    "BBB-2013B-34694-70",
+    "BBB-2013B-34694-105",
+    "AAA-2013J-38053-14",
+    "AAA-2013J-38053-35",
+    "AAA-2013J-38053-70",
+    "AAA-2013J-38053-105",
+    "DDD-2014B-39660-14",
+    "DDD-2014B-39660-35",
+    "DDD-2014B-39660-70",
+    "DDD-2014B-39660-105",
+    "DDD-2013J-42818-14",
+    "DDD-2013J-42818-35",
+    "DDD-2013J-42818-70",
+    "DDD-2013J-42818-105",
+    "DDD-2013B-43284-14",
+    "DDD-2013B-43284-35",
+    "DDD-2013B-43284-70",
+    "DDD-2013B-43284-105",
+    "BBB-2013J-48040-14",
+    "BBB-2013J-48040-35",
+    "BBB-2013J-48040-70",
+    "BBB-2013J-48040-105",
+    "BBB-2014B-50069-14",
+    "BBB-2014B-50069-35",
+    "BBB-2014B-50069-70",
+    "BBB-2014B-50069-105",
+    "DDD-2013J-51163-14",
+    "DDD-2013J-51163-35",
+    "DDD-2013J-51163-70",
+    "DDD-2013J-51163-105",
+    "CCC-2014B-51576-14",
+    "CCC-2014J-51576-14",
+    "FFF-2013J-51576-14",
+    "CCC-2014B-51576-35",
+    "CCC-2014J-51576-35",
+    "FFF-2013J-51576-35",
+    "CCC-2014B-51576-70",
+    "CCC-2014J-51576-70",
+    "FFF-2013J-51576-70",
+    "CCC-2014B-51576-105",
+    "CCC-2014J-51576-105",
+    "FFF-2013J-51576-105",
+    "DDD-2013B-52014-14",
+    "DDD-2013B-52014-35",
+    "DDD-2013B-52014-70",
+    "DDD-2013B-52014-105",
+    "BBB-2013J-54388-14",
+    "BBB-2013J-54388-35",
+    "BBB-2013J-54388-70",
+    "BBB-2013J-54388-105",
+    "AAA-2013J-57506-14",
+    "AAA-2013J-57506-35",
+    "AAA-2013J-57506-70",
+    "AAA-2013J-57506-105",
+    "FFF-2013J-58077-14",
+    "FFF-2013J-58077-35",
+    "FFF-2013J-58077-70",
+    "FFF-2013J-58077-105",
+    "CCC-2014B-62278-14",
+    "CCC-2014B-62278-35",
+    "CCC-2014B-62278-70",
+    "CCC-2014B-62278-105",
+    "BBB-2013B-62631-14",
+    "BBB-2013B-62631-35",
+    "BBB-2013B-62631-70",
+    "BBB-2013B-62631-105",
+    "EEE-2013J-63112-14",
+    "FFF-2014J-63112-14",
+    "EEE-2013J-63112-35",
+    "FFF-2014J-63112-35",
+    "EEE-2013J-63112-70",
+    "FFF-2014J-63112-70",
+    "EEE-2013J-63112-105",
+    "FFF-2014J-63112-105",
+    "DDD-2013J-67471-14",
+    "DDD-2013J-67471-35",
+    "DDD-2013J-67471-70",
+    "DDD-2013J-67471-105",
+    "CCC-2014B-70771-14",
+    "CCC-2014B-70771-35",
+    "CCC-2014B-70771-70",
+    "CCC-2014B-70771-105",
+    "DDD-2013B-72451-14",
+    "DDD-2013B-72451-35",
+    "DDD-2013B-72451-70",
+    "DDD-2013B-72451-105",
+    "FFF-2014J-74165-14",
+    "FFF-2014J-74165-35",
+    "FFF-2014J-74165-70",
+    "FFF-2014J-74165-105",
+    "AAA-2013J-75091-14",
+    "AAA-2013J-75091-35",
+    "AAA-2013J-75091-70",
+    "AAA-2013J-75091-105",
+    "CCC-2014B-75469-14",
+    "DDD-2014B-75469-14",
+    "CCC-2014B-75469-35",
+    "DDD-2014B-75469-35",
+    "CCC-2014B-75469-70",
+    "DDD-2014B-75469-70",
+    "CCC-2014B-75469-105",
+    "DDD-2014B-75469-105",
+    "DDD-2014B-76081-14",
+    "DDD-2014J-76081-14",
+    "DDD-2014B-76081-35",
+    "DDD-2014J-76081-35",
+    "DDD-2014B-76081-70",
+    "DDD-2014J-76081-70",
+    "DDD-2014B-76081-105",
+    "DDD-2014J-76081-105",
+    "FFF-2013J-77744-14",
+    "FFF-2013J-77744-35",
+    "FFF-2013J-77744-70",
+    "FFF-2013J-77744-105",
+    "DDD-2013B-77763-14",
+    "DDD-2013B-77763-35",
+    "DDD-2013B-77763-70",
+    "DDD-2013B-77763-105",
+    "BBB-2013J-78255-14",
+    "BBB-2014B-78255-14",
+    "BBB-2013J-78255-35",
+    "BBB-2014B-78255-35",
+    "BBB-2013J-78255-70",
+    "BBB-2014B-78255-70",
+    "BBB-2013J-78255-105",
+    "BBB-2014B-78255-105",
+    "GGG-2013J-82341-14",
+    "GGG-2013J-82341-35",
+    "GGG-2013J-82341-70",
+    "GGG-2013J-82341-105",
+    "BBB-2013B-83254-14",
+    "BBB-2013B-83254-35",
+    "BBB-2013B-83254-70",
+    "BBB-2013B-83254-105",
+    "BBB-2014J-89850-14",
+    "BBB-2014J-89850-35",
+    "BBB-2014J-89850-70",
+    "BBB-2014J-89850-105",
+    "DDD-2013B-90836-14",
+    "DDD-2013B-90836-35",
+    "DDD-2013B-90836-70",
+    "DDD-2013B-90836-105"
+  ],
+  "systems": {
+    "gpt_5_4_official": {
+      "model": "gpt-5.4",
+      "prompt_version": "openai_probability_baseline_v1",
+      "source_artifact_sha256": "35aec2fef2ad8f00106dd122f14aa840608331c3a0a767d2ad8111938b16a1f8"
+    },
+    "logistic_statistical": {
+      "family": "logistic_regression",
+      "version": "oulad-completion-v1",
+      "calibration": "IsotonicRegression",
+      "artifact_sha256": "dad43f005181768c2f1fecd6220da9a9764bd695436c429889331dc36cbef2a1"
+    },
+    "pass_2_selected": {
+      "family": "hist_gradient_boosting",
+      "version": "oulad-completion-v1",
+      "calibration": "LogisticRegression",
+      "artifact_sha256": "b10ffc4b7edf25ee7130d21919348df535231271255850e23bfcb74ee0ebcc8c"
+    }
+  },
+  "brier": {
+    "gpt_5_4_official": 0.22279949999999998,
+    "logistic_statistical": 0.1729641967634455,
+    "pass_2_selected": 0.15799360362599907
+  },
+  "paired_brier_differences": {
+    "gpt_5_4_minus_logistic": 0.049835303236554496,
+    "gpt_5_4_minus_pass_2": 0.06480589637400092,
+    "logistic_minus_pass_2": 0.01497059313744642
+  },
+  "predictions": [
+    {
+      "case_id": "DDD-2013J-8462-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.67,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.6314219028909855
+    },
+    {
+      "case_id": "DDD-2014J-8462-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.18,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.2871912685717997
+    },
+    {
+      "case_id": "DDD-2013J-8462-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.83,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7573968096250883
+    },
+    {
+      "case_id": "DDD-2014J-8462-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.11,
+      "logistic_statistical": 0.04602510460251046,
+      "pass_2_selected": 0.09898722033612503
+    },
+    {
+      "case_id": "DDD-2013J-8462-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.64,
+      "logistic_statistical": 0.8073878627968337,
+      "pass_2_selected": 0.6909786890515761
+    },
+    {
+      "case_id": "DDD-2014J-8462-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.03614216530095239
+    },
+    {
+      "case_id": "DDD-2013J-8462-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.9056603773584906,
+      "pass_2_selected": 0.7315728962011703
+    },
+    {
+      "case_id": "DDD-2014J-8462-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.06,
+      "logistic_statistical": 0.0,
+      "pass_2_selected": 0.028528197542957337
+    },
+    {
+      "case_id": "DDD-2014J-25572-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.27,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.22313058291625998
+    },
+    {
+      "case_id": "DDD-2014J-25572-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.76,
+      "logistic_statistical": 0.4052631578947368,
+      "pass_2_selected": 0.3469312897649399
+    },
+    {
+      "case_id": "DDD-2014J-25572-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.31,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.13672359952082505
+    },
+    {
+      "case_id": "DDD-2014J-25572-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.18,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.05147744255064915
+    },
+    {
+      "case_id": "GGG-2013J-26023-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.39,
+      "logistic_statistical": 0.8073878627968337,
+      "pass_2_selected": 0.7442422574413476
+    },
+    {
+      "case_id": "GGG-2013J-26023-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.18,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.7288512201870487
+    },
+    {
+      "case_id": "GGG-2013J-26023-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.56,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7694661453342941
+    },
+    {
+      "case_id": "GGG-2013J-26023-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.8939217697688046
+    },
+    {
+      "case_id": "BBB-2013J-27759-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.43,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.6639190532346756
+    },
+    {
+      "case_id": "BBB-2013J-27759-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.52,
+      "logistic_statistical": 0.5840336134453782,
+      "pass_2_selected": 0.4612362194726635
+    },
+    {
+      "case_id": "BBB-2013J-27759-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.69,
+      "logistic_statistical": 0.5840336134453782,
+      "pass_2_selected": 0.5467698906647207
+    },
+    {
+      "case_id": "BBB-2013J-27759-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.8033874111954329
+    },
+    {
+      "case_id": "AAA-2013J-28400-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7988685047501811
+    },
+    {
+      "case_id": "AAA-2013J-28400-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.73,
+      "logistic_statistical": 0.8073878627968337,
+      "pass_2_selected": 0.717008083431872
+    },
+    {
+      "case_id": "AAA-2013J-28400-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.79,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.8516556729868153
+    },
+    {
+      "case_id": "AAA-2013J-28400-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.8703624581417373
+    },
+    {
+      "case_id": "GGG-2014B-29985-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.38,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.6941683483247704
+    },
+    {
+      "case_id": "GGG-2014B-29985-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.16,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.718592528521028
+    },
+    {
+      "case_id": "GGG-2014B-29985-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.66,
+      "logistic_statistical": 0.6944444444444444,
+      "pass_2_selected": 0.8161036596884949
+    },
+    {
+      "case_id": "GGG-2014B-29985-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.8965951079779686
+    },
+    {
+      "case_id": "FFF-2014B-30531-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.53,
+      "logistic_statistical": 0.2608695652173913,
+      "pass_2_selected": 0.5277313688273947
+    },
+    {
+      "case_id": "FFF-2014B-30531-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.7196337017710668
+    },
+    {
+      "case_id": "FFF-2014B-30531-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.87,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.6732522422750438
+    },
+    {
+      "case_id": "FFF-2014B-30531-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.74,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.033976256497733406
+    },
+    {
+      "case_id": "BBB-2013B-31663-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.63,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7264229487559923
+    },
+    {
+      "case_id": "BBB-2013B-31663-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.94,
+      "logistic_statistical": 0.8888888888888888,
+      "pass_2_selected": 0.9238267496293493
+    },
+    {
+      "case_id": "BBB-2013B-31663-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.89,
+      "logistic_statistical": 0.9344262295081968,
+      "pass_2_selected": 0.9625627963300921
+    },
+    {
+      "case_id": "BBB-2013B-31663-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.95,
+      "logistic_statistical": 0.9344262295081968,
+      "pass_2_selected": 0.9635936393155704
+    },
+    {
+      "case_id": "FFF-2013J-32221-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.52,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.5704570237043541
+    },
+    {
+      "case_id": "FFF-2013J-32221-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.93,
+      "logistic_statistical": 0.806060606060606,
+      "pass_2_selected": 0.7895199586072326
+    },
+    {
+      "case_id": "FFF-2013J-32221-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.95,
+      "logistic_statistical": 0.8073878627968337,
+      "pass_2_selected": 0.8814432879583589
+    },
+    {
+      "case_id": "FFF-2013J-32221-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.9,
+      "logistic_statistical": 0.9344262295081968,
+      "pass_2_selected": 0.9426816116325063
+    },
+    {
+      "case_id": "DDD-2013J-33897-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.14,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.08986245218982118
+    },
+    {
+      "case_id": "DDD-2014J-33897-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.11,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.10686264453426175
+    },
+    {
+      "case_id": "DDD-2013J-33897-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.33,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.12379428812067472
+    },
+    {
+      "case_id": "DDD-2014J-33897-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.07,
+      "logistic_statistical": 0.0673076923076923,
+      "pass_2_selected": 0.02858358939981563
+    },
+    {
+      "case_id": "DDD-2013J-33897-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.32,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.02204670261912224
+    },
+    {
+      "case_id": "DDD-2014J-33897-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.025157232704402517,
+      "pass_2_selected": 0.025174354951015988
+    },
+    {
+      "case_id": "DDD-2013J-33897-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.24,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.00306081270904892
+    },
+    {
+      "case_id": "DDD-2014J-33897-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.05,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.025292248341203565
+    },
+    {
+      "case_id": "BBB-2013B-34431-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.23,
+      "logistic_statistical": 0.4052631578947368,
+      "pass_2_selected": 0.5141244869608467
+    },
+    {
+      "case_id": "BBB-2014J-34431-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.17,
+      "logistic_statistical": 0.4052631578947368,
+      "pass_2_selected": 0.15689391947318793
+    },
+    {
+      "case_id": "BBB-2013B-34431-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.21,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.06905965427985346
+    },
+    {
+      "case_id": "BBB-2014J-34431-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.08,
+      "logistic_statistical": 0.2608695652173913,
+      "pass_2_selected": 0.03146240633607337
+    },
+    {
+      "case_id": "BBB-2013B-34431-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.46,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.11027790486516605
+    },
+    {
+      "case_id": "BBB-2014J-34431-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.027719606329803376
+    },
+    {
+      "case_id": "BBB-2013B-34431-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.35,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.007138972302411113
+    },
+    {
+      "case_id": "BBB-2014J-34431-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.025157232704402517,
+      "pass_2_selected": 0.027849078800485268
+    },
+    {
+      "case_id": "BBB-2013B-34694-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.12,
+      "logistic_statistical": 0.26666666666666666,
+      "pass_2_selected": 0.07854034033629842
+    },
+    {
+      "case_id": "BBB-2013B-34694-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.08,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.00896863584594438
+    },
+    {
+      "case_id": "BBB-2013B-34694-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.06,
+      "logistic_statistical": 0.04602510460251046,
+      "pass_2_selected": 0.0068893940471360686
+    },
+    {
+      "case_id": "BBB-2013B-34694-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.006148359269177195
+    },
+    {
+      "case_id": "AAA-2013J-38053-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.67,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.8719502200069728
+    },
+    {
+      "case_id": "AAA-2013J-38053-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.82,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.9129761718863463
+    },
+    {
+      "case_id": "AAA-2013J-38053-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.78,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.9013631002539235
+    },
+    {
+      "case_id": "AAA-2013J-38053-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.77,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.9097168963722877
+    },
+    {
+      "case_id": "DDD-2014B-39660-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.62,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.6886625355644307
+    },
+    {
+      "case_id": "DDD-2014B-39660-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.8901773931554791
+    },
+    {
+      "case_id": "DDD-2014B-39660-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.9,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.8536878994365824
+    },
+    {
+      "case_id": "DDD-2014B-39660-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.8220153577087591
+    },
+    {
+      "case_id": "DDD-2013J-42818-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.36,
+      "logistic_statistical": 0.3408450704225352,
+      "pass_2_selected": 0.4642805300411272
+    },
+    {
+      "case_id": "DDD-2013J-42818-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.39,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.075102321759794
+    },
+    {
+      "case_id": "DDD-2013J-42818-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.13,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.004894855746001184
+    },
+    {
+      "case_id": "DDD-2013J-42818-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.12,
+      "logistic_statistical": 0.0026954177897574125,
+      "pass_2_selected": 0.0017376213264056488
+    },
+    {
+      "case_id": "DDD-2013B-43284-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.4,
+      "logistic_statistical": 0.0673076923076923,
+      "pass_2_selected": 0.3063572883343924
+    },
+    {
+      "case_id": "DDD-2013B-43284-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.5180926854603878
+    },
+    {
+      "case_id": "DDD-2013B-43284-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.7121212121212122,
+      "pass_2_selected": 0.715142703361556
+    },
+    {
+      "case_id": "DDD-2013B-43284-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.7682605860305646
+    },
+    {
+      "case_id": "BBB-2013J-48040-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.46,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.7703067783411786
+    },
+    {
+      "case_id": "BBB-2013J-48040-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.83,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7305316820531308
+    },
+    {
+      "case_id": "BBB-2013J-48040-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.83,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.7216932918529037
+    },
+    {
+      "case_id": "BBB-2013J-48040-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.87,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.8556807892401024
+    },
+    {
+      "case_id": "BBB-2014B-50069-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.6920980926430518,
+      "pass_2_selected": 0.6898342013654659
+    },
+    {
+      "case_id": "BBB-2014B-50069-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.71,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.7133090304293443
+    },
+    {
+      "case_id": "BBB-2014B-50069-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.7,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.7614661817416228
+    },
+    {
+      "case_id": "BBB-2014B-50069-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.87,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.7702334735171259
+    },
+    {
+      "case_id": "DDD-2013J-51163-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.41,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.5088618732690281
+    },
+    {
+      "case_id": "DDD-2013J-51163-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.6880044715615558
+    },
+    {
+      "case_id": "DDD-2013J-51163-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.625423560977651
+    },
+    {
+      "case_id": "DDD-2013J-51163-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.6920980926430518,
+      "pass_2_selected": 0.6705933768799648
+    },
+    {
+      "case_id": "CCC-2014B-51576-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.31,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.2642345173234354
+    },
+    {
+      "case_id": "CCC-2014J-51576-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.38556612010778435
+    },
+    {
+      "case_id": "FFF-2013J-51576-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.19,
+      "logistic_statistical": 0.10227272727272728,
+      "pass_2_selected": 0.0429347562356307
+    },
+    {
+      "case_id": "CCC-2014B-51576-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.81,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.7109686161696823
+    },
+    {
+      "case_id": "CCC-2014J-51576-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.9,
+      "logistic_statistical": 0.806060606060606,
+      "pass_2_selected": 0.8161312202216576
+    },
+    {
+      "case_id": "FFF-2013J-51576-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.6136119824423019
+    },
+    {
+      "case_id": "CCC-2014B-51576-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.44,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.13882436186444763
+    },
+    {
+      "case_id": "CCC-2014J-51576-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.67,
+      "logistic_statistical": 0.5840336134453782,
+      "pass_2_selected": 0.4346044820488173
+    },
+    {
+      "case_id": "FFF-2013J-51576-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.78,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.6575655643884468
+    },
+    {
+      "case_id": "CCC-2014B-51576-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.0673076923076923,
+      "pass_2_selected": 0.012157540601107632
+    },
+    {
+      "case_id": "CCC-2014J-51576-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.019592989618935193
+    },
+    {
+      "case_id": "FFF-2013J-51576-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.94,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.843621816137885
+    },
+    {
+      "case_id": "DDD-2013B-52014-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.29,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.23299926807281748
+    },
+    {
+      "case_id": "DDD-2013B-52014-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.38,
+      "logistic_statistical": 0.42063492063492064,
+      "pass_2_selected": 0.2420001793815991
+    },
+    {
+      "case_id": "DDD-2013B-52014-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.46,
+      "logistic_statistical": 0.3408450704225352,
+      "pass_2_selected": 0.1589675765176454
+    },
+    {
+      "case_id": "DDD-2013B-52014-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.38,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.18597052454857332
+    },
+    {
+      "case_id": "BBB-2013J-54388-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.09,
+      "logistic_statistical": 0.26666666666666666,
+      "pass_2_selected": 0.08128741993307018
+    },
+    {
+      "case_id": "BBB-2013J-54388-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.1055064405273635,
+      "pass_2_selected": 0.028691543842092188
+    },
+    {
+      "case_id": "BBB-2013J-54388-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.04602510460251046,
+      "pass_2_selected": 0.029171358986038242
+    },
+    {
+      "case_id": "BBB-2013J-54388-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.029307407894715864
+    },
+    {
+      "case_id": "AAA-2013J-57506-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.47,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.8176437888723784
+    },
+    {
+      "case_id": "AAA-2013J-57506-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.8732091803131794
+    },
+    {
+      "case_id": "AAA-2013J-57506-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.89,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.9368807908849156
+    },
+    {
+      "case_id": "AAA-2013J-57506-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.88,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.9335989418353199
+    },
+    {
+      "case_id": "FFF-2013J-58077-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.24,
+      "logistic_statistical": 0.10227272727272728,
+      "pass_2_selected": 0.23950906716249062
+    },
+    {
+      "case_id": "FFF-2013J-58077-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.12,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.09192820414400005
+    },
+    {
+      "case_id": "FFF-2013J-58077-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.05,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.011369190753939398
+    },
+    {
+      "case_id": "FFF-2013J-58077-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.08,
+      "logistic_statistical": 0.0026954177897574125,
+      "pass_2_selected": 0.018079889015580754
+    },
+    {
+      "case_id": "CCC-2014B-62278-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.68,
+      "logistic_statistical": 0.48507462686567154,
+      "pass_2_selected": 0.4985490289543647
+    },
+    {
+      "case_id": "CCC-2014B-62278-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.42053512173896507
+    },
+    {
+      "case_id": "CCC-2014B-62278-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.8,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.41898934482572026
+    },
+    {
+      "case_id": "CCC-2014B-62278-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.75,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.689325828538785
+    },
+    {
+      "case_id": "BBB-2013B-62631-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.19,
+      "logistic_statistical": 0.42063492063492064,
+      "pass_2_selected": 0.4624813908319518
+    },
+    {
+      "case_id": "BBB-2013B-62631-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.68,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.6811696000062987
+    },
+    {
+      "case_id": "BBB-2013B-62631-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.7705512401370708
+    },
+    {
+      "case_id": "BBB-2013B-62631-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.86,
+      "logistic_statistical": 0.7121212121212122,
+      "pass_2_selected": 0.8098295441113873
+    },
+    {
+      "case_id": "EEE-2013J-63112-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.62,
+      "logistic_statistical": 0.6944444444444444,
+      "pass_2_selected": 0.8019164381704815
+    },
+    {
+      "case_id": "FFF-2014J-63112-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.28,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.4910047774785906
+    },
+    {
+      "case_id": "EEE-2013J-63112-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.95,
+      "logistic_statistical": 0.9344262295081968,
+      "pass_2_selected": 0.8483781529948294
+    },
+    {
+      "case_id": "FFF-2014J-63112-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.53,
+      "logistic_statistical": 0.546647165192765,
+      "pass_2_selected": 0.3858259629772048
+    },
+    {
+      "case_id": "EEE-2013J-63112-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.97,
+      "logistic_statistical": 0.9344262295081968,
+      "pass_2_selected": 0.9573841009261141
+    },
+    {
+      "case_id": "FFF-2014J-63112-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.36,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.17331943731207392
+    },
+    {
+      "case_id": "EEE-2013J-63112-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.93,
+      "logistic_statistical": 0.9296875,
+      "pass_2_selected": 0.9694192147510198
+    },
+    {
+      "case_id": "FFF-2014J-63112-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.54,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.393600625901264
+    },
+    {
+      "case_id": "DDD-2013J-67471-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.28,
+      "logistic_statistical": 0.26666666666666666,
+      "pass_2_selected": 0.48401696335515415
+    },
+    {
+      "case_id": "DDD-2013J-67471-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.57,
+      "logistic_statistical": 0.4166666666666667,
+      "pass_2_selected": 0.39184592024582926
+    },
+    {
+      "case_id": "DDD-2013J-67471-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.560313815068348
+    },
+    {
+      "case_id": "DDD-2013J-67471-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.78,
+      "logistic_statistical": 0.5341614906832297,
+      "pass_2_selected": 0.5855532491450216
+    },
+    {
+      "case_id": "CCC-2014B-70771-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.24,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.22503906983903363
+    },
+    {
+      "case_id": "CCC-2014B-70771-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.34,
+      "logistic_statistical": 0.20509849362688296,
+      "pass_2_selected": 0.0950357575106839
+    },
+    {
+      "case_id": "CCC-2014B-70771-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.17,
+      "logistic_statistical": 0.0673076923076923,
+      "pass_2_selected": 0.02092189442309379
+    },
+    {
+      "case_id": "CCC-2014B-70771-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.1,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.0031560477456026325
+    },
+    {
+      "case_id": "DDD-2013B-72451-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.16,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.05464670105875312
+    },
+    {
+      "case_id": "DDD-2013B-72451-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.1,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.004777368662737745
+    },
+    {
+      "case_id": "DDD-2013B-72451-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.002415283370007586
+    },
+    {
+      "case_id": "DDD-2013B-72451-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.0020141278359320303
+    },
+    {
+      "case_id": "FFF-2014J-74165-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.56,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.6266434683251503
+    },
+    {
+      "case_id": "FFF-2014J-74165-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.97,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.7569988395645292
+    },
+    {
+      "case_id": "FFF-2014J-74165-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.8888888888888888,
+      "pass_2_selected": 0.8771577341724501
+    },
+    {
+      "case_id": "FFF-2014J-74165-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.82,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.8045379996112314
+    },
+    {
+      "case_id": "AAA-2013J-75091-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.72,
+      "logistic_statistical": 0.8073878627968337,
+      "pass_2_selected": 0.8482769712003793
+    },
+    {
+      "case_id": "AAA-2013J-75091-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.8874770977953924
+    },
+    {
+      "case_id": "AAA-2013J-75091-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.74,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.8954161329359658
+    },
+    {
+      "case_id": "AAA-2013J-75091-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.81,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.8806143306025654
+    },
+    {
+      "case_id": "CCC-2014B-75469-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.18,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.03809086249736537
+    },
+    {
+      "case_id": "DDD-2014B-75469-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.08,
+      "logistic_statistical": 0.025157232704402517,
+      "pass_2_selected": 0.0449087697042982
+    },
+    {
+      "case_id": "CCC-2014B-75469-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.06,
+      "logistic_statistical": 0.04602510460251046,
+      "pass_2_selected": 0.004196165579106869
+    },
+    {
+      "case_id": "DDD-2014B-75469-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.01812875942372182
+    },
+    {
+      "case_id": "CCC-2014B-75469-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.002393823082492335
+    },
+    {
+      "case_id": "DDD-2014B-75469-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.01800544882158056
+    },
+    {
+      "case_id": "CCC-2014B-75469-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.002248676116986809
+    },
+    {
+      "case_id": "DDD-2014B-75469-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.03,
+      "logistic_statistical": 0.0026954177897574125,
+      "pass_2_selected": 0.018090392711690134
+    },
+    {
+      "case_id": "DDD-2014B-76081-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.38,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.4972402896792299
+    },
+    {
+      "case_id": "DDD-2014J-76081-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.18,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.16361434293588004
+    },
+    {
+      "case_id": "DDD-2014B-76081-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.77,
+      "logistic_statistical": 0.5341614906832297,
+      "pass_2_selected": 0.44165943003821984
+    },
+    {
+      "case_id": "DDD-2014J-76081-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.31,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.31603277174990574
+    },
+    {
+      "case_id": "DDD-2014B-76081-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.82,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.727953395288448
+    },
+    {
+      "case_id": "DDD-2014J-76081-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.17,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.2486473965087045
+    },
+    {
+      "case_id": "DDD-2014B-76081-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.74,
+      "logistic_statistical": 0.6,
+      "pass_2_selected": 0.5903867781697157
+    },
+    {
+      "case_id": "DDD-2014J-76081-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.19,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.3173923534978681
+    },
+    {
+      "case_id": "FFF-2013J-77744-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.22,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.2821194465250355
+    },
+    {
+      "case_id": "FFF-2013J-77744-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.78,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.7379977887992893
+    },
+    {
+      "case_id": "FFF-2013J-77744-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.9033570818160301
+    },
+    {
+      "case_id": "FFF-2013J-77744-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.8698845607904889
+    },
+    {
+      "case_id": "DDD-2013B-77763-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.39,
+      "logistic_statistical": 0.1007905138339921,
+      "pass_2_selected": 0.42674795074588984
+    },
+    {
+      "case_id": "DDD-2013B-77763-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.76,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.6758134216133264
+    },
+    {
+      "case_id": "DDD-2013B-77763-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.82,
+      "logistic_statistical": 0.7610619469026548,
+      "pass_2_selected": 0.7513566272041745
+    },
+    {
+      "case_id": "DDD-2013B-77763-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.91,
+      "logistic_statistical": 0.8888888888888888,
+      "pass_2_selected": 0.8249147160477617
+    },
+    {
+      "case_id": "BBB-2013J-78255-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.42063492063492064,
+      "pass_2_selected": 0.5320893819645305
+    },
+    {
+      "case_id": "BBB-2014B-78255-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.34,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.3745978226750014
+    },
+    {
+      "case_id": "BBB-2013J-78255-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.81,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.6752969457559241
+    },
+    {
+      "case_id": "BBB-2014B-78255-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.14,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.0867906254737074
+    },
+    {
+      "case_id": "BBB-2013J-78255-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.34,
+      "logistic_statistical": 0.3550295857988165,
+      "pass_2_selected": 0.09354823656426833
+    },
+    {
+      "case_id": "BBB-2014B-78255-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.74,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.3304779829448884
+    },
+    {
+      "case_id": "BBB-2013J-78255-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.29,
+      "logistic_statistical": 0.03463203463203463,
+      "pass_2_selected": 0.004207335405036045
+    },
+    {
+      "case_id": "BBB-2014B-78255-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.58,
+      "logistic_statistical": 0.11650485436893204,
+      "pass_2_selected": 0.09246969744783187
+    },
+    {
+      "case_id": "GGG-2013J-82341-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.19,
+      "logistic_statistical": 0.695852534562212,
+      "pass_2_selected": 0.6899837799277031
+    },
+    {
+      "case_id": "GGG-2013J-82341-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.22,
+      "logistic_statistical": 0.6640106241699867,
+      "pass_2_selected": 0.7369901701778317
+    },
+    {
+      "case_id": "GGG-2013J-82341-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.23,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.5474836882640867
+    },
+    {
+      "case_id": "GGG-2013J-82341-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.83,
+      "logistic_statistical": 0.782608695652174,
+      "pass_2_selected": 0.7763241719794435
+    },
+    {
+      "case_id": "BBB-2013B-83254-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.58,
+      "logistic_statistical": 0.5341614906832297,
+      "pass_2_selected": 0.5637523909029868
+    },
+    {
+      "case_id": "BBB-2013B-83254-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.62,
+      "logistic_statistical": 0.6,
+      "pass_2_selected": 0.48695336211137336
+    },
+    {
+      "case_id": "BBB-2013B-83254-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.82,
+      "logistic_statistical": 0.6920980926430518,
+      "pass_2_selected": 0.527899267944927
+    },
+    {
+      "case_id": "BBB-2013B-83254-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.84,
+      "logistic_statistical": 0.8374760994263862,
+      "pass_2_selected": 0.8158831244308646
+    },
+    {
+      "case_id": "BBB-2014J-89850-14",
+      "outcome": 1,
+      "gpt_5_4_official": 0.23,
+      "logistic_statistical": 0.5475000000000001,
+      "pass_2_selected": 0.5031615404803027
+    },
+    {
+      "case_id": "BBB-2014J-89850-35",
+      "outcome": 1,
+      "gpt_5_4_official": 0.83,
+      "logistic_statistical": 0.6098283007696863,
+      "pass_2_selected": 0.6830706516633358
+    },
+    {
+      "case_id": "BBB-2014J-89850-70",
+      "outcome": 1,
+      "gpt_5_4_official": 0.58,
+      "logistic_statistical": 0.8861607142857143,
+      "pass_2_selected": 0.9087949208533785
+    },
+    {
+      "case_id": "BBB-2014J-89850-105",
+      "outcome": 1,
+      "gpt_5_4_official": 0.34,
+      "logistic_statistical": 0.8237547892720306,
+      "pass_2_selected": 0.8761475970644386
+    },
+    {
+      "case_id": "DDD-2013B-90836-14",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.10227272727272728,
+      "pass_2_selected": 0.3871811925246485
+    },
+    {
+      "case_id": "DDD-2013B-90836-35",
+      "outcome": 0,
+      "gpt_5_4_official": 0.42,
+      "logistic_statistical": 0.06451612903225806,
+      "pass_2_selected": 0.15972465775072112
+    },
+    {
+      "case_id": "DDD-2013B-90836-70",
+      "outcome": 0,
+      "gpt_5_4_official": 0.12,
+      "logistic_statistical": 0.02099737532808399,
+      "pass_2_selected": 0.009138507721201075
+    },
+    {
+      "case_id": "DDD-2013B-90836-105",
+      "outcome": 0,
+      "gpt_5_4_official": 0.16,
+      "logistic_statistical": 0.00880503144654088,
+      "pass_2_selected": 0.02099951105006415
+    }
+  ],
+  "runtime_seconds": 22.018352999992203,
+  "evaluation_command": "uv run python scripts/evaluate_shared_subset.py"
+}

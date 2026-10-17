@@ -1,0 +1,2012 @@
+{
+  "status": "executed",
+  "contract": "openai_probability_baseline_v1",
+  "model": "gpt-5.4",
+  "prompt_version": "openai_probability_baseline_v1",
+  "n": 200,
+  "brier": 0.22279949999999998,
+  "predictions_written": 200,
+  "estimated_cost_usd": 0.269565,
+  "predictions": [
+    {
+      "case_id": "DDD-2013J-8462-14",
+      "probability": 0.67,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-8462-14",
+      "probability": 0.18,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 439,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013375
+    },
+    {
+      "case_id": "DDD-2013J-8462-35",
+      "probability": 0.83,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-8462-35",
+      "probability": 0.11,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 441,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013425
+    },
+    {
+      "case_id": "DDD-2013J-8462-70",
+      "probability": 0.64,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "DDD-2014J-8462-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 442,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001345
+    },
+    {
+      "case_id": "DDD-2013J-8462-105",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "DDD-2014J-8462-105",
+      "probability": 0.06,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-25572-14",
+      "probability": 0.27,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-25572-35",
+      "probability": 0.76,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-25572-70",
+      "probability": 0.31,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2014J-25572-105",
+      "probability": 0.18,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "GGG-2013J-26023-14",
+      "probability": 0.39,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "GGG-2013J-26023-35",
+      "probability": 0.18,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "GGG-2013J-26023-70",
+      "probability": 0.56,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "GGG-2013J-26023-105",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "BBB-2013J-27759-14",
+      "probability": 0.43,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013J-27759-35",
+      "probability": 0.52,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013J-27759-70",
+      "probability": 0.69,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "BBB-2013J-27759-105",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "AAA-2013J-28400-14",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-28400-35",
+      "probability": 0.73,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-28400-70",
+      "probability": 0.79,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "AAA-2013J-28400-105",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "GGG-2014B-29985-14",
+      "probability": 0.38,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "GGG-2014B-29985-35",
+      "probability": 0.16,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "GGG-2014B-29985-70",
+      "probability": 0.66,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "GGG-2014B-29985-105",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2014B-30531-14",
+      "probability": 0.53,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "FFF-2014B-30531-35",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "FFF-2014B-30531-70",
+      "probability": 0.87,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "FFF-2014B-30531-105",
+      "probability": 0.74,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 450,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001365
+    },
+    {
+      "case_id": "BBB-2013B-31663-14",
+      "probability": 0.63,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-31663-35",
+      "probability": 0.94,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-31663-70",
+      "probability": 0.89,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 460,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00139
+    },
+    {
+      "case_id": "BBB-2013B-31663-105",
+      "probability": 0.95,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 450,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001365
+    },
+    {
+      "case_id": "FFF-2013J-32221-14",
+      "probability": 0.52,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "FFF-2013J-32221-35",
+      "probability": 0.93,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "FFF-2013J-32221-70",
+      "probability": 0.95,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "FFF-2013J-32221-105",
+      "probability": 0.9,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "DDD-2013J-33897-14",
+      "probability": 0.14,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014J-33897-14",
+      "probability": 0.11,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013J-33897-35",
+      "probability": 0.33,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-33897-35",
+      "probability": 0.07,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013J-33897-70",
+      "probability": 0.32,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-33897-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013J-33897-105",
+      "probability": 0.24,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "DDD-2014J-33897-105",
+      "probability": 0.05,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34431-14",
+      "probability": 0.23,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014J-34431-14",
+      "probability": 0.17,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34431-35",
+      "probability": 0.21,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014J-34431-35",
+      "probability": 0.08,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34431-70",
+      "probability": 0.46,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014J-34431-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34431-105",
+      "probability": 0.35,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "BBB-2014J-34431-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34694-14",
+      "probability": 0.12,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34694-35",
+      "probability": 0.08,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34694-70",
+      "probability": 0.06,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013B-34694-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "AAA-2013J-38053-14",
+      "probability": 0.67,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-38053-35",
+      "probability": 0.82,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-38053-70",
+      "probability": 0.78,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "AAA-2013J-38053-105",
+      "probability": 0.77,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "DDD-2014B-39660-14",
+      "probability": 0.62,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014B-39660-35",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014B-39660-70",
+      "probability": 0.9,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "DDD-2014B-39660-105",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "DDD-2013J-42818-14",
+      "probability": 0.36,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-42818-35",
+      "probability": 0.39,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-42818-70",
+      "probability": 0.13,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "DDD-2013J-42818-105",
+      "probability": 0.12,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "DDD-2013B-43284-14",
+      "probability": 0.4,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 442,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001345
+    },
+    {
+      "case_id": "DDD-2013B-43284-35",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "DDD-2013B-43284-70",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013B-43284-105",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "BBB-2013J-48040-14",
+      "probability": 0.46,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 442,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001345
+    },
+    {
+      "case_id": "BBB-2013J-48040-35",
+      "probability": 0.83,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013J-48040-70",
+      "probability": 0.83,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 453,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013725
+    },
+    {
+      "case_id": "BBB-2013J-48040-105",
+      "probability": 0.87,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "BBB-2014B-50069-14",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014B-50069-35",
+      "probability": 0.71,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014B-50069-70",
+      "probability": 0.7,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "BBB-2014B-50069-105",
+      "probability": 0.87,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013J-51163-14",
+      "probability": 0.41,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-51163-35",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-51163-70",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013J-51163-105",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "CCC-2014B-51576-14",
+      "probability": 0.31,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "CCC-2014J-51576-14",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "FFF-2013J-51576-14",
+      "probability": 0.19,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "CCC-2014B-51576-35",
+      "probability": 0.81,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "CCC-2014J-51576-35",
+      "probability": 0.9,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2013J-51576-35",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "CCC-2014B-51576-70",
+      "probability": 0.44,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "CCC-2014J-51576-70",
+      "probability": 0.67,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2013J-51576-70",
+      "probability": 0.78,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "CCC-2014B-51576-105",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "CCC-2014J-51576-105",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "FFF-2013J-51576-105",
+      "probability": 0.94,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "DDD-2013B-52014-14",
+      "probability": 0.29,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "DDD-2013B-52014-35",
+      "probability": 0.38,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "DDD-2013B-52014-70",
+      "probability": 0.46,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013B-52014-105",
+      "probability": 0.38,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "BBB-2013J-54388-14",
+      "probability": 0.09,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013J-54388-35",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013J-54388-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "BBB-2013J-54388-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "AAA-2013J-57506-14",
+      "probability": 0.47,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-57506-35",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-57506-70",
+      "probability": 0.89,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "AAA-2013J-57506-105",
+      "probability": 0.88,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2013J-58077-14",
+      "probability": 0.24,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 440,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00134
+    },
+    {
+      "case_id": "FFF-2013J-58077-35",
+      "probability": 0.12,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "FFF-2013J-58077-70",
+      "probability": 0.05,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "FFF-2013J-58077-105",
+      "probability": 0.08,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "CCC-2014B-62278-14",
+      "probability": 0.68,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "CCC-2014B-62278-35",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "CCC-2014B-62278-70",
+      "probability": 0.8,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 453,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013725
+    },
+    {
+      "case_id": "CCC-2014B-62278-105",
+      "probability": 0.75,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "BBB-2013B-62631-14",
+      "probability": 0.19,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-62631-35",
+      "probability": 0.68,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-62631-70",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "BBB-2013B-62631-105",
+      "probability": 0.86,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "EEE-2013J-63112-14",
+      "probability": 0.62,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 442,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001345
+    },
+    {
+      "case_id": "FFF-2014J-63112-14",
+      "probability": 0.28,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 439,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013375
+    },
+    {
+      "case_id": "EEE-2013J-63112-35",
+      "probability": 0.95,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "FFF-2014J-63112-35",
+      "probability": 0.53,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "EEE-2013J-63112-70",
+      "probability": 0.97,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "FFF-2014J-63112-70",
+      "probability": 0.36,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "EEE-2013J-63112-105",
+      "probability": 0.93,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "FFF-2014J-63112-105",
+      "probability": 0.54,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 452,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00137
+    },
+    {
+      "case_id": "DDD-2013J-67471-14",
+      "probability": 0.28,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-67471-35",
+      "probability": 0.57,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013J-67471-70",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "DDD-2013J-67471-105",
+      "probability": 0.78,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 451,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013675
+    },
+    {
+      "case_id": "CCC-2014B-70771-14",
+      "probability": 0.24,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 439,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013375
+    },
+    {
+      "case_id": "CCC-2014B-70771-35",
+      "probability": 0.34,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "CCC-2014B-70771-70",
+      "probability": 0.17,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "CCC-2014B-70771-105",
+      "probability": 0.1,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "DDD-2013B-72451-14",
+      "probability": 0.16,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013B-72451-35",
+      "probability": 0.1,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013B-72451-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2013B-72451-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "FFF-2014J-74165-14",
+      "probability": 0.56,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "FFF-2014J-74165-35",
+      "probability": 0.97,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2014J-74165-70",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "FFF-2014J-74165-105",
+      "probability": 0.82,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "AAA-2013J-75091-14",
+      "probability": 0.72,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-75091-35",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "AAA-2013J-75091-70",
+      "probability": 0.74,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "AAA-2013J-75091-105",
+      "probability": 0.81,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 450,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001365
+    },
+    {
+      "case_id": "CCC-2014B-75469-14",
+      "probability": 0.18,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014B-75469-14",
+      "probability": 0.08,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "CCC-2014B-75469-35",
+      "probability": 0.06,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014B-75469-35",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "CCC-2014B-75469-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014B-75469-70",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "CCC-2014B-75469-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014B-75469-105",
+      "probability": 0.03,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 427,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013075
+    },
+    {
+      "case_id": "DDD-2014B-76081-14",
+      "probability": 0.38,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-76081-14",
+      "probability": 0.18,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "DDD-2014B-76081-35",
+      "probability": 0.77,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014J-76081-35",
+      "probability": 0.31,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014B-76081-70",
+      "probability": 0.82,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2014J-76081-70",
+      "probability": 0.17,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2014B-76081-105",
+      "probability": 0.74,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "DDD-2014J-76081-105",
+      "probability": 0.19,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "FFF-2013J-77744-14",
+      "probability": 0.22,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "FFF-2013J-77744-35",
+      "probability": 0.78,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "FFF-2013J-77744-70",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "FFF-2013J-77744-105",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013B-77763-14",
+      "probability": 0.39,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013B-77763-35",
+      "probability": 0.76,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013B-77763-70",
+      "probability": 0.82,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "DDD-2013B-77763-105",
+      "probability": 0.91,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 454,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.001375
+    },
+    {
+      "case_id": "BBB-2013J-78255-14",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014B-78255-14",
+      "probability": 0.34,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013J-78255-35",
+      "probability": 0.81,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014B-78255-35",
+      "probability": 0.14,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "BBB-2013J-78255-70",
+      "probability": 0.34,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "BBB-2014B-78255-70",
+      "probability": 0.74,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "BBB-2013J-78255-105",
+      "probability": 0.29,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 444,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.00135
+    },
+    {
+      "case_id": "BBB-2014B-78255-105",
+      "probability": 0.58,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 449,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013625
+    },
+    {
+      "case_id": "GGG-2013J-82341-14",
+      "probability": 0.19,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "GGG-2013J-82341-35",
+      "probability": 0.22,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "GGG-2013J-82341-70",
+      "probability": 0.23,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 445,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013525
+    },
+    {
+      "case_id": "GGG-2013J-82341-105",
+      "probability": 0.83,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "BBB-2013B-83254-14",
+      "probability": 0.58,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-83254-35",
+      "probability": 0.62,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2013B-83254-70",
+      "probability": 0.82,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 457,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013825
+    },
+    {
+      "case_id": "BBB-2013B-83254-105",
+      "probability": 0.84,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 448,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013599999999999999
+    },
+    {
+      "case_id": "BBB-2014J-89850-14",
+      "probability": 0.23,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014J-89850-35",
+      "probability": 0.83,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "BBB-2014J-89850-70",
+      "probability": 0.58,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "BBB-2014J-89850-105",
+      "probability": 0.34,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 447,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013575
+    },
+    {
+      "case_id": "DDD-2013B-90836-14",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013B-90836-35",
+      "probability": 0.42,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013B-90836-70",
+      "probability": 0.12,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    },
+    {
+      "case_id": "DDD-2013B-90836-105",
+      "probability": 0.16,
+      "model": "gpt-5.4",
+      "usage": {
+        "input_tokens": 443,
+        "output_tokens": 16
+      },
+      "estimated_cost_usd": 0.0013475
+    }
+  ]
+}

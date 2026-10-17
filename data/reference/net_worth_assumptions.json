@@ -1,0 +1,31 @@
+{
+  "title": "Personal net worth growth assumptions",
+  "domain": "finance",
+  "version": "2026-08-29.v1",
+  "checksum": "net-worth-assumptions-v1",
+  "population": "Broad diversified portfolio prior (exploratory, not personalized calibration)",
+  "definition": "Default period return/volatility and shock priors for continuous net-worth forecasting when the user has not supplied explicit assumptions.",
+  "limitations": [
+    "Not calibrated to an individual portfolio composition or tax jurisdiction.",
+    "Shock prior is a simplified drawdown event, not a full macro scenario model.",
+    "Liabilities reduce net worth only when explicitly supplied in evidence."
+  ],
+  "causal_label": "associative",
+  "permitted_use": "baseline continuous_target pricing and exploratory What If perturbation",
+  "status": "EXPLORATORY",
+  "defaults": {
+    "annual_return_mean": 0.07,
+    "annual_return_volatility": 0.15,
+    "periods_per_year": 12,
+    "shock_probability_per_period": 0.02,
+    "shock_fraction": 0.08
+  },
+  "claims": [
+    {
+      "claim": "Default return and volatility are explicit exploration assumptions, not LLM-assigned probabilities.",
+      "source": "frozen://net_worth_assumptions.json",
+      "source_type": "frozen",
+      "evidence_class": "assumption"
+    }
+  ]
+}

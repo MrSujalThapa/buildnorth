@@ -1,0 +1,1337 @@
+{
+  "artifact": "hackathon_proof_v1",
+  "captured_at": "2026-08-30T18:27:55.652175+00:00",
+  "seed": 20260830,
+  "domain_inventory": {
+    "artifact": "hackathon_proof_v1_domain_inventory",
+    "captured_at": "2026-08-30T18:30:00+00:00",
+    "rule": "Do not fabricate resolved outcome labels. Macro-average pricing Brier requires resolved y in {0,1} per domain.",
+    "domains": [
+      {
+        "domain": "education",
+        "resolved_pricing_labels": true,
+        "dataset": "oulad_completion_v1",
+        "source": "Open University Learning Analytics Dataset (public)",
+        "n_shared_gpt_comparison": 200,
+        "n_full_test": 13252,
+        "horizons_days": [
+          14,
+          35,
+          70,
+          105
+        ],
+        "label_definition": "Pass/Distinction vs Fail/Withdrawn by course end",
+        "leakage_controls": "checkpoint event_day <= t; no final result / future VLE / future assessments",
+        "status": "INCLUDED_IN_PRICING_BENCHMARK"
+      },
+      {
+        "domain": "career",
+        "resolved_pricing_labels": false,
+        "candidates_considered": [
+          "Public hiring funnel panels with offer outcomes (generally private / proprietary)",
+          "LeetCode contest rankings (not a personal goal contract with deadline + binary success)"
+        ],
+        "status": "AGENT_AND_WHAT_IF_ONLY",
+        "evaluation_without_labels": [
+          "Goal Architect schema / no invented odds",
+          "Intervention mechanism / NOT_PRICED honesty",
+          "Source Planner relevance ranking",
+          "Model-consistent policy regret under hiring simulator (not causal ATE)"
+        ]
+      },
+      {
+        "domain": "finance",
+        "resolved_pricing_labels": false,
+        "candidates_considered": [
+          "Lending Club / consumer loan default (population credit risk, not personal net-worth goal contracts)",
+          "Public market OHLC (asset price, not individual savings-goal resolution)"
+        ],
+        "status": "AGENT_AND_MECHANISTIC_WHAT_IF_ONLY",
+        "note": "Product uses mechanistic net-worth simulation; no held-out personal savings-goal panel loaded."
+      },
+      {
+        "domain": "running",
+        "resolved_pricing_labels": false,
+        "candidates_considered": [
+          "Public race results without individual training history at prediction time t",
+          "Strava / Garmin exports (private user data; not a frozen public labeled panel)"
+        ],
+        "status": "AGENT_AND_MECHANISTIC_WHAT_IF_ONLY"
+      },
+      {
+        "domain": "startup",
+        "resolved_pricing_labels": false,
+        "candidates_considered": [
+          "Crunchbase funding outcomes (firm-level; sparse personal goal contracts; severe selection bias)"
+        ],
+        "status": "AGENT_ONLY_FOR_NOW"
+      },
+      {
+        "domain": "habits",
+        "resolved_pricing_labels": false,
+        "candidates_considered": [
+          "Habit-tracking app dumps (typically private; outcome definitions inconsistent)"
+        ],
+        "status": "AGENT_ONLY_FOR_NOW"
+      }
+    ],
+    "macro_average_pricing": {
+      "computable": false,
+      "reason": "Only education has resolved binary goal outcomes under a frozen no-leakage protocol.",
+      "honest_reporting": "Report education pricing metrics separately; report agent/decision metrics by domain; do not claim K/K domain pricing wins."
+    },
+    "action_impact_causal": {
+      "computable": false,
+      "reason": "No randomized or credible quasi-experimental personal-action panel with treatment variation and outcomes is loaded.",
+      "proxy_used": "Model-consistent What If uplift + policy regret under the product's numerical simulator, clearly labeled non-causal."
+    }
+  },
+  "goal_pricing": {
+    "domain": "education",
+    "dataset": "oulad_completion_v1",
+    "n_shared": 200,
+    "n_full_test": 13252,
+    "arms": {
+      "A_raw_gpt": {
+        "n": 200,
+        "brier": 0.22279949999999998,
+        "log_loss": 0.6378909273930528,
+        "ece_10": 0.16275,
+        "mean_p": 0.49705,
+        "base_rate": 0.38,
+        "roc_auc": 0.7464983022071308
+      },
+      "C_logistic_statistical": {
+        "n": 200,
+        "brier": 0.17296419676345048,
+        "log_loss": 0.5202243647555109,
+        "ece_10": 0.1113686050910312,
+        "mean_p": 0.45410848566380496,
+        "base_rate": 0.38,
+        "roc_auc": 0.8325551782682513
+      },
+      "G_play_it_out_calibrated_numerical": {
+        "n": 200,
+        "brier": 0.15799360362599907,
+        "log_loss": 0.46661749508325234,
+        "ece_10": 0.08412276701976744,
+        "mean_p": 0.46412276701976735,
+        "base_rate": 0.38,
+        "roc_auc": 0.8608870967741936
+      }
+    },
+    "ablation_applicability": {
+      "A_raw_gpt": "measured_same_checkpoints",
+      "B_structured_gpt_probability": "not_applicable_as_official_baseline; official baseline is free-form probability from gpt-5.4 on frozen features (recorded as A)",
+      "C_logistic_statistical": "measured_same_checkpoints",
+      "D_agent_only": "not_used_for_OULAD_probability; agents do not emit final odds",
+      "E_agent_plus_tools": "not_used_for_OULAD_probability; public features already structured",
+      "F_agent_plus_numerical": "product path uses numerical core; scored as G on shared-200",
+      "G_full_play_it_out": "measured_same_checkpoints_calibrated_selected_model"
+    },
+    "relative_brier_reduction_vs_gpt": 0.2908709237408563,
+    "relative_brier_reduction_vs_logistic": 0.08655313306213029,
+    "paired_bootstrap_vs_gpt": {
+      "mean_brier_improvement": 0.06518688779014065,
+      "ci_95_low": 0.03985251753095099,
+      "ci_95_high": 0.0935311935860826,
+      "probability_improvement_gt_zero": 1.0,
+      "iterations": 2000.0
+    },
+    "by_horizon": {
+      "14": {
+        "raw_gpt": {
+          "n": 50,
+          "brier": 0.227896,
+          "log_loss": 0.6459470094204707,
+          "ece_10": 0.09679999999999997,
+          "mean_p": 0.3652,
+          "base_rate": 0.38,
+          "roc_auc": 0.6502546689303905
+        },
+        "logistic": {
+          "n": 50,
+          "brier": 0.1764368387755032,
+          "log_loss": 0.5490153843031724,
+          "ece_10": 0.21264591507644395,
+          "mean_p": 0.37823354820988475,
+          "base_rate": 0.38,
+          "roc_auc": 0.7682512733446519
+        },
+        "play_it_out": {
+          "n": 50,
+          "brier": 0.18292583049257194,
+          "log_loss": 0.5550811531566832,
+          "ece_10": 0.17399575628888309,
+          "mean_p": 0.44348656094638217,
+          "base_rate": 0.38,
+          "roc_auc": 0.7962648556876061
+        }
+      },
+      "35": {
+        "raw_gpt": {
+          "n": 50,
+          "brier": 0.25506,
+          "log_loss": 0.7209609739806604,
+          "ece_10": 0.23439999999999997,
+          "mean_p": 0.544,
+          "base_rate": 0.38,
+          "roc_auc": 0.7359932088285229
+        },
+        "logistic": {
+          "n": 50,
+          "brier": 0.19439079180105714,
+          "log_loss": 0.5587301615264997,
+          "ece_10": 0.16195966823710026,
+          "mean_p": 0.5128773633880371,
+          "base_rate": 0.38,
+          "roc_auc": 0.8200339558573855
+        },
+        "play_it_out": {
+          "n": 50,
+          "brier": 0.16996181873102023,
+          "log_loss": 0.4952500930774248,
+          "ece_10": 0.12736815754550215,
+          "mean_p": 0.47846571219564527,
+          "base_rate": 0.38,
+          "roc_auc": 0.8268251273344652
+        }
+      },
+      "70": {
+        "raw_gpt": {
+          "n": 50,
+          "brier": 0.218552,
+          "log_loss": 0.6358695952757376,
+          "ece_10": 0.23640000000000003,
+          "mean_p": 0.5347999999999999,
+          "base_rate": 0.38,
+          "roc_auc": 0.764855687606112
+        },
+        "logistic": {
+          "n": 50,
+          "brier": 0.17688704399207833,
+          "log_loss": 0.513326616307753,
+          "ece_10": 0.13327552678905552,
+          "mean_p": 0.4849877046670549,
+          "base_rate": 0.38,
+          "roc_auc": 0.8446519524617997
+        },
+        "play_it_out": {
+          "n": 50,
+          "brier": 0.14590413820172501,
+          "log_loss": 0.42476054432548804,
+          "ece_10": 0.16501745383784905,
+          "mean_p": 0.4650757278184587,
+          "base_rate": 0.38,
+          "roc_auc": 0.8811544991511036
+        }
+      },
+      "105": {
+        "raw_gpt": {
+          "n": 50,
+          "brier": 0.18969000000000003,
+          "log_loss": 0.5487861308953424,
+          "ece_10": 0.17420000000000002,
+          "mean_p": 0.5442,
+          "base_rate": 0.38,
+          "roc_auc": 0.8607809847198641
+        },
+        "logistic": {
+          "n": 50,
+          "brier": 0.14414211248516334,
+          "log_loss": 0.4598252968846186,
+          "ece_10": 0.1627668203148244,
+          "mean_p": 0.44033532639024303,
+          "base_rate": 0.38,
+          "roc_auc": 0.8633276740237691
+        },
+        "play_it_out": {
+          "n": 50,
+          "brier": 0.13318262707867912,
+          "log_loss": 0.39137818977341327,
+          "ece_10": 0.1010233479426184,
+          "mean_p": 0.4694630671185837,
+          "base_rate": 0.38,
+          "roc_auc": 0.9202037351443124
+        }
+      }
+    },
+    "longitudinal": {
+      "raw_gpt_brier_by_day": {
+        "14": 0.227896,
+        "35": 0.25506,
+        "70": 0.218552,
+        "105": 0.18969000000000003
+      },
+      "play_it_out_brier_by_day": {
+        "14": 0.18292583049257194,
+        "35": 0.16996181873102023,
+        "70": 0.14590413820172501,
+        "105": 0.13318262707867912
+      },
+      "play_it_out_improves_with_horizon": true,
+      "raw_gpt_improves_with_horizon": true,
+      "play_it_out_relative_brier_improvement_day14_to_105": 0.2719309967321031,
+      "raw_gpt_relative_brier_improvement_day14_to_105": 0.16764664583845246
+    },
+    "decay_ablation": {
+      "selected_half_life_days": 14,
+      "validation_selection": [
+        {
+          "family": "logistic_regression",
+          "half_life_days": 7,
+          "validation_brier": 0.1584934244661323,
+          "fit_seconds": 0.6392011000425555
+        },
+        {
+          "family": "logistic_regression",
+          "half_life_days": 14,
+          "validation_brier": 0.15856177696582652,
+          "fit_seconds": 0.548234100046102
+        },
+        {
+          "family": "logistic_regression",
+          "half_life_days": 28,
+          "validation_brier": 0.1585428138221306,
+          "fit_seconds": 0.5091836000210606
+        },
+        {
+          "family": "hist_gradient_boosting",
+          "half_life_days": 7,
+          "validation_brier": 0.14286722468511961,
+          "fit_seconds": 3.6903375000110827
+        },
+        {
+          "family": "hist_gradient_boosting",
+          "half_life_days": 14,
+          "validation_brier": 0.1427851072349701,
+          "fit_seconds": 2.0703532999614254
+        },
+        {
+          "family": "hist_gradient_boosting",
+          "half_life_days": 28,
+          "validation_brier": 0.14280428287561261,
+          "fit_seconds": 1.5486236999859102
+        }
+      ],
+      "note": "Half-life chosen on validation before test; H=14 selected for hist GB."
+    },
+    "full_test_selected": {
+      "logistic_regression": {
+        "calibration_method": "isotonic",
+        "raw": {
+          "n": 13252,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.1507292944507768,
+          "log_loss": 0.45820660806481894,
+          "roc_auc": 0.8628841914518858,
+          "pr_auc": 0.8313872745869746,
+          "ece_10": 0.026906154727532557,
+          "calibration_intercept": 0.029367977109304902,
+          "calibration_slope": 1.0919633272633293,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 2061,
+              "mean_probability": 0.040501317674937275,
+              "observed_rate": 0.01455604075691412
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 1396,
+              "mean_probability": 0.1494975028600226,
+              "observed_rate": 0.10673352435530085
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 1227,
+              "mean_probability": 0.2486676148610633,
+              "observed_rate": 0.23879380603096984
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 1169,
+              "mean_probability": 0.3497105042573636,
+              "observed_rate": 0.378956372968349
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 1043,
+              "mean_probability": 0.45126330225433947,
+              "observed_rate": 0.5043144774688398
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1117,
+              "mean_probability": 0.5515659536092702,
+              "observed_rate": 0.6016114592658908
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 1369,
+              "mean_probability": 0.6513526339124448,
+              "observed_rate": 0.6822498173849525
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 1506,
+              "mean_probability": 0.7496633785270934,
+              "observed_rate": 0.7443559096945551
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 1309,
+              "mean_probability": 0.8479940233917493,
+              "observed_rate": 0.8632543926661573
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 1055,
+              "mean_probability": 0.9455779408416328,
+              "observed_rate": 0.9308056872037914
+            }
+          ]
+        },
+        "calibrated": {
+          "n": 13252,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.150038725565295,
+          "log_loss": 0.45498236142950926,
+          "roc_auc": 0.8628755125141147,
+          "pr_auc": 0.8237375434334513,
+          "ece_10": 0.012623795917464247,
+          "calibration_intercept": -0.010755826302753789,
+          "calibration_slope": 1.0482023657978574,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 2609,
+              "mean_probability": 0.03018729591994188,
+              "observed_rate": 0.025297048677654272
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 825,
+              "mean_probability": 0.10864526720281636,
+              "observed_rate": 0.1321212121212121
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 868,
+              "mean_probability": 0.22489563187415573,
+              "observed_rate": 0.22350230414746544
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 917,
+              "mean_probability": 0.35133242389833985,
+              "observed_rate": 0.3173391494002181
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 778,
+              "mean_probability": 0.430227646133841,
+              "observed_rate": 0.41516709511568123
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1007,
+              "mean_probability": 0.5473458943413145,
+              "observed_rate": 0.5273088381330685
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 2852,
+              "mean_probability": 0.6518315300495767,
+              "observed_rate": 0.6493688639551192
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 1007,
+              "mean_probability": 0.7679570220554015,
+              "observed_rate": 0.7755710029791459
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 1721,
+              "mean_probability": 0.8446707154202832,
+              "observed_rate": 0.8768158047646717
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 668,
+              "mean_probability": 0.9354432143065243,
+              "observed_rate": 0.9341317365269461
+            }
+          ]
+        },
+        "fit_and_predict_seconds": 0.6982839000411332,
+        "artifact_sha256": "dad43f005181768c2f1fecd6220da9a9764bd695436c429889331dc36cbef2a1"
+      },
+      "hist_gradient_boosting": {
+        "calibration_method": "platt",
+        "raw": {
+          "n": 13252,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.13786077443371011,
+          "log_loss": 0.4174837034081676,
+          "roc_auc": 0.8823734428158494,
+          "pr_auc": 0.8539438173072984,
+          "ece_10": 0.00959956807674182,
+          "calibration_intercept": 0.027363732917366847,
+          "calibration_slope": 1.0527431722477603,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 3359,
+              "mean_probability": 0.023784392073519442,
+              "observed_rate": 0.019946412622804405
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 614,
+              "mean_probability": 0.14992099309889517,
+              "observed_rate": 0.1498371335504886
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 664,
+              "mean_probability": 0.25293611296720775,
+              "observed_rate": 0.2575301204819277
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 762,
+              "mean_probability": 0.35100928603005727,
+              "observed_rate": 0.38976377952755903
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 948,
+              "mean_probability": 0.45204934985325707,
+              "observed_rate": 0.4451476793248945
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1044,
+              "mean_probability": 0.5533463535630814,
+              "observed_rate": 0.5478927203065134
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 1485,
+              "mean_probability": 0.6506114338632709,
+              "observed_rate": 0.6498316498316499
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 1751,
+              "mean_probability": 0.748831610675036,
+              "observed_rate": 0.7692747001713307
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 1634,
+              "mean_probability": 0.8501660518394621,
+              "observed_rate": 0.8592411260709915
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 991,
+              "mean_probability": 0.9337336111903068,
+              "observed_rate": 0.9515640766902119
+            }
+          ]
+        },
+        "calibrated": {
+          "n": 13252,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.13782719151077477,
+          "log_loss": 0.41711142586407707,
+          "roc_auc": 0.8823734428158494,
+          "pr_auc": 0.8539438173072984,
+          "ece_10": 0.007361195240919958,
+          "calibration_intercept": 4.2221584805192825e-05,
+          "calibration_slope": 1.0095739921628906,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 3399,
+              "mean_probability": 0.022354583311170236,
+              "observed_rate": 0.020888496616651958
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 599,
+              "mean_probability": 0.14953078648458454,
+              "observed_rate": 0.15191986644407346
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 646,
+              "mean_probability": 0.2519274839646209,
+              "observed_rate": 0.2678018575851393
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 737,
+              "mean_probability": 0.3504783757510928,
+              "observed_rate": 0.3880597014925373
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 882,
+              "mean_probability": 0.451150414156653,
+              "observed_rate": 0.4365079365079365
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 989,
+              "mean_probability": 0.5511881571114448,
+              "observed_rate": 0.5409504550050556
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 1421,
+              "mean_probability": 0.6508138458926948,
+              "observed_rate": 0.6418015482054891
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 1727,
+              "mean_probability": 0.7500170123097634,
+              "observed_rate": 0.7486971627099016
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 1681,
+              "mean_probability": 0.8502734071827559,
+              "observed_rate": 0.8483045806067817
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 1171,
+              "mean_probability": 0.9361667088677282,
+              "observed_rate": 0.946199829205807
+            }
+          ]
+        },
+        "fit_and_predict_seconds": 1.9255621999618597,
+        "artifact_sha256": "b10ffc4b7edf25ee7130d21919348df535231271255850e23bfcb74ee0ebcc8c"
+      }
+    },
+    "domains_with_resolved_labels": [
+      "education"
+    ],
+    "domains_without_resolved_labels": [
+      "career",
+      "finance",
+      "running",
+      "startup",
+      "habits"
+    ],
+    "macro_average_note": "Macro-average across goal families is not computable for pricing Brier until non-education domains have resolved outcome labels. Reporting education alone and agent/decision metrics for other families."
+  },
+  "monte_carlo_crn": {
+    "monte_carlo": {
+      "same_seed_reproducible": true,
+      "probabilities_in_range": true,
+      "draws": 6000,
+      "achieved_mc_error": 0.00639499804534763,
+      "converged": true
+    },
+    "common_random_numbers": {
+      "replications": 30,
+      "paired_variance": 0.00016735660919540226,
+      "independent_variance": 0.0002233474137931031,
+      "variance_ratio": 0.7493107099526674,
+      "crn_reduced_variance": true
+    },
+    "variance_reduction_pct": 25.068929004733263
+  },
+  "policy_regret_model_consistent": {
+    "status": "ok",
+    "assumption": "Model-consistent regret under the product's numerical hiring simulator. Not a causal real-world treatment-effect claim.",
+    "budget_hours": 20,
+    "actions": [
+      {
+        "id": "applications",
+        "text": "What if I send 15 applications a week?",
+        "pricing_status": "PRICED",
+        "effect_assigned": false,
+        "unsupported": [
+          "No defensible mapping is provided from application volume alone to a numeric change in offer probability.",
+          "Observed funnel counts are immutable evidence and are not directly editable by this intervention.",
+          "No change is specified for application quality, targeting, resume fit, or interview performance, so downstream effects remain unpriced."
+        ],
+        "p_baseline": 0.8354232873680396,
+        "p_scenario": 0.9873518377007326,
+        "uplift": 0.15192855033269304,
+        "hours_cost_estimate": 8
+      },
+      {
+        "id": "mocks",
+        "text": "What if I do 3 mock interviews a week?",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "unsupported": [
+          "No supplied model metric directly maps mock interviews per week to offer probability or to a calibrated uplift in funnel conversion rates.",
+          "There is no allowed metric for technical_interview readiness or interview performance score, so the causal impact cannot be parameterized in the provided state space.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "p_baseline": 0.8354232873680396,
+        "p_scenario": 0.8354226695802697,
+        "uplift": -6.177877699409251e-07,
+        "hours_cost_estimate": 6
+      },
+      {
+        "id": "linkedin",
+        "text": "What if I post on LinkedIn 4 times a week?",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "unsupported": [
+          "The provided metric list includes linkedin_posts_per_week, but the baseline state does not include a calibrated link from LinkedIn posting frequency to applications or offer outcomes.",
+          "No numeric effect size for increased posting is supplied, so downstream changes to applications_per_week or execution_probability cannot be defensibly priced.",
+          "Observed funnel counts are immutable evidence; only future pipeline assumptions are editable.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "p_baseline": 0.8354232873680396,
+        "p_scenario": 0.8354224011779253,
+        "uplift": -8.86190114290919e-07,
+        "hours_cost_estimate": 4
+      },
+      {
+        "id": "leetcode",
+        "text": "What if I do LeetCode 2 hours a day?",
+        "pricing_status": "NOT_PRICED",
+        "effect_assigned": false,
+        "unsupported": [
+          "The available modeled metrics do not include a direct, priced mapping from LeetCode hours to offer probability or to interview-stage conversion rates.",
+          "No explicit metric in the supplied state captures coding-problem practice hours, so a direct quantitative state change cannot be defensibly priced from the provided model.",
+          "Observed funnel counts are immutable evidence; this intervention only affects future preparation state, not past funnel outcomes.",
+          "Intervention output attempted to assign probability-like effects."
+        ],
+        "p_baseline": 0.8354232873680396,
+        "p_scenario": 0.8354221043540757,
+        "uplift": -1.1830139639013026e-06,
+        "hours_cost_estimate": 14
+      }
+    ],
+    "play_it_out_policy": {
+      "selected_ids": [
+        "applications"
+      ],
+      "hours_used": 8,
+      "policy_value_uplift": 0.15192855033269304
+    },
+    "baselines": {
+      "equal_allocation_proxy": 0.037981465835211226,
+      "do_every_positive_action": 0.15192855033269304,
+      "best_single_action": 0.15192855033269304,
+      "oracle_recoverable": 0.15192855033269304
+    },
+    "regret_vs_oracle": 0.0,
+    "regret_vs_equal_proxy": -0.11394708449748181,
+    "constraint_violations": 0
+  },
+  "agent_comparable_ablations": {
+    "goal_architect": {
+      "rows": [
+        {
+          "id": "internship",
+          "domain": "career",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": true,
+          "clarification_match": false,
+          "A_cost": 0.0082675,
+          "B_cost": 0.0005196,
+          "A_latency_ms": 6160,
+          "B_latency_ms": 1839
+        },
+        {
+          "id": "10k-sub45",
+          "domain": "running",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": false,
+          "clarification_match": true,
+          "A_cost": 0.00564,
+          "B_cost": 0.00044800000000000005,
+          "A_latency_ms": 5021,
+          "B_latency_ms": 1595
+        },
+        {
+          "id": "savings-100k",
+          "domain": "finance",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": true,
+          "clarification_match": false,
+          "A_cost": 0.0048625,
+          "B_cost": 0.0004332,
+          "A_latency_ms": 4686,
+          "B_latency_ms": 1736
+        },
+        {
+          "id": "mrr-10k",
+          "domain": "startup",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": false,
+          "clarification_match": true,
+          "A_cost": 0.009675000000000001,
+          "B_cost": 0.00042720000000000003,
+          "A_latency_ms": 8137,
+          "B_latency_ms": 1472
+        },
+        {
+          "id": "waterloo",
+          "domain": "education",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": true,
+          "clarification_match": false,
+          "A_cost": 0.0087925,
+          "B_cost": 0.0004732,
+          "A_latency_ms": 6710,
+          "B_latency_ms": 1601
+        },
+        {
+          "id": "read-100",
+          "domain": "habits",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": false,
+          "clarification_match": true,
+          "A_cost": 0.006175000000000001,
+          "B_cost": 0.000432,
+          "A_latency_ms": 5353,
+          "B_latency_ms": 1511
+        },
+        {
+          "id": "ambiguous-career",
+          "domain": "career",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": true,
+          "clarification_match": true,
+          "A_cost": 0.0058000000000000005,
+          "B_cost": 0.000528,
+          "A_latency_ms": 4610,
+          "B_latency_ms": 2349
+        },
+        {
+          "id": "compound-finance",
+          "domain": "finance",
+          "A_raw_contains_probability": true,
+          "B_schema_valid": true,
+          "B_invented_probability_field": false,
+          "B_needs_clarification": true,
+          "clarification_match": true,
+          "A_cost": 0.0073225,
+          "B_cost": 0.0005884,
+          "A_latency_ms": 5869,
+          "B_latency_ms": 2309
+        }
+      ],
+      "n": 8,
+      "A_probability_claim_rate": 1.0,
+      "B_schema_valid_rate": 1.0,
+      "B_invented_probability_rate": 0.0
+    },
+    "evidence_agent": {
+      "rows": [
+        {
+          "id": "leetcode-screen",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 2,
+          "G_expect_events": 2,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "run",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 1,
+          "G_expect_events": 1,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "ambiguous",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 0,
+          "G_expect_events": 0,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "github-commit",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 1,
+          "G_expect_events": 1,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "finance-row",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 1,
+          "G_expect_events": 1,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "duplicate-noise",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 2,
+          "G_expect_events": 2,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        },
+        {
+          "id": "unit-mix",
+          "A_raw_assigns_odds": true,
+          "G_schema_valid": true,
+          "G_event_count": 1,
+          "G_expect_events": 1,
+          "G_event_count_match": true,
+          "G_hallucinated_probability": false
+        }
+      ],
+      "n": 7,
+      "A_raw_odds_rate": 1.0,
+      "G_schema_valid_rate": 1.0,
+      "G_event_match_rate": 1.0,
+      "G_hallucinated_probability_rate": 0.0
+    },
+    "intervention_agent": {
+      "rows": [
+        {
+          "id": "linkedin-career",
+          "domain": "career",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "mock-interviews",
+          "domain": "career",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": true,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "apps-career",
+          "domain": "career",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": false,
+          "G_priced": true,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "leetcode-career",
+          "domain": "career",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "mileage-running",
+          "domain": "running",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": true,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "sleep-running",
+          "domain": "running",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "tempo-running",
+          "domain": "running",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "users-startup",
+          "domain": "startup",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "ads-startup",
+          "domain": "startup",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "rent-finance",
+          "domain": "finance",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "side-hustle-finance",
+          "domain": "finance",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": true,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "habit-streak",
+          "domain": "habits",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "paraphrase-mileage",
+          "domain": "running",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": false,
+          "G_priced": true,
+          "G_hallucinated_fitted_coeff": false
+        },
+        {
+          "id": "unsupported-novel",
+          "domain": "career",
+          "A_raw_invents_numeric_uplift": true,
+          "G_schema_valid": true,
+          "G_not_priced_or_unsupported": true,
+          "G_priced": false,
+          "G_hallucinated_fitted_coeff": false
+        }
+      ],
+      "n": 14,
+      "A_raw_invents_uplift_rate": 1.0,
+      "G_schema_valid_rate": 1.0,
+      "G_unsupported_or_not_priced_rate": 0.8571428571428571,
+      "G_hallucinated_fitted_coeff_rate": 0.0
+    },
+    "source_planner": {
+      "rows": [
+        {
+          "id": "career-fde",
+          "goal_family": "career",
+          "recommended": [
+            "github",
+            "gmail",
+            "calendar",
+            "sheets",
+            "notion"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "ndcg_at_5": 1.0,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        },
+        {
+          "id": "running-10k",
+          "goal_family": "running",
+          "recommended": [
+            "strava",
+            "sheets",
+            "calendar",
+            "notion"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "ndcg_at_5": 0.9904436061045989,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        },
+        {
+          "id": "finance-savings",
+          "goal_family": "finance",
+          "recommended": [
+            "sheets",
+            "gmail",
+            "notion"
+          ],
+          "precision": 1.0,
+          "recall": 1.0,
+          "ndcg_at_5": 1.0,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        },
+        {
+          "id": "education-waterloo",
+          "goal_family": "education",
+          "recommended": [
+            "calendar",
+            "gmail",
+            "notion",
+            "sheets",
+            "github"
+          ],
+          "precision": 0.8,
+          "recall": 1.0,
+          "ndcg_at_5": 0.9737922625687712,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        },
+        {
+          "id": "startup-mrr",
+          "goal_family": "startup",
+          "recommended": [
+            "sheets",
+            "gmail",
+            "notion",
+            "github",
+            "calendar"
+          ],
+          "precision": 0.8,
+          "recall": 1.0,
+          "ndcg_at_5": 0.9806148958274842,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        },
+        {
+          "id": "habits-reading",
+          "goal_family": "habits",
+          "recommended": [
+            "notion",
+            "calendar",
+            "sheets",
+            "gmail"
+          ],
+          "precision": 0.75,
+          "recall": 1.0,
+          "ndcg_at_5": 0.9777813616305049,
+          "top1_relevant": true,
+          "irrelevant_rejected": true,
+          "schema_valid": true
+        }
+      ],
+      "n": 6,
+      "mean_precision": 0.8916666666666666,
+      "mean_recall": 1.0,
+      "mean_ndcg_at_5": 0.9871053543552266,
+      "top1_accuracy": 1.0,
+      "irrelevant_rejection_rate": 1.0
+    },
+    "critic": {
+      "rows": [
+        {
+          "id": "future_leak",
+          "issues": [
+            "Future leakage: evidence observed_at is after now."
+          ],
+          "decision": "withhold",
+          "expect_decision": "withhold",
+          "correct": true
+        },
+        {
+          "id": "unsupported_coeff",
+          "issues": [
+            "Unsupported coefficient provenance: LLM_GENERATED_COEFFICIENT."
+          ],
+          "decision": "withhold",
+          "expect_decision": "withhold",
+          "correct": true
+        },
+        {
+          "id": "bad_prob",
+          "issues": [
+            "Numerical probability is outside [0, 1]."
+          ],
+          "decision": "withhold",
+          "expect_decision": "withhold",
+          "correct": true
+        },
+        {
+          "id": "valid_publish",
+          "issues": [],
+          "decision": "publish",
+          "expect_decision": "publish",
+          "correct": true
+        }
+      ],
+      "accuracy": 1.0,
+      "leakage_recall": true,
+      "unsupported_coeff_recall": true,
+      "false_veto_on_valid": false
+    }
+  },
+  "claims": {
+    "empirically_supported": [
+      "On the frozen OULAD shared-200 education goal-pricing benchmark (n=200), Play It Out Brier 0.157994 vs raw GPT 0.222799 (29.1% relative Brier reduction); paired bootstrap P(\u0394>0)=1.000.",
+      "Selected numerical model also beats the logistic statistical baseline on the same shared-200 cases (Brier 0.157994 vs 0.172964).",
+      "As evidence accumulates toward resolution, Play It Out Brier improved 27.2% (day-14 0.1829 \u2192 day-105 0.1332) while raw GPT improved 16.8% (0.2279 \u2192 0.1897).",
+      "Evidence decay ablation selected half-life=14d on validation before test (hist GB).",
+      "CRN reduced uplift estimator variance by 25.1% (ratio 0.749).",
+      "Raw GPT invents success probabilities on 100% of Goal Architect cases (n=8); structured Goal Architect schema-valid 100% with invented-probability-field rate 0%.",
+      "Evidence Agent (n=7) hallucinated-probability rate 0% vs raw GPT odds-assignment rate 100%; event-count match 100%.",
+      "Intervention Agent (n=14) unsupported/NOT_PRICED rate 86%; raw GPT invents numeric uplift on 100% of forced-uplift prompts.",
+      "Source Planner (n=6) mean NDCG@5 0.987; mean precision 0.892; irrelevant-plugin rejection 100%.",
+      "Forecast Critic frozen suite accuracy 100% (leakage recall True; LLM_GENERATED_COEFFICIENT recall True).",
+      "Model-consistent career policy selection under a 20h budget produced regret_vs_oracle=0.0 (not a causal real-world claim)."
+    ],
+    "not_empirically_supported_yet": [
+      "Macro-average Brier across career/finance/running/startup/habits \u2014 no resolved outcome labels yet.",
+      "Real-world causal action-effect MAE / ATE validation \u2014 no randomized/quasi-experimental personal action panel loaded.",
+      "Domains-won K/K pricing claim \u2014 only education currently has resolved labels.",
+      "Cold browser Goal Architect\u2192Paths matrix for every family from empty state \u2014 still pending full interactive run.",
+      "Raw-GPT Source Planner NDCG head-to-head on the expanded resource-level set \u2014 current probe scores Play It Out planner only."
+    ]
+  },
+  "proof_table": {
+    "GOAL_PRICING_education_shared_200": {
+      "raw_gpt_brier": 0.22279949999999998,
+      "logistic_brier": 0.17296419676345048,
+      "play_it_out_brier": 0.15799360362599907,
+      "relative_improvement_vs_gpt": 0.2908709237408563,
+      "log_loss_gpt": 0.6378909273930528,
+      "log_loss_play": 0.46661749508325234,
+      "ece_gpt": 0.16275,
+      "ece_play": 0.08412276701976744,
+      "auc_gpt": 0.7464983022071308,
+      "auc_play": 0.8608870967741936
+    },
+    "LONGITUDINAL": {
+      "raw_gpt_brier_by_day": {
+        "14": 0.227896,
+        "35": 0.25506,
+        "70": 0.218552,
+        "105": 0.18969000000000003
+      },
+      "play_it_out_brier_by_day": {
+        "14": 0.18292583049257194,
+        "35": 0.16996181873102023,
+        "70": 0.14590413820172501,
+        "105": 0.13318262707867912
+      },
+      "play_it_out_improves_with_horizon": true,
+      "raw_gpt_improves_with_horizon": true,
+      "play_it_out_relative_brier_improvement_day14_to_105": 0.2719309967321031,
+      "raw_gpt_relative_brier_improvement_day14_to_105": 0.16764664583845246
+    },
+    "ACTION_POLICY_MODEL_CONSISTENT": {
+      "regret_vs_oracle": 0.0,
+      "policy_value": 0.15192855033269304,
+      "constraint_violations": 0
+    },
+    "AGENTS": {
+      "goal_architect_raw_prob_claim_rate": 1.0,
+      "goal_architect_schema_valid": 1.0,
+      "evidence_hallucinated_prob_rate": 0.0,
+      "evidence_event_match_rate": 1.0,
+      "intervention_raw_uplift_invention_rate": 1.0,
+      "intervention_unsupported_rate": 0.8571428571428571,
+      "source_planner_mean_precision": 0.8916666666666666,
+      "source_planner_mean_recall": 1.0,
+      "source_planner_mean_ndcg_at_5": 0.9871053543552266,
+      "critic_accuracy": 1.0,
+      "critic_leakage_recall": true
+    },
+    "MC_CRN": {
+      "monte_carlo": {
+        "same_seed_reproducible": true,
+        "probabilities_in_range": true,
+        "draws": 6000,
+        "achieved_mc_error": 0.00639499804534763,
+        "converged": true
+      },
+      "common_random_numbers": {
+        "replications": 30,
+        "paired_variance": 0.00016735660919540226,
+        "independent_variance": 0.0002233474137931031,
+        "variance_ratio": 0.7493107099526674,
+        "crn_reduced_variance": true
+      },
+      "variance_reduction_pct": 25.068929004733263
+    }
+  }
+}

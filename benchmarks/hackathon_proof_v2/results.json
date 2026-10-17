@@ -1,0 +1,1681 @@
+{
+  "artifact": "hackathon_proof_v2",
+  "captured_at": "2026-08-30T19:10:26.559333+00:00",
+  "pricing": {
+    "artifact": "hackathon_proof_v2_pricing",
+    "seed": 20260830,
+    "model_gpt": "gpt-5.4",
+    "domains": [
+      {
+        "domain": "education",
+        "dataset": "oulad_completion_v1",
+        "n": 200,
+        "goal": "Course completion (Pass/Distinction) by presentation end",
+        "gpt": {
+          "n": 200,
+          "brier": 0.22279949999999998,
+          "log_loss": 0.6378909273930528,
+          "ece_10": 0.16275,
+          "mean_p": 0.49705,
+          "base_rate": 0.38,
+          "roc_auc": 0.7464983022071308
+        },
+        "pio": {
+          "n": 200,
+          "brier": 0.15799360362599907,
+          "log_loss": 0.46661749508325234,
+          "ece_10": 0.08412276701976744,
+          "mean_p": 0.46412276701976735,
+          "base_rate": 0.38,
+          "roc_auc": 0.8608870967741936
+        },
+        "logistic": {
+          "n": 200,
+          "brier": 0.17296419676345048,
+          "log_loss": 0.5202243647555109,
+          "ece_10": 0.1113686050910312,
+          "mean_p": 0.45410848566380496,
+          "base_rate": 0.38,
+          "roc_auc": 0.8325551782682513
+        },
+        "relative_brier_reduction_vs_gpt": 0.2908709237408563,
+        "paired_bootstrap_vs_gpt": {
+          "mean_brier_improvement": 0.06518688779014065,
+          "ci_95_low": 0.03985251753095099,
+          "ci_95_high": 0.0935311935860826,
+          "probability_improvement_gt_zero": 1.0,
+          "iterations": 2000.0
+        },
+        "by_horizon": {
+          "14": {
+            "raw_gpt": {
+              "n": 50,
+              "brier": 0.227896,
+              "log_loss": 0.6459470094204707,
+              "ece_10": 0.09679999999999997,
+              "mean_p": 0.3652,
+              "base_rate": 0.38,
+              "roc_auc": 0.6502546689303905
+            },
+            "logistic": {
+              "n": 50,
+              "brier": 0.1764368387755032,
+              "log_loss": 0.5490153843031724,
+              "ece_10": 0.21264591507644395,
+              "mean_p": 0.37823354820988475,
+              "base_rate": 0.38,
+              "roc_auc": 0.7682512733446519
+            },
+            "play_it_out": {
+              "n": 50,
+              "brier": 0.18292583049257194,
+              "log_loss": 0.5550811531566832,
+              "ece_10": 0.17399575628888309,
+              "mean_p": 0.44348656094638217,
+              "base_rate": 0.38,
+              "roc_auc": 0.7962648556876061
+            }
+          },
+          "35": {
+            "raw_gpt": {
+              "n": 50,
+              "brier": 0.25506,
+              "log_loss": 0.7209609739806604,
+              "ece_10": 0.23439999999999997,
+              "mean_p": 0.544,
+              "base_rate": 0.38,
+              "roc_auc": 0.7359932088285229
+            },
+            "logistic": {
+              "n": 50,
+              "brier": 0.19439079180105714,
+              "log_loss": 0.5587301615264997,
+              "ece_10": 0.16195966823710026,
+              "mean_p": 0.5128773633880371,
+              "base_rate": 0.38,
+              "roc_auc": 0.8200339558573855
+            },
+            "play_it_out": {
+              "n": 50,
+              "brier": 0.16996181873102023,
+              "log_loss": 0.4952500930774248,
+              "ece_10": 0.12736815754550215,
+              "mean_p": 0.47846571219564527,
+              "base_rate": 0.38,
+              "roc_auc": 0.8268251273344652
+            }
+          },
+          "70": {
+            "raw_gpt": {
+              "n": 50,
+              "brier": 0.218552,
+              "log_loss": 0.6358695952757376,
+              "ece_10": 0.23640000000000003,
+              "mean_p": 0.5347999999999999,
+              "base_rate": 0.38,
+              "roc_auc": 0.764855687606112
+            },
+            "logistic": {
+              "n": 50,
+              "brier": 0.17688704399207833,
+              "log_loss": 0.513326616307753,
+              "ece_10": 0.13327552678905552,
+              "mean_p": 0.4849877046670549,
+              "base_rate": 0.38,
+              "roc_auc": 0.8446519524617997
+            },
+            "play_it_out": {
+              "n": 50,
+              "brier": 0.14590413820172501,
+              "log_loss": 0.42476054432548804,
+              "ece_10": 0.16501745383784905,
+              "mean_p": 0.4650757278184587,
+              "base_rate": 0.38,
+              "roc_auc": 0.8811544991511036
+            }
+          },
+          "105": {
+            "raw_gpt": {
+              "n": 50,
+              "brier": 0.18969000000000003,
+              "log_loss": 0.5487861308953424,
+              "ece_10": 0.17420000000000002,
+              "mean_p": 0.5442,
+              "base_rate": 0.38,
+              "roc_auc": 0.8607809847198641
+            },
+            "logistic": {
+              "n": 50,
+              "brier": 0.14414211248516334,
+              "log_loss": 0.4598252968846186,
+              "ece_10": 0.1627668203148244,
+              "mean_p": 0.44033532639024303,
+              "base_rate": 0.38,
+              "roc_auc": 0.8633276740237691
+            },
+            "play_it_out": {
+              "n": 50,
+              "brier": 0.13318262707867912,
+              "log_loss": 0.39137818977341327,
+              "ece_10": 0.1010233479426184,
+              "mean_p": 0.4694630671185837,
+              "base_rate": 0.38,
+              "roc_auc": 0.9202037351443124
+            }
+          }
+        },
+        "source": "reuse_hackathon_proof_v1_shared_200"
+      },
+      {
+        "domain": "finance",
+        "dataset": "shed_emergency_savings_v1",
+        "n": 40,
+        "goal": "Have emergency/rainy-day funds covering 3 months of expenses by the next annual survey",
+        "gpt": {
+          "n": 40,
+          "brier": 0.192315,
+          "log_loss": 0.568325746870372,
+          "ece_10": 0.16449999999999995,
+          "mean_p": 0.5429999999999999,
+          "base_rate": 0.4,
+          "roc_auc": 0.8125,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 3,
+              "mean_probability": 0.16,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 4,
+              "mean_probability": 0.2375,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 6,
+              "mean_probability": 0.35333333333333333,
+              "observed_rate": 0.16666666666666666
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 5,
+              "mean_probability": 0.446,
+              "observed_rate": 0.2
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1,
+              "mean_probability": 0.57,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 7,
+              "mean_probability": 0.6442857142857142,
+              "observed_rate": 0.5714285714285714
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 9,
+              "mean_probability": 0.741111111111111,
+              "observed_rate": 0.5555555555555556
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 5,
+              "mean_probability": 0.8379999999999999,
+              "observed_rate": 0.8
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            }
+          ]
+        },
+        "pio": {
+          "n": 40,
+          "brier": 0.16747098066911972,
+          "log_loss": 0.5065414794407811,
+          "ece_10": 0.1623391502362175,
+          "mean_p": 0.5093661772632446,
+          "base_rate": 0.4,
+          "roc_auc": 0.8619791666666666,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 7,
+              "mean_probability": 0.04310133604512058,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 6,
+              "mean_probability": 0.11553883958494678,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 4,
+              "mean_probability": 0.23513513513513515,
+              "observed_rate": 0.5
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 2,
+              "mean_probability": 0.45295918850098327,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 2,
+              "mean_probability": 0.5555555555555556,
+              "observed_rate": 0.5
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 3,
+              "mean_probability": 0.7277183600713012,
+              "observed_rate": 0.3333333333333333
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 12,
+              "mean_probability": 0.8740816326530613,
+              "observed_rate": 0.75
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 4,
+              "mean_probability": 0.9375,
+              "observed_rate": 0.75
+            }
+          ]
+        },
+        "logistic": {
+          "n": 40,
+          "brier": 0.16591604066952326,
+          "log_loss": 0.5308393987691906,
+          "ece_10": 0.13387516584430856,
+          "mean_p": 0.5033939824218486,
+          "base_rate": 0.4,
+          "roc_auc": 0.8255208333333334,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 7,
+              "mean_probability": 0.05576804736440031,
+              "observed_rate": 0.14285714285714285
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 8,
+              "mean_probability": 0.10588235294117647,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 5,
+              "mean_probability": 0.4117647058823529,
+              "observed_rate": 0.2
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 5,
+              "mean_probability": 0.649090909090909,
+              "observed_rate": 0.6
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 4,
+              "mean_probability": 0.8660256410256411,
+              "observed_rate": 0.75
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 11,
+              "mean_probability": 0.9209039548022598,
+              "observed_rate": 0.7272727272727273
+            }
+          ]
+        },
+        "prevalence": {
+          "n": 40,
+          "brier": 0.26686390081341466,
+          "log_loss": 0.7270829663158231,
+          "ece_10": 0.16390210740992517,
+          "mean_p": 0.5639021074099252,
+          "base_rate": 0.4,
+          "roc_auc": 0.5,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 40,
+              "mean_probability": 0.5639021074099252,
+              "observed_rate": 0.4
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            }
+          ]
+        },
+        "relative_brier_reduction_vs_gpt": 0.1291839915288994,
+        "paired_bootstrap_vs_gpt": {
+          "mean_brier_improvement": 0.02494392399379963,
+          "ci_95_low": -0.03350206576480505,
+          "ci_95_high": 0.08459333422813137,
+          "probability_improvement_gt_zero": 0.8015,
+          "iterations": 2000.0
+        },
+        "judge_card": {
+          "domain": "finance",
+          "resolved_cases": 40,
+          "technical": {
+            "gpt_brier": 0.192315,
+            "pio_brier": 0.16747098066911972,
+            "relative_reduction": 0.1291839915288994
+          },
+          "human": {
+            "probability_error_gpt": 0.192315,
+            "probability_error_pio": 0.16747098066911972,
+            "accuracy_claim": "12.9% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+            "brier_definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily."
+          },
+          "calibration": {
+            "pio": [
+              {
+                "predicted_around": 0.5,
+                "mean_probability": 0.5555555555555556,
+                "observed_success_rate": 0.5,
+                "count": 2,
+                "human": "Predicted around 50% \u2192 observed success rate 50% (n=2)."
+              },
+              {
+                "predicted_around": 0.7,
+                "mean_probability": 0.7277183600713012,
+                "observed_success_rate": 0.3333333333333333,
+                "count": 3,
+                "human": "Predicted around 70% \u2192 observed success rate 33% (n=3)."
+              }
+            ],
+            "gpt": [
+              {
+                "predicted_around": 0.5,
+                "mean_probability": 0.57,
+                "observed_success_rate": 1.0,
+                "count": 1,
+                "human": "Predicted around 50% \u2192 observed success rate 100% (n=1)."
+              },
+              {
+                "predicted_around": 0.7,
+                "mean_probability": 0.741111111111111,
+                "observed_success_rate": 0.5555555555555556,
+                "count": 9,
+                "human": "Predicted around 70% \u2192 observed success rate 56% (n=9)."
+              }
+            ]
+          }
+        },
+        "translations": {
+          "brier": {
+            "technical": {
+              "gpt_brier": 0.192315,
+              "pio_brier": 0.16747098066911972,
+              "relative_reduction": 0.1291839915288994
+            },
+            "human": {
+              "definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily.",
+              "claim": "12.9% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+              "short": "probability error GPT 0.192 \u2192 PIO 0.167"
+            }
+          },
+          "ece": {
+            "technical": {
+              "gpt_ece": 0.16449999999999995,
+              "pio_ece": 0.1623391502362175,
+              "relative_reduction": 0.01313586482542521
+            },
+            "human": {
+              "definition": "When Play It Out says something has roughly a 70% chance, outcomes predicted around 70% should happen roughly 70% of the time.",
+              "claim": "Play It Out\u2019s confidence matches reality more closely (1.3% lower calibration error)."
+            }
+          },
+          "auc_pio": {
+            "technical": {
+              "auc": 0.8619791666666666
+            },
+            "human": {
+              "definition": "How often does the model correctly rank someone who eventually succeeds above someone who eventually fails?",
+              "claim": "Approximately 86% pairwise ranking accuracy (AUC=0.862)."
+            }
+          },
+          "calibration_pio": [
+            {
+              "predicted_around": 0.5,
+              "mean_probability": 0.5555555555555556,
+              "observed_success_rate": 0.5,
+              "count": 2,
+              "human": "Predicted around 50% \u2192 observed success rate 50% (n=2)."
+            },
+            {
+              "predicted_around": 0.7,
+              "mean_probability": 0.7277183600713012,
+              "observed_success_rate": 0.3333333333333333,
+              "count": 3,
+              "human": "Predicted around 70% \u2192 observed success rate 33% (n=3)."
+            }
+          ],
+          "calibration_gpt": [
+            {
+              "predicted_around": 0.5,
+              "mean_probability": 0.57,
+              "observed_success_rate": 1.0,
+              "count": 1,
+              "human": "Predicted around 50% \u2192 observed success rate 100% (n=1)."
+            },
+            {
+              "predicted_around": 0.7,
+              "mean_probability": 0.741111111111111,
+              "observed_success_rate": 0.5555555555555556,
+              "count": 9,
+              "human": "Predicted around 70% \u2192 observed success rate 56% (n=9)."
+            }
+          ]
+        }
+      },
+      {
+        "domain": "running",
+        "dataset": "running_volume_2019_v1",
+        "n": 40,
+        "checkpoint": "2019-03-31",
+        "goal": "Accumulate at least 1500 km of logged running distance by 2019-12-31",
+        "gpt": {
+          "n": 40,
+          "brier": 0.010973925,
+          "log_loss": 0.06535561135006389,
+          "ece_10": 0.058625000000000003,
+          "mean_p": 0.530525,
+          "base_rate": 0.5,
+          "roc_auc": 1.0,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 14,
+              "mean_probability": 0.0195,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 2,
+              "mean_probability": 0.185,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 1,
+              "mean_probability": 0.2,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 3,
+              "mean_probability": 0.3133333333333333,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 20,
+              "mean_probability": 0.9719,
+              "observed_rate": 1.0
+            }
+          ]
+        },
+        "pio": {
+          "n": 40,
+          "brier": 0.014157758605781886,
+          "log_loss": 0.07930065207965431,
+          "ece_10": 0.07034901784309897,
+          "mean_p": 0.4688917601531558,
+          "base_rate": 0.5,
+          "roc_auc": 1.0,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 17,
+              "mean_probability": 0.022064190549869724,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 3,
+              "mean_probability": 0.13657477352576977,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1,
+              "mean_probability": 0.5653409090909091,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 4,
+              "mean_probability": 0.7461396755361458,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 2,
+              "mean_probability": 0.8846365914786967,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 13,
+              "mean_probability": 0.9732063116929424,
+              "observed_rate": 1.0
+            }
+          ]
+        },
+        "logistic": {
+          "n": 40,
+          "brier": 0.01641318769864022,
+          "log_loss": 0.09194761896782487,
+          "ece_10": 0.081674422381848,
+          "mean_p": 0.48329064194269283,
+          "base_rate": 0.5,
+          "roc_auc": 1.0,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 14,
+              "mean_probability": 0.02399455215510924,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 4,
+              "mean_probability": 0.12205760892009085,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 2,
+              "mean_probability": 0.23757356031946195,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 1,
+              "mean_probability": 0.574585635359116,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 1,
+              "mean_probability": 0.6666666666666666,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 2,
+              "mean_probability": 0.7733402489626555,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 3,
+              "mean_probability": 0.8667682575683745,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 13,
+              "mean_probability": 0.9726220629662061,
+              "observed_rate": 1.0
+            }
+          ]
+        },
+        "relative_brier_reduction_vs_gpt": -0.29012715193350463,
+        "paired_bootstrap_vs_gpt": {
+          "mean_brier_improvement": -0.00321298058349819,
+          "ci_95_low": -0.017603098757307197,
+          "ci_95_high": 0.008723335098461876,
+          "probability_improvement_gt_zero": 0.3275,
+          "iterations": 2000.0
+        },
+        "judge_card": {
+          "domain": "running",
+          "resolved_cases": 40,
+          "technical": {
+            "gpt_brier": 0.010973925,
+            "pio_brier": 0.014157758605781886,
+            "relative_reduction": -0.29012715193350463
+          },
+          "human": {
+            "probability_error_gpt": 0.010973925,
+            "probability_error_pio": 0.014157758605781886,
+            "accuracy_claim": "-29.0% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+            "brier_definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily."
+          },
+          "calibration": {
+            "pio": [
+              {
+                "predicted_around": 0.5,
+                "mean_probability": 0.5653409090909091,
+                "observed_success_rate": 1.0,
+                "count": 1,
+                "human": "Predicted around 50% \u2192 observed success rate 100% (n=1)."
+              },
+              {
+                "predicted_around": 0.7,
+                "mean_probability": 0.7461396755361458,
+                "observed_success_rate": 1.0,
+                "count": 4,
+                "human": "Predicted around 70% \u2192 observed success rate 100% (n=4)."
+              }
+            ],
+            "gpt": [
+              {
+                "predicted_around": 0.5,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 50%: insufficient cases in bin."
+              },
+              {
+                "predicted_around": 0.7,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 70%: insufficient cases in bin."
+              }
+            ]
+          }
+        },
+        "translations": {
+          "brier": {
+            "technical": {
+              "gpt_brier": 0.010973925,
+              "pio_brier": 0.014157758605781886,
+              "relative_reduction": -0.29012715193350463
+            },
+            "human": {
+              "definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily.",
+              "claim": "-29.0% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+              "short": "probability error GPT 0.011 \u2192 PIO 0.014"
+            }
+          },
+          "ece": {
+            "technical": {
+              "gpt_ece": 0.058625000000000003,
+              "pio_ece": 0.07034901784309897,
+              "relative_reduction": -0.19998324679060062
+            },
+            "human": {
+              "definition": "When Play It Out says something has roughly a 70% chance, outcomes predicted around 70% should happen roughly 70% of the time.",
+              "claim": "Play It Out\u2019s confidence matches reality more closely (-20.0% lower calibration error)."
+            }
+          },
+          "auc_pio": {
+            "technical": {
+              "auc": 1.0
+            },
+            "human": {
+              "definition": "How often does the model correctly rank someone who eventually succeeds above someone who eventually fails?",
+              "claim": "Approximately 100% pairwise ranking accuracy (AUC=1.000)."
+            }
+          },
+          "calibration_pio": [
+            {
+              "predicted_around": 0.5,
+              "mean_probability": 0.5653409090909091,
+              "observed_success_rate": 1.0,
+              "count": 1,
+              "human": "Predicted around 50% \u2192 observed success rate 100% (n=1)."
+            },
+            {
+              "predicted_around": 0.7,
+              "mean_probability": 0.7461396755361458,
+              "observed_success_rate": 1.0,
+              "count": 4,
+              "human": "Predicted around 70% \u2192 observed success rate 100% (n=4)."
+            }
+          ],
+          "calibration_gpt": [
+            {
+              "predicted_around": 0.5,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 50%: insufficient cases in bin."
+            },
+            {
+              "predicted_around": 0.7,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 70%: insufficient cases in bin."
+            }
+          ]
+        },
+        "decay_note": "Decay ablation on full test improved Brier by only ~0.3%; not claimed as material for this domain."
+      },
+      {
+        "domain": "career",
+        "dataset": "jth_offer_v1",
+        "n": 40,
+        "goal": "This job application receives a job offer by the end of the recruiting process",
+        "full_test_statistical": {
+          "calibration": "isotonic",
+          "models": {
+            "logistic": {
+              "brier": 0.020040553863003827,
+              "logloss": 0.09591585419919248,
+              "ece": 0.0021855969006767317,
+              "auc": 0.6863442637805053,
+              "n_test_rows": 24390,
+              "test_positive_rate": 0.02107421074210742
+            },
+            "hist_gradient_boosting": {
+              "brier": 0.02016300719382377,
+              "logloss": 0.0947371821628579,
+              "ece": 0.0011213205196757507,
+              "auc": 0.6986776034153113,
+              "n_test_rows": 24390,
+              "test_positive_rate": 0.02107421074210742
+            }
+          }
+        },
+        "gpt": {
+          "n": 40,
+          "brier": 0.10062249999999999,
+          "log_loss": 0.3476919002576439,
+          "ece_10": 0.05775000000000001,
+          "mean_p": 0.14525000000000002,
+          "base_rate": 0.125,
+          "roc_auc": 0.66,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 8,
+              "mean_probability": 0.0775,
+              "observed_rate": 0.0
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 27,
+              "mean_probability": 0.14592592592592593,
+              "observed_rate": 0.1111111111111111
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 4,
+              "mean_probability": 0.2275,
+              "observed_rate": 0.25
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 1,
+              "mean_probability": 0.34,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            }
+          ]
+        },
+        "pio": {
+          "n": 40,
+          "brier": 0.09992201332742864,
+          "log_loss": 0.4026030527711583,
+          "ece_10": 0.09662771221664165,
+          "mean_p": 0.028372287783358353,
+          "base_rate": 0.125,
+          "roc_auc": 0.7285714285714285,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 38,
+              "mean_probability": 0.01538830682495546,
+              "observed_rate": 0.07894736842105263
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 1,
+              "mean_probability": 0.16030534351145037,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 1,
+              "mean_probability": 0.3898305084745763,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            }
+          ]
+        },
+        "logistic": {
+          "n": 40,
+          "brier": 0.10526053882453645,
+          "log_loss": 0.4205612224220518,
+          "ece_10": 0.09930449651011547,
+          "mean_p": 0.025695503489884523,
+          "base_rate": 0.125,
+          "roc_auc": 0.66,
+          "calibration_bins": [
+            {
+              "lower": 0.0,
+              "upper": 0.1,
+              "count": 38,
+              "mean_probability": 0.016758699951667413,
+              "observed_rate": 0.07894736842105263
+            },
+            {
+              "lower": 0.1,
+              "upper": 0.2,
+              "count": 1,
+              "mean_probability": 0.16371681415929204,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.2,
+              "upper": 0.3,
+              "count": 1,
+              "mean_probability": 0.22727272727272727,
+              "observed_rate": 1.0
+            },
+            {
+              "lower": 0.3,
+              "upper": 0.4,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.4,
+              "upper": 0.5,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.5,
+              "upper": 0.6,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.6,
+              "upper": 0.7,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.7,
+              "upper": 0.8,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.8,
+              "upper": 0.9,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            },
+            {
+              "lower": 0.9,
+              "upper": 1.0,
+              "count": 0,
+              "mean_probability": null,
+              "observed_rate": null
+            }
+          ]
+        },
+        "relative_brier_reduction_vs_gpt": 0.0069615311940306205,
+        "paired_bootstrap_vs_gpt": {
+          "mean_brier_improvement": -3.926146549204859e-05,
+          "ci_95_low": -0.034823749859150085,
+          "ci_95_high": 0.031035391067747695,
+          "probability_improvement_gt_zero": 0.517,
+          "iterations": 2000.0
+        },
+        "judge_card": {
+          "domain": "career",
+          "resolved_cases": 40,
+          "technical": {
+            "gpt_brier": 0.10062249999999999,
+            "pio_brier": 0.09992201332742864,
+            "relative_reduction": 0.0069615311940306205
+          },
+          "human": {
+            "probability_error_gpt": 0.10062249999999999,
+            "probability_error_pio": 0.09992201332742864,
+            "accuracy_claim": "0.7% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+            "brier_definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily."
+          },
+          "calibration": {
+            "pio": [
+              {
+                "predicted_around": 0.5,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 50%: insufficient cases in bin."
+              },
+              {
+                "predicted_around": 0.7,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 70%: insufficient cases in bin."
+              }
+            ],
+            "gpt": [
+              {
+                "predicted_around": 0.5,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 50%: insufficient cases in bin."
+              },
+              {
+                "predicted_around": 0.7,
+                "observed_success_rate": null,
+                "count": 0,
+                "human": "Predicted around 70%: insufficient cases in bin."
+              }
+            ]
+          }
+        },
+        "translations": {
+          "brier": {
+            "technical": {
+              "gpt_brier": 0.10062249999999999,
+              "pio_brier": 0.09992201332742864,
+              "relative_reduction": 0.0069615311940306205
+            },
+            "human": {
+              "definition": "Brier measures how close predicted probabilities were to what actually happened; lower is better and confident wrong predictions are penalized heavily.",
+              "claim": "0.7% lower probabilistic forecasting error than GPT on the same resolved forecasts.",
+              "short": "probability error GPT 0.101 \u2192 PIO 0.100"
+            }
+          },
+          "ece": {
+            "technical": {
+              "gpt_ece": 0.05775000000000001,
+              "pio_ece": 0.09662771221664165,
+              "relative_reduction": -0.6732071379505046
+            },
+            "human": {
+              "definition": "When Play It Out says something has roughly a 70% chance, outcomes predicted around 70% should happen roughly 70% of the time.",
+              "claim": "Play It Out\u2019s confidence matches reality more closely (-67.3% lower calibration error)."
+            }
+          },
+          "auc_pio": {
+            "technical": {
+              "auc": 0.7285714285714285
+            },
+            "human": {
+              "definition": "How often does the model correctly rank someone who eventually succeeds above someone who eventually fails?",
+              "claim": "Approximately 73% pairwise ranking accuracy (AUC=0.729)."
+            }
+          },
+          "calibration_pio": [
+            {
+              "predicted_around": 0.5,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 50%: insufficient cases in bin."
+            },
+            {
+              "predicted_around": 0.7,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 70%: insufficient cases in bin."
+            }
+          ],
+          "calibration_gpt": [
+            {
+              "predicted_around": 0.5,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 50%: insufficient cases in bin."
+            },
+            {
+              "predicted_around": 0.7,
+              "observed_success_rate": null,
+              "count": 0,
+              "human": "Predicted around 70%: insufficient cases in bin."
+            }
+          ]
+        }
+      }
+    ],
+    "macro": {
+      "domains_evaluated": 4,
+      "domains_won": 3,
+      "macro_gpt_brier": 0.13167773124999999,
+      "macro_pio_brier": 0.10988608905708233,
+      "macro_relative_brier_reduction": 0.16549223612870878,
+      "human": "Play It Out beat GPT in 3/4 domains and reduced macro probability error by 16.5%."
+    }
+  },
+  "inventory": {
+    "artifact": "hackathon_proof_v2_domain_inventory",
+    "captured_at": "2026-08-30T19:10:26.559333+00:00",
+    "rule": "No fabricated labels. Only domains with resolved y in {0,1} under frozen no-leakage contracts.",
+    "domains": [
+      {
+        "domain": "education",
+        "resolved_pricing_labels": true,
+        "dataset": "oulad_completion_v1",
+        "n_shared_gpt": 200,
+        "status": "INCLUDED"
+      },
+      {
+        "domain": "finance",
+        "resolved_pricing_labels": true,
+        "dataset": "shed_emergency_savings_v1",
+        "source": "Federal Reserve SHED 2022\u21922023 panel (shedid overlap)",
+        "n_panel": 3870,
+        "n_shared_gpt": 40,
+        "outcome": "EF1==Yes in 2023 (3-month emergency funds)",
+        "status": "INCLUDED"
+      },
+      {
+        "domain": "running",
+        "resolved_pricing_labels": true,
+        "dataset": "running_volume_2019_v1",
+        "source": "Figshare DOI 10.6084/m9.figshare.16620238",
+        "outcome": ">=1500 km logged in 2019",
+        "n_shared_gpt": 40,
+        "note": "major column excluded (retrospective tag). Volume goal is training-consistency proxy, not race finish time.",
+        "status": "INCLUDED_WITH_LIMITATIONS"
+      },
+      {
+        "domain": "career",
+        "resolved_pricing_labels": true,
+        "dataset": "jth_offer_v1",
+        "source": "Zenodo 21390581 JTH CC BY-NC 4.0",
+        "outcome": "job_offer_proposed_date not null",
+        "n_shared_gpt": 40,
+        "base_rate_approx": 0.021,
+        "status": "INCLUDED"
+      },
+      {
+        "domain": "habits",
+        "resolved_pricing_labels": false,
+        "status": "EXCLUDED_NO_STRONG_PUBLIC_PANEL",
+        "candidates_rejected": [
+          "Medication adherence Mendeley (download blocked)",
+          "StudentLife (host unreachable this run)",
+          "Osteoporosis adherence (cross-sectional, weak temporal contract)"
+        ]
+      },
+      {
+        "domain": "startup",
+        "resolved_pricing_labels": false,
+        "status": "EXCLUDED_NO_DEFENSIBLE_PERSONAL_PANEL"
+      }
+    ]
+  },
+  "full_test_statistical": {
+    "shed": {
+      "A_prevalence": {
+        "system": "prevalence",
+        "n": 374,
+        "brier": 0.24861591933913654,
+        "log_loss": 0.6903863256054094,
+        "ece_10": 0.021121358746823637,
+        "mean_p": 0.5639021074099252,
+        "base_rate": 0.5427807486631016,
+        "roc_auc": 0.5
+      },
+      "C_logistic": {
+        "system": "logistic_calibrated",
+        "n": 374,
+        "brier": 0.13142419850509882,
+        "log_loss": 0.6723350150900472,
+        "ece_10": 0.05748502775359941,
+        "mean_p": 0.533652389371853,
+        "base_rate": 0.5427807486631016,
+        "roc_auc": 0.885273528649209
+      },
+      "G_hgb": {
+        "system": "hgb_calibrated",
+        "n": 374,
+        "brier": 0.1297169907583013,
+        "log_loss": 0.41186057582241364,
+        "ece_10": 0.05098924971945466,
+        "mean_p": 0.5290279527990929,
+        "base_rate": 0.5427807486631016,
+        "roc_auc": 0.8890329271454498
+      },
+      "relative_brier_reduction_hgb_vs_prevalence": 0.4782434242219439
+    },
+    "running": {
+      "A_prevalence": {
+        "system": "prevalence",
+        "n": 10932,
+        "brier": 0.24426704535695493,
+        "log_loss": 0.6816371656603282,
+        "ece_10": 0.001932862547244285,
+        "mean_p": 0.4223261934351926,
+        "base_rate": 0.4242590559824369,
+        "roc_auc": 0.5
+      },
+      "C_logistic": {
+        "system": "logistic_calibrated",
+        "n": 10932,
+        "brier": 0.0636654413606137,
+        "log_loss": 0.2084721268290064,
+        "ece_10": 0.012096400341004928,
+        "mean_p": 0.4158406361963396,
+        "base_rate": 0.4242590559824369,
+        "roc_auc": 0.9727922497630481
+      },
+      "G_hgb": {
+        "system": "hgb_calibrated",
+        "n": 10932,
+        "brier": 0.06189668082664544,
+        "log_loss": 0.20222131732469115,
+        "ece_10": 0.010523317710845982,
+        "mean_p": 0.4159346078636802,
+        "base_rate": 0.4242590559824369,
+        "roc_auc": 0.974548972559614
+      },
+      "decay_ablation": {
+        "selected_half_life_days_on_validation": 14,
+        "validation_brier_proxy": 0.06106108709147418,
+        "G_with_decay": {
+          "system": "hgb_decay",
+          "n": 10932,
+          "brier": 0.06189668082664544,
+          "log_loss": 0.20222131732469115,
+          "ece_10": 0.010523317710845982,
+          "mean_p": 0.4159346078636802,
+          "base_rate": 0.4242590559824369,
+          "roc_auc": 0.974548972559614
+        },
+        "G_without_decay": {
+          "system": "hgb_no_decay",
+          "n": 10932,
+          "brier": 0.06208304729791184,
+          "log_loss": 0.20277805023040094,
+          "ece_10": 0.011751939958197254,
+          "mean_p": 0.4161890075275027,
+          "base_rate": 0.4242590559824369,
+          "roc_auc": 0.9743726031609397
+        },
+        "relative_brier_change_removing_decay": 0.00301092835314319
+      },
+      "by_checkpoint": {
+        "0": {
+          "prevalence": {
+            "system": "prev_0",
+            "n": 3644,
+            "brier": 0.24426704535695493,
+            "log_loss": 0.6816371656603281,
+            "ece_10": 0.001932862547244285,
+            "mean_p": 0.42232619343519257,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.5
+          },
+          "logistic": {
+            "system": "log_0",
+            "n": 3644,
+            "brier": 0.10187311802024085,
+            "log_loss": 0.3307043806426697,
+            "ece_10": 0.022571868083795032,
+            "mean_p": 0.41663470350237636,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9301184088338921
+          },
+          "hgb": {
+            "system": "hgb_0",
+            "n": 3644,
+            "brier": 0.10137181980202022,
+            "log_loss": 0.3280453443409777,
+            "ece_10": 0.02472332292695963,
+            "mean_p": 0.41460982819740383,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9329317208405221
+          }
+        },
+        "1": {
+          "prevalence": {
+            "system": "prev_1",
+            "n": 3644,
+            "brier": 0.24426704535695493,
+            "log_loss": 0.6816371656603281,
+            "ece_10": 0.001932862547244285,
+            "mean_p": 0.42232619343519257,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.5
+          },
+          "logistic": {
+            "system": "log_1",
+            "n": 3644,
+            "brier": 0.05869931652045661,
+            "log_loss": 0.19519015475980556,
+            "ece_10": 0.026822715828636767,
+            "mean_p": 0.403895247100644,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9776811094654307
+          },
+          "hgb": {
+            "system": "hgb_1",
+            "n": 3644,
+            "brier": 0.055941215007245575,
+            "log_loss": 0.18578419560479148,
+            "ece_10": 0.01359244688855834,
+            "mean_p": 0.4133893554291023,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9791614511202069
+          }
+        },
+        "2": {
+          "prevalence": {
+            "system": "prev_2",
+            "n": 3644,
+            "brier": 0.24426704535695493,
+            "log_loss": 0.6816371656603281,
+            "ece_10": 0.001932862547244285,
+            "mean_p": 0.42232619343519257,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.5
+          },
+          "logistic": {
+            "system": "log_2",
+            "n": 3644,
+            "brier": 0.030423889541143622,
+            "log_loss": 0.0995218450845439,
+            "ece_10": 0.009824883956221322,
+            "mean_p": 0.4269919579859986,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9937641590524827
+          },
+          "hgb": {
+            "system": "hgb_2",
+            "n": 3644,
+            "brier": 0.028377007670670532,
+            "log_loss": 0.09283441202830425,
+            "ece_10": 0.008707371037202356,
+            "mean_p": 0.41980463996453443,
+            "base_rate": 0.4242590559824369,
+            "roc_auc": 0.9945996741799311
+          }
+        }
+      },
+      "feature_columns": [
+        "checkpoint_index",
+        "km_ytd",
+        "minutes_ytd",
+        "sessions_ytd",
+        "active_weeks",
+        "km_last_4w",
+        "km_last_8w",
+        "mean_pace_min_per_km",
+        "km_per_day_ytd",
+        "projected_km_linear",
+        "frac_threshold_ytd",
+        "days_elapsed",
+        "days_remaining",
+        "already_met_by_t",
+        "decay_km_hl14",
+        "decay_km_hl28",
+        "decay_km_hl56",
+        "gender",
+        "age_group",
+        "country"
+      ]
+    },
+    "jth": {
+      "calibration": "isotonic",
+      "models": {
+        "logistic": {
+          "brier": 0.020040553863003827,
+          "logloss": 0.09591585419919248,
+          "ece": 0.0021855969006767317,
+          "auc": 0.6863442637805053,
+          "n_test_rows": 24390,
+          "test_positive_rate": 0.02107421074210742
+        },
+        "hist_gradient_boosting": {
+          "brier": 0.02016300719382377,
+          "logloss": 0.0947371821628579,
+          "ece": 0.0011213205196757507,
+          "auc": 0.6986776034153113,
+          "n_test_rows": 24390,
+          "test_positive_rate": 0.02107421074210742
+        }
+      }
+    }
+  },
+  "oulad_longitudinal_from_v1": null,
+  "agents_from_v1": {}
+}

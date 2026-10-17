@@ -1,0 +1,3676 @@
+{
+  "artifact": "hackathon_proof_v2_action_policy",
+  "captured_at": "2026-08-30T19:33:28.089613+00:00",
+  "seed": 20260830,
+  "label": "NON-CAUSAL / MODEL-CONSISTENT",
+  "status": "ok",
+  "goal_id": "20000000-0000-0000-0000-000000000002",
+  "n_cases": 36,
+  "action_catalog_ids": [
+    "applications",
+    "response_rate",
+    "tech_rate",
+    "offer_rate"
+  ],
+  "best_action_top1_rates": {
+    "greedy": 0.08333333333333333,
+    "equal_proxy": 0.3611111111111111,
+    "random": 0.19444444444444445,
+    "oracle": 1.0
+  },
+  "oracle_best_action_counts": {
+    "applications": 23,
+    "response_rate": 13
+  },
+  "mean_policy_value_uplift": {
+    "greedy": 0.2648194444444445,
+    "equal_proxy": 0.13234722222222223,
+    "random": 0.2326666666666667,
+    "oracle": 0.2739166666666667
+  },
+  "mean_regret_vs_oracle": {
+    "greedy": 0.00909722222222222,
+    "equal_proxy": 0.14156944444444447,
+    "random": 0.04125000000000001,
+    "oracle": 0.0
+  },
+  "mean_upside_captured": {
+    "greedy": 0.9514826591739454,
+    "equal_proxy": 0.5453482963469283,
+    "random": 0.7331360282012149,
+    "oracle": 1.0
+  },
+  "plain_english": {
+    "disclaimer": "NON-CAUSAL / MODEL-CONSISTENT: these figures compare recommendation policies under Play It Out's hiring funnel numeric model and deadline-event Monte Carlo with explicit parameter overrides. They are not randomized controlled trial average treatment effects and must not be reported as real-world causal action impact.",
+    "causal_panel_status": "No public RCT / credible quasi-experimental personal-action panel with treatment variation loaded in this worktree. Full OULAD studentVle.csv is not present under data/, so no observational study-intensity associative proxy was computed.",
+    "top1": "Across 36 simulator ranking cases, a greedy uplift/hour policy picked the best single action 8% of the time; equal-proxy 36%; random 19%; oracle 100%.",
+    "policy_value": "Mean model-consistent policy uplift under the hours budget: greedy 0.2648, equal-proxy 0.1323, random 0.2327, oracle 0.2739.",
+    "regret": "Mean regret vs oracle (probability points left on the table): greedy 0.0091, equal-proxy 0.1416, random 0.0413.",
+    "upside_captured": "Mean fraction of oracle upside captured: greedy 95%, equal-proxy 55%, random 73%.",
+    "best_action_mix": "Oracle best-action frequencies across the case grid: applications=23, response_rate=13.",
+    "reuse_note": "Extends hackathon_proof_v1 policy_regret_model_consistent with a multi-case ranking grid (baseline application rate \u00d7 stage-prior scale \u00d7 budget) and greedy/equal/random/oracle comparisons on model-priced hiring levers (weekly applications + stage conversion priors)."
+  },
+  "limitations": [
+    "Not causal; model-implied uplifts only",
+    "Additive bundle value approximation (no joint multi-override MC interaction)",
+    "Hours costs are fixed product estimates, not measured opportunity costs",
+    "Stage-rate actions are exploration priors in the hiring reference model, not RCT effects",
+    "No RCT ATE panel loaded; no OULAD associative proxy computed (data absent)"
+  ],
+  "cases": [
+    {
+      "case_id": "career_rate2_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.5137807888285986,
+          "p_scenario_model": 0.8151563192063964,
+          "p_baseline": 0.5195,
+          "p_scenario": 0.939,
+          "uplift": 0.4195,
+          "uplift_model_raw": 0.30137553037779785
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.5137807888285986,
+          "p_scenario_model": 0.5688114390431278,
+          "p_baseline": 0.5195,
+          "p_scenario": 0.869,
+          "uplift": 0.34950000000000003,
+          "uplift_model_raw": 0.05503065021452924
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.5137807888285986,
+          "p_scenario_model": 0.5394170270991578,
+          "p_baseline": 0.5195,
+          "p_scenario": 0.8605,
+          "uplift": 0.3410000000000001,
+          "uplift_model_raw": 0.025636238270559275
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.5137807888285986,
+          "p_scenario_model": 0.5569555868475914,
+          "p_baseline": 0.5195,
+          "p_scenario": 0.864,
+          "uplift": 0.34450000000000003,
+          "uplift_model_raw": 0.04317479801899282
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "applications",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.34450000000000003,
+        "equal_proxy": 0.36362500000000003,
+        "random": 0.34450000000000003,
+        "oracle": 0.4195
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.07499999999999996,
+        "equal_proxy": 0.05587499999999995,
+        "random": 0.07499999999999996,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8212157330154948,
+        "equal_proxy": 0.8668057210965436,
+        "random": 0.8212157330154948,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.513780788728952,
+          "p_scenario_model": 0.8151563191691815,
+          "p_baseline": 0.519,
+          "p_scenario": 0.946,
+          "uplift": 0.42699999999999994,
+          "uplift_model_raw": 0.30137553044022947
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.513780788728952,
+          "p_scenario_model": 0.5688114389810937,
+          "p_baseline": 0.519,
+          "p_scenario": 0.872,
+          "uplift": 0.353,
+          "uplift_model_raw": 0.0550306502521416
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.513780788728952,
+          "p_scenario_model": 0.5394170270343678,
+          "p_baseline": 0.519,
+          "p_scenario": 0.8645,
+          "uplift": 0.34550000000000003,
+          "uplift_model_raw": 0.025636238305415726
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.513780788728952,
+          "p_scenario_model": 0.5569555867698636,
+          "p_baseline": 0.519,
+          "p_scenario": 0.869,
+          "uplift": 0.35,
+          "uplift_model_raw": 0.04317479804091151
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.703,
+        "equal_proxy": 0.36887499999999995,
+        "random": 0.703,
+        "oracle": 0.703
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.334125,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5247155049786628,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.513780788659618,
+          "p_scenario_model": 0.8151563191419502,
+          "p_baseline": 0.5255,
+          "p_scenario": 0.947,
+          "uplift": 0.4215,
+          "uplift_model_raw": 0.30137553048233223
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.513780788659618,
+          "p_scenario_model": 0.5688114389142198,
+          "p_baseline": 0.5255,
+          "p_scenario": 0.876,
+          "uplift": 0.35050000000000003,
+          "uplift_model_raw": 0.055030650254601854
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.513780788659618,
+          "p_scenario_model": 0.5394170269607272,
+          "p_baseline": 0.5255,
+          "p_scenario": 0.87,
+          "uplift": 0.34450000000000003,
+          "uplift_model_raw": 0.025636238301109282
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.513780788659618,
+          "p_scenario_model": 0.556955586693575,
+          "p_baseline": 0.5255,
+          "p_scenario": 0.873,
+          "uplift": 0.34750000000000003,
+          "uplift_model_raw": 0.043174798033957074
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "applications",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 1.1195,
+        "equal_proxy": 0.366,
+        "random": 1.1195,
+        "oracle": 1.1195
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.7535,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.32693166592228673,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "applications",
+          "response_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.6715422752776883,
+          "p_scenario_model": 0.9747571953643324,
+          "p_baseline": 0.7005,
+          "p_scenario": 0.991,
+          "uplift": 0.2905,
+          "uplift_model_raw": 0.3032149200866441
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.6715422752776883,
+          "p_scenario_model": 0.7491425520745603,
+          "p_baseline": 0.7005,
+          "p_scenario": 0.934,
+          "uplift": 0.23350000000000004,
+          "uplift_model_raw": 0.07760027679687198
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.6715422752776883,
+          "p_scenario_model": 0.7073903494377436,
+          "p_baseline": 0.7005,
+          "p_scenario": 0.9235,
+          "uplift": 0.22299999999999998,
+          "uplift_model_raw": 0.03584807416005531
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.6715422752776883,
+          "p_scenario_model": 0.707139637242616,
+          "p_baseline": 0.7005,
+          "p_scenario": 0.9235,
+          "uplift": 0.22299999999999998,
+          "uplift_model_raw": 0.03559736196492769
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.22299999999999998,
+        "equal_proxy": 0.2425,
+        "random": 0.2905,
+        "oracle": 0.2905
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0675,
+        "equal_proxy": 0.04799999999999999,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.7676419965576592,
+        "equal_proxy": 0.8347676419965577,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.671542275205858,
+          "p_scenario_model": 0.9747571953587988,
+          "p_baseline": 0.663,
+          "p_scenario": 0.993,
+          "uplift": 0.32999999999999996,
+          "uplift_model_raw": 0.3032149201529408
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.671542275205858,
+          "p_scenario_model": 0.7491425520196218,
+          "p_baseline": 0.663,
+          "p_scenario": 0.939,
+          "uplift": 0.2759999999999999,
+          "uplift_model_raw": 0.0776002768137638
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.671542275205858,
+          "p_scenario_model": 0.7073903493707142,
+          "p_baseline": 0.663,
+          "p_scenario": 0.928,
+          "uplift": 0.265,
+          "uplift_model_raw": 0.03584807416485625
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.671542275205858,
+          "p_scenario_model": 0.7071396371660112,
+          "p_baseline": 0.663,
+          "p_scenario": 0.928,
+          "uplift": 0.265,
+          "uplift_model_raw": 0.035597361960153284
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.5409999999999999,
+        "equal_proxy": 0.284,
+        "random": 0.5409999999999999,
+        "oracle": 0.5409999999999999
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.25699999999999995,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5249537892791127,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.6715422751299863,
+          "p_scenario_model": 0.9747571953528391,
+          "p_baseline": 0.6895,
+          "p_scenario": 0.993,
+          "uplift": 0.3035,
+          "uplift_model_raw": 0.3032149202228528
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.6715422751299863,
+          "p_scenario_model": 0.7491425519580411,
+          "p_baseline": 0.6895,
+          "p_scenario": 0.923,
+          "uplift": 0.23350000000000004,
+          "uplift_model_raw": 0.07760027682805481
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.6715422751299863,
+          "p_scenario_model": 0.7073903492964974,
+          "p_baseline": 0.6895,
+          "p_scenario": 0.913,
+          "uplift": 0.22350000000000003,
+          "uplift_model_raw": 0.035848074166511035
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.6715422751299863,
+          "p_scenario_model": 0.707139637082042,
+          "p_baseline": 0.6895,
+          "p_scenario": 0.913,
+          "uplift": 0.22350000000000003,
+          "uplift_model_raw": 0.03559736195205565
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.7605000000000001,
+        "equal_proxy": 0.24600000000000002,
+        "random": 0.44700000000000006,
+        "oracle": 0.7605000000000001
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.5145000000000001,
+        "random": 0.3135,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3234714003944773,
+        "random": 0.5877712031558185,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "tech_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8307266862095746,
+          "p_scenario_model": 0.9995555122502634,
+          "p_baseline": 0.843,
+          "p_scenario": 1.0,
+          "uplift": 0.15700000000000003,
+          "uplift_model_raw": 0.16882882604068883
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8307266862095746,
+          "p_scenario_model": 0.9013706945716399,
+          "p_baseline": 0.843,
+          "p_scenario": 0.9745,
+          "uplift": 0.13150000000000006,
+          "uplift_model_raw": 0.0706440083620653
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8307266862095746,
+          "p_scenario_model": 0.8646256071239651,
+          "p_baseline": 0.843,
+          "p_scenario": 0.9655,
+          "uplift": 0.12250000000000005,
+          "uplift_model_raw": 0.03389892091439051
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8307266862095746,
+          "p_scenario_model": 0.8544091490684319,
+          "p_baseline": 0.843,
+          "p_scenario": 0.9625,
+          "uplift": 0.11950000000000005,
+          "uplift_model_raw": 0.023682462858857334
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.11950000000000005,
+        "equal_proxy": 0.13262500000000005,
+        "random": 0.11950000000000005,
+        "oracle": 0.15700000000000003
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.03749999999999998,
+        "equal_proxy": 0.02437499999999998,
+        "random": 0.03749999999999998,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.7611464968152868,
+        "equal_proxy": 0.8447452229299365,
+        "random": 0.7611464968152868,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8307266861588488,
+          "p_scenario_model": 0.9995555122501273,
+          "p_baseline": 0.8175,
+          "p_scenario": 1.0,
+          "uplift": 0.1825,
+          "uplift_model_raw": 0.16882882609127847
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8307266861588488,
+          "p_scenario_model": 0.9013706945404985,
+          "p_baseline": 0.8175,
+          "p_scenario": 0.9695,
+          "uplift": 0.15200000000000002,
+          "uplift_model_raw": 0.07064400838164964
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8307266861588488,
+          "p_scenario_model": 0.8646256070798153,
+          "p_baseline": 0.8175,
+          "p_scenario": 0.963,
+          "uplift": 0.14549999999999996,
+          "uplift_model_raw": 0.03389892092096647
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8307266861588488,
+          "p_scenario_model": 0.8544091490175234,
+          "p_baseline": 0.8175,
+          "p_scenario": 0.961,
+          "uplift": 0.14349999999999996,
+          "uplift_model_raw": 0.02368246285867459
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.2955,
+        "equal_proxy": 0.15587499999999999,
+        "random": 0.14549999999999996,
+        "oracle": 0.2955
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.139625,
+        "random": 0.15000000000000002,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5274957698815567,
+        "random": 0.4923857868020304,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate2_scale1.15_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 2.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8307266861066109,
+          "p_scenario_model": 0.9995555122499874,
+          "p_baseline": 0.831,
+          "p_scenario": 1.0,
+          "uplift": 0.16900000000000004,
+          "uplift_model_raw": 0.16882882614337646
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8307266861066109,
+          "p_scenario_model": 0.9013706945085792,
+          "p_baseline": 0.831,
+          "p_scenario": 0.972,
+          "uplift": 0.14100000000000001,
+          "uplift_model_raw": 0.07064400840196827
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8307266861066109,
+          "p_scenario_model": 0.8646256070353986,
+          "p_baseline": 0.831,
+          "p_scenario": 0.962,
+          "uplift": 0.131,
+          "uplift_model_raw": 0.03389892092878766
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8307266861066109,
+          "p_scenario_model": 0.8544091489666679,
+          "p_baseline": 0.831,
+          "p_scenario": 0.9605,
+          "uplift": 0.12950000000000006,
+          "uplift_model_raw": 0.02368246286005693
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.4395000000000001,
+        "equal_proxy": 0.14262500000000003,
+        "random": 0.30000000000000004,
+        "oracle": 0.4395000000000001
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.2968750000000001,
+        "random": 0.13950000000000007,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3245164960182025,
+        "random": 0.68259385665529,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate",
+          "applications"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.61104201598911,
+          "p_scenario_model": 0.8151563189173627,
+          "p_baseline": 0.62,
+          "p_scenario": 0.952,
+          "uplift": 0.33199999999999996,
+          "uplift_model_raw": 0.20411430292825272
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.61104201598911,
+          "p_scenario_model": 0.7104879505062647,
+          "p_baseline": 0.62,
+          "p_scenario": 0.9185,
+          "uplift": 0.2985,
+          "uplift_model_raw": 0.09944593451715467
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.61104201598911,
+          "p_scenario_model": 0.656160776745139,
+          "p_baseline": 0.62,
+          "p_scenario": 0.904,
+          "uplift": 0.28400000000000003,
+          "uplift_model_raw": 0.04511876075602894
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.61104201598911,
+          "p_scenario_model": 0.6561613409221546,
+          "p_baseline": 0.62,
+          "p_scenario": 0.904,
+          "uplift": 0.28400000000000003,
+          "uplift_model_raw": 0.0451193249330446
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.28400000000000003,
+        "equal_proxy": 0.29962500000000003,
+        "random": 0.28400000000000003,
+        "oracle": 0.33199999999999996
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.04799999999999993,
+        "equal_proxy": 0.03237499999999993,
+        "random": 0.04799999999999993,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8554216867469882,
+        "equal_proxy": 0.9024849397590363,
+        "random": 0.8554216867469882,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.6110420159281299,
+          "p_scenario_model": 0.8151563188862491,
+          "p_baseline": 0.613,
+          "p_scenario": 0.9445,
+          "uplift": 0.3315,
+          "uplift_model_raw": 0.20411430295811916
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.6110420159281299,
+          "p_scenario_model": 0.7104879504560693,
+          "p_baseline": 0.613,
+          "p_scenario": 0.9165,
+          "uplift": 0.3035,
+          "uplift_model_raw": 0.09944593452793937
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.6110420159281299,
+          "p_scenario_model": 0.6561607766845008,
+          "p_baseline": 0.613,
+          "p_scenario": 0.8955,
+          "uplift": 0.2825,
+          "uplift_model_raw": 0.04511876075637089
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.6110420159281299,
+          "p_scenario_model": 0.6561613408512239,
+          "p_baseline": 0.613,
+          "p_scenario": 0.8955,
+          "uplift": 0.2825,
+          "uplift_model_raw": 0.045119324923094006
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.586,
+        "equal_proxy": 0.3,
+        "random": 0.586,
+        "oracle": 0.586
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.286,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5119453924914676,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.6110420158592496,
+          "p_scenario_model": 0.8151563188555558,
+          "p_baseline": 0.625,
+          "p_scenario": 0.947,
+          "uplift": 0.32199999999999995,
+          "uplift_model_raw": 0.20411430299630628
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.6110420158592496,
+          "p_scenario_model": 0.7104879504082651,
+          "p_baseline": 0.625,
+          "p_scenario": 0.9175,
+          "uplift": 0.2925,
+          "uplift_model_raw": 0.09944593454901551
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.6110420158592496,
+          "p_scenario_model": 0.6561607766281012,
+          "p_baseline": 0.625,
+          "p_scenario": 0.8965,
+          "uplift": 0.27149999999999996,
+          "uplift_model_raw": 0.045118760768851685
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.6110420158592496,
+          "p_scenario_model": 0.6561613407879086,
+          "p_baseline": 0.625,
+          "p_scenario": 0.8965,
+          "uplift": 0.27149999999999996,
+          "uplift_model_raw": 0.045119324928659
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.8859999999999999,
+        "equal_proxy": 0.28937499999999994,
+        "random": 0.8859999999999999,
+        "oracle": 0.8859999999999999
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.596625,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3266083521444695,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8183130794722615,
+          "p_scenario_model": 0.9747571953104588,
+          "p_baseline": 0.8185,
+          "p_scenario": 0.991,
+          "uplift": 0.1725,
+          "uplift_model_raw": 0.15644411583819728
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8183130794722615,
+          "p_scenario_model": 0.9065530720021178,
+          "p_baseline": 0.8185,
+          "p_scenario": 0.9725,
+          "uplift": 0.15400000000000003,
+          "uplift_model_raw": 0.08823999252985626
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8183130794722615,
+          "p_scenario_model": 0.8615223046234378,
+          "p_baseline": 0.8185,
+          "p_scenario": 0.9595,
+          "uplift": 0.14100000000000001,
+          "uplift_model_raw": 0.04320922515117631
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8183130794722615,
+          "p_scenario_model": 0.8487129253748986,
+          "p_baseline": 0.8185,
+          "p_scenario": 0.9575,
+          "uplift": 0.139,
+          "uplift_model_raw": 0.030399845902637113
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.139,
+        "equal_proxy": 0.151625,
+        "random": 0.1725,
+        "oracle": 0.1725
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.033499999999999974,
+        "equal_proxy": 0.020874999999999977,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8057971014492755,
+        "equal_proxy": 0.8789855072463769,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8183130794176113,
+          "p_scenario_model": 0.9747571953027865,
+          "p_baseline": 0.8115,
+          "p_scenario": 0.9915,
+          "uplift": 0.18000000000000005,
+          "uplift_model_raw": 0.15644411588517515
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8183130794176113,
+          "p_scenario_model": 0.9065530719730828,
+          "p_baseline": 0.8115,
+          "p_scenario": 0.976,
+          "uplift": 0.16449999999999998,
+          "uplift_model_raw": 0.08823999255547144
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8183130794176113,
+          "p_scenario_model": 0.8615223045806297,
+          "p_baseline": 0.8115,
+          "p_scenario": 0.962,
+          "uplift": 0.15049999999999997,
+          "uplift_model_raw": 0.043209225163018394
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8183130794176113,
+          "p_scenario_model": 0.8487129253247834,
+          "p_baseline": 0.8115,
+          "p_scenario": 0.956,
+          "uplift": 0.14449999999999996,
+          "uplift_model_raw": 0.03039984590717204
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.30899999999999994,
+        "equal_proxy": 0.159875,
+        "random": 0.18000000000000005,
+        "oracle": 0.30899999999999994
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.14912499999999995,
+        "random": 0.1289999999999999,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5173948220064726,
+        "random": 0.5825242718446605,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8183130793797161,
+          "p_scenario_model": 0.9747571952977819,
+          "p_baseline": 0.8075,
+          "p_scenario": 0.9885,
+          "uplift": 0.18100000000000005,
+          "uplift_model_raw": 0.15644411591806584
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8183130793797161,
+          "p_scenario_model": 0.9065530719544601,
+          "p_baseline": 0.8075,
+          "p_scenario": 0.97,
+          "uplift": 0.16249999999999998,
+          "uplift_model_raw": 0.08823999257474402
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8183130793797161,
+          "p_scenario_model": 0.8615223045525169,
+          "p_baseline": 0.8075,
+          "p_scenario": 0.9575,
+          "uplift": 0.15000000000000002,
+          "uplift_model_raw": 0.04320922517280079
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8183130793797161,
+          "p_scenario_model": 0.8487129252881849,
+          "p_baseline": 0.8075,
+          "p_scenario": 0.9545,
+          "uplift": 0.14700000000000002,
+          "uplift_model_raw": 0.03039984590846878
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.49050000000000005,
+        "equal_proxy": 0.16012500000000002,
+        "random": 0.49050000000000005,
+        "oracle": 0.49050000000000005
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.33037500000000003,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3264525993883792,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "applications",
+          "response_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1.15_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9570428242587916,
+          "p_scenario_model": 0.9995555122490125,
+          "p_baseline": 0.944,
+          "p_scenario": 0.9995,
+          "uplift": 0.055500000000000105,
+          "uplift_model_raw": 0.0425126879902209
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9570428242587916,
+          "p_scenario_model": 0.9887276533817797,
+          "p_baseline": 0.944,
+          "p_scenario": 0.9945,
+          "uplift": 0.0505000000000001,
+          "uplift_model_raw": 0.03168482912298809
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9570428242587916,
+          "p_scenario_model": 0.9749194908423487,
+          "p_baseline": 0.944,
+          "p_scenario": 0.9905,
+          "uplift": 0.0465000000000001,
+          "uplift_model_raw": 0.017876666583557133
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9570428242587916,
+          "p_scenario_model": 0.9678127789175603,
+          "p_baseline": 0.944,
+          "p_scenario": 0.989,
+          "uplift": 0.04500000000000004,
+          "uplift_model_raw": 0.010769954658768732
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.04500000000000004,
+        "equal_proxy": 0.049375000000000085,
+        "random": 0.0505000000000001,
+        "oracle": 0.055500000000000105
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.010500000000000065,
+        "equal_proxy": 0.006125000000000019,
+        "random": 0.0050000000000000044,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.81081081081081,
+        "equal_proxy": 0.8896396396396395,
+        "random": 0.90990990990991,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "response_rate"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1.15_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9570428242481855,
+          "p_scenario_model": 0.999555512248908,
+          "p_baseline": 0.956,
+          "p_scenario": 1.0,
+          "uplift": 0.04400000000000004,
+          "uplift_model_raw": 0.0425126880007225
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9570428242481855,
+          "p_scenario_model": 0.9887276533791363,
+          "p_baseline": 0.956,
+          "p_scenario": 0.9975,
+          "uplift": 0.04150000000000009,
+          "uplift_model_raw": 0.03168482913095072
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9570428242481855,
+          "p_scenario_model": 0.9749194908364145,
+          "p_baseline": 0.956,
+          "p_scenario": 0.993,
+          "uplift": 0.03700000000000003,
+          "uplift_model_raw": 0.01787666658822895
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9570428242481855,
+          "p_scenario_model": 0.9678127789089271,
+          "p_baseline": 0.956,
+          "p_scenario": 0.9915,
+          "uplift": 0.03550000000000009,
+          "uplift_model_raw": 0.010769954660741599
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.07700000000000018,
+        "equal_proxy": 0.03950000000000006,
+        "random": 0.07700000000000018,
+        "oracle": 0.07700000000000018
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.03750000000000012,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5129870129870127,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate5_scale1.15_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 5.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9570428242376754,
+          "p_scenario_model": 0.9995555122488001,
+          "p_baseline": 0.9605,
+          "p_scenario": 0.9995,
+          "uplift": 0.039000000000000035,
+          "uplift_model_raw": 0.04251268801112473
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9570428242376754,
+          "p_scenario_model": 0.9887276533764014,
+          "p_baseline": 0.9605,
+          "p_scenario": 0.9965,
+          "uplift": 0.03600000000000003,
+          "uplift_model_raw": 0.031684829138726056
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9570428242376754,
+          "p_scenario_model": 0.9749194908301478,
+          "p_baseline": 0.9605,
+          "p_scenario": 0.9915,
+          "uplift": 0.031000000000000028,
+          "uplift_model_raw": 0.017876666592472445
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9570428242376754,
+          "p_scenario_model": 0.967812778899882,
+          "p_baseline": 0.9605,
+          "p_scenario": 0.9885,
+          "uplift": 0.028000000000000025,
+          "uplift_model_raw": 0.010769954662206649
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "response_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.10300000000000009,
+        "equal_proxy": 0.03350000000000003,
+        "random": 0.05900000000000005,
+        "oracle": 0.10300000000000009
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.06950000000000006,
+        "random": 0.04400000000000004,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.32524271844660196,
+        "random": 0.5728155339805825,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "response_rate",
+          "offer_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate",
+          "offer_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.7689350706941664,
+          "p_scenario_model": 0.8151563186436049,
+          "p_baseline": 0.764,
+          "p_scenario": 0.95,
+          "uplift": 0.18599999999999994,
+          "uplift_model_raw": 0.04622124794943849
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.7689350706941664,
+          "p_scenario_model": 0.8857125332864345,
+          "p_baseline": 0.764,
+          "p_scenario": 0.972,
+          "uplift": 0.20799999999999996,
+          "uplift_model_raw": 0.11677746259226807
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.7689350706941664,
+          "p_scenario_model": 0.826166687610242,
+          "p_baseline": 0.764,
+          "p_scenario": 0.954,
+          "uplift": 0.18999999999999995,
+          "uplift_model_raw": 0.05723161691607559
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.7689350706941664,
+          "p_scenario_model": 0.8096854188402771,
+          "p_baseline": 0.764,
+          "p_scenario": 0.949,
+          "uplift": 0.18499999999999994,
+          "uplift_model_raw": 0.04075034814611067
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.18499999999999994,
+        "equal_proxy": 0.19224999999999995,
+        "random": 0.18499999999999994,
+        "oracle": 0.20799999999999996
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.02300000000000002,
+        "equal_proxy": 0.015750000000000014,
+        "random": 0.02300000000000002,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8894230769230768,
+        "equal_proxy": 0.924278846153846,
+        "random": 0.8894230769230768,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate"
+        ],
+        "oracle": [
+          "response_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.768935070663205,
+          "p_scenario_model": 0.8151563186185079,
+          "p_baseline": 0.7655,
+          "p_scenario": 0.9515,
+          "uplift": 0.18600000000000005,
+          "uplift_model_raw": 0.04622124795530291
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.768935070663205,
+          "p_scenario_model": 0.8857125332702754,
+          "p_baseline": 0.7655,
+          "p_scenario": 0.9685,
+          "uplift": 0.20300000000000007,
+          "uplift_model_raw": 0.11677746260707045
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.768935070663205,
+          "p_scenario_model": 0.8261666875852132,
+          "p_baseline": 0.7655,
+          "p_scenario": 0.954,
+          "uplift": 0.1885,
+          "uplift_model_raw": 0.05723161692200818
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.768935070663205,
+          "p_scenario_model": 0.8096854188063831,
+          "p_baseline": 0.7655,
+          "p_scenario": 0.9505,
+          "uplift": 0.18500000000000005,
+          "uplift_model_raw": 0.04075034814317813
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.3880000000000001,
+        "equal_proxy": 0.19062500000000004,
+        "random": 0.1885,
+        "oracle": 0.3880000000000001
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.19737500000000008,
+        "random": 0.19950000000000012,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.49130154639175255,
+        "random": 0.48582474226804107,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.7689350706253852,
+          "p_scenario_model": 0.8151563185882967,
+          "p_baseline": 0.778,
+          "p_scenario": 0.9595,
+          "uplift": 0.1815,
+          "uplift_model_raw": 0.046221247962911494
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.7689350706253852,
+          "p_scenario_model": 0.8857125332491492,
+          "p_baseline": 0.778,
+          "p_scenario": 0.978,
+          "uplift": 0.19999999999999996,
+          "uplift_model_raw": 0.11677746262376398
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.7689350706253852,
+          "p_scenario_model": 0.8261666875508616,
+          "p_baseline": 0.778,
+          "p_scenario": 0.962,
+          "uplift": 0.18399999999999994,
+          "uplift_model_raw": 0.0572316169254764
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.7689350706253852,
+          "p_scenario_model": 0.8096854187629879,
+          "p_baseline": 0.778,
+          "p_scenario": 0.958,
+          "uplift": 0.17999999999999994,
+          "uplift_model_raw": 0.0407503481376027
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.5614999999999999,
+        "equal_proxy": 0.18637499999999996,
+        "random": 0.5614999999999999,
+        "oracle": 0.5614999999999999
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.37512499999999993,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3319234194122885,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "response_rate",
+          "offer_rate",
+          "applications"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9543654864979447,
+          "p_scenario_model": 0.9747571952604133,
+          "p_baseline": 0.959,
+          "p_scenario": 0.997,
+          "uplift": 0.038000000000000034,
+          "uplift_model_raw": 0.02039170876246854
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9543654864979447,
+          "p_scenario_model": 0.9906698828795893,
+          "p_baseline": 0.959,
+          "p_scenario": 0.9995,
+          "uplift": 0.04050000000000009,
+          "uplift_model_raw": 0.03630439638164462
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9543654864979447,
+          "p_scenario_model": 0.9758309683920255,
+          "p_baseline": 0.959,
+          "p_scenario": 0.9985,
+          "uplift": 0.03950000000000009,
+          "uplift_model_raw": 0.021465481894080818
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9543654864979447,
+          "p_scenario_model": 0.9676059915012541,
+          "p_baseline": 0.959,
+          "p_scenario": 0.996,
+          "uplift": 0.03700000000000003,
+          "uplift_model_raw": 0.013240505003309422
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.03700000000000003,
+        "equal_proxy": 0.03875000000000006,
+        "random": 0.04050000000000009,
+        "oracle": 0.04050000000000009
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0035000000000000586,
+        "equal_proxy": 0.0017500000000000293,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.913580246913579,
+        "equal_proxy": 0.9567901234567895,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9543654864912025,
+          "p_scenario_model": 0.9747571952566413,
+          "p_baseline": 0.9505,
+          "p_scenario": 0.9925,
+          "uplift": 0.04200000000000004,
+          "uplift_model_raw": 0.020391708765438832
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9543654864912025,
+          "p_scenario_model": 0.9906698828781535,
+          "p_baseline": 0.9505,
+          "p_scenario": 0.997,
+          "uplift": 0.046499999999999986,
+          "uplift_model_raw": 0.03630439638695104
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9543654864912025,
+          "p_scenario_model": 0.9758309683882554,
+          "p_baseline": 0.9505,
+          "p_scenario": 0.9925,
+          "uplift": 0.04200000000000004,
+          "uplift_model_raw": 0.021465481897052996
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9543654864912025,
+          "p_scenario_model": 0.9676059914957663,
+          "p_baseline": 0.9505,
+          "p_scenario": 0.991,
+          "uplift": 0.04049999999999998,
+          "uplift_model_raw": 0.013240505004563863
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "applications",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.08699999999999997,
+        "equal_proxy": 0.04275000000000001,
+        "random": 0.04200000000000004,
+        "oracle": 0.08699999999999997
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.044249999999999956,
+        "random": 0.04499999999999993,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.4913793103448279,
+        "random": 0.4827586206896558,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9543654864850661,
+          "p_scenario_model": 0.9747571952532954,
+          "p_baseline": 0.958,
+          "p_scenario": 0.993,
+          "uplift": 0.03500000000000003,
+          "uplift_model_raw": 0.020391708768229266
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9543654864850661,
+          "p_scenario_model": 0.9906698828768621,
+          "p_baseline": 0.958,
+          "p_scenario": 0.998,
+          "uplift": 0.040000000000000036,
+          "uplift_model_raw": 0.036304396391795946
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9543654864850661,
+          "p_scenario_model": 0.9758309683848462,
+          "p_baseline": 0.958,
+          "p_scenario": 0.994,
+          "uplift": 0.03600000000000003,
+          "uplift_model_raw": 0.021465481899780037
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9543654864850661,
+          "p_scenario_model": 0.9676059914899001,
+          "p_baseline": 0.958,
+          "p_scenario": 0.9885,
+          "uplift": 0.030500000000000083,
+          "uplift_model_raw": 0.01324050500483398
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": true,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "response_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "applications",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.10550000000000015,
+        "equal_proxy": 0.035375000000000045,
+        "random": 0.07100000000000006,
+        "oracle": 0.10550000000000015
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0701250000000001,
+        "random": 0.034500000000000086,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.33530805687203785,
+        "random": 0.672985781990521,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "response_rate",
+          "offer_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications",
+          "tech_rate"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1.15_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.998248490185259,
+          "p_scenario_model": 0.9995555122480329,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0013070220627738882
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.998248490185259,
+          "p_scenario_model": 0.9999285448000076,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0016800546147486273
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.998248490185259,
+          "p_scenario_model": 0.9995092398660491,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.001260749680790152
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.998248490185259,
+          "p_scenario_model": 0.9990487410748409,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0008002508895819105
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.0020000000000000018,
+        "equal_proxy": 0.0020000000000000018,
+        "random": 0.0020000000000000018,
+        "oracle": 0.0020000000000000018
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 1.0,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "applications"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1.15_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.998248490184936,
+          "p_scenario_model": 0.9995555122479485,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0013070220630124751
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.998248490184936,
+          "p_scenario_model": 0.9999285447999928,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0016800546150568252
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.998248490184936,
+          "p_scenario_model": 0.9995092398659452,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.001260749681009199
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.998248490184936,
+          "p_scenario_model": 0.999048741074621,
+          "p_baseline": 0.998,
+          "p_scenario": 1.0,
+          "uplift": 0.0020000000000000018,
+          "uplift_model_raw": 0.0008002508896850502
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.0040000000000000036,
+        "equal_proxy": 0.0020000000000000018,
+        "random": 0.0020000000000000018,
+        "oracle": 0.0040000000000000036
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0020000000000000018,
+        "random": 0.0020000000000000018,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.5,
+        "random": 0.5,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate12_scale1.15_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 12.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9982484901845425,
+          "p_scenario_model": 0.9995555122478503,
+          "p_baseline": 0.996,
+          "p_scenario": 1.0,
+          "uplift": 0.0040000000000000036,
+          "uplift_model_raw": 0.0013070220633077945
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9982484901845425,
+          "p_scenario_model": 0.9999285447999774,
+          "p_baseline": 0.996,
+          "p_scenario": 1.0,
+          "uplift": 0.0040000000000000036,
+          "uplift_model_raw": 0.0016800546154348561
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9982484901845425,
+          "p_scenario_model": 0.999509239865838,
+          "p_baseline": 0.996,
+          "p_scenario": 1.0,
+          "uplift": 0.0040000000000000036,
+          "uplift_model_raw": 0.0012607496812954144
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9982484901845425,
+          "p_scenario_model": 0.9990487410744021,
+          "p_baseline": 0.996,
+          "p_scenario": 0.9995,
+          "uplift": 0.0035000000000000586,
+          "uplift_model_raw": 0.0008002508898595773
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "applications",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.011500000000000066,
+        "equal_proxy": 0.0038750000000000173,
+        "random": 0.008000000000000007,
+        "oracle": 0.011500000000000066
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.007625000000000048,
+        "random": 0.0035000000000000586,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.33695652173913,
+        "random": 0.6956521739130401,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate",
+          "applications"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale0.85_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8521316641221843,
+          "p_scenario_model": 0.8151563184294376,
+          "p_baseline": 0.8395,
+          "p_scenario": 0.8085,
+          "uplift": -0.031000000000000028,
+          "uplift_model_raw": -0.03697534569274674
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8521316641221843,
+          "p_scenario_model": 0.9484774402867364,
+          "p_baseline": 0.8395,
+          "p_scenario": 0.983,
+          "uplift": 0.14349999999999996,
+          "uplift_model_raw": 0.09634577616455209
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8521316641221843,
+          "p_scenario_model": 0.903121349249068,
+          "p_baseline": 0.8395,
+          "p_scenario": 0.9685,
+          "uplift": 0.129,
+          "uplift_model_raw": 0.05098968512688362
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8521316641221843,
+          "p_scenario_model": 0.8853729956788801,
+          "p_baseline": 0.8395,
+          "p_scenario": 0.9625,
+          "uplift": 0.123,
+          "uplift_model_raw": 0.03324133155669573
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.123,
+        "equal_proxy": 0.09112499999999998,
+        "random": 0.123,
+        "oracle": 0.14349999999999996
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.020499999999999963,
+        "equal_proxy": 0.05237499999999998,
+        "random": 0.020499999999999963,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8571428571428573,
+        "equal_proxy": 0.6350174216027875,
+        "random": 0.8571428571428573,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate"
+        ],
+        "oracle": [
+          "response_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale0.85_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8521316641041238,
+          "p_scenario_model": 0.8151563184075077,
+          "p_baseline": 0.856,
+          "p_scenario": 0.8245,
+          "uplift": -0.03149999999999997,
+          "uplift_model_raw": -0.03697534569661609
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8521316641041238,
+          "p_scenario_model": 0.9484774402810165,
+          "p_baseline": 0.856,
+          "p_scenario": 0.9865,
+          "uplift": 0.13050000000000006,
+          "uplift_model_raw": 0.09634577617689277
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8521316641041238,
+          "p_scenario_model": 0.9031213492396416,
+          "p_baseline": 0.856,
+          "p_scenario": 0.977,
+          "uplift": 0.121,
+          "uplift_model_raw": 0.050989685135517826
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8521316641041238,
+          "p_scenario_model": 0.8853729956663046,
+          "p_baseline": 0.856,
+          "p_scenario": 0.9695,
+          "uplift": 0.11350000000000005,
+          "uplift_model_raw": 0.03324133156218079
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.2440000000000001,
+        "equal_proxy": 0.08337500000000003,
+        "random": 0.2440000000000001,
+        "oracle": 0.2440000000000001
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.16062500000000007,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3417008196721311,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale0.85_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 0.85,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.8521316640890757,
+          "p_scenario_model": 0.815156318388306,
+          "p_baseline": 0.8555,
+          "p_scenario": 0.8345,
+          "uplift": -0.02100000000000002,
+          "uplift_model_raw": -0.03697534570076966
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.8521316640890757,
+          "p_scenario_model": 0.948477440275502,
+          "p_baseline": 0.8555,
+          "p_scenario": 0.988,
+          "uplift": 0.13249999999999995,
+          "uplift_model_raw": 0.09634577618642626
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.8521316640890757,
+          "p_scenario_model": 0.9031213492286426,
+          "p_baseline": 0.8555,
+          "p_scenario": 0.975,
+          "uplift": 0.11949999999999994,
+          "uplift_model_raw": 0.05098968513956692
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.8521316640890757,
+          "p_scenario_model": 0.8853729956511687,
+          "p_baseline": 0.8555,
+          "p_scenario": 0.9695,
+          "uplift": 0.11399999999999999,
+          "uplift_model_raw": 0.03324133156209297
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.24649999999999994,
+        "equal_proxy": 0.08624999999999997,
+        "random": 0.09849999999999992,
+        "oracle": 0.2519999999999999
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.005499999999999949,
+        "equal_proxy": 0.16574999999999993,
+        "random": 0.15349999999999997,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.9781746031746034,
+        "equal_proxy": 0.34226190476190477,
+        "random": 0.3908730158730157,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate",
+          "applications"
+        ],
+        "oracle": [
+          "response_rate",
+          "tech_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9860369018295799,
+          "p_scenario_model": 0.9747571952253518,
+          "p_baseline": 0.986,
+          "p_scenario": 0.9745,
+          "uplift": -0.011499999999999955,
+          "uplift_model_raw": -0.011279706604228168
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9860369018295799,
+          "p_scenario_model": 0.9987053178735971,
+          "p_baseline": 0.986,
+          "p_scenario": 0.9985,
+          "uplift": 0.012500000000000067,
+          "uplift_model_raw": 0.012668416044017139
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9860369018295799,
+          "p_scenario_model": 0.9945869553215083,
+          "p_baseline": 0.986,
+          "p_scenario": 0.998,
+          "uplift": 0.01200000000000001,
+          "uplift_model_raw": 0.008550053491928389
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9860369018295799,
+          "p_scenario_model": 0.9913553552892559,
+          "p_baseline": 0.986,
+          "p_scenario": 0.997,
+          "uplift": 0.01100000000000001,
+          "uplift_model_raw": 0.005318453459675965
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": true,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "response_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.01100000000000001,
+        "equal_proxy": 0.006000000000000033,
+        "random": -0.011499999999999955,
+        "oracle": 0.012500000000000067
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0015000000000000568,
+        "equal_proxy": 0.0065000000000000335,
+        "random": 0.02400000000000002,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.8799999999999961,
+        "equal_proxy": 0.4800000000000001,
+        "random": -0.9199999999999915,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "response_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9860369018275489,
+          "p_scenario_model": 0.9747571952217824,
+          "p_baseline": 0.986,
+          "p_scenario": 0.972,
+          "uplift": -0.014000000000000012,
+          "uplift_model_raw": -0.011279706605766493
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9860369018275489,
+          "p_scenario_model": 0.9987053178734226,
+          "p_baseline": 0.986,
+          "p_scenario": 0.999,
+          "uplift": 0.013000000000000012,
+          "uplift_model_raw": 0.012668416045873765
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9860369018275489,
+          "p_scenario_model": 0.9945869553207966,
+          "p_baseline": 0.986,
+          "p_scenario": 0.997,
+          "uplift": 0.01100000000000001,
+          "uplift_model_raw": 0.008550053493247667
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9860369018275489,
+          "p_scenario_model": 0.9913553552879966,
+          "p_baseline": 0.986,
+          "p_scenario": 0.9955,
+          "uplift": 0.009500000000000064,
+          "uplift_model_raw": 0.005318453460447681
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": true,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "response_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.022500000000000075,
+        "equal_proxy": 0.004875000000000018,
+        "random": -0.014000000000000012,
+        "oracle": 0.022500000000000075
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.017625000000000057,
+        "random": 0.03650000000000009,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.21666666666666676,
+        "random": -0.6222222222222207,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "response_rate",
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": [
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.0,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9860369018258415,
+          "p_scenario_model": 0.9747571952187395,
+          "p_baseline": 0.9795,
+          "p_scenario": 0.974,
+          "uplift": -0.00550000000000006,
+          "uplift_model_raw": -0.01127970660710198
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9860369018258415,
+          "p_scenario_model": 0.9987053178732628,
+          "p_baseline": 0.9795,
+          "p_scenario": 0.999,
+          "uplift": 0.019499999999999962,
+          "uplift_model_raw": 0.012668416047421305
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9860369018258415,
+          "p_scenario_model": 0.9945869553200608,
+          "p_baseline": 0.9795,
+          "p_scenario": 0.999,
+          "uplift": 0.019499999999999962,
+          "uplift_model_raw": 0.008550053494219334
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9860369018258415,
+          "p_scenario_model": 0.9913553552866252,
+          "p_baseline": 0.9795,
+          "p_scenario": 0.9975,
+          "uplift": 0.018000000000000016,
+          "uplift_model_raw": 0.005318453460783745
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.03749999999999998,
+        "equal_proxy": 0.01287499999999997,
+        "random": 0.03749999999999998,
+        "oracle": 0.038999999999999924
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0014999999999999458,
+        "equal_proxy": 0.026124999999999954,
+        "random": 0.0014999999999999458,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 0.9615384615384629,
+        "equal_proxy": 0.330128205128205,
+        "random": 0.9615384615384629,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "tech_rate",
+          "offer_rate"
+        ],
+        "oracle": [
+          "response_rate",
+          "tech_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1.15_budget8",
+      "budget_hours": 8.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9998872005395999,
+          "p_scenario_model": 0.9995555122472515,
+          "p_baseline": 0.9995,
+          "p_scenario": 0.9995,
+          "uplift": 0.0,
+          "uplift_model_raw": -0.0003316882923484199
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9998872005395999,
+          "p_scenario_model": 0.999999,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 0.00011179946040007493
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9998872005395999,
+          "p_scenario_model": 0.9999831550809444,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 9.595454134447845e-05
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9998872005395999,
+          "p_scenario_model": 0.9999535059326818,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 6.630539308194461e-05
+        }
+      ],
+      "best_action_id": "response_rate",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": true,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "response_rate"
+      },
+      "policy_value": {
+        "greedy": 0.0004999999999999449,
+        "equal_proxy": 0.0003749999999999587,
+        "random": 0.0004999999999999449,
+        "oracle": 0.0004999999999999449
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.00012499999999998623,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.75,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "response_rate"
+        ],
+        "oracle": [
+          "response_rate"
+        ]
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1.15_budget12",
+      "budget_hours": 12.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9998872005395811,
+          "p_scenario_model": 0.999555512247176,
+          "p_baseline": 1.0,
+          "p_scenario": 1.0,
+          "uplift": 0.0,
+          "uplift_model_raw": -0.0003316882924051523
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9998872005395811,
+          "p_scenario_model": 0.999999,
+          "p_baseline": 1.0,
+          "p_scenario": 1.0,
+          "uplift": 0.0,
+          "uplift_model_raw": 0.0001117994604188377
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9998872005395811,
+          "p_scenario_model": 0.9999831550809413,
+          "p_baseline": 1.0,
+          "p_scenario": 1.0,
+          "uplift": 0.0,
+          "uplift_model_raw": 9.59545413601326e-05
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9998872005395811,
+          "p_scenario_model": 0.9999535059326728,
+          "p_baseline": 1.0,
+          "p_scenario": 1.0,
+          "uplift": 0.0,
+          "uplift_model_raw": 6.630539309171457e-05
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": true,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "applications",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "tech_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": null,
+        "equal_proxy": null,
+        "random": null,
+        "oracle": null
+      },
+      "selected_ids": {
+        "greedy": [
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "applications"
+        ],
+        "oracle": []
+      }
+    },
+    {
+      "case_id": "career_rate18_scale1.15_budget20",
+      "budget_hours": 20.0,
+      "baseline_weekly_application_rate": 18.0,
+      "stage_scale": 1.15,
+      "actions": [
+        {
+          "id": "applications",
+          "label": "Raise weekly applications to 15",
+          "hours_cost": 8.0,
+          "p_baseline_model": 0.9998872005395594,
+          "p_scenario_model": 0.9995555122470944,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": -0.0003316882924649933
+        },
+        {
+          "id": "response_rate",
+          "label": "Improve application\u2192response conversion (+8pp model prior)",
+          "hours_cost": 6.0,
+          "p_baseline_model": 0.9998872005395594,
+          "p_scenario_model": 0.999999,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 0.00011179946044059808
+        },
+        {
+          "id": "tech_rate",
+          "label": "Improve OA\u2192technical conversion (+10pp model prior)",
+          "hours_cost": 10.0,
+          "p_baseline_model": 0.9998872005395594,
+          "p_scenario_model": 0.9999831550809383,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 9.595454137889536e-05
+        },
+        {
+          "id": "offer_rate",
+          "label": "Improve final\u2192offer conversion (+6pp model prior)",
+          "hours_cost": 5.0,
+          "p_baseline_model": 0.9998872005395594,
+          "p_scenario_model": 0.9999535059326634,
+          "p_baseline": 0.9995,
+          "p_scenario": 1.0,
+          "uplift": 0.0004999999999999449,
+          "uplift_model_raw": 6.630539310403805e-05
+        }
+      ],
+      "best_action_id": "applications",
+      "top1": {
+        "greedy": false,
+        "equal_proxy": false,
+        "random": false,
+        "oracle": true,
+        "greedy_choice": "offer_rate",
+        "equal_proxy_choice": "response_rate",
+        "random_choice": "offer_rate",
+        "oracle_choice": "applications"
+      },
+      "policy_value": {
+        "greedy": 0.0014999999999998348,
+        "equal_proxy": 0.0004999999999999449,
+        "random": 0.0014999999999998348,
+        "oracle": 0.0014999999999998348
+      },
+      "regret_vs_oracle": {
+        "greedy": 0.0,
+        "equal_proxy": 0.0009999999999998899,
+        "random": 0.0,
+        "oracle": 0.0
+      },
+      "upside_captured": {
+        "greedy": 1.0,
+        "equal_proxy": 0.3333333333333333,
+        "random": 1.0,
+        "oracle": 1.0
+      },
+      "selected_ids": {
+        "greedy": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "equal_proxy": [
+          "applications",
+          "response_rate",
+          "tech_rate",
+          "offer_rate"
+        ],
+        "random": [
+          "offer_rate",
+          "response_rate",
+          "applications"
+        ],
+        "oracle": [
+          "applications",
+          "response_rate",
+          "offer_rate"
+        ]
+      }
+    }
+  ]
+}

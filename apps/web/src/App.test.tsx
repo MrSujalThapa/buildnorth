@@ -1,0 +1,59 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, expect, test, vi } from "vitest";
+import { App } from "./App";
+import { seededGoals } from "./test/fixtures";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  window.localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
+});
+
+function renderApp() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function mockApi(goals: unknown = []) {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    let payload: unknown = goals;
+    if (url.endsWith("/health")) payload = { status: "ok", service: "api", version: "test" };
+    else if (url.includes("/history/")) payload = [];
+    else if (url.includes("/plugins")) payload = [];
+    else if (url.includes("/goals/") && !url.endsWith("/goals")) payload = (goals as typeof seededGoals)[0] ?? {};
+    else if (url.endsWith("/goals")) payload = goals;
+    return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } }));
+  });
+}
+
+test("renders the approved markets shell without inventing forecasts", async () => {
+  mockApi([]);
+  renderApp();
+  expect(await screen.findByRole("heading", { name: "Your outcomes" })).toBeInTheDocument();
+  expect(screen.getByText("MARKETS")).toBeInTheDocument();
+});
+
+test("renders seeded goals using the template market cards", async () => {
+  mockApi(seededGoals);
+  renderApp();
+  expect(await screen.findByRole("heading", { name: "Receive Waterloo Engineering admission" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Your outcomes" })).toBeInTheDocument();
+});
+
+test("theme toggle persists the explicit preference", async () => {
+  mockApi([]);
+  renderApp();
+  const toggle = await screen.findByRole("button", { name: "Switch to dark mode" });
+  fireEvent.click(toggle);
+  expect(document.documentElement.dataset.theme).toBe("dark");
+  expect(window.localStorage.getItem("pm-theme")).toBe("dark");
+});

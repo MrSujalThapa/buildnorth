@@ -1,0 +1,221 @@
+{
+  "dataset_version": "oulad-2017-official-v1",
+  "tables": {
+    "assessments.csv": {
+      "rows": 206,
+      "columns": [
+        "code_module",
+        "code_presentation",
+        "id_assessment",
+        "assessment_type",
+        "date",
+        "weight"
+      ],
+      "sha256": "8cc738fb88ad760571d6f2a23059bfee0ffcae3bcd830514c9cbd5c6d5a046f1",
+      "duplicate_rows": 0,
+      "missing": {
+        "code_module": 0,
+        "code_presentation": 0,
+        "id_assessment": 0,
+        "assessment_type": 0,
+        "date": 11,
+        "weight": 0
+      }
+    },
+    "courses.csv": {
+      "rows": 22,
+      "columns": [
+        "code_module",
+        "code_presentation",
+        "module_presentation_length"
+      ],
+      "sha256": "4f16eee7454b15e109b0a21a0e43be820e6846ed6f9301bb7feb5ab5ad737a75",
+      "duplicate_rows": 0,
+      "missing": {
+        "code_module": 0,
+        "code_presentation": 0,
+        "module_presentation_length": 0
+      }
+    },
+    "studentAssessment.csv": {
+      "rows": 173912,
+      "columns": [
+        "id_assessment",
+        "id_student",
+        "date_submitted",
+        "is_banked",
+        "score"
+      ],
+      "sha256": "fd5320786328d05af841ee7dd4b5871b9dada3b9fe9d6a3642b2f42635510a6e",
+      "duplicate_rows": 0,
+      "missing": {
+        "id_assessment": 0,
+        "id_student": 0,
+        "date_submitted": 0,
+        "is_banked": 0,
+        "score": 173
+      }
+    },
+    "studentInfo.csv": {
+      "rows": 32593,
+      "columns": [
+        "code_module",
+        "code_presentation",
+        "id_student",
+        "gender",
+        "region",
+        "highest_education",
+        "imd_band",
+        "age_band",
+        "num_of_prev_attempts",
+        "studied_credits",
+        "disability",
+        "final_result"
+      ],
+      "sha256": "7e6f3e474a5eee00639d2a414a6c7e928745823c2d2c2563ca1780145f99b0d6",
+      "duplicate_rows": 0,
+      "missing": {
+        "code_module": 0,
+        "code_presentation": 0,
+        "id_student": 0,
+        "gender": 0,
+        "region": 0,
+        "highest_education": 0,
+        "imd_band": 1111,
+        "age_band": 0,
+        "num_of_prev_attempts": 0,
+        "studied_credits": 0,
+        "disability": 0,
+        "final_result": 0
+      }
+    },
+    "studentRegistration.csv": {
+      "rows": 32593,
+      "columns": [
+        "code_module",
+        "code_presentation",
+        "id_student",
+        "date_registration",
+        "date_unregistration"
+      ],
+      "sha256": "0d32676285372aaf2e7a80304e5b274b4fba24313e2ca4c04317225e1ec90170",
+      "duplicate_rows": 0,
+      "missing": {
+        "code_module": 0,
+        "code_presentation": 0,
+        "id_student": 0,
+        "date_registration": 45,
+        "date_unregistration": 22521
+      }
+    },
+    "studentVle.csv": {
+      "rows": 10655280,
+      "columns": [
+        "code_module",
+        "code_presentation",
+        "id_student",
+        "id_site",
+        "date",
+        "sum_click"
+      ],
+      "sha256": "52668253d876c5becbcb72185977152700cecab2942aca807fecc3dd54b937f0",
+      "duplicate_rows": 787170,
+      "missing": {
+        "code_module": 0,
+        "code_presentation": 0,
+        "id_student": 0,
+        "id_site": 0,
+        "date": 0,
+        "sum_click": 0
+      }
+    },
+    "vle.csv": {
+      "rows": 6364,
+      "columns": [
+        "id_site",
+        "code_module",
+        "code_presentation",
+        "activity_type",
+        "week_from",
+        "week_to"
+      ],
+      "sha256": "d1b28303dea802ad87b4484e1196e878e06824850b9a4fe8aa34693439fe87e9",
+      "duplicate_rows": 0,
+      "missing": {
+        "id_site": 0,
+        "code_module": 0,
+        "code_presentation": 0,
+        "activity_type": 0,
+        "week_from": 5243,
+        "week_to": 5243
+      }
+    }
+  },
+  "population": {
+    "enrollments": 32593,
+    "students": 28785,
+    "presentations": 22,
+    "outcomes": {
+      "Pass": 12361,
+      "Withdrawn": 10156,
+      "Fail": 7052,
+      "Distinction": 3024
+    }
+  },
+  "temporal_profile": {
+    "registration_day_range": [
+      -322,
+      167
+    ],
+    "unregistration_records": 10072,
+    "unregistration_day_range": [
+      -365,
+      444
+    ],
+    "submission_day_range": [
+      -11,
+      608
+    ],
+    "vle_day_range": [
+      -25,
+      269
+    ]
+  },
+  "assessment_structure": {
+    "definitions": 206,
+    "types": {
+      "TMA": 106,
+      "CMA": 76,
+      "Exam": 24
+    },
+    "weight_range": [
+      0.0,
+      100.0
+    ],
+    "missing_scores": 173,
+    "banked_submissions": 1909
+  },
+  "vle_activity": {
+    "click_quantiles": {
+      "0.0": 1.0,
+      "0.5": 2.0,
+      "0.9": 8.0,
+      "0.99": 34.0,
+      "1.0": 6977.0
+    },
+    "negative_day_rows": 688988,
+    "zero_click_rows": 0
+  },
+  "target_alternatives": {
+    "A_completion_including_withdrawal_as_failure": {
+      "n": 32593
+    },
+    "B_completion_excluding_withdrawal": {
+      "n": 22437
+    },
+    "C_four_class": {
+      "n": 32593,
+      "classes": 4
+    }
+  }
+}

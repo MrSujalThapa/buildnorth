@@ -1,0 +1,60 @@
+# Local environment and secrets
+.env
+.env.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+htmlcov/
+.coverage
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local planning state
+task_plan.md
+findings.md
+progress.md
+
+# Local AI / development instructions
+AGENTS.md
+agents.md
+
+# Internal documentation / audits
+/docs/
+
+# Local one-off Pass 6 diagnostics (replaced by committed verification commands)
+scripts/_check_glyphs.py
+scripts/_diag_finance.py
+scripts/_diag_mc.py
+scripts/_probe.py
+scripts/_probe_missing_state.py
+scripts/_probe_whatif.py
+
+# Runtime artifacts
+.artifacts/
+data/*.db
+data/oulad/
+data/jth/
+data/running_ww/
+data/shed/
+data/boe_nmg/
+data/med_adhere/
+data/studentlife/
+data/pune_savings/
+supabase/.temp/

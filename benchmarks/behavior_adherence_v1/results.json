@@ -1,0 +1,91 @@
+{
+  "protocol": "behavior_adherence_v1",
+  "estimator_version": "behavior_hierarchical_beta_v1",
+  "n_users": 40,
+  "n_trials": 1920,
+  "n_test_commitments": 109,
+  "selected_half_life_days": 42.0,
+  "default_half_life_days": 21.0,
+  "logistic_coefficients": {
+    "intercept": 7.974994094768164,
+    "logit_theta": 1.8472246716717156,
+    "log_commitment": -0.5961524940617972,
+    "momentum": 3.740969050426199,
+    "overcommit": -8.997512196669751,
+    "recovery": 16.86178100909603
+  },
+  "metrics": {
+    "always_one": {
+      "brier": 0.45871559633027525,
+      "log_loss": 15.843842198321504,
+      "ece": 0.45871559633027525,
+      "mean_pred": 1.0,
+      "mean_label": 0.5412844036697247
+    },
+    "global_prior": {
+      "brier": 0.23494475100724674,
+      "log_loss": 0.665745763870287,
+      "ece": 0.09750373317986187,
+      "mean_pred": 0.5291231066128107,
+      "mean_label": 0.5412844036697247
+    },
+    "gpt_heuristic": {
+      "brier": 0.29100917431192663,
+      "log_loss": 2.8432252108475273,
+      "ece": 0.18899082568807338,
+      "mean_pred": 0.565137614678899,
+      "mean_label": 0.5412844036697247
+    },
+    "global_only": {
+      "brier": 0.23791164795148234,
+      "log_loss": 0.6684144358761982,
+      "ece": 0.0351259401327524,
+      "mean_pred": 0.5237803797115341,
+      "mean_label": 0.5412844036697247
+    },
+    "global_domain": {
+      "brier": 0.2372672511818781,
+      "log_loss": 0.6672371296167806,
+      "ece": 0.03648332411525919,
+      "mean_pred": 0.5237355170392841,
+      "mean_label": 0.5412844036697247
+    },
+    "plus_action": {
+      "brier": 0.23473112168126134,
+      "log_loss": 0.6654813640143272,
+      "ece": 0.10781122009404895,
+      "mean_pred": 0.5302547121920494,
+      "mean_label": 0.5412844036697247
+    },
+    "plus_decay": {
+      "brier": 0.23764171196093065,
+      "log_loss": 0.6679478240188109,
+      "ece": 0.02828304734629372,
+      "mean_pred": 0.5238805135167316,
+      "mean_label": 0.5412844036697247
+    },
+    "logistic_overfit": {
+      "brier": 0.2968227000227844,
+      "log_loss": 1.1093322230109937,
+      "ece": 0.23606770826406842,
+      "mean_pred": 0.5632371679421211,
+      "mean_label": 0.5412844036697247
+    },
+    "behavior_model": {
+      "brier": 0.23473112168126134,
+      "log_loss": 0.6654813640143272,
+      "ece": 0.10781122009404895,
+      "mean_pred": 0.5302547121920494,
+      "mean_label": 0.5412844036697247
+    }
+  },
+  "brier_improvement_vs_global_prior": 0.0009092747340365524,
+  "headline": "Play It Out predicted whether users would follow through with 0.1% lower probability error than the global completion-rate baseline.",
+  "production_note": "Production uses hierarchical Beta-Bernoulli with action-type shrinkage. The logistic refinement overfit this split and was not shipped.",
+  "calibration_headline": "When it predicted ~70% follow-through, users actually followed through 78% of the time.",
+  "seventy_band": {
+    "n": 36,
+    "actual_rate": 0.7777777777777778
+  },
+  "note": "Held-out future commitments per user. Radar values are not used."
+}
