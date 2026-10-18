@@ -202,17 +202,22 @@ class PostgresSimulationRepository:
     async def list_runs(
         self, goal_id: UUID, *, run_kind: str | None = "impact", limit: int = 50
     ) -> list[PersistedSimulation]:
-        query = (
-            "select * from simulation_artifacts where goal_id=:id "
-            "and (:run_kind is null or run_kind=:run_kind) "
-            "order by created_at desc limit :limit"
-        )
+        if run_kind is None:
+            query = (
+                "select * from simulation_artifacts where goal_id=:id "
+                "order by created_at desc limit :limit"
+            )
+            params: dict[str, object] = {"id": goal_id, "limit": limit}
+        else:
+            query = (
+                "select * from simulation_artifacts where goal_id=:id "
+                "and run_kind=:run_kind "
+                "order by created_at desc limit :limit"
+            )
+            params = {"id": goal_id, "run_kind": run_kind, "limit": limit}
         async with self._engine.connect() as connection:
             rows = (
-                await connection.execute(
-                    text(query),
-                    {"id": goal_id, "run_kind": run_kind, "limit": limit},
-                )
+                await connection.execute(text(query), params)
             ).mappings()
             return [self._run(dict(row)) for row in rows]
 

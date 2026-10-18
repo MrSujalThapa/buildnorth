@@ -4,6 +4,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from personal_markets.core.config import DEFAULT_USER_ID, Settings, get_settings
+from personal_markets.core.errors import UnauthorizedError
+from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+from personal_markets.integrations.composio_normalizer import normalize_tool_result
+from personal_markets.integrations.composio_transport import ComposioTransport
 from personal_markets.integrations.mcp_domain import (
     ConnectionType,
     PluginConnectionRecord,
@@ -14,14 +19,15 @@ from personal_markets.integrations.mcp_domain import (
     SyncRecipeStep,
 )
 from personal_markets.integrations.mcp_policy import MCPReadPolicy
-from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository, payload_hash
+from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
 from personal_markets.integrations.mcp_transport import MCPTransport, MockMCPTransport
-from personal_markets.integrations.plugins import PLUGIN_DEFINITIONS, PluginConnection, PluginDefinition, PluginStatus, PluginView
-from personal_markets.core.config import DEFAULT_USER_ID, Settings, get_settings
-from personal_markets.demo_fixtures import demo_fixtures_enabled
-from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
-from personal_markets.integrations.composio_normalizer import normalize_tool_result
-from personal_markets.integrations.composio_transport import ComposioTransport
+from personal_markets.integrations.plugins import (
+    PLUGIN_DEFINITIONS,
+    PluginConnection,
+    PluginDefinition,
+    PluginStatus,
+    PluginView,
+)
 
 _MCP_DEFAULT_USER_ID = DEFAULT_USER_ID
 
@@ -42,6 +48,13 @@ class IntegrationGatewayService:
         self._settings = settings or get_settings()
         self._composio = ComposioIntegrationGateway(self._settings)
         self._definitions = {item.id: item for item in PLUGIN_DEFINITIONS}
+
+    def _owner(self, user_id: UUID | None) -> UUID:
+        if user_id is not None:
+            return user_id
+        if self._settings.environment in {"test", "pytest"}:
+            return self._default_user_id
+        raise UnauthorizedError("authenticated user required")
 
     def _transport_for(self, connection: PluginConnectionRecord) -> MCPTransport:
         if (
@@ -148,7 +161,7 @@ class IntegrationGatewayService:
         limit: int = 20,
         user_id: UUID | None = None,
     ) -> dict[str, object]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         await self._reconcile_connections(owner)
         connections = {item.plugin_id: item for item in await self._repository.list_connections(owner)}
         local_views = await self.views(owner)
@@ -220,7 +233,7 @@ class IntegrationGatewayService:
         )
 
     async def views(self, user_id: UUID | None = None) -> list[PluginView]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         await self._reconcile_connections(owner)
         connections = {item.plugin_id: item for item in await self._repository.list_connections(owner)}
         views: list[PluginView] = []
@@ -281,7 +294,7 @@ class IntegrationGatewayService:
         gateway_provider: str = "composio",
         auth_ref: str | None = None,
     ) -> dict[str, object]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         now = datetime.now(UTC)
         if not self._composio.available:
             if self._settings.environment in {"test", "pytest"}:
@@ -358,7 +371,7 @@ class IntegrationGatewayService:
         }
 
     async def list_capabilities(self, plugin_id: str, *, user_id: UUID | None = None) -> list[dict[str, object]]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
             return []
@@ -366,7 +379,7 @@ class IntegrationGatewayService:
         return [row.model_dump(mode="json") for row in rows]
 
     async def list_resources(self, plugin_id: str, *, user_id: UUID | None = None) -> list[dict[str, object]]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
             return []
@@ -375,7 +388,7 @@ class IntegrationGatewayService:
         return [item.model_dump(mode="json") for item in resources]
 
     async def refresh_connection(self, plugin_id: str, *, user_id: UUID | None = None) -> dict[str, object]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         await self._reconcile_connections(owner)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
@@ -423,7 +436,7 @@ class IntegrationGatewayService:
         supported = {"stdio", "sse", "http"}
         if transport not in supported:
             raise ValueError(f"unsupported MCP transport: {transport}")
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         now = datetime.now(UTC)
         record = PluginConnectionRecord(
             id=uuid4(),
@@ -494,7 +507,7 @@ class IntegrationGatewayService:
         user_id: UUID | None = None,
         steps: list[SyncRecipeStep] | None = None,
     ) -> dict[str, Any]:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         await self._reconcile_connections(owner)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
@@ -596,7 +609,7 @@ class IntegrationGatewayService:
             raise
 
     async def disconnect(self, plugin_id: str, *, user_id: UUID | None = None) -> None:
-        owner = user_id or self._default_user_id
+        owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
             return

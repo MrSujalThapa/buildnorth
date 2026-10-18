@@ -33,6 +33,7 @@ class SourcePlannerService:
         gateway: UnifiedIntegrationGateway,
         run_store: object,
         repository: object,
+        owner_id: UUID | None = None,
     ) -> None:
         self._settings = settings
         self._inference = inference
@@ -41,10 +42,11 @@ class SourcePlannerService:
         self._gateway = gateway
         self._run_store = run_store
         self._repository = repository
+        self._owner_id = owner_id
         self._ladders = ladders(settings)
 
     async def plan(self, goal_id: str) -> SourcePlannerProposal:
-        goal = await self._goals.get_goal_by_string(goal_id)
+        goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         evidence = await self._evidence.list_for_goal(goal.goal_id)
         plugin_views = await self._gateway.views()
         catalog = []
@@ -124,6 +126,7 @@ class SourcePlannerService:
             fallback_models=list(ladder.fallbacks),
             pool=ladder.pool,  # type: ignore[arg-type]
             agent_name="source_planner",
+            user_id=self._owner_id,
         )
         response = await self._inference.complete_structured(request)
         proposal = SourcePlannerProposal.model_validate(response.structured_output)
@@ -167,8 +170,9 @@ class SourcePlannerService:
         approved: bool = True,
         activity_types: list[str] | None = None,
     ) -> GoalSyncRecipeRecord:
-        goal = await self._goals.get_goal_by_string(goal_id)
-        connection = await self._repository.get_connection(self._settings.default_user_id, plugin_id)  # type: ignore[attr-defined]
+        goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
+        owner = self._owner_id or getattr(self._gateway, "_user_id", None)
+        connection = await self._repository.get_connection(owner, plugin_id)  # type: ignore[attr-defined]
         if connection is None:
             raise KeyError(f"plugin {plugin_id} is not connected")
         recipe_steps = steps or await self.build_recipe_steps(
@@ -223,7 +227,7 @@ class SourcePlannerService:
         return steps
 
     async def list_recipes(self, goal_id: str) -> list[GoalSyncRecipeRecord]:
-        goal = await self._goals.get_goal_by_string(goal_id)
+        goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         return await self._repository.list_goal_recipes(goal.goal_id)  # type: ignore[attr-defined]
 
     @staticmethod

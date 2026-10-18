@@ -86,7 +86,7 @@ def test_parse_intervention_api_uses_agent() -> None:
     repository = app.state.agent_workflow._inner._deps.goals._repository
     import asyncio
 
-    asyncio.run(repository.create(goal, uuid4()))
+    asyncio.run(repository.create(goal, app.state.auth_bypass_principal.user_id))
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/what-if/parse-intervention",

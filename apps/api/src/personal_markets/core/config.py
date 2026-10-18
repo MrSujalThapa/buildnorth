@@ -1,9 +1,10 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, ValidationInfo, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from personal_markets.core.errors import ProviderNotConfiguredError
 
@@ -61,13 +62,67 @@ class Settings(BaseSettings):
     composio_api_key: str | None = Field(default=None, validation_alias="COMPOSIO_API_KEY")
     composio_base_url: str = "https://backend.composio.dev/api/v3.1"
     composio_connect_callback_url: str | None = None
+    clerk_jwks_url: str | None = None
+    clerk_issuer: str | None = None
+    clerk_authorized_parties: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
+    )
+    clerk_secret_key: str | None = Field(default=None, validation_alias="CLERK_SECRET_KEY")
+    admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    test_auth_secret: str | None = None
+    hosted_inference_enabled: bool = True
+    hosted_user_quota_usd: float = 2.0
+    hosted_user_quota_tokens: int = 100_000
+    hosted_global_quota_usd: float = 25.0
+    hosted_global_quota_tokens: int = 1_000_000
+    hosted_user_rpm: int = 20
+    hosted_ip_rpm: int = 60
+    invite_ttl_hours: int = 72
+    invite_max_redemptions: int = 20
+    dev_bootstrap_test_users: bool = False
 
-    @field_validator("composio_enabled", mode="before")
+    def resolved_clerk_jwks_url(self) -> str | None:
+        if self.clerk_jwks_url:
+            return self.clerk_jwks_url.strip() or None
+        issuer = (self.clerk_issuer or "").strip().rstrip("/")
+        if issuer:
+            return f"{issuer}/.well-known/jwks.json"
+        return None
+
+    @field_validator(
+        "composio_enabled",
+        "hosted_inference_enabled",
+        "dev_bootstrap_test_users",
+        mode="before",
+    )
     @classmethod
     def _coerce_bool(cls, value: object) -> object:
         if isinstance(value, str):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return value
+
+    @field_validator("admin_emails", "clerk_authorized_parties", mode="before")
+    @classmethod
+    def _coerce_str_list(cls, value: object, info: ValidationInfo) -> object:
+        items: list[str]
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                import json
+
+                parsed = json.loads(stripped)
+                items = [str(item).strip() for item in parsed if str(item).strip()]
+            else:
+                items = [item.strip() for item in stripped.split(",") if item.strip()]
+        elif isinstance(value, list):
+            items = [str(item).strip() for item in value if str(item).strip()]
+        else:
+            return value
+        if info.field_name == "admin_emails":
+            return [item.lower() for item in items]
+        return items
 
     def resolved_spur_model(self) -> str:
         requested = (self.spur_model or "").strip() or AUTHENTICATED_SPUR_MODEL

@@ -326,8 +326,7 @@ class PostgresThreadStore:
                 """),
                 {
                     "id": snapshot.thread_id,
-                    "user_id": payload.get("debug", {}).get("user_id")
-                    or "10000000-0000-0000-0000-000000000001",
+                    "user_id": payload.get("debug", {}).get("user_id"),
                     "kind": snapshot.kind,
                     "status": snapshot.status,
                     "current_step": snapshot.current_step,

@@ -8,8 +8,10 @@ from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
-from personal_markets.integrations.mcp_domain import SyncRecipeStep
+from personal_markets.identity.deps import get_invited_principal
+from personal_markets.identity.domain import Principal
 from personal_markets.integrations.goal_sync_service import GoalSyncService
+from personal_markets.integrations.mcp_domain import SyncRecipeStep
 from personal_markets.ports import SourcePlannerProposal, WorkflowSnapshot
 from personal_markets.wiring import (
     get_evidence_service,
@@ -70,8 +72,9 @@ async def behavior_profile(
     goal_id: UUID,
     goals: Annotated[GoalService, Depends(get_goal_service)],
     evidence: Annotated[EvidenceService, Depends(get_evidence_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> dict[str, object]:
-    goal = await goals.get_goal_by_string(str(goal_id))
+    goal = await goals.get_goal_by_string(str(goal_id), owner_id=principal.user_id)
     events = await evidence.list_for_goal(goal.goal_id)
     profile = BehaviorService().profile_from_evidence(events, goal)
     return profile.model_dump(mode="json")

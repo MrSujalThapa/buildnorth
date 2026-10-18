@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 from personal_markets.core.config import get_settings
 from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.identity.deps import get_invited_principal
+from personal_markets.identity.domain import Principal
 from personal_markets.integrations.csv_import import (
     CsvColumnMapping,
     CsvImportRequest,
@@ -26,6 +28,7 @@ from personal_markets.wiring import (
     get_baseline_reprice_service,
     get_evidence_service,
     get_github_cursor_store,
+    get_goal_service,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["agents"])
@@ -51,6 +54,7 @@ class ResumeBody(BaseModel):
 async def start_thread(
     body: CreateThreadBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
     request = WorkflowRequest(
         kind=body.kind,  # type: ignore[arg-type]
@@ -60,7 +64,7 @@ async def start_thread(
         github_login=body.github_login,
         mcp_records=body.mcp_records,
         evidence_events=body.evidence_events,
-        user_id=get_settings().default_user_id,
+        user_id=principal.user_id,
     )
     return await workflow.start(request)
 
@@ -69,8 +73,11 @@ async def start_thread(
 async def get_thread(
     thread_id: UUID,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
-    return await workflow.snapshot(thread_id)
+    snapshot = await workflow.snapshot(thread_id)
+    _assert_thread_owner(snapshot, principal)
+    return snapshot
 
 
 @router.post("/agent/threads/{thread_id}/resume", response_model=WorkflowSnapshot)
@@ -78,7 +85,10 @@ async def resume_thread(
     thread_id: UUID,
     body: ResumeBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
+    snapshot = await workflow.snapshot(thread_id)
+    _assert_thread_owner(snapshot, principal)
     return await workflow.resume(
         thread_id,
         ResumePayload(answers=body.answers, confirmed=body.confirmed, cancelled=body.cancelled),
@@ -89,7 +99,10 @@ async def resume_thread(
 async def list_evidence(
     goal_id: UUID,
     evidence: Annotated[Any, Depends(get_evidence_service)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> list[dict[str, Any]]:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
     rows = await evidence.list_for_goal(goal_id)
     return [row.model_dump(mode="json") for row in rows]
 
@@ -99,14 +112,17 @@ async def add_manual_evidence(
     goal_id: UUID,
     body: CreateThreadBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
     return await workflow.start(
         WorkflowRequest(
             kind="add_evidence",
             goal_id=goal_id,
             evidence_text=body.evidence_text or body.intent,
             evidence_events=body.evidence_events,
-            user_id=get_settings().default_user_id,
+            user_id=principal.user_id,
         )
     )
 
@@ -138,6 +154,8 @@ async def add_manual_state(
     body: ManualStateBody,
     evidence: Annotated[Any, Depends(get_evidence_service)],
     reprice: Annotated[Any, Depends(get_baseline_reprice_service)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> ManualStateResponse:
     """Commit numbers the user entered directly against a declared state requirement.
 
@@ -146,6 +164,7 @@ async def add_manual_state(
     an LLM would only add cost and a chance of renaming it. It commits through the same
     repository as every other event, so fingerprint de-duplication and provenance apply.
     """
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
     observed_at = datetime.now(UTC).isoformat()
     proposals = [
         EvidenceEventProposal(
@@ -161,7 +180,7 @@ async def add_manual_state(
         for entry in body.entries
     ]
     commit = await evidence.commit(
-        user_id=get_settings().default_user_id,
+        user_id=principal.user_id,
         goal_id=goal_id,
         events=proposals,
         agent_run_id=None,
@@ -186,16 +205,19 @@ async def sync_github(
     body: CreateThreadBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
     cursors: Annotated[Any, Depends(get_github_cursor_store)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
     login = body.github_login
     if not login:
         raise ResourceNotFoundError("github_login is required")
     settings = get_settings()
     source = GitHubEvidenceSource(login, settings.github_token)
-    cursor = await cursors.get(settings.default_user_id, login) if cursors else None
+    cursor = await cursors.get(principal.user_id, login) if cursors else None
     batch = await source.sync(cursor)
     if cursors:
-        await cursors.put(settings.default_user_id, login, batch.next_cursor)
+        await cursors.put(principal.user_id, login, batch.next_cursor)
     lines = [
         f"GitHub {item.get('event_type')} on {item.get('repo')} "
         f"({item.get('commit_count')} commits)"
@@ -207,7 +229,7 @@ async def sync_github(
             goal_id=goal_id,
             evidence_text="\n".join(lines) or f"GitHub profile {login} had no new public events.",
             github_login=login,
-            user_id=settings.default_user_id,
+            user_id=principal.user_id,
         )
     )
 
@@ -225,11 +247,14 @@ async def csv_import(
     file: Annotated[UploadFile, File()],
     metric: Annotated[str, Form()],
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
     numeric_value: Annotated[str | None, Form()] = None,
     observed_at: Annotated[str | None, Form()] = None,
     domain: Annotated[str | None, Form()] = None,
     event_type: Annotated[str | None, Form()] = None,
 ) -> WorkflowSnapshot:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
     raw = (await file.read()).decode("utf-8-sig")
     records = parse_csv(
         raw,
@@ -249,6 +274,12 @@ async def csv_import(
             kind="add_evidence",
             goal_id=goal_id,
             evidence_events=events,
-            user_id=get_settings().default_user_id,
+            user_id=principal.user_id,
         )
     )
+
+
+def _assert_thread_owner(snapshot: WorkflowSnapshot, principal: Principal) -> None:
+    owner = str((snapshot.debug or {}).get("user_id") or "")
+    if owner != str(principal.user_id):
+        raise ResourceNotFoundError(f"Workflow thread {snapshot.thread_id} was not found")

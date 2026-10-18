@@ -14,6 +14,9 @@ sys.path[:] = [
 ]
 
 os.environ["PM_ENVIRONMENT"] = "test"
+os.environ["PM_TEST_AUTH_SECRET"] = "phase1-test-secret-must-be-32b!!"
+os.environ["PM_ADMIN_EMAILS"] = '["admin@example.test"]'
+os.environ["PM_DEV_BOOTSTRAP_TEST_USERS"] = "false"
 os.environ["PM_COMPOSIO_ENABLED"] = "false"
 os.environ.pop("COMPOSIO_API_KEY", None)
 os.environ["PM_CORS_ORIGIN_REGEX"] = r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$"

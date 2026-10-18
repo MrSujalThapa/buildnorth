@@ -1,4 +1,8 @@
-﻿import { Moon, ShieldCheck, Sun } from "lucide-react";
+﻿import { Copy, KeyRound, Link2, Moon, Plug, ShieldCheck, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
+import { api, type InvitationRecord } from "../../api/client";
+import { useAccount } from "../../auth/AuthGate";
+import { invitePath } from "../../auth/session";
 import "./utility-pages.css";
 
 type Props = {
@@ -6,14 +10,81 @@ type Props = {
   onSetTheme: (theme: "light" | "dark") => void;
 };
 
+function money(value: number): string {
+  return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+}
+
 export default function SettingsPage({ theme, onSetTheme }: Props) {
+  const account = useAccount();
+  const hosted = account?.hosted;
   return (
     <main className="utility-page">
       <section className="utility-shell">
         <header className="utility-header">
           <h1>Settings</h1>
-          <p>Control how Play It Out looks, connects data, and uses evidence.</p>
+          <p>
+            {account?.role === "admin"
+              ? "Generate a shared invitation, then check hosted allowance and appearance."
+              : "Control how Play It Out looks, connects data, and uses evidence."}
+          </p>
         </header>
+
+        {account?.role === "admin" ? <InviteAdmin /> : null}
+
+        <section className="settings-group">
+          <h2>Account</h2>
+          <div className="settings-list">
+            <div className="setting-row">
+              <div>
+                <strong>{account?.email || "Local session"}</strong>
+                <span>
+                  {account
+                    ? `${account.role === "admin" ? "Administrator" : "Invited member"}${account.email_verified ? " · verified email" : ""}`
+                    : "Sign in with Clerk to bind this workspace to your account."}
+                </span>
+              </div>
+            </div>
+            <div className="setting-row">
+              <div>
+                <strong>Hosted inference</strong>
+                <span>
+                  {hosted
+                    ? `${money(hosted.remaining_usd)} remaining of ${money(hosted.quota_usd)} · ${hosted.remaining_tokens.toLocaleString()} tokens left`
+                    : "Sign in to see your hosted Spur allowance."}
+                </span>
+              </div>
+            </div>
+            {hosted ? (
+              <p className="setting-note">{hosted.billing_note}</p>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="settings-group">
+          <h2>Bring your own key</h2>
+          <div className="settings-list">
+            <div className="setting-row">
+              <div>
+                <strong>Personal inference keys</strong>
+                <span>Connect your own provider key in a later phase. Hosted Spur remains budgeted until then.</span>
+              </div>
+              <span className="setting-soon"><KeyRound size={16} /> Coming later</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="settings-group">
+          <h2>Personal agents</h2>
+          <div className="settings-list">
+            <div className="setting-row">
+              <div>
+                <strong>Remote MCP connections</strong>
+                <span>Personal agent connections are reserved and not enabled in this phase.</span>
+              </div>
+              <span className="setting-soon"><Plug size={16} /> Coming later</span>
+            </div>
+          </div>
+        </section>
 
         <section className="settings-group">
           <h2>Appearance</h2>
@@ -73,5 +144,191 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
         </section>
       </section>
     </main>
+  );
+}
+
+function inviteUrl(token: string): string {
+  return `${window.location.origin}${invitePath(token)}`;
+}
+
+function InviteAdmin() {
+  const [invites, setInvites] = useState<InvitationRecord[]>([]);
+  const [sessionUrls, setSessionUrls] = useState<Record<string, string>>({});
+  const [ttlHours, setTtlHours] = useState(72);
+  const [maxRedemptions, setMaxRedemptions] = useState(20);
+  const [note, setNote] = useState("Hackathon access");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    setInvites(await api.listInvites());
+  }
+
+  useEffect(() => {
+    void refresh().catch((caught: unknown) => {
+      setError(caught instanceof Error ? caught.message : "Could not load invitations.");
+    });
+  }, []);
+
+  async function generate(replaceId?: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      if (replaceId) {
+        await api.revokeInvite(replaceId);
+        setSessionUrls((current) => {
+          const next = { ...current };
+          delete next[replaceId];
+          return next;
+        });
+      }
+      const created = await api.createInvite({
+        note: note.trim() || "Hackathon access",
+        ttl_hours: ttlHours,
+        max_redemptions: maxRedemptions,
+      });
+      if (!created.token) throw new Error("Invitation token was not returned.");
+      const url = inviteUrl(created.token);
+      setSessionUrls((current) => ({ ...current, [created.invitation_id]: url }));
+      await navigator.clipboard.writeText(url);
+      setCopiedId(created.invitation_id);
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Invitation could not be created.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy(invitationId: string, url: string) {
+    await navigator.clipboard.writeText(url);
+    setCopiedId(invitationId);
+  }
+
+  async function revoke(invitationId: string) {
+    setError(null);
+    try {
+      await api.revokeInvite(invitationId);
+      setSessionUrls((current) => {
+        const next = { ...current };
+        delete next[invitationId];
+        return next;
+      });
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Invitation could not be revoked.");
+    }
+  }
+
+  return (
+    <section className="settings-group">
+      <h2>Invitations</h2>
+      <div className="settings-list">
+        <div className="setting-row">
+          <div>
+            <strong>Shared hackathon link</strong>
+            <span>
+              You do not need a personal invitation. Generate one link for up to {maxRedemptions}{" "}
+              distinct Google accounts. Play It Out stores only a hash of the token, so copy the URL
+              while this page is open — a reload cannot recover it.
+            </span>
+          </div>
+        </div>
+      </div>
+      <form
+        className="invite-admin-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void generate();
+        }}
+      >
+        <label>
+          Note
+          <input value={note} onChange={(event) => setNote(event.target.value)} />
+        </label>
+        <label>
+          Expires in hours
+          <input
+            type="number"
+            min={1}
+            max={720}
+            value={ttlHours}
+            onChange={(event) => setTtlHours(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          Maximum redemptions
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={maxRedemptions}
+            onChange={(event) => setMaxRedemptions(Number(event.target.value))}
+          />
+        </label>
+        <button type="submit" disabled={busy}>
+          <Link2 size={16} />
+          {busy ? "Generating…" : "Generate link"}
+        </button>
+      </form>
+      {error ? <p className="setting-note">{error}</p> : null}
+      <div className="invite-list">
+        {invites.length === 0 ? (
+          <p className="setting-note">No invitations yet.</p>
+        ) : (
+          invites.map((invite) => {
+            const status = invite.revoked_at
+              ? "Revoked"
+              : invite.redeemed_at
+                ? "Filled"
+                : "Open";
+            const url = sessionUrls[invite.invitation_id];
+            return (
+              <div key={invite.invitation_id} className="invite-row">
+                <div>
+                  <strong>{invite.kind === "shared" ? "Shared link" : invite.email || "Email invite"}</strong>
+                  <span>
+                    {invite.redemption_count}/{invite.max_redemptions} redeemed · {status}
+                    {invite.note ? ` · ${invite.note}` : ""} · expires{" "}
+                    {new Date(invite.expires_at).toLocaleString()}
+                  </span>
+                  {url ? (
+                    <div className="invite-created">
+                      <code>{url}</code>
+                      <button type="button" onClick={() => void copy(invite.invitation_id, url)}>
+                        <Copy size={15} />
+                        {copiedId === invite.invitation_id ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  ) : status === "Open" ? (
+                    <span>
+                      The full URL cannot be recovered after a reload. Generate a replacement or
+                      revoke this invitation.
+                    </span>
+                  ) : null}
+                </div>
+                {status === "Open" ? (
+                  <div className="invite-row-actions">
+                    {url ? null : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void generate(invite.invitation_id)}
+                      >
+                        Generate replacement
+                      </button>
+                    )}
+                    <button type="button" onClick={() => void revoke(invite.invitation_id)}>
+                      Revoke
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </section>
   );
 }

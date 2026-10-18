@@ -1,6 +1,7 @@
 ﻿import { useLocation, useNavigate } from "react-router-dom";
 import { ChartNoAxesCombined, Moon, Plug, Settings, Sun, UserRound, Users } from "lucide-react";
 import type { ReactNode } from "react";
+import { useAccount } from "../../auth/AuthGate";
 import { useTheme } from "../../theme/useTheme";
 import "./app-shell.css";
 
@@ -25,6 +26,8 @@ export default function AppShell({ children }: Props) {
   const navigate = useNavigate();
   const active = activeFromPath(location.pathname);
   const { theme, toggle } = useTheme();
+  const account = useAccount();
+  const profileLabel = account?.email?.split("@")[0] || "Sujal";
 
   return (
     <div className={`app-shell theme-${theme}`}>
@@ -51,7 +54,7 @@ export default function AppShell({ children }: Props) {
             {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}<span>Theme</span>
           </button>
           <button type="button" onClick={() => { void navigate("/settings"); }} aria-label="Open profile settings">
-            <UserRound size={19} /><span>Sujal</span>
+            <UserRound size={19} /><span>{profileLabel}</span>
           </button>
         </div>
       </aside>

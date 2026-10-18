@@ -5,6 +5,7 @@ from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.core.config import Settings
+from personal_markets.core.request_context import client_ip_var
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.repository import InMemoryBaselineForecastRepository
 from personal_markets.forecasting.service import BaselineForecastService
@@ -141,6 +142,8 @@ async def complete_agent(
         fallback_models=list(ladder.fallbacks),
         pool=ladder.pool,  # type: ignore[arg-type]
         agent_name=agent,
+        user_id=UUID(state["user_id"]) if state.get("user_id") else None,
+        client_ip=client_ip_var.get(),
     )
     response = await deps.inference.complete_structured(request)
     parsed = model_cls.model_validate(response.structured_output)

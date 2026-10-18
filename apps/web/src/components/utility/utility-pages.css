@@ -116,6 +116,131 @@
 .setting-switch input:checked + span { background: var(--app-accent); }
 .setting-switch input:checked + span::after { transform: translateX(16px); }
 
+.setting-note {
+  margin: 12px 0 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  max-width: 640px;
+}
+
+.invite-admin-form {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr 0.8fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.invite-admin-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.invite-admin-form input {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.invite-admin-form button,
+.invite-created button,
+.invite-row button {
+  min-height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--app-text);
+  color: var(--app-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.invite-created {
+  margin-top: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+}
+
+.invite-created code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.invite-list {
+  margin-top: 8px;
+}
+
+.invite-row {
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.invite-row strong,
+.invite-row span {
+  display: block;
+}
+
+.invite-row strong { font-size: 13px; }
+.invite-row span { margin-top: 5px; max-width: 620px; color: var(--app-muted); font-size: 11px; line-height: 1.45; }
+
+.invite-row button {
+  background: transparent;
+  color: var(--app-muted);
+  border: 1px solid var(--app-border);
+}
+
+.invite-row .invite-created {
+  margin-top: 10px;
+  max-width: 620px;
+}
+
+.invite-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 800px) {
+  .invite-admin-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.setting-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .privacy-note {
   margin-top: 34px;
   padding: 18px;

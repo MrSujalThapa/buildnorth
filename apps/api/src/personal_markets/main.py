@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -11,11 +11,13 @@ from personal_markets.agents.api import router as agents_router
 from personal_markets.core.config import get_settings, safe_database_identity
 from personal_markets.core.errors import (
     DomainError,
+    ForbiddenError,
     PermanentProviderError,
     ProviderBudgetExceededError,
     ProviderNotConfiguredError,
     ResourceNotFoundError,
     TransientProviderError,
+    UnauthorizedError,
 )
 from personal_markets.core.event_loop import configure_windows_selector_event_loop
 from personal_markets.core.logging import configure_logging
@@ -23,6 +25,8 @@ from personal_markets.core.request_context import request_context_middleware
 from personal_markets.evidence.source_api import router as evidence_sources_router
 from personal_markets.goals.api import router as goals_router
 from personal_markets.goals.service import GoalService
+from personal_markets.identity.api import router as identity_router
+from personal_markets.identity.deps import get_invited_principal
 from personal_markets.integrations.api import router as integrations_router
 from personal_markets.integrations.research import (
     CompositeResearchProvider,
@@ -53,6 +57,10 @@ class HealthDetailsResponse(HealthResponse):
 def _status_for(error: DomainError) -> int:
     if isinstance(error, ResourceNotFoundError):
         return 404
+    if isinstance(error, UnauthorizedError):
+        return 401
+    if isinstance(error, ForbiddenError):
+        return 403
     if isinstance(error, ProviderNotConfiguredError):
         return 503
     if isinstance(error, ProviderBudgetExceededError):
@@ -77,6 +85,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         identity=identity,
         environment=settings.environment,
     )
+    if settings.environment in {"production", "prod"} and not settings.resolved_clerk_jwks_url():
+        structlog.get_logger("personal_markets").error("clerk_jwks_missing")
+        raise RuntimeError("PM_CLERK_JWKS_URL is required in production")
     if use_postgres:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
@@ -94,6 +105,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             PostgresUsageStore,
         )
         from personal_markets.persistence.database import create_engine
+        from personal_markets.wiring import get_goal_repository
 
         assert settings.database_url is not None
         engine = create_engine(settings.database_url)
@@ -128,9 +140,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.github_cursor_store = PostgresGithubCursorStore(engine)
         application.state.checkpointer = checkpointer
     else:
-        from personal_markets.wiring import build_in_memory_workflow
+        from personal_markets.wiring import build_in_memory_workflow, get_goal_repository
 
-        workflow = build_in_memory_workflow()
+        workflow = build_in_memory_workflow(goal_repository=get_goal_repository())
         application.state.agent_workflow = workflow
         application.state.evidence_service = workflow._inner._deps.evidence
         application.state.github_cursor_store = InMemoryGithubCursorStore()
@@ -189,11 +201,13 @@ def create_app() -> FastAPI:
             database=_database_identity(request),
         )
 
-    application.include_router(goals_router)
-    application.include_router(agents_router)
-    application.include_router(what_if_router)
-    application.include_router(integrations_router)
-    application.include_router(evidence_sources_router)
+    private = [Depends(get_invited_principal)]
+    application.include_router(identity_router)
+    application.include_router(goals_router, dependencies=private)
+    application.include_router(agents_router, dependencies=private)
+    application.include_router(what_if_router, dependencies=private)
+    application.include_router(integrations_router, dependencies=private)
+    application.include_router(evidence_sources_router, dependencies=private)
     return application
 
 

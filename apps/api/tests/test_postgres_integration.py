@@ -1,3 +1,5 @@
+import asyncio
+import hashlib
 import json
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -101,6 +103,8 @@ async def test_simulation_artifacts_are_idempotent_and_immutable() -> None:
         assert first[0].id == second[0].id
         assert first[1:] == (True, False)
         assert second[1:] == (False, False)
+        listed = await repository.list_runs(goal_id, run_kind="impact")
+        assert any(item.id == first[0].id for item in listed)
         history = await repository.history(goal_id)
         assert sum(point.simulation_artifact_id == first[0].id for point in history) == 0
         with pytest.raises(Exception, match="append-only"):
@@ -109,5 +113,50 @@ async def test_simulation_artifacts_are_idempotent_and_immutable() -> None:
                     text("update simulation_artifacts set status='changed' where id=:id"),
                     {"id": first[0].id},
                 )
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_postgres_shared_invite_redemptions_are_atomic_and_idempotent() -> None:
+    url = isolated_postgres_url()
+    if not url:
+        pytest.skip("PM_TEST_DATABASE_URL is not configured")
+
+    from personal_markets.core.config import Settings
+    from personal_markets.identity.service import IdentityService
+    from personal_markets.identity.store import PostgresIdentityRepository
+    from personal_markets.identity.testing import admin_principal, make_principal
+
+    engine = create_engine(url)
+    try:
+        repo = PostgresIdentityRepository(engine)
+        identity = IdentityService(repo, Settings(environment="test", invite_max_redemptions=20))
+        admin = admin_principal(f"pg-admin-{uuid4().hex[:8]}")
+        await repo.upsert_user(admin)
+        invitation = await identity.create_invitation(admin, max_redemptions=3, note="pg-shared")
+        assert invitation.token is not None
+        users = []
+        for _ in range(5):
+            user = make_principal(f"pg-shared-{uuid4().hex[:8]}")
+            await repo.upsert_user(user)
+            users.append(user)
+        results = await asyncio.gather(
+            *[identity.redeem_invitation(user, invitation.token) for user in users],
+            return_exceptions=True,
+        )
+        successes = [item for item in results if not isinstance(item, Exception)]
+        assert len(successes) == 3
+        winner = successes[0]
+        again = await identity.redeem_invitation(winner, invitation.token)
+        stored = await repo.get_invitation_by_hash(
+            hashlib.sha256(invitation.token.encode("utf-8")).hexdigest()
+        )
+        assert stored is not None
+        assert stored.redemption_count == 3
+        assert again.hosted_quota_usd == winner.hosted_quota_usd
+        entitled = await repo.get_user(winner.user_id)
+        assert entitled is not None
+        assert entitled.hosted_enabled is True
     finally:
         await engine.dispose()

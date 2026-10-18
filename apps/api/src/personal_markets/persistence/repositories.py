@@ -23,12 +23,36 @@ class PostgresGoalRepository:
             rows = (await connection.execute(text("select * from goals order by title"))).mappings()
             return [self._to_domain(dict(row)) for row in rows]
 
+    async def list_for_user(self, user_id: UUID) -> list[GoalContract]:
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text("select * from goals where user_id = :user_id order by title"),
+                    {"user_id": user_id},
+                )
+            ).mappings()
+            return [self._to_domain(dict(row)) for row in rows]
+
     async def get(self, goal_id: UUID) -> GoalContract | None:
         async with self._engine.connect() as connection:
             row = (
                 (
                     await connection.execute(
                         text("select * from goals where id = :id"), {"id": goal_id}
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            return self._to_domain(dict(row)) if row else None
+
+    async def get_for_user(self, goal_id: UUID, user_id: UUID) -> GoalContract | None:
+        async with self._engine.connect() as connection:
+            row = (
+                (
+                    await connection.execute(
+                        text("select * from goals where id = :id and user_id = :user_id"),
+                        {"id": goal_id, "user_id": user_id},
                     )
                 )
                 .mappings()

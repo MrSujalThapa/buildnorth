@@ -78,7 +78,14 @@ class LangGraphAgentWorkflow:
 
     async def start(self, request: WorkflowRequest) -> WorkflowSnapshot:
         thread_id = request.thread_id or uuid4()
-        user_id = request.user_id or self._deps.settings.default_user_id
+        user_id = request.user_id
+        if user_id is None:
+            if self._deps.settings.environment in {"test", "pytest"}:
+                user_id = self._deps.settings.default_user_id
+            else:
+                from personal_markets.core.errors import UnauthorizedError
+
+                raise UnauthorizedError("authenticated user required")
         initial: AgentGraphState = {
             "thread_id": str(thread_id),
             "user_id": str(user_id),
@@ -149,7 +156,9 @@ class LangGraphAgentWorkflow:
         goal_id = state.get("committed_goal_id") or state.get("goal_id")
         if goal_id:
             try:
-                goal = await self._deps.goals.get_goal(UUID(goal_id))
+                goal = await self._deps.goals.get_goal(
+                    UUID(goal_id), owner_id=UUID(state["user_id"])
+                )
             except ResourceNotFoundError:
                 goal = None
             if (
@@ -422,7 +431,9 @@ class LangGraphAgentWorkflow:
 
     async def _decide_research(self, state: AgentGraphState) -> dict[str, Any]:
         if not state.get("goal_proposal"):
-            goal = await self._deps.goals.get_goal(UUID(state["goal_id"]))
+            goal = await self._deps.goals.get_goal(
+                UUID(state["goal_id"]), owner_id=UUID(state["user_id"])
+            )
             proposal = GoalArchitectProposal(
                 ready_to_commit=True,
                 title=goal.title,
@@ -494,7 +505,7 @@ class LangGraphAgentWorkflow:
 
         proposal = GoalArchitectProposal.model_validate(state["goal_proposal"])
         goal_id = UUID(state["goal_id"])
-        goal = await self._deps.goals.get_goal(goal_id)
+        goal = await self._deps.goals.get_goal(goal_id, owner_id=UUID(state["user_id"]))
         evidence = await self._deps.evidence.list_for_goal(goal_id)
         evidence_ids = [str(item.evidence_id) for item in evidence if item.evidence_id]
         numeric = build_numeric_inputs(goal, proposal, evidence)
@@ -604,7 +615,9 @@ class LangGraphAgentWorkflow:
         critic = CriticArtifact.model_validate(state["critic"])
         from personal_markets.ports import PricingResult
 
-        goal = await self._deps.goals.get_goal(UUID(state["goal_id"]))
+        goal = await self._deps.goals.get_goal(
+            UUID(state["goal_id"]), owner_id=UUID(state["user_id"])
+        )
         pricing = PricingResult.model_validate(state["pricing"])
         status = await self._deps.baseline_forecasts.publish(goal, pricing, critic)
         return {"status": status, "current_step": "publish"}

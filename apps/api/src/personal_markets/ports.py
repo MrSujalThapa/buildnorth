@@ -207,6 +207,8 @@ class InferenceRequest(BaseModel):
     pool: Literal["high_volume", "premium"] = "high_volume"
     agent_name: str = "unknown"
     timeout_seconds: float | None = None
+    user_id: UUID | None = None
+    client_ip: str | None = None
 
 
 class InferenceResponse(BaseModel):

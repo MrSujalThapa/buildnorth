@@ -6,6 +6,14 @@ class ResourceNotFoundError(DomainError):
     pass
 
 
+class UnauthorizedError(DomainError):
+    pass
+
+
+class ForbiddenError(DomainError):
+    pass
+
+
 class ProviderNotConfiguredError(DomainError):
     pass
 

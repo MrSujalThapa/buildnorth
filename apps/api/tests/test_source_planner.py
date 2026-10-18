@@ -12,9 +12,11 @@ from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
-from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
-from personal_markets.persistence.agent_store import InMemoryAgentRunStore, InMemoryEvidenceRepository
-from personal_markets.wiring import get_integration_gateway, get_integration_repository
+from personal_markets.persistence.agent_store import (
+    InMemoryAgentRunStore,
+    InMemoryEvidenceRepository,
+)
+from personal_markets.wiring import get_integration_repository, integration_gateway_for
 
 
 @pytest.mark.asyncio
@@ -35,7 +37,7 @@ async def test_source_planner_recommends_goal_specific_sources() -> None:
         inference=ScriptedInferenceProvider(),
         goals=GoalService(repo),
         evidence=EvidenceService(InMemoryEvidenceRepository()),
-        gateway=get_integration_gateway(),
+        gateway=integration_gateway_for(uuid4()),
         run_store=InMemoryAgentRunStore(),
         repository=get_integration_repository(),
     )
@@ -60,7 +62,7 @@ def test_source_plan_api() -> None:
     repository = app.state.agent_workflow._inner._deps.goals._repository
     import asyncio
 
-    asyncio.run(repository.create(goal, uuid4()))
+    asyncio.run(repository.create(goal, app.state.auth_bypass_principal.user_id))
     with TestClient(app) as client:
         response = client.get(f"/api/v1/goals/{goal.goal_id}/evidence/sources/plan")
     assert response.status_code == 200

@@ -1,4 +1,21 @@
+import { currentAccessToken, type AccountView } from "../auth/session";
+
 export type ForecastStatus = "CALIBRATED" | "ANCHORED" | "EXPLORATORY";
+
+export type InvitationRecord = {
+  invitation_id: string;
+  email: string | null;
+  note: string;
+  kind: "email" | "shared";
+  max_redemptions: number;
+  redemption_count: number;
+  hosted_quota_usd: number;
+  hosted_quota_tokens: number;
+  expires_at: string;
+  revoked_at: string | null;
+  redeemed_at: string | null;
+  token?: string | null;
+};
 
 export interface Goal {
   goal_id: string;
@@ -389,10 +406,15 @@ const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
 const baseUrl = configuredBaseUrl || `${window.location.protocol}//${window.location.hostname}:8000`;
 
 async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
+  const token = await currentAccessToken();
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     signal,
-    headers: { Accept: "application/json", ...(init?.headers || {}) },
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers || {}),
+    },
   });
   if (!response.ok) {
     let detail = `status ${response.status}`;
@@ -408,6 +430,27 @@ async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal
 }
 
 export const api = {
+  me: (signal?: AbortSignal) => request<AccountView>("/api/v1/me", undefined, signal),
+  redeemInvite: (token: string) =>
+    request<AccountView>("/api/v1/invites/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }),
+  createInvite: (body: {
+    email?: string;
+    note?: string;
+    ttl_hours?: number;
+    max_redemptions?: number;
+  }) =>
+    request<InvitationRecord>("/api/v1/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  listInvites: (signal?: AbortSignal) => request<InvitationRecord[]>("/api/v1/admin/invites", undefined, signal),
+  revokeInvite: (invitationId: string) =>
+    request<InvitationRecord>(`/api/v1/admin/invites/${invitationId}/revoke`, { method: "POST" }),
   health: (signal?: AbortSignal) => request<Health>("/health", undefined, signal),
   goals: (signal?: AbortSignal) => request<Goal[]>("/api/v1/goals", undefined, signal),
   goal: (goalId: string, signal?: AbortSignal) => request<Goal>(`/api/v1/goals/${goalId}`, undefined, signal),

@@ -71,6 +71,7 @@ class WhatIfService:
         engine: SimulationEngine | None = None,
         evidence: EvidenceService | None = None,
         behavior: BehaviorService | None = None,
+        owner_id: UUID | None = None,
     ) -> None:
         self._goals = goals
         self._engine = engine or SimulationEngine()
@@ -78,9 +79,13 @@ class WhatIfService:
         self._repository = repository or InMemorySimulationRepository()
         self._evidence = evidence
         self._behavior = behavior or BehaviorService()
+        self._owner_id = owner_id
+
+    async def _require_goal(self, goal_id: str) -> GoalContract:
+        return await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
 
     async def baseline_state(self, goal_id: str) -> WhatIfBaselineState:
-        goal = await self._goals.get_goal_by_string(goal_id)
+        goal = await self._require_goal(goal_id)
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
@@ -120,7 +125,7 @@ class WhatIfService:
         return await self._simulate(request, persist=False)
 
     async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
-        goal = await self._goals.get_goal_by_string(request.goal_id)
+        goal = await self._require_goal(request.goal_id)
         model = self._registry.select(goal)
 
         if self._evidence is not None:
@@ -514,6 +519,7 @@ class WhatIfService:
         return result
 
     async def history(self, goal_id: str) -> list[MarketHistoryPointResponse]:
+        await self._require_goal(goal_id)
         points = await self._repository.history(UUID(goal_id))
         return [
             MarketHistoryPointResponse(
@@ -534,6 +540,7 @@ class WhatIfService:
         ]
 
     async def explorations(self, goal_id: str) -> list[WhatIfExplorationResponse]:
+        await self._require_goal(goal_id)
         runs = await self._repository.list_runs(UUID(goal_id), run_kind="impact")
         items: list[WhatIfExplorationResponse] = []
         for run in runs:
@@ -650,7 +657,7 @@ class WhatIfService:
         candidates = list(request.candidates)
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.base.goal_id))
-            goal = await self._goals.get_goal_by_string(request.base.goal_id)
+            goal = await self._require_goal(request.base.goal_id)
             adjusted = []
             for action in candidates:
                 context = context_from_text(
@@ -779,7 +786,7 @@ class WhatIfService:
             fixture = fixture_compare(request.base.goal_id)
             if fixture is not None:
                 return fixture
-        goal = await self._goals.get_goal_by_string(request.base.goal_id)
+        goal = await self._require_goal(request.base.goal_id)
         budget = budget_from_goal(goal)
         items: list[PathComparisonItem] = []
         for path in request.paths:
@@ -1119,7 +1126,7 @@ class WhatIfService:
     ) -> PossibleFuturesRequest | None:
         if self._evidence is None:
             return None
-        goal = await self._goals.get_goal_by_string(request.goal_id)
+        goal = await self._require_goal(request.goal_id)
         evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
         labels = [item.label for item in request.outcomes]
         resolved = resolve_futures_weights(

@@ -33,6 +33,7 @@ class InterventionAgentService:
         goals: GoalService,
         evidence: EvidenceService,
         run_store: object,
+        owner_id=None,
     ) -> None:
         self._settings = settings
         self._inference = inference
@@ -40,10 +41,11 @@ class InterventionAgentService:
         self._goals = goals
         self._evidence = evidence
         self._run_store = run_store
+        self._owner_id = owner_id
         self._ladders = ladders(settings)
 
     async def parse(self, goal_id: str, text: str) -> ParseInterventionResponse:
-        goal = await self._goals.get_goal_by_string(goal_id)
+        goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         evidence = await self._evidence.list_for_goal(UUID(goal_id))
         baseline = build_baseline_state(goal, evidence)
         thread_id = uuid4()
@@ -141,6 +143,7 @@ class InterventionAgentService:
             fallback_models=list(ladder.fallbacks),
             pool=ladder.pool,  # type: ignore[arg-type]
             agent_name="intervention",
+            user_id=self._owner_id,
         )
         response = await self._inference.complete_structured(request)
         proposal = InterventionAgentProposal.model_validate(response.structured_output)

@@ -1,4 +1,7 @@
+import { ClerkProvider } from "@clerk/react";
 import { Route, Routes } from "react-router-dom";
+import { AuthGate } from "./auth/AuthGate";
+import { clerkEnabled } from "./auth/session";
 import AppShell from "./components/shell/AppShell";
 import SocialPage from "./components/utility/SocialPage";
 import { NewGoalPage } from "./features/goals/NewGoalPage";
@@ -23,12 +26,14 @@ function AppRoutes() {
       <Route path="/plugins" element={<PluginsRoute />} />
       <Route path="/social" element={<SocialPage />} />
       <Route path="/settings" element={<SettingsRoute />} />
+      <Route path="/invite" element={<MarketsRoute />} />
+      <Route path="/invite/:token" element={<MarketsRoute />} />
       <Route path="*" element={<MarketsRoute />} />
     </Routes>
   );
 }
 
-export function App() {
+function AppTree() {
   return (
     <ThemeProvider>
       <Routes>
@@ -36,12 +41,22 @@ export function App() {
         <Route
           path="*"
           element={
-            <AppShell>
-              <AppRoutes />
-            </AppShell>
+            <AuthGate>
+              <AppShell>
+                <AppRoutes />
+              </AppShell>
+            </AuthGate>
           }
         />
       </Routes>
     </ThemeProvider>
   );
+}
+
+export function App() {
+  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  if (clerkEnabled() && publishableKey) {
+    return <ClerkProvider publishableKey={publishableKey}><AppTree /></ClerkProvider>;
+  }
+  return <AppTree />;
 }

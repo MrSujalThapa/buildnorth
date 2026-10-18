@@ -1,7 +1,7 @@
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import Request
+from fastapi import Depends, Request
 from langgraph.checkpoint.memory import MemorySaver
 
 from personal_markets.agents.budget import TokenBudget
@@ -19,6 +19,8 @@ from personal_markets.forecasting.service import BaselineForecastService
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.repository import GoalRepository
 from personal_markets.goals.service import GoalService
+from personal_markets.identity.deps import get_invited_principal
+from personal_markets.identity.domain import Principal
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
 from personal_markets.integrations.gateway import UnifiedIntegrationGateway
 from personal_markets.integrations.goal_sync_service import GoalSyncService
@@ -110,34 +112,41 @@ class PersistingWorkflow:
         )
 
 
+def _use_postgres() -> bool:
+    settings = get_settings()
+    return bool(settings.database_url) and settings.environment not in {"test", "pytest"}
+
+
 @lru_cache
 def get_goal_repository() -> GoalRepository:
-    database_url = get_settings().database_url
-    if not database_url:
+    if not _use_postgres():
         return InMemoryGoalRepository()
-    return PostgresGoalRepository(create_engine(database_url))
+    return PostgresGoalRepository(create_engine(get_settings().database_url or ""))
 
 
 def get_goal_service() -> GoalService:
     return GoalService(get_goal_repository())
 
 
-def get_what_if_service() -> Any:
+def get_what_if_service(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> Any:
     from personal_markets.persistence.agent_store import (
         InMemoryEvidenceRepository,
         PostgresEvidenceRepository,
     )
     from personal_markets.what_if.service import WhatIfService
 
-    database_url = get_settings().database_url
-    if database_url:
-        evidence_repo = PostgresEvidenceRepository(create_engine(database_url))
+    owner_id = principal.user_id
+    if _use_postgres():
+        evidence_repo = PostgresEvidenceRepository(create_engine(get_settings().database_url or ""))
     else:
         evidence_repo = InMemoryEvidenceRepository()
     return WhatIfService(
         get_goal_service(),
         get_simulation_repository(),
         evidence=EvidenceService(evidence_repo),
+        owner_id=owner_id,
     )
 
 
@@ -145,7 +154,10 @@ def get_baseline_forecast_service() -> BaselineForecastService:
     return BaselineForecastService(get_baseline_forecast_repository())
 
 
-def get_baseline_reprice_service(request: Request) -> Any:
+def get_baseline_reprice_service(
+    request: Request,
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> Any:
     from personal_markets.forecasting.reprice import BaselineRepriceService
 
     deps = _workflow_deps(request)
@@ -153,15 +165,15 @@ def get_baseline_reprice_service(request: Request) -> Any:
         deps.goals,
         deps.evidence,
         deps.baseline_forecasts,
+        owner_id=principal.user_id,
     )
 
 
 @lru_cache
 def get_baseline_forecast_repository() -> Any:
-    database_url = get_settings().database_url
-    if not database_url:
+    if not _use_postgres():
         return InMemoryBaselineForecastRepository()
-    return PostgresBaselineForecastRepository(create_engine(database_url))
+    return PostgresBaselineForecastRepository(create_engine(get_settings().database_url or ""))
 
 
 @lru_cache
@@ -171,10 +183,9 @@ def get_simulation_repository() -> Any:
         PostgresSimulationRepository,
     )
 
-    database_url = get_settings().database_url
-    if not database_url:
+    if not _use_postgres():
         return InMemorySimulationRepository()
-    return PostgresSimulationRepository(create_engine(database_url))
+    return PostgresSimulationRepository(create_engine(get_settings().database_url or ""))
 
 
 def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
@@ -204,27 +215,35 @@ def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
             default_model = settings.resolved_spur_model()
         except ProviderNotConfiguredError as error:
             return UnconfiguredOpenAIInferenceProvider(str(error))
-        return SpurInferenceProvider(
-            api_key=settings.spur_api_key or "",
-            base_url=settings.spur_base_url,
-            default_model=default_model,
-            budget=budget,
-            timeout_seconds=settings.openai_timeout_seconds,
-            max_retries=settings.openai_max_retries,
-            max_concurrency=settings.openai_max_concurrency,
-            max_output_tokens=settings.openai_max_output_tokens,
+        return _with_hosted_budget(
+            SpurInferenceProvider(
+                api_key=settings.spur_api_key or "",
+                base_url=settings.spur_base_url,
+                default_model=default_model,
+                budget=budget,
+                timeout_seconds=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+                max_concurrency=settings.openai_max_concurrency,
+                max_output_tokens=settings.openai_max_output_tokens,
+            ),
+            "spur",
+            settings.openai_max_output_tokens,
         )
     if selected == "openai":
         if not openai_ready:
             return UnconfiguredOpenAIInferenceProvider()
-        return OpenAIInferenceProvider(
-            api_key=settings.openai_api_key or "",
-            default_model=settings.openai_goal_model,
-            budget=budget,
-            timeout_seconds=settings.openai_timeout_seconds,
-            max_retries=settings.openai_max_retries,
-            max_concurrency=settings.openai_max_concurrency,
-            max_output_tokens=settings.openai_max_output_tokens,
+        return _with_hosted_budget(
+            OpenAIInferenceProvider(
+                api_key=settings.openai_api_key or "",
+                default_model=settings.openai_goal_model,
+                budget=budget,
+                timeout_seconds=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+                max_concurrency=settings.openai_max_concurrency,
+                max_output_tokens=settings.openai_max_output_tokens,
+            ),
+            "openai",
+            settings.openai_max_output_tokens,
         )
 
     # auto: prefer Spur when its key is present. Never substitute OpenAI if Spur is selected
@@ -237,27 +256,58 @@ def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
             default_model = settings.resolved_spur_model()
         except ProviderNotConfiguredError as error:
             return UnconfiguredOpenAIInferenceProvider(str(error))
-        return SpurInferenceProvider(
-            api_key=settings.spur_api_key or "",
-            base_url=settings.spur_base_url,
-            default_model=default_model,
-            budget=budget,
-            timeout_seconds=settings.openai_timeout_seconds,
-            max_retries=settings.openai_max_retries,
-            max_concurrency=settings.openai_max_concurrency,
-            max_output_tokens=settings.openai_max_output_tokens,
+        return _with_hosted_budget(
+            SpurInferenceProvider(
+                api_key=settings.spur_api_key or "",
+                base_url=settings.spur_base_url,
+                default_model=default_model,
+                budget=budget,
+                timeout_seconds=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+                max_concurrency=settings.openai_max_concurrency,
+                max_output_tokens=settings.openai_max_output_tokens,
+            ),
+            "spur",
+            settings.openai_max_output_tokens,
         )
     if openai_ready:
-        return OpenAIInferenceProvider(
-            api_key=settings.openai_api_key or "",
-            default_model=settings.openai_goal_model,
-            budget=budget,
-            timeout_seconds=settings.openai_timeout_seconds,
-            max_retries=settings.openai_max_retries,
-            max_concurrency=settings.openai_max_concurrency,
-            max_output_tokens=settings.openai_max_output_tokens,
+        return _with_hosted_budget(
+            OpenAIInferenceProvider(
+                api_key=settings.openai_api_key or "",
+                default_model=settings.openai_goal_model,
+                budget=budget,
+                timeout_seconds=settings.openai_timeout_seconds,
+                max_retries=settings.openai_max_retries,
+                max_concurrency=settings.openai_max_concurrency,
+                max_output_tokens=settings.openai_max_output_tokens,
+            ),
+            "openai",
+            settings.openai_max_output_tokens,
         )
     return UnconfiguredOpenAIInferenceProvider()
+
+
+def _with_hosted_budget(
+    inner: InferenceProvider, provider: str, max_output_tokens: int
+) -> InferenceProvider:
+    from uuid import UUID
+
+    from personal_markets.identity.factory import (
+        get_identity_repository,
+        get_inference_budget_service,
+    )
+    from personal_markets.identity.hosted import HostedInferenceGateway
+
+    async def lookup(user_id: object):
+        return await get_identity_repository().get_user(UUID(str(user_id)))
+
+    return HostedInferenceGateway(
+        inner,
+        get_inference_budget_service(),
+        provider_name=provider,
+        max_output_tokens=max_output_tokens,
+        principal_lookup=lookup,
+    )
 
 
 def build_in_memory_workflow(
@@ -289,23 +339,27 @@ def build_in_memory_workflow(
 
 @lru_cache
 def get_integration_repository() -> InMemoryIntegrationRepository | PostgresIntegrationRepository:
-    database_url = get_settings().database_url
-    if database_url:
-        return PostgresIntegrationRepository(create_engine(database_url))
-    return InMemoryIntegrationRepository()
+    if not _use_postgres():
+        return InMemoryIntegrationRepository()
+    return PostgresIntegrationRepository(create_engine(get_settings().database_url or ""))
 
 
-def get_integration_gateway() -> UnifiedIntegrationGateway:
-    default_user_id = get_settings().default_user_id
+def integration_gateway_for(user_id) -> UnifiedIntegrationGateway:
     repository = get_integration_repository()
     return UnifiedIntegrationGateway(
         mcp=IntegrationGatewayService(
             repository=repository,
-            default_user_id=default_user_id,
+            default_user_id=user_id,
             settings=get_settings(),
         ),
-        user_id=default_user_id,
+        user_id=user_id,
     )
+
+
+def get_integration_gateway(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> UnifiedIntegrationGateway:
+    return integration_gateway_for(principal.user_id)
 
 
 def _workflow_deps(request: Request) -> AgentDependencies:
@@ -313,7 +367,10 @@ def _workflow_deps(request: Request) -> AgentDependencies:
     return workflow._inner._deps
 
 
-def get_intervention_service(request: Request) -> InterventionAgentService:
+def get_intervention_service(
+    request: Request,
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> InterventionAgentService:
     deps = _workflow_deps(request)
     settings = get_settings()
     return InterventionAgentService(
@@ -323,10 +380,14 @@ def get_intervention_service(request: Request) -> InterventionAgentService:
         goals=deps.goals,
         evidence=deps.evidence,
         run_store=deps.run_store,
+        owner_id=principal.user_id,
     )
 
 
-def get_source_planner_service(request: Request) -> SourcePlannerService:
+def get_source_planner_service(
+    request: Request,
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> SourcePlannerService:
     deps = _workflow_deps(request)
     settings = get_settings()
     return SourcePlannerService(
@@ -334,21 +395,26 @@ def get_source_planner_service(request: Request) -> SourcePlannerService:
         inference=deps.inference,
         goals=deps.goals,
         evidence=deps.evidence,
-        gateway=get_integration_gateway(),
+        gateway=integration_gateway_for(principal.user_id),
         run_store=deps.run_store,
         repository=get_integration_repository(),
+        owner_id=principal.user_id,
     )
 
 
-def get_goal_sync_service(request: Request) -> GoalSyncService:
+def get_goal_sync_service(
+    request: Request,
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> GoalSyncService:
     deps = _workflow_deps(request)
     return GoalSyncService(
         settings=get_settings(),
-        gateway=get_integration_gateway(),
+        gateway=integration_gateway_for(principal.user_id),
         repository=get_integration_repository(),
         goals=deps.goals,
         workflow=request.app.state.agent_workflow,
         evidence=deps.evidence,
+        owner_id=principal.user_id,
     )
 
 

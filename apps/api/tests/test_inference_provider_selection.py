@@ -8,8 +8,15 @@ from personal_markets.integrations.openai import (
     UnconfiguredOpenAIInferenceProvider,
 )
 from personal_markets.integrations.spur import SpurInferenceProvider
+from personal_markets.identity.hosted import HostedInferenceGateway
 from personal_markets.ports import InferenceRequest
 from personal_markets.wiring import build_inference
+
+
+def _inner(provider: object) -> object:
+    if isinstance(provider, HostedInferenceGateway):
+        return provider._inner
+    return provider
 
 
 def test_spur_requires_authenticated_model_id() -> None:
@@ -29,7 +36,8 @@ def test_auto_prefers_spur_when_spur_key_present() -> None:
         spur_model="spur-glm-5-3",
     )
     provider = build_inference(settings, InMemoryUsageStore())
-    assert isinstance(provider, SpurInferenceProvider)
+    assert isinstance(provider, HostedInferenceGateway)
+    assert isinstance(provider._inner, SpurInferenceProvider)
 
 
 def test_retired_spur_model_id_does_not_silently_remap() -> None:
@@ -39,7 +47,7 @@ def test_retired_spur_model_id_does_not_silently_remap() -> None:
         openai_api_key="sk-openai-test",
         spur_model="glm-5.2",
     )
-    provider = build_inference(settings, InMemoryUsageStore())
+    provider = _inner(build_inference(settings, InMemoryUsageStore()))
     assert isinstance(provider, UnconfiguredOpenAIInferenceProvider)
 
 
@@ -49,7 +57,7 @@ def test_spur_selection_does_not_fall_back_to_openai_when_unconfigured() -> None
         spur_api_key=None,
         openai_api_key="sk-openai-test",
     )
-    provider = build_inference(settings, InMemoryUsageStore())
+    provider = _inner(build_inference(settings, InMemoryUsageStore()))
     assert isinstance(provider, UnconfiguredOpenAIInferenceProvider)
 
 
@@ -60,7 +68,7 @@ def test_spur_selection_does_not_use_openai_key() -> None:
         openai_api_key="sk-openai-test",
         spur_model="spur-glm-5-3",
     )
-    provider = build_inference(settings, InMemoryUsageStore())
+    provider = _inner(build_inference(settings, InMemoryUsageStore()))
     assert isinstance(provider, SpurInferenceProvider)
     assert provider._default_model == AUTHENTICATED_SPUR_MODEL
 
@@ -71,7 +79,7 @@ def test_openai_selection_requires_openai_key() -> None:
         spur_api_key="sk-spur-test",
         openai_api_key=None,
     )
-    provider = build_inference(settings, InMemoryUsageStore())
+    provider = _inner(build_inference(settings, InMemoryUsageStore()))
     assert isinstance(provider, UnconfiguredOpenAIInferenceProvider)
 
 
@@ -82,7 +90,8 @@ def test_openai_selection_uses_openai_when_configured() -> None:
         openai_goal_model="gpt-5.4-mini",
     )
     provider = build_inference(settings, InMemoryUsageStore())
-    assert isinstance(provider, OpenAIInferenceProvider)
+    assert isinstance(provider, HostedInferenceGateway)
+    assert isinstance(provider._inner, OpenAIInferenceProvider)
 
 
 def test_spur_remaps_openai_model_ids() -> None:

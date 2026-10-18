@@ -70,13 +70,15 @@ class BaselineRepriceService:
         goals: GoalService,
         evidence: EvidenceService,
         forecasts: BaselineForecastService,
+        owner_id: UUID | None = None,
     ) -> None:
         self._goals = goals
         self._evidence = evidence
         self._forecasts = forecasts
+        self._owner_id = owner_id
 
     async def publish_if_priceable(self, goal_id: UUID) -> RepriceResult:
-        goal = await self._goals.get_goal(goal_id)
+        goal = await self._goals.get_goal(goal_id, owner_id=self._owner_id)
         proposal = proposal_from_goal(goal)
         events = await self._evidence.list_for_goal(goal_id)
         evidence_ids = [str(item.evidence_id) for item in events if item.evidence_id]

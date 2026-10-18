@@ -13,6 +13,7 @@ class GoalSyncService:
         goals,
         workflow,
         evidence,
+        owner_id=None,
     ) -> None:
         self._settings = settings
         self._gateway = gateway
@@ -20,9 +21,10 @@ class GoalSyncService:
         self._goals = goals
         self._workflow = workflow
         self._evidence = evidence
+        self._owner_id = owner_id
 
     async def sync_goal_sources(self, goal_id: str):
-        goal = await self._goals.get_goal_by_string(goal_id)
+        goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         recipes = await self._repository.list_goal_recipes(goal.goal_id)
         approved = [item for item in recipes if item.approved]
         if not approved:
@@ -44,6 +46,6 @@ class GoalSyncService:
                 goal_id=goal.goal_id,
                 evidence_text=f"Synced {len(new_records)} records from approved integrations.",
                 mcp_records=[record.model_dump(mode="json") for record in new_records],
-                user_id=self._settings.default_user_id,
+                user_id=self._owner_id,
             )
         )
