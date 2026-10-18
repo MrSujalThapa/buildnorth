@@ -271,7 +271,10 @@ class WhatIfService:
         assert isinstance(baseline_ctx, ResolvedSimulationContext)
         assert isinstance(scenario_ctx, ResolvedSimulationContext)
         baseline_prob = baseline_ctx.baseline_probability or 0.0
-        scenario_prob = scenario_ctx.baseline_probability or baseline_prob
+        scenario_prob = (
+            scenario_ctx.baseline_probability
+            if scenario_ctx.baseline_probability is not None else baseline_prob
+        )
         execution = next(
             (item.value for item in scenario_ctx.assumptions if item.name == "execution_probability"),
             0.72,
@@ -421,6 +424,9 @@ class WhatIfService:
         )
         values = {item.name: item.value for item in assumptions}
         execution_probability = values.get("execution_probability", 0.72)
+        if mode == "deadline_event" and scenario_override is not None:
+            conditional = scenario_override
+            scenario = baseline + execution_probability * (conditional - baseline)
         budget = budget_from_goal(goal)
         usage = evaluate_resource_usage(intervention, budget)
         scaled_execution, scale_notes = execution_scale_for_budget(
@@ -976,6 +982,7 @@ class WhatIfService:
             "assumptions": assumptions,
             "assumption_hash": assumption_hash,
             "model": {"family": family, "version": version},
+            "simulation_engine_version": self._engine.version,
             "forecast_status": result.status,
             "seed": result.diagnostics.seed if result.diagnostics else request.config.seed,
             "draws": result.diagnostics.n_draws if result.diagnostics else 0,

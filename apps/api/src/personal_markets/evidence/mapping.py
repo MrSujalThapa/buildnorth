@@ -7,16 +7,12 @@ from personal_markets.evidence.domain import (
     Provenance,
     metadata_for,
 )
+from personal_markets.evidence.metrics import parse_observed_at
 from personal_markets.ports import EvidenceEventProposal
 
 
 def _parse_observed_at(value: str) -> datetime | None:
-    if not value or value.lower() in {"unknown", "unspecified"}:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
+    return parse_observed_at(value)
 
 
 def proposal_to_normalized(
@@ -48,6 +44,8 @@ def proposal_to_normalized(
             else "partial",
             conflict_status="flagged" if conflict != "none" else "none",
             raw_event_id=raw_event_id,
+            observation_kind=event.observation_kind,
+            event_identity=event.event_identity,
         ),
         summary=event.summary,
         fingerprint=fingerprint,

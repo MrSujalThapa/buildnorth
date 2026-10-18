@@ -94,6 +94,8 @@ def _receipt(
 
 
 def needs_research(proposal: GoalArchitectProposal) -> bool:
+    if proposal.research_required:
+        return True
     blob = " ".join(
         [
             proposal.title,

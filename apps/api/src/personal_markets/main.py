@@ -5,6 +5,7 @@ import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
 from personal_markets.agents.api import router as agents_router
@@ -26,6 +27,7 @@ from personal_markets.evidence.source_api import router as evidence_sources_rout
 from personal_markets.goals.api import router as goals_router
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.api import router as identity_router
+from personal_markets.identity.inference_api import router as inference_settings_router
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.integrations.api import router as integrations_router
 from personal_markets.integrations.research import (
@@ -33,6 +35,7 @@ from personal_markets.integrations.research import (
     FrozenReferenceProvider,
     MonidResearchProvider,
 )
+from personal_markets.persistence.research_store import ResearchStore
 from personal_markets.what_if.api import router as what_if_router
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
@@ -119,12 +122,14 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             research=CompositeResearchProvider(
                 FrozenReferenceProvider(),
                 MonidResearchProvider(
-                    settings.monid_enabled, settings.monid_api_base, settings.monid_client_id
+                    settings.monid_enabled, settings.monid_api_base, settings.monid_client_id,
+                    settings=settings
                 ),
             ),
             goals=GoalService(get_goal_repository()),
             evidence=evidence,
             run_store=PostgresAgentRunStore(engine),
+            research_store=ResearchStore(engine),
             baseline_forecasts=BaselineForecastService(
                 PostgresBaselineForecastRepository(engine)
             ),
@@ -159,7 +164,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_origin_regex=settings.cors_origin_regex,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -170,6 +175,17 @@ def create_app() -> FastAPI:
             content={"error": {"type": type(error).__name__, "message": str(error)}},
             headers={"x-request-id": request.headers.get("x-request-id", "")},
         )
+
+    @application.exception_handler(RequestValidationError)
+    async def handle_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
+        # FastAPI's default includes raw submitted values. Credential errors must never echo keys.
+        if "/settings/inference/credentials" in request.url.path:
+            return JSONResponse(status_code=422, content={"error": {
+                "type": "ValidationError", "message": "Invalid provider or API key format"}},
+                headers={"Cache-Control": "no-store"})
+        return JSONResponse(status_code=422, content={"detail": [
+            {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
+            for item in error.errors()]})
 
     def _database_identity(request: Request) -> str:
         identity = getattr(request.app.state, "database_identity", None)
@@ -203,6 +219,7 @@ def create_app() -> FastAPI:
 
     private = [Depends(get_invited_principal)]
     application.include_router(identity_router)
+    application.include_router(inference_settings_router)
     application.include_router(goals_router, dependencies=private)
     application.include_router(agents_router, dependencies=private)
     application.include_router(what_if_router, dependencies=private)

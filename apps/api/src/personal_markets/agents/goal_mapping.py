@@ -39,7 +39,7 @@ def proposal_to_contract(
         if item not in unique:
             unique.append(item)
     try:
-        return GoalContract(
+        contract = GoalContract(
             goal_id=goal_id or uuid4(),
             title=proposal.title,
             goal_type=GoalType(proposal.goal_type),
@@ -53,6 +53,23 @@ def proposal_to_contract(
             state_dimensions=unique,
             model_requirements={"compatibility": proposal.model_family_compatibility},
             forecast_status=ForecastStatus.EXPLORATORY,
+        )
+        from personal_markets.forecasting.spec import compile_existing_spec
+
+        spec = compile_existing_spec(contract).model_copy(
+            update={
+                "units": proposal.success_unit,
+                "research_required": proposal.research_required,
+                "research_questions": proposal.research_questions,
+            }
+        )
+        return contract.model_copy(
+            update={
+                "model_requirements": {
+                    **contract.model_requirements,
+                    "forecast_spec": spec.model_dump(mode="json"),
+                }
+            }
         )
     except (ValidationError, ValueError) as error:
         raise SemanticProviderError(str(error)) from error

@@ -1,9 +1,10 @@
-﻿import { Copy, KeyRound, Link2, Moon, Plug, ShieldCheck, Sun } from "lucide-react";
+﻿import { Copy, Link2, Moon, Plug, ShieldCheck, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type InvitationRecord } from "../../api/client";
 import { useAccount } from "../../auth/AuthGate";
 import { invitePath } from "../../auth/session";
 import "./utility-pages.css";
+import { InferenceSettings } from "./InferenceSettings";
 
 type Props = {
   theme: "light" | "dark";
@@ -16,7 +17,18 @@ function money(value: number): string {
 
 export default function SettingsPage({ theme, onSetTheme }: Props) {
   const account = useAccount();
-  const hosted = account?.hosted;
+  const [hosted, setHosted] = useState(account?.hosted);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!account) return;
+    let cancelled = false;
+    void api.me().then((next) => {
+      if (!cancelled) setHosted(next.hosted);
+    }).catch(() => {
+      if (!cancelled) setUsageError("Hosted usage could not be refreshed. Reload to try again.");
+    });
+    return () => { cancelled = true; };
+  }, [account]);
   return (
     <main className="utility-page">
       <section className="utility-shell">
@@ -57,21 +69,11 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
             {hosted ? (
               <p className="setting-note">{hosted.billing_note}</p>
             ) : null}
+            {usageError ? <p className="setting-note" role="alert">{usageError}</p> : null}
           </div>
         </section>
 
-        <section className="settings-group">
-          <h2>Bring your own key</h2>
-          <div className="settings-list">
-            <div className="setting-row">
-              <div>
-                <strong>Personal inference keys</strong>
-                <span>Connect your own provider key in a later phase. Hosted Spur remains budgeted until then.</span>
-              </div>
-              <span className="setting-soon"><KeyRound size={16} /> Coming later</span>
-            </div>
-          </div>
-        </section>
+        <InferenceSettings />
 
         <section className="settings-group">
           <h2>Personal agents</h2>

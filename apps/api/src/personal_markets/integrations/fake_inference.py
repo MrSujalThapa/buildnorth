@@ -18,9 +18,26 @@ class ScriptedInferenceProvider:
         self._script = script or default_agent_script
         self.calls: list[InferenceRequest] = []
 
+    async def complete_text(self, request: InferenceRequest) -> InferenceResponse:
+        import json
+
+        response = await self.complete_structured(request)
+        response.text = json.dumps(response.structured_output)
+        return response
+
+    async def complete_tools(self, request: InferenceRequest) -> InferenceResponse:
+        raise SemanticProviderError("Scripted tool calls must be explicitly configured by a test")
+
     async def complete_structured(self, request: InferenceRequest) -> InferenceResponse:
         self.calls.append(request)
         output = self._script(request)
+        if request.agent_name == "evidence":
+            from personal_markets.evidence.metrics import observation_kind
+
+            for event in output.get("events", []):
+                # Test fixture migration only. Runtime adapters require semantic extraction.
+                event.setdefault("observation_kind", observation_kind(
+                    event.get("metric", ""), event.get("event_type", "")))
         return InferenceResponse(
             structured_output=output,
             provider="scripted",
@@ -40,6 +57,12 @@ class FailingInferenceProvider:
         del request
         raise self._error
 
+    async def complete_text(self, request: InferenceRequest) -> InferenceResponse:
+        raise self._error
+
+    async def complete_tools(self, request: InferenceRequest) -> InferenceResponse:
+        raise self._error
+
 
 def default_agent_script(request: InferenceRequest) -> dict[str, Any]:
     agent = request.agent_name
@@ -49,6 +72,8 @@ def default_agent_script(request: InferenceRequest) -> dict[str, Any]:
     if agent == "evidence":
         return _evidence(payload)
     if agent == "research":
+        if "recommended" in request.output_schema.get("properties", {}):
+            return _source_planner(payload)
         return _research(payload)
     if agent == "critic":
         return _critic(payload)

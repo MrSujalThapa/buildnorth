@@ -2,6 +2,27 @@ import { currentAccessToken, type AccountView } from "../auth/session";
 
 export type ForecastStatus = "CALIBRATED" | "ANCHORED" | "EXPLORATORY";
 
+export type InferencePreference = {
+  mode: "hosted" | "byok";
+  provider: "openai" | "anthropic";
+  model: string | null;
+};
+export type CredentialMetadata = {
+  provider: "openai" | "anthropic";
+  status: "validated" | "invalid";
+  masked_suffix: string;
+  version: string;
+  validated_at: string;
+};
+export type InferenceSettings = {
+  preference: InferencePreference;
+  credentials: CredentialMetadata[];
+  models: { provider: string; model: string; structured: boolean; tools: boolean }[];
+  hosted_provider: string;
+  hosted_model: string | null;
+  byok_usage: { calls: number; input_tokens: number; output_tokens: number; estimated_cost_usd: number };
+};
+
 export type InvitationRecord = {
   invitation_id: string;
   email: string | null;
@@ -426,10 +447,26 @@ async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal
     }
     throw new Error(`API request failed (${detail})`);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
 export const api = {
+  inferenceSettings: (signal?: AbortSignal) =>
+    request<InferenceSettings>("/api/v1/settings/inference", undefined, signal),
+  saveInferencePreference: (body: InferencePreference) =>
+    request<InferenceSettings>("/api/v1/settings/inference", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  saveProviderKey: (provider: InferencePreference["provider"], apiKey: string) =>
+    request<CredentialMetadata>(`/api/v1/settings/inference/credentials/${provider}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey }),
+    }),
+  validateProviderKey: (provider: InferencePreference["provider"]) =>
+    request<CredentialMetadata>(`/api/v1/settings/inference/credentials/${provider}/validate`, { method: "POST" }),
+  deleteProviderKey: (provider: InferencePreference["provider"]) =>
+    request<void>(`/api/v1/settings/inference/credentials/${provider}`, { method: "DELETE" }),
   me: (signal?: AbortSignal) => request<AccountView>("/api/v1/me", undefined, signal),
   redeemInvite: (token: string) =>
     request<AccountView>("/api/v1/invites/redeem", {

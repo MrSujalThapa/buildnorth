@@ -79,7 +79,11 @@ def apply_parsed_changes_to_assumptions(
             )
         elif change.metric == "applications_per_week" and "weekly_application_rate" in by_name:
             rate = by_name["weekly_application_rate"]
-            value = change.value if change.operation == "set" else rate.value + change.value
+            value = (
+                change.value if change.operation == "set" else
+                rate.value - change.value if change.operation == "subtract" else
+                rate.value + change.value
+            )
             by_name["weekly_application_rate"] = rate.model_copy(
                 update={
                     "value": max(rate.minimum, min(rate.maximum, value)),

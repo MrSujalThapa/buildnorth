@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel, Field
 
 from personal_markets.core.config import get_settings
-from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.core.errors import ForbiddenError, ResourceNotFoundError
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
 from personal_markets.integrations.csv_import import (
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/v1", tags=["agents"])
 
 
 class CreateThreadBody(BaseModel):
-    kind: str = "create_goal"
+    kind: Literal["create_goal", "add_evidence", "reprice"] = "create_goal"
     intent: str | None = None
     goal_id: UUID | None = None
     evidence_text: str | None = None
@@ -56,6 +56,8 @@ async def start_thread(
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> WorkflowSnapshot:
+    if body.mcp_records:
+        raise ForbiddenError("Connector records require the authorized connector ingestion path")
     request = WorkflowRequest(
         kind=body.kind,  # type: ignore[arg-type]
         intent=body.intent,
@@ -63,7 +65,8 @@ async def start_thread(
         evidence_text=body.evidence_text,
         github_login=body.github_login,
         mcp_records=body.mcp_records,
-        evidence_events=body.evidence_events,
+        evidence_events=[event.model_copy(update={"source_type": "manual"})
+                         for event in body.evidence_events] if body.evidence_events else None,
         user_id=principal.user_id,
     )
     return await workflow.start(request)
@@ -107,6 +110,17 @@ async def list_evidence(
     return [row.model_dump(mode="json") for row in rows]
 
 
+@router.get("/goals/{goal_id}/research")
+async def list_research(
+    goal_id: UUID,
+    workflow: Annotated[Any, Depends(get_agent_workflow)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> list[dict[str, Any]]:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    return await workflow._inner._deps.research_store.list_for_goal(principal.user_id, goal_id)
+
+
 @router.post("/goals/{goal_id}/evidence", response_model=WorkflowSnapshot)
 async def add_manual_evidence(
     goal_id: UUID,
@@ -121,7 +135,8 @@ async def add_manual_evidence(
             kind="add_evidence",
             goal_id=goal_id,
             evidence_text=body.evidence_text or body.intent,
-            evidence_events=body.evidence_events,
+            evidence_events=[event.model_copy(update={"source_type": "manual"})
+                             for event in body.evidence_events] if body.evidence_events else None,
             user_id=principal.user_id,
         )
     )
@@ -169,6 +184,7 @@ async def add_manual_state(
     proposals = [
         EvidenceEventProposal(
             event_type="manual_state_entry",
+            observation_kind="snapshot",
             domain="user_state",
             metric=entry.key,
             numeric_value=entry.value,

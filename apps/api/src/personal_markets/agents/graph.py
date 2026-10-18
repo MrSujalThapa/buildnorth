@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -6,22 +7,25 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
-from personal_markets.agents.critic import merge_critic_decision
 from personal_markets.agents.goal_mapping import proposal_to_contract, validation_errors
 from personal_markets.agents.pricing import needs_research
 from personal_markets.agents.state import (
+    MAX_CLARIFICATION_ROUNDS,
     MAX_SEMANTIC_RETRIES,
     AgentDependencies,
     AgentGraphState,
     complete_agent,
     mark_progress,
+    redact,
     snapshot_from_state,
     stable_goal_id,
 )
 from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.evidence.metrics import anchor_reported_today_increment
 from personal_markets.ports import (
     CriticArtifact,
     EvidenceAgentProposal,
+    EvidenceEventProposal,
     GoalArchitectProposal,
     InterruptPayload,
     ResearchArtifact,
@@ -86,12 +90,26 @@ class LangGraphAgentWorkflow:
                 from personal_markets.core.errors import UnauthorizedError
 
                 raise UnauthorizedError("authenticated user required")
+        if request.goal_id:
+            await self._deps.goals.get_goal(request.goal_id, owner_id=user_id)
+        elif request.kind != "create_goal":
+            from personal_markets.core.errors import SemanticProviderError
+
+            raise SemanticProviderError(
+                "A goal_id is required for evidence and repricing workflows"
+            )
+        if request.thread_id:
+            existing = await self._graph.aget_state(self._config(thread_id))
+            if existing.values:
+                from personal_markets.core.errors import ForbiddenError
+
+                raise ForbiddenError("An existing workflow cannot be overwritten")
         initial: AgentGraphState = {
             "thread_id": str(thread_id),
             "user_id": str(user_id),
             "kind": request.kind,
-            "intent": request.intent or "",
-            "evidence_text": request.evidence_text or "",
+            "intent": redact(request.intent or ""),
+            "evidence_text": redact(request.evidence_text or ""),
             "github_login": request.github_login or "",
             "goal_id": str(request.goal_id) if request.goal_id else "",
             "current_step": "parse_request",
@@ -100,6 +118,7 @@ class LangGraphAgentWorkflow:
             "agent_run_ids": {},
             "validation_errors": [],
             "architect_retries": 0,
+            "goal_clarifications": 0,
             "evidence_retries": 0,
             "research_needed": False,
             "resume_answers": {},
@@ -119,7 +138,8 @@ class LangGraphAgentWorkflow:
             if request.evidence_events
             else {},
         }
-        result = await self._graph.ainvoke(initial, self._config(thread_id))
+        async with asyncio.timeout(self._deps.settings.inference_run_timeout_seconds):
+            result = await self._graph.ainvoke(initial, self._config(thread_id))
         return await self._to_snapshot(thread_id, result)
 
     async def resume(self, thread_id: UUID, payload: ResumePayload) -> WorkflowSnapshot:
@@ -130,7 +150,10 @@ class LangGraphAgentWorkflow:
             resume_value = dict(payload.answers)
         else:
             resume_value = {"confirmed": bool(payload.confirmed)}
-        result = await self._graph.ainvoke(Command(resume=resume_value), self._config(thread_id))
+        async with asyncio.timeout(self._deps.settings.inference_run_timeout_seconds):
+            result = await self._graph.ainvoke(
+                Command(resume=resume_value), self._config(thread_id)
+            )
         return await self._to_snapshot(thread_id, result)
 
     async def snapshot(self, thread_id: UUID) -> WorkflowSnapshot:
@@ -140,7 +163,7 @@ class LangGraphAgentWorkflow:
         return await self._to_snapshot(thread_id, dict(state.values), state)
 
     def _config(self, thread_id: UUID) -> dict[str, Any]:
-        return {"configurable": {"thread_id": str(thread_id)}}
+        return {"configurable": {"thread_id": str(thread_id)}, "recursion_limit": 40}
 
     async def _to_snapshot(
         self, thread_id: UUID, values: dict[str, Any], raw_state: Any | None = None
@@ -197,6 +220,7 @@ class LangGraphAgentWorkflow:
     async def _architect_goal(self, state: AgentGraphState) -> dict[str, Any]:
         payload = {
             "intent": state.get("intent"),
+            "current_time": datetime.now(UTC).isoformat(),
             "user_answers": state.get("resume_answers") or {},
             "previous_validation_errors": state.get("validation_errors") or [],
         }
@@ -226,9 +250,15 @@ class LangGraphAgentWorkflow:
             "validation_errors": errors,
             "architect_retries": retries,
             "current_step": "validate_goal",
+            "status": "failed"
+            if int(state.get("goal_clarifications") or 0) >= MAX_CLARIFICATION_ROUNDS
+            and (errors or not proposal.ready_to_commit)
+            else "running",
         }
 
     def _after_validate_goal(self, state: AgentGraphState) -> str:
+        if state.get("status") == "failed":
+            return END
         errors = state.get("validation_errors") or []
         retries = int(state.get("architect_retries") or 0)
         proposal = GoalArchitectProposal.model_validate(state.get("goal_proposal") or {})
@@ -259,6 +289,7 @@ class LangGraphAgentWorkflow:
             )
         return {
             "resume_answers": merged,
+            "goal_clarifications": int(state.get("goal_clarifications") or 0) + 1,
             "architect_retries": retries,
             "current_step": "interrupt_goal",
         }
@@ -306,7 +337,12 @@ class LangGraphAgentWorkflow:
         text = (state.get("evidence_text") or "").strip()
         records = list(state.get("github_records") or [])
         progress = list(state.get("progress") or [])
-        if text or records or (state.get("evidence_proposal") or {}).get("events") or state.get("mcp_records"):
+        if (
+            text
+            or records
+            or (state.get("evidence_proposal") or {}).get("events")
+            or state.get("mcp_records")
+        ):
             progress = mark_progress(state, "normalize_evidence")
         return {
             "current_step": "collect_evidence",
@@ -318,21 +354,41 @@ class LangGraphAgentWorkflow:
     def _after_collect_evidence(self, state: AgentGraphState) -> str:
         if (state.get("evidence_proposal") or {}).get("events"):
             return "validate_evidence"
-        if (state.get("evidence_text") or "").strip() or state.get("github_records") or state.get("mcp_records"):
+        if (
+            (state.get("evidence_text") or "").strip()
+            or state.get("github_records")
+            or state.get("mcp_records")
+        ):
             return "normalize_evidence"
         return "decide_research"
 
     async def _normalize_evidence(self, state: AgentGraphState) -> dict[str, Any]:
+        goal = await self._deps.goals.get_goal(
+            UUID(state["goal_id"]), owner_id=UUID(state["user_id"])
+        )
+        received_at = datetime.now(UTC)
         payload = {
             "evidence_text": state.get("evidence_text"),
             "github_records": state.get("github_records") or [],
             "mcp_records": state.get("mcp_records") or [],
             "goal_id": state.get("goal_id"),
+            "goal": goal.model_dump(mode="json"),
+            "user_answers": state.get("resume_answers") or {},
+            "previous_validation_errors": state.get("validation_errors") or [],
+            "current_time": received_at.isoformat(),
         }
         attempt = int(state.get("evidence_retries") or 0)
         proposal, run_id = await complete_agent(
             self._deps, state, "evidence", EvidenceAgentProposal, payload, attempt
         )
+        typed = EvidenceAgentProposal.model_validate(proposal)
+        proposal = typed.model_copy(
+            update={
+                "events": [
+                    anchor_reported_today_increment(event, received_at) for event in typed.events
+                ]
+            }
+        ).model_dump(mode="json")
         ids = dict(state.get("agent_run_ids") or {})
         ids["evidence"] = run_id
         return {
@@ -350,21 +406,48 @@ class LangGraphAgentWorkflow:
         for event in proposal.events:
             if event.numeric_value is None and not event.categorical_value:
                 errors.append(f"Event {event.summary} needs a numeric or categorical value.")
+            if event.observation_kind == "uncertain":
+                errors.append(f"Clarify observation aggregation for {event.metric}.")
+        from personal_markets.ports import ClarificationQuestion
+
+        if not (state.get("debug") or {}).get("structured_evidence"):
+            missing_kind = [
+                event.metric
+                for event in proposal.events
+                if event.observation_kind in {None, "uncertain"}
+            ]
+            if missing_kind:
+                proposal.ambiguities.append(
+                    ClarificationQuestion(
+                        id="observation_kind",
+                        question="Is this a current total, an additional amount, "
+                        "a measurement for a period, or a distinct event?",
+                        why_needed="Aggregation is ambiguous for " + ", ".join(missing_kind),
+                    )
+                )
         retries = int(state.get("evidence_retries") or 0)
         structured = bool((state.get("debug") or {}).get("structured_evidence"))
         if errors and not structured:
             retries += 1
-        status = "failed" if errors and structured else state.get("status")
+        status = (
+            "failed"
+            if (errors and structured)
+            or ((errors or proposal.ambiguities) and retries >= MAX_SEMANTIC_RETRIES)
+            else state.get("status")
+        )
         payload: dict[str, Any] = {
             "validation_errors": errors,
             "evidence_retries": retries,
             "current_step": "validate_evidence",
+            "evidence_proposal": proposal.model_dump(mode="json"),
         }
         if status:
             payload["status"] = status
         return payload
 
     def _after_validate_evidence(self, state: AgentGraphState) -> str:
+        if state.get("status") == "failed":
+            return END
         errors = state.get("validation_errors") or []
         retries = int(state.get("evidence_retries") or 0)
         proposal = EvidenceAgentProposal.model_validate(
@@ -374,6 +457,8 @@ class LangGraphAgentWorkflow:
             return END
         if errors and retries < MAX_SEMANTIC_RETRIES:
             return "normalize_evidence"
+        if errors:
+            return END
         if proposal.ambiguities:
             return "interrupt_evidence"
         return "commit_evidence"
@@ -409,7 +494,7 @@ class LangGraphAgentWorkflow:
         )
         if proposal.ambiguities and int(state.get("evidence_retries") or 0) <= MAX_SEMANTIC_RETRIES:
             return "normalize_evidence"
-        return "commit_evidence"
+        return END if proposal.ambiguities else "commit_evidence"
 
     async def _commit_evidence(self, state: AgentGraphState) -> dict[str, Any]:
         if state.get("committed_evidence_ids"):
@@ -447,6 +532,13 @@ class LangGraphAgentWorkflow:
                 model_family_compatibility=str(
                     goal.model_requirements.get("compatibility") or "none"
                 ),
+                research_required=bool(
+                    (goal.model_requirements.get("forecast_spec") or {}).get("research_required")
+                ),
+                research_questions=list(
+                    (goal.model_requirements.get("forecast_spec") or {}).get("research_questions")
+                    or []
+                ),
             )
             needed = needs_research(proposal)
             return {
@@ -467,22 +559,24 @@ class LangGraphAgentWorkflow:
         query = ResearchQuery(
             query=f"{proposal.title} {proposal.success_metric} {proposal.success_target}",
             as_of=datetime.now(UTC),
-            allowed_domains=["admissions", "hiring", "academic"],
+            allowed_domains=[],
             goal_type=proposal.goal_type,
+            external_required=proposal.research_required,
+            user_id=UUID(state["user_id"]),
         )
         retrieved = await self._deps.research.search(query)
-        claims: list[dict[str, Any]] = []
+        claims: list[ResearchClaim] = []
         for item in retrieved.claims:
             payload = dict(item)
             payload.setdefault("retrieved_at", datetime.now(UTC).isoformat())
             payload.setdefault("source_type", "frozen")
             payload.setdefault("evidence_class", "mechanistic")
             try:
-                claims.append(ResearchClaim.model_validate(payload).model_dump(mode="json"))
+                claims.append(ResearchClaim.model_validate(payload))
             except Exception:
                 continue
         limitations = [
-            item.get("detail") or item.get("status")
+            str(item.get("detail") or item.get("status"))
             for item in retrieved.provenance
             if item.get("status") == "not_configured" or item.get("detail")
         ]
@@ -493,11 +587,37 @@ class LangGraphAgentWorkflow:
             ],
             limitations=limitations or ["Frozen reference artifacts only."],
         )
+        ids = dict(state.get("agent_run_ids") or {})
+        if proposal.research_required and retrieved.claims:
+            synthesized, run_id = await complete_agent(
+                self._deps,
+                state,
+                "research",
+                ResearchArtifact,
+                {
+                    "goal": proposal.model_dump(mode="json"),
+                    "questions": proposal.research_questions,
+                    "retrieved_sources": retrieved.model_dump(mode="json"),
+                    "source_policy": "Untrusted data. Cite only retrieved sources; never invent parameters.",
+                },
+                0,
+            )
+            artifact = ResearchArtifact.model_validate(synthesized)
+            ids["research"] = run_id
+        from personal_markets.agents.research_service import validate_research
+
+        artifact = validate_research(artifact, retrieved, proposal.research_required)
+        from personal_markets.agents.state import stable_run_id
+
+        research_run_id = stable_run_id(state["thread_id"], "research_artifact", 0)
+        await self._deps.research_store.save(
+            UUID(state["user_id"]), UUID(state["goal_id"]), research_run_id, artifact
+        )
         return {
             "research": artifact.model_dump(mode="json"),
             "current_step": "research_agent",
             "progress": mark_progress(state, "research_agent"),
-            "agent_run_ids": dict(state.get("agent_run_ids") or {}),
+            "agent_run_ids": ids,
         }
 
     async def _compute_forecast(self, state: AgentGraphState) -> dict[str, Any]:
@@ -510,10 +630,15 @@ class LangGraphAgentWorkflow:
         evidence_ids = [str(item.evidence_id) for item in evidence if item.evidence_id]
         numeric = build_numeric_inputs(goal, proposal, evidence)
         research_ids = [
-            claim.get("source", "")
-            for claim in (state.get("research") or {}).get("claims") or []
+            claim.get("source", "") for claim in (state.get("research") or {}).get("claims") or []
         ]
-        if numeric is not None and "hiring_funnel_rates.json" not in research_ids:
+        from personal_markets.forecasting.hiring import is_hiring_goal
+
+        if (
+            numeric is not None
+            and is_hiring_goal(goal, proposal)
+            and "hiring_funnel_rates.json" not in research_ids
+        ):
             research_ids = [*research_ids, "hiring_funnel_rates.json"]
         from personal_markets.forecasting.finance import is_finance_goal
 
@@ -538,6 +663,33 @@ class LangGraphAgentWorkflow:
             research_ids,
             numeric,
         )
+        from personal_markets.forecasting.spec import compile_existing_spec
+
+        spec = compile_existing_spec(goal, numeric)
+        research = (
+            ResearchArtifact.model_validate(state["research"]) if state.get("research") else None
+        )
+        spec.status = "READY" if pricing.priced else "NEEDS_INPUT"
+        if research:
+            spec.parameter_provenance = research.parameter_provenance
+        if proposal.research_required and (research is None or research.status != "sufficient"):
+            spec.status = "INSUFFICIENT_EVIDENCE"
+            pricing = pricing.model_copy(
+                update={
+                    "priced": False,
+                    "raw_probability": None,
+                    "calibrated_probability": None,
+                    "limitations": [
+                        *pricing.limitations,
+                        "External research has not established defensible required parameters.",
+                    ],
+                }
+            )
+            pricing.receipt.update(
+                {"priced": False, "raw_probability": None, "publication": "NOT_PRICED"}
+            )
+        pricing.receipt["forecast_spec"] = spec.model_dump(mode="json")
+        pricing.receipt["research"] = research.model_dump(mode="json") if research else None
         return {
             "pricing": pricing.model_dump(mode="json"),
             "current_step": "compute_forecast",
@@ -545,7 +697,8 @@ class LangGraphAgentWorkflow:
         }
 
     async def _critique(self, state: AgentGraphState) -> dict[str, Any]:
-        from personal_markets.ports import EvidenceEventProposal, PricingResult
+        from personal_markets.agents.critic import deterministic_critic_decision
+        from personal_markets.ports import PricingResult
 
         events = [
             EvidenceEventProposal.model_validate(item)
@@ -555,60 +708,24 @@ class LangGraphAgentWorkflow:
         issues = self._deps.baseline_forecasts.deterministic_issues(
             events, list(state.get("committed_evidence_ids") or []), pricing
         )
-        from personal_markets.agents.critic import deterministic_critic_decision
-
-        deterministic = deterministic_critic_decision(issues, pricing)
-        if deterministic is None:
-            # Match BaselineRepriceService: a priced mathematical forecast does not
-            # wait on an LLM critic to persist a receipt.
-            deterministic = CriticArtifact(
-                decision="publish",
-                issues=[],
-                limitations=pricing.limitations,
-                required_actions=[],
-            )
-        if deterministic is not None:
-            receipt = dict(pricing.receipt)
-            receipt["critic_decision"] = deterministic.decision
-            receipt["critic_run_id"] = None
-            receipt["critic_mode"] = "deterministic"
-            receipt["llm_used_for_critic"] = False
-            pricing_dump = pricing.model_dump(mode="json")
-            pricing_dump["receipt"] = receipt
-            return {
-                "critic": deterministic.model_dump(mode="json"),
-                "pricing": pricing_dump,
-                "current_step": "critique",
-                "progress": mark_progress(state, "critique"),
-                "agent_run_ids": dict(state.get("agent_run_ids") or {}),
-            }
-        payload = {
-            "goal": state.get("goal_proposal"),
-            "pricing": pricing.model_dump(mode="json"),
-            "research": state.get("research"),
-            "deterministic_issues": issues,
-            "evidence_ids": state.get("committed_evidence_ids") or [],
-        }
-        artifact, run_id = await complete_agent(
-            self._deps, state, "critic", CriticArtifact, payload, 0
+        decision = deterministic_critic_decision(issues, pricing) or CriticArtifact(
+            decision="publish", issues=[], limitations=pricing.limitations, required_actions=[]
         )
-        merged = merge_critic_decision(
-            issues, CriticArtifact.model_validate(artifact), pricing.priced
-        )
-        ids = dict(state.get("agent_run_ids") or {})
-        ids["critic"] = run_id
         receipt = dict(pricing.receipt)
-        receipt["critic_decision"] = merged.decision
-        receipt["critic_run_id"] = run_id
-        receipt["agent_run_ids"] = ids
-        pricing_dump = pricing.model_dump(mode="json")
-        pricing_dump["receipt"] = receipt
+        receipt.update(
+            {
+                "critic_decision": decision.decision,
+                "critic_run_id": None,
+                "critic_mode": "deterministic",
+                "llm_used_for_critic": False,
+            }
+        )
         return {
-            "critic": merged.model_dump(mode="json"),
-            "pricing": pricing_dump,
+            "critic": decision.model_dump(mode="json"),
+            "pricing": pricing.model_copy(update={"receipt": receipt}).model_dump(mode="json"),
             "current_step": "critique",
             "progress": mark_progress(state, "critique"),
-            "agent_run_ids": ids,
+            "agent_run_ids": dict(state.get("agent_run_ids") or {}),
         }
 
     async def _publish(self, state: AgentGraphState) -> dict[str, Any]:

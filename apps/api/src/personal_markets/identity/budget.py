@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.agents.models import estimate_cost_usd
+from personal_markets.agents.models import estimate_cost_usd, pool_for_model
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import (
+    DomainError,
     ForbiddenError,
     ProviderBudgetExceededError,
     ProviderNotConfiguredError,
@@ -26,6 +28,8 @@ class Reservation:
     user_id: UUID
     amount_usd: float
     tokens: int
+    model: str = ""
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class InferenceBudgetService:
@@ -66,6 +70,44 @@ class InferenceBudgetService:
     async def set_kill_switch(self, enabled: bool) -> None:
         await self._store.set_hosted_enabled(enabled)
 
+    async def reserve_research(self, principal: Principal | None, amount: float) -> Reservation:
+        if principal is None or not principal.hosted_enabled:
+            raise ForbiddenError("Hosted research tool allowance is required")
+        if not await self._store.hosted_enabled(self._settings.hosted_inference_enabled):
+            raise ProviderNotConfiguredError("Hosted research tools are disabled")
+        await self.enforce_application_limits(principal.user_id, None)
+        reservation = await self._store.reserve(
+            user_id=principal.user_id,
+            clerk_user_id=principal.clerk_user_id,
+            agent_name="research",
+            provider="monid",
+            model="approved_research_tool",
+            amount_usd=amount,
+            tokens=0,
+            user_cap_usd=principal.hosted_quota_usd,
+            user_cap_tokens=principal.hosted_quota_tokens,
+            global_cap_usd=self._settings.hosted_global_quota_usd,
+            global_cap_tokens=self._settings.hosted_global_quota_tokens,
+            daily_cost_cap=self._settings.openai_max_cost_usd,
+        )
+        if reservation is None:
+            raise ProviderBudgetExceededError("Hosted research tool budget exhausted")
+        return reservation
+
+    async def settle_research(
+        self, reservation: Reservation, principal: Principal, amount: float
+    ) -> None:
+        await self._store.settle(
+            reservation,
+            clerk_user_id=principal.clerk_user_id,
+            agent_name="research",
+            provider="monid",
+            model="approved_research_tool",
+            input_tokens=0,
+            output_tokens=0,
+            cost=amount,
+        )
+
     async def reserve(
         self,
         principal: Principal,
@@ -75,6 +117,7 @@ class InferenceBudgetService:
         model: str,
         max_output_tokens: int,
         client_ip: str | None,
+        input_token_bound: int = 512,
     ) -> Reservation:
         try:
             enabled = await self._store.hosted_enabled(self._settings.hosted_inference_enabled)
@@ -87,9 +130,9 @@ class InferenceBudgetService:
         if not principal.hosted_enabled:
             raise ForbiddenError("this account has no hosted inference entitlement")
         await self._enforce_rate_limits(principal.user_id, client_ip)
-        max_tokens = min(int(max_output_tokens), self._settings.openai_max_output_tokens)
-        projected_tokens = max(256, max_tokens + 512)
-        projected_usd = estimate_cost_usd(model, 512, max_tokens)
+        max_tokens = int(max_output_tokens)
+        projected_tokens = max(256, max_tokens + input_token_bound)
+        projected_usd = estimate_cost_usd(model, input_token_bound, max_tokens)
         try:
             reserved = await self._store.reserve(
                 user_id=principal.user_id,
@@ -103,6 +146,10 @@ class InferenceBudgetService:
                 user_cap_tokens=principal.hosted_quota_tokens,
                 global_cap_usd=self._settings.hosted_global_quota_usd,
                 global_cap_tokens=self._settings.hosted_global_quota_tokens,
+                daily_cost_cap=self._settings.openai_max_cost_usd,
+                daily_token_cap=self._settings.openai_daily_token_budget_premium
+                if pool_for_model(model) == "premium"
+                else self._settings.openai_daily_token_budget_high_volume,
             )
         except Exception as error:
             raise ProviderBudgetExceededError(
@@ -142,16 +189,18 @@ class InferenceBudgetService:
         await self._store.release(reservation)
 
     async def _enforce_rate_limits(self, user_id: UUID, client_ip: str | None) -> None:
-        window = datetime.now(UTC) - timedelta(minutes=1)
-        user_count = await self._store.rate_count(user_id=user_id, ip_hash=None, since=window)
-        if user_count >= self._settings.hosted_user_rpm:
-            raise ProviderBudgetExceededError("per-user hosted inference rate limit exceeded")
-        ip_hash = _ip_hash(client_ip)
-        if ip_hash:
-            ip_count = await self._store.rate_count(user_id=None, ip_hash=ip_hash, since=window)
-            if ip_count >= self._settings.hosted_ip_rpm:
-                raise ProviderBudgetExceededError("per-ip hosted inference rate limit exceeded")
-        await self._store.record_rate(user_id, ip_hash)
+        try:
+            await self._store.consume_rate(
+                user_id, _ip_hash(client_ip), self._settings.hosted_user_rpm,
+                self._settings.hosted_ip_rpm)
+        except DomainError:
+            raise
+        except Exception:
+            raise ProviderNotConfiguredError("Application inference limits are unavailable") from None
+
+    async def enforce_application_limits(self, user_id: UUID, client_ip: str | None) -> None:
+        """BYOK and key validation consume request limits, never hosted entitlements."""
+        await self._enforce_rate_limits(user_id, client_ip)
 
 
 @dataclass
@@ -163,13 +212,18 @@ class _Counters:
 
 
 class BudgetStore:
+    async def consume_rate(
+        self, user_id: UUID, ip_hash: str | None, user_limit: int, ip_limit: int
+    ) -> None: ...
     async def hosted_enabled(self, default: bool) -> bool: ...
     async def set_hosted_enabled(self, enabled: bool) -> None: ...
     async def counters(self, scope: str) -> _Counters: ...
     async def reserve(self, **kwargs: object) -> Reservation | None: ...
     async def settle(self, reservation: Reservation, **kwargs: object) -> None: ...
     async def release(self, reservation: Reservation) -> None: ...
-    async def rate_count(self, user_id: UUID | None, ip_hash: str | None, since: datetime) -> int: ...
+    async def rate_count(
+        self, user_id: UUID | None, ip_hash: str | None, since: datetime
+    ) -> int: ...
     async def record_rate(self, user_id: UUID, ip_hash: str | None) -> None: ...
 
 
@@ -181,6 +235,18 @@ class InMemoryBudgetStore(BudgetStore):
         self._reservations: dict[UUID, Reservation] = {}
         self._rates: list[tuple[datetime, UUID | None, str | None]] = []
         self.ledger: list[dict[str, object]] = []
+
+    async def consume_rate(
+        self, user_id: UUID, ip_hash: str | None, user_limit: int, ip_limit: int
+    ) -> None:
+        async with self._lock:
+            since = datetime.now(UTC) - timedelta(minutes=1)
+            self._rates = [row for row in self._rates if row[0] >= since]
+            if await self.rate_count(user_id, None, since) >= user_limit:
+                raise ProviderBudgetExceededError("Per-user inference rate limit exceeded")
+            if ip_hash and await self.rate_count(None, ip_hash, since) >= ip_limit:
+                raise ProviderBudgetExceededError("Per-IP inference rate limit exceeded")
+            await self.record_rate(user_id, ip_hash)
 
     async def hosted_enabled(self, default: bool) -> bool:
         return default if self._enabled is None else self._enabled
@@ -205,9 +271,30 @@ class InMemoryBudgetStore(BudgetStore):
         user_cap_tokens: int,
         global_cap_usd: float,
         global_cap_tokens: int,
+        daily_cost_cap: float = float("inf"),
+        daily_token_cap: int = 2**63 - 1,
     ) -> Reservation | None:
-        del clerk_user_id, agent_name, provider, model
+        del clerk_user_id, agent_name, provider
         async with self._lock:
+            today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            active = [r for r in self._reservations.values() if r.created_at >= today]
+            spent = [
+                r
+                for r in self.ledger
+                if r.get("billing_mode") == "hosted"
+                and cast(datetime, r.get("created_at", today)) >= today
+            ]
+            daily_cost = sum(r.amount_usd for r in active) + sum(
+                float(str(r["estimated_cost_usd"])) for r in spent
+            )
+            pool = pool_for_model(model)
+            daily_tokens = sum(r.tokens for r in active if pool_for_model(r.model) == pool) + sum(
+                int(str(r["input_tokens"])) + int(str(r["output_tokens"]))
+                for r in spent
+                if pool_for_model(str(r["model"])) == pool
+            )
+            if daily_cost + amount_usd > daily_cost_cap or daily_tokens + tokens > daily_token_cap:
+                return None
             user = self._counters.setdefault(str(user_id), _Counters())
             globe = self._counters.setdefault("global", _Counters())
             if (
@@ -221,7 +308,7 @@ class InMemoryBudgetStore(BudgetStore):
             user.reserved_tokens += tokens
             globe.reserved_usd += amount_usd
             globe.reserved_tokens += tokens
-            reservation = Reservation(uuid4(), user_id, amount_usd, tokens)
+            reservation = Reservation(uuid4(), user_id, amount_usd, tokens, model)
             self._reservations[reservation.reservation_id] = reservation
             return reservation
 
@@ -261,6 +348,9 @@ class InMemoryBudgetStore(BudgetStore):
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
                     "estimated_cost_usd": cost,
+                    "reservation_id": reservation.reservation_id,
+                    "billing_mode": "hosted",
+                    "created_at": datetime.now(UTC),
                 }
             )
 
@@ -290,6 +380,43 @@ class InMemoryBudgetStore(BudgetStore):
 
 
 class PostgresBudgetStore(BudgetStore):
+    async def consume_rate(
+        self, user_id: UUID, ip_hash: str | None, user_limit: int, ip_limit: int
+    ) -> None:
+        async with transaction(self._engine) as conn:
+            # Fixed lock order prevents deadlocks; per-IP then per-user serializes admission.
+            for scope in ([f"ip:{ip_hash}"] if ip_hash else []) + [f"user:{user_id}"]:
+                await conn.execute(
+                    text("select pg_advisory_xact_lock(hashtextextended(:s, 0))"), {"s": scope}
+                )
+            since = datetime.now(UTC) - timedelta(minutes=1)
+            user_count = await conn.scalar(
+                text("""
+                select count(*) from inference_rate_events
+                where user_id=:user_id and created_at >= :since
+            """),
+                {"user_id": user_id, "since": since},
+            )
+            ip_count = (
+                await conn.scalar(
+                    text("""
+                select count(*) from inference_rate_events
+                where ip_hash=:ip_hash and created_at >= :since
+            """),
+                    {"ip_hash": ip_hash, "since": since},
+                )
+                if ip_hash
+                else 0
+            )
+            if int(user_count or 0) >= user_limit or int(ip_count or 0) >= ip_limit:
+                raise ProviderBudgetExceededError("Application inference rate limit exceeded")
+            await conn.execute(
+                text("""
+                insert into inference_rate_events (user_id, ip_hash) values (:user_id, :ip_hash)
+            """),
+                {"user_id": user_id, "ip_hash": ip_hash},
+            )
+
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
 
@@ -298,7 +425,9 @@ class PostgresBudgetStore(BudgetStore):
             row = (
                 (
                     await connection.execute(
-                        text("select value_json from platform_controls where key = 'hosted_inference_enabled'")
+                        text(
+                            "select value_json from platform_controls where key = 'hosted_inference_enabled'"
+                        )
                     )
                 )
                 .mappings()
@@ -363,9 +492,44 @@ class PostgresBudgetStore(BudgetStore):
         user_cap_tokens: int,
         global_cap_usd: float,
         global_cap_tokens: int,
+        daily_cost_cap: float = float("inf"),
+        daily_token_cap: int = 2**63 - 1,
     ) -> Reservation | None:
         reservation_id = uuid4()
         async with transaction(self._engine) as connection:
+            # Reserve daily legacy pool/cost budgets in the same transaction as Phase 1
+            # user/global counters. Retries and active reservations count before spending.
+            await connection.execute(text("select pg_advisory_xact_lock(82026017)"))
+            today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+            daily = (
+                (
+                    await connection.execute(
+                        text("""
+                select coalesce(sum(amount),0) as cost,
+                  coalesce(sum(case when pool=:pool then tokens else 0 end),0) as tokens
+                from (
+                  select estimated_cost_usd as amount, input_tokens+output_tokens as tokens,
+                    case when model in ('gpt-5.4','claude-opus-5-5') then 'premium'
+                    else 'high_volume' end as pool
+                  from inference_ledger where created_at>=:today and billing_mode='hosted'
+                  union all
+                  select reserved_usd, reserved_tokens,
+                    case when model in ('gpt-5.4','claude-opus-5-5') then 'premium'
+                    else 'high_volume' end
+                  from inference_reservations where created_at>=:today and status='reserved'
+                ) usage
+            """),
+                        {"pool": pool_for_model(model), "today": today},
+                    )
+                )
+                .mappings()
+                .one()
+            )
+            if (
+                float(daily["cost"]) + amount_usd > daily_cost_cap
+                or int(daily["tokens"]) + tokens > daily_token_cap
+            ):
+                return None
             await connection.execute(
                 text("""
                 insert into hosted_budget_counters (scope)

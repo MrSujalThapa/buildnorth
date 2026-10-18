@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from personal_markets.agents.intervention_critic import critique_intervention
 from personal_markets.agents.json_schema import strict_json_schema
+from personal_markets.agents.completion import complete_validated
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
@@ -139,14 +140,16 @@ class InterventionAgentService:
             instructions=prompt.text,
             input=redact(payload),
             output_schema=strict_json_schema(InterventionAgentProposal),
-            model=ladder.primary,
-            fallback_models=list(ladder.fallbacks),
+            model=None,
+            fallback_models=[],
             pool=ladder.pool,  # type: ignore[arg-type]
             agent_name="intervention",
             user_id=self._owner_id,
         )
-        response = await self._inference.complete_structured(request)
-        proposal = InterventionAgentProposal.model_validate(response.structured_output)
+        proposal, response = await complete_validated(
+            self._inference, request, InterventionAgentProposal,
+            timeout_seconds=self._settings.inference_run_timeout_seconds,
+        )
         critic = critique_intervention(goal, proposal)
         await self._run_store.record(  # type: ignore[attr-defined]
             {

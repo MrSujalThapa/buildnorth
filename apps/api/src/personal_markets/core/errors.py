@@ -30,8 +30,22 @@ class PermanentProviderError(DomainError):
     pass
 
 
+class ProviderAuthenticationError(PermanentProviderError):
+    pass
+
+
 class SemanticProviderError(DomainError):
     pass
+
+
+class InferenceOutputError(SemanticProviderError):
+    """Safe validation reason with usage retained from a completed provider response."""
+
+    def __init__(self, message: str, usage: dict[str, int] | None, provider: str, model: str) -> None:
+        super().__init__(message)
+        self.usage = usage
+        self.provider = provider
+        self.model = model
 
 
 class WorkflowInterruptError(DomainError):

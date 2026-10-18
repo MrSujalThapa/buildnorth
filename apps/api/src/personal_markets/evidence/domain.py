@@ -21,6 +21,8 @@ class Provenance(BaseModel):
     conflict_status: Literal["none", "flagged"]
     raw_event_id: str | None = None
     external_event_id: str | None = None
+    observation_kind: Literal["snapshot", "increment", "period", "event", "uncertain"] | None = None
+    event_identity: str | None = None
     corroborating_sources: list[CorroboratingSource] = Field(default_factory=list)
 
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -54,6 +57,18 @@ class BaselineForecastService:
         oulad = _oulad_limitations(goal)
         limitations = list(dict.fromkeys([*family_price.limitations, *oulad]))
         priced = family_price.priced and family_price.raw_probability is not None
+        from personal_markets.forecasting.spec import compile_existing_spec
+
+        spec = compile_existing_spec(goal, inputs)
+        if spec.research_required:
+            priced = False
+            spec.status = "INSUFFICIENT_EVIDENCE"
+            limitations.append(
+                "Required external parameters remain unapproved; research candidates "
+                "cannot be used as numerical assumptions."
+            )
+        else:
+            spec.status = "READY" if priced else "NEEDS_INPUT"
         metadata = family_receipt_metadata(model)
         receipt: dict[str, Any] = {
             "receipt_version": 1,
@@ -61,6 +76,7 @@ class BaselineForecastService:
             "priced": priced,
             "goal_id": str(goal.goal_id),
             "goal_contract_version": goal.version,
+            "forecast_spec": spec.model_dump(mode="json"),
             "goal_metric": goal.success_definition.get("metric"),
             "goal_type": goal.goal_type.value,
             "forecast_status": family_price.forecast_status,
@@ -77,16 +93,20 @@ class BaselineForecastService:
             "state_snapshot_id": "unavailable",
             "state_snapshot_version": 0,
             "research_source_ids": research_source_ids,
-            "reference_versions": [
-                {"id": source, "source": "REFERENCE_DATA"}
-                for source in research_source_ids
-                if source
-            ],
+            "reference_versions": _reference_lineage(research_source_ids, metadata["family"]),
+            "numeric_inputs": {
+                "state": numeric.state,
+                "assumptions": numeric.assumptions,
+                "assumption_sources": numeric.assumption_sources,
+            },
+            "state_hash": hashlib.sha256(
+                json.dumps(numeric.state, sort_keys=True, default=str).encode()
+            ).hexdigest(),
             "agent_run_ids": agent_run_ids,
             "assumptions": family_price.used_assumptions,
             "feature_transforms": family_price.transforms,
             "calibration": {"method": None, "applied": False, "reason": "no valid calibrator"},
-            "raw_probability": family_price.raw_probability,
+            "raw_probability": family_price.raw_probability if priced else None,
             "calibrated_probability": None,
             "final_probability": None,
             "critic_decision": None,
@@ -180,6 +200,33 @@ def _oulad_limitations(goal: GoalContract) -> list[str]:
             "OULAD path is applicable only with frozen checkpoint features, which this goal lacks."
         )
     return limitations
+
+
+def _reference_lineage(source_ids: list[str], family: str) -> list[dict[str, Any]]:
+    root = Path(__file__).resolve().parents[5] / "data" / "reference"
+    primary = {
+        "deadline_event_hazard": "hiring_funnel_rates.json",
+        "continuous_target_transition": "net_worth_assumptions.json",
+        "threshold_trend": "running_performance_assumptions.json",
+        "multi_outcome_transition": "startup_outcome_priors.json",
+    }.get(family)
+    result = []
+    for source in dict.fromkeys(source_ids):
+        if not source:
+            continue
+        filename = source.removeprefix("frozen://")
+        local = Path(filename).name == filename and (root / filename).is_file()
+        result.append(
+            {
+                "id": source,
+                "source": "REFERENCE_DATA" if local else "RESEARCH_CANDIDATE",
+                "checksum_sha256": hashlib.sha256((root / filename).read_bytes()).hexdigest()
+                if local
+                else None,
+                "used_by_engine": local and filename == primary,
+            }
+        )
+    return result
 
 
 # Re-export for callers that imported the in-memory repository from this module.

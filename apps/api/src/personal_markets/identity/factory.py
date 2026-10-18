@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from personal_markets.core.config import get_settings
 from personal_markets.identity.budget import (
@@ -6,12 +7,17 @@ from personal_markets.identity.budget import (
     InMemoryBudgetStore,
     PostgresBudgetStore,
 )
+from personal_markets.identity.credentials import CredentialStore
 from personal_markets.identity.service import IdentityService
 from personal_markets.identity.store import InMemoryIdentityRepository, PostgresIdentityRepository
 from personal_markets.persistence.database import create_engine
 
+if TYPE_CHECKING:
+    from personal_markets.identity.inference_settings import InferenceSettingsService
+
 
 def reset_identity_state() -> None:
+    get_credential_store.cache_clear()
     get_identity_repository.cache_clear()
     get_budget_store.cache_clear()
     get_identity_repository._memory = InMemoryIdentityRepository()  # type: ignore[attr-defined]
@@ -50,3 +56,28 @@ def get_budget_store():
 
 def get_inference_budget_service() -> InferenceBudgetService:
     return InferenceBudgetService(get_budget_store(), get_settings())
+
+
+@lru_cache
+def get_credential_store() -> CredentialStore:
+    from personal_markets.identity.credentials import (
+        InMemoryCredentialStore,
+        PostgresCredentialStore,
+    )
+
+    settings = get_settings()
+    if settings.database_url and settings.environment not in {"test", "pytest"}:
+        return PostgresCredentialStore(create_engine(settings.database_url))
+    return InMemoryCredentialStore()
+
+
+def get_inference_settings_service() -> "InferenceSettingsService":
+    from personal_markets.identity.inference_audit import InferenceAudit
+    from personal_markets.identity.inference_settings import InferenceSettingsService
+
+    return InferenceSettingsService(
+        get_settings(),
+        get_credential_store(),
+        get_inference_budget_service(),
+        InferenceAudit(get_budget_store()),
+    )

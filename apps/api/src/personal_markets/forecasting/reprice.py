@@ -7,13 +7,13 @@ from uuid import UUID
 from personal_markets.agents.critic import deterministic_critic_decision
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.service import EvidenceService
-from personal_markets.forecasting.inputs_builder import build_numeric_inputs
+from personal_markets.forecasting.engine import NumericInputs
+from personal_markets.forecasting.inputs_builder import build_numeric_inputs, proposal_from_goal
 from personal_markets.forecasting.repository import history_point
 from personal_markets.forecasting.service import BaselineForecastService
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
 from personal_markets.ports import CriticArtifact, EvidenceEventProposal, GoalArchitectProposal
-from personal_markets.what_if.baseline_state import proposal_from_goal
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,18 +40,24 @@ def _evidence_proposals(events: list[NormalizedEvidence]) -> list[EvidenceEventP
                 observed_at=observed,
                 source_type=source_type,
                 summary=item.summary,
+                observation_kind=item.provenance.observation_kind,
+                event_identity=item.provenance.event_identity,
             )
         )
     return proposals
 
 
-def _research_ids(goal: GoalContract, proposal: GoalArchitectProposal, numeric) -> list[str]:
+def _research_ids(
+    goal: GoalContract, proposal: GoalArchitectProposal, numeric: NumericInputs | None
+) -> list[str]:
     from personal_markets.forecasting.finance import is_finance_goal
     from personal_markets.forecasting.running import is_running_goal
     from personal_markets.forecasting.startup import is_startup_goal
 
     research_ids: list[str] = []
-    if numeric is not None:
+    from personal_markets.forecasting.hiring import is_hiring_goal
+
+    if numeric is not None and is_hiring_goal(goal, proposal):
         research_ids.append("hiring_funnel_rates.json")
     if numeric is not None and is_finance_goal(goal, proposal):
         research_ids.append("net_worth_assumptions.json")

@@ -36,6 +36,9 @@ class UnconfiguredOpenAIInferenceProvider:
         del request
         raise ProviderNotConfiguredError(self._message)
 
+    complete_text = complete_structured
+    complete_tools = complete_structured
+
 
 class OpenAIInferenceProvider:
     """Structured-output adapter. Domain modules must not import this class."""
@@ -52,7 +55,7 @@ class OpenAIInferenceProvider:
     ) -> None:
         if not api_key:
             raise ProviderNotConfiguredError("OpenAI API key is required")
-        self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds)
+        self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=0)
         self._default_model = default_model
         self._budget = budget
         self._timeout_seconds = timeout_seconds
@@ -98,7 +101,7 @@ class OpenAIInferenceProvider:
                     retries += 1
                     await asyncio.sleep(_backoff(attempt))
                     continue
-                raise wrapped from error
+                raise wrapped from None
         raise last_error or TransientProviderError("openai request failed")
 
     async def _once(self, request: InferenceRequest, model: str, retries: int) -> InferenceResponse:
@@ -155,12 +158,12 @@ def _wrap(error: Exception) -> Exception:
     if isinstance(error, AuthenticationError):
         return PermanentProviderError("OpenAI authentication failed")
     if isinstance(error, RateLimitError | APITimeoutError | APIConnectionError):
-        return TransientProviderError(str(error))
+        return TransientProviderError("OpenAI rate limit, timeout or connection failure")
     if isinstance(error, APIStatusError):
         classified = classify_provider_error(error)
-        return classified(str(error))
+        return classified("OpenAI request failed")
     classified = classify_provider_error(error)
-    return classified(str(error))
+    return classified("OpenAI request failed")
 
 
 def _backoff(attempt: int) -> float:

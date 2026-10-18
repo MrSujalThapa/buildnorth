@@ -55,6 +55,8 @@ scripts/_phase0_e2e.py
 scripts/_phase0_db_receipts.py
 
 # Runtime artifacts
+/.phase2-*
+/artifacts/phase2/
 .artifacts/
 data/*.db
 data/oulad/

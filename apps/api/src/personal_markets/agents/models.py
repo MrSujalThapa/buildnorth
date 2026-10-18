@@ -2,15 +2,17 @@ from dataclasses import dataclass
 
 from personal_markets.core.config import Settings
 
-PREMIUM_MODELS = frozenset({"gpt-5.4"})
+PREMIUM_MODELS = frozenset({"gpt-5.4", "claude-opus-5-5"})
 HIGH_VOLUME_MODELS = frozenset({"gpt-5.4-mini", "gpt-5.4-nano"})
 
 # Conservative estimates used only for budget guards, not billing.
-ESTIMATED_USD_PER_MILLION = {
-    "gpt-5.4-nano": {"input": 0.10, "output": 0.40},
-    "gpt-5.4-mini": {"input": 0.40, "output": 1.60},
+ESTIMATED_USD_PER_MILLION: dict[str, dict[str, float]] = {
+    "gpt-5.4-nano": {"input": 0.20, "output": 1.25},
+    "gpt-5.4-mini": {"input": 0.75, "output": 4.50},
     "gpt-5.4": {"input": 2.50, "output": 15.00},
     "spur-glm-5-3": {"input": 2.50, "output": 15.00},
+    "claude-sonnet-5-5": {"input": 2, "output": 10},
+    "claude-opus-5-5": {"input": 4, "output": 20},
 }
 
 

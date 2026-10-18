@@ -53,7 +53,7 @@ function InviteScreen({
       const account = await api.redeemInvite(value.trim());
       clearPendingInvite();
       onRedeemed(account);
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     } catch (caught) {
       setBusy(false);
       setError(caught instanceof Error ? caught.message : "Invitation could not be redeemed.");
@@ -198,7 +198,7 @@ function ClerkGate({ children }: Props) {
     if (account.role === "admin" && !account.invited && !capturePendingInvite()) {
       landed.current = true;
       if (!window.location.pathname.startsWith("/settings")) {
-        navigate("/settings", { replace: true });
+        void navigate("/settings", { replace: true });
       }
     }
   }, [account, navigate]);
@@ -268,7 +268,7 @@ function TokenGate({ children }: Props) {
       setAccessTokenProvider(null);
       return;
     }
-    setAccessTokenProvider(async () => readTestToken());
+    setAccessTokenProvider(() => Promise.resolve(readTestToken()));
     let cancelled = false;
     void api
       .me()
@@ -290,7 +290,7 @@ function TokenGate({ children }: Props) {
   useEffect(() => {
     if (account?.role === "admin" && !account.invited && !capturePendingInvite()) {
       if (!window.location.pathname.startsWith("/settings")) {
-        navigate("/settings", { replace: true });
+        void navigate("/settings", { replace: true });
       }
     }
   }, [account, navigate]);

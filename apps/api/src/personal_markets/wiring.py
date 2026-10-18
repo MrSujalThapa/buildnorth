@@ -4,7 +4,6 @@ from typing import Annotated, Any
 from fastapi import Depends, Request
 from langgraph.checkpoint.memory import MemorySaver
 
-from personal_markets.agents.budget import TokenBudget
 from personal_markets.agents.graph import LangGraphAgentWorkflow
 from personal_markets.agents.intervention_service import InterventionAgentService
 from personal_markets.agents.source_planner_service import SourcePlannerService
@@ -29,10 +28,6 @@ from personal_markets.integrations.mcp_repository import (
     PostgresIntegrationRepository,
 )
 from personal_markets.integrations.mcp_service import IntegrationGatewayService
-from personal_markets.integrations.openai import (
-    OpenAIInferenceProvider,
-    UnconfiguredOpenAIInferenceProvider,
-)
 from personal_markets.integrations.research import (
     CompositeResearchProvider,
     FrozenReferenceProvider,
@@ -189,124 +184,21 @@ def get_simulation_repository() -> Any:
 
 
 def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
-    selected = (settings.inference_provider or "auto").strip().lower()
-    spur_ready = bool(settings.spur_api_key)
-    openai_ready = bool(settings.openai_api_key)
-    budget = TokenBudget(
-        usage_store,
-        settings.openai_daily_token_budget_high_volume,
-        settings.openai_daily_token_budget_premium,
-        settings.openai_max_cost_usd,
-    )
-
-    if selected == "none":
-        return UnconfiguredOpenAIInferenceProvider(
-            "Inference is disabled; set PM_INFERENCE_PROVIDER to spur or openai"
-        )
-    if selected == "spur":
-        if not spur_ready:
-            return UnconfiguredOpenAIInferenceProvider(
-                "Spur inference is not configured; set SPUR_API_KEY to enable product agents"
-            )
-        from personal_markets.core.errors import ProviderNotConfiguredError
-        from personal_markets.integrations.spur import SpurInferenceProvider
-
-        try:
-            default_model = settings.resolved_spur_model()
-        except ProviderNotConfiguredError as error:
-            return UnconfiguredOpenAIInferenceProvider(str(error))
-        return _with_hosted_budget(
-            SpurInferenceProvider(
-                api_key=settings.spur_api_key or "",
-                base_url=settings.spur_base_url,
-                default_model=default_model,
-                budget=budget,
-                timeout_seconds=settings.openai_timeout_seconds,
-                max_retries=settings.openai_max_retries,
-                max_concurrency=settings.openai_max_concurrency,
-                max_output_tokens=settings.openai_max_output_tokens,
-            ),
-            "spur",
-            settings.openai_max_output_tokens,
-        )
-    if selected == "openai":
-        if not openai_ready:
-            return UnconfiguredOpenAIInferenceProvider()
-        return _with_hosted_budget(
-            OpenAIInferenceProvider(
-                api_key=settings.openai_api_key or "",
-                default_model=settings.openai_goal_model,
-                budget=budget,
-                timeout_seconds=settings.openai_timeout_seconds,
-                max_retries=settings.openai_max_retries,
-                max_concurrency=settings.openai_max_concurrency,
-                max_output_tokens=settings.openai_max_output_tokens,
-            ),
-            "openai",
-            settings.openai_max_output_tokens,
-        )
-
-    # auto: prefer Spur when its key is present. Never substitute OpenAI if Spur is selected
-    # or is the auto-chosen provider.
-    if spur_ready:
-        from personal_markets.core.errors import ProviderNotConfiguredError
-        from personal_markets.integrations.spur import SpurInferenceProvider
-
-        try:
-            default_model = settings.resolved_spur_model()
-        except ProviderNotConfiguredError as error:
-            return UnconfiguredOpenAIInferenceProvider(str(error))
-        return _with_hosted_budget(
-            SpurInferenceProvider(
-                api_key=settings.spur_api_key or "",
-                base_url=settings.spur_base_url,
-                default_model=default_model,
-                budget=budget,
-                timeout_seconds=settings.openai_timeout_seconds,
-                max_retries=settings.openai_max_retries,
-                max_concurrency=settings.openai_max_concurrency,
-                max_output_tokens=settings.openai_max_output_tokens,
-            ),
-            "spur",
-            settings.openai_max_output_tokens,
-        )
-    if openai_ready:
-        return _with_hosted_budget(
-            OpenAIInferenceProvider(
-                api_key=settings.openai_api_key or "",
-                default_model=settings.openai_goal_model,
-                budget=budget,
-                timeout_seconds=settings.openai_timeout_seconds,
-                max_retries=settings.openai_max_retries,
-                max_concurrency=settings.openai_max_concurrency,
-                max_output_tokens=settings.openai_max_output_tokens,
-            ),
-            "openai",
-            settings.openai_max_output_tokens,
-        )
-    return UnconfiguredOpenAIInferenceProvider()
-
-
-def _with_hosted_budget(
-    inner: InferenceProvider, provider: str, max_output_tokens: int
-) -> InferenceProvider:
-    from uuid import UUID
-
     from personal_markets.identity.factory import (
+        get_budget_store,
+        get_credential_store,
         get_identity_repository,
         get_inference_budget_service,
     )
-    from personal_markets.identity.hosted import HostedInferenceGateway
+    from personal_markets.identity.inference_audit import InferenceAudit
+    from personal_markets.identity.inference_router import InferenceRouter
 
-    async def lookup(user_id: object):
-        return await get_identity_repository().get_user(UUID(str(user_id)))
-
-    return HostedInferenceGateway(
-        inner,
-        get_inference_budget_service(),
-        provider_name=provider,
-        max_output_tokens=max_output_tokens,
-        principal_lookup=lookup,
+    # usage_store is retained for callers from Phase 0/1; the canonical ledger now
+    # accounts every provider attempt in hosted or BYOK mode.
+    del usage_store
+    return InferenceRouter(
+        settings, get_credential_store(), get_inference_budget_service(),
+        InferenceAudit(get_budget_store()), get_identity_repository().get_user,
     )
 
 
@@ -321,11 +213,15 @@ def build_in_memory_workflow(
     threads = InMemoryThreadStore()
     deps = AgentDependencies(
         settings=settings,
-        inference=inference or ScriptedInferenceProvider(),
+        inference=inference or (
+            ScriptedInferenceProvider() if settings.environment in {"test", "pytest"}
+            else build_inference(settings, None)
+        ),
         research=CompositeResearchProvider(
             FrozenReferenceProvider(),
             MonidResearchProvider(
-                settings.monid_enabled, settings.monid_api_base, settings.monid_client_id
+                settings.monid_enabled, settings.monid_api_base, settings.monid_client_id,
+                    settings=settings
             ),
         ),
         goals=GoalService(goals_repo),

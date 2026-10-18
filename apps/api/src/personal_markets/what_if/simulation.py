@@ -20,7 +20,7 @@ class PairedSimulation:
 
 
 class SimulationEngine:
-    version = "1.0.0"
+    version = "1.1.0"
 
     def continuous_target(
         self,
@@ -173,34 +173,38 @@ class SimulationEngine:
     ) -> PairedSimulation:
         started = perf_counter()
         rng = np.random.default_rng(config.seed)
-        n_draws = config.minimum_draws
-        execution = rng.random(n_draws) < execution_probability
-        baseline_success = rng.random(n_draws) < baseline_probability
-        scenario_base = rng.random(n_draws) < scenario_probability
-        uplift = max(0.0, scenario_probability - baseline_probability)
-        scenario_success = np.where(
-            execution,
-            np.minimum(1.0, scenario_base.astype(float) + uplift * execution.astype(float)),
-            scenario_base,
-        ).astype(bool)
-        trajectory = np.tile(
-            np.linspace(baseline_probability, scenario_probability, periods + 1),
-            (n_draws, 1),
+        adjusted_probability = (
+            execution_probability * scenario_probability
+            + (1 - execution_probability) * baseline_probability
         )
+        variance = max(
+            baseline_probability * (1 - baseline_probability),
+            adjusted_probability * (1 - adjusted_probability),
+        )
+        required = int(np.ceil(variance / config.probability_se_tolerance**2))
+        n_draws = min(config.maximum_draws, max(config.minimum_draws, required))
+        execution = rng.random(n_draws) < execution_probability
+        worlds = rng.random(n_draws)
+        baseline_success = worlds < baseline_probability
+        scenario_success = worlds < np.where(execution, scenario_probability, baseline_probability)
+        scenario_outcome = np.where(execution, scenario_probability, baseline_probability)
+        trajectory = baseline_probability + (
+            scenario_outcome[:, None] - baseline_probability
+        ) * np.linspace(0, 1, periods + 1)[None, :]
         error = float(
-            np.sqrt(scenario_probability * (1 - scenario_probability) / max(n_draws, 1))
+            np.sqrt(variance / max(n_draws, 1))
         )
         return PairedSimulation(
             baseline_success=baseline_success,
             scenario_success=scenario_success,
             baseline_outcome=np.full(n_draws, baseline_probability),
-            scenario_outcome=np.full(n_draws, scenario_probability),
+            scenario_outcome=scenario_outcome,
             scenario_trajectory=trajectory,
             execution=execution,
             diagnostics=SimulationDiagnostics(
                 n_draws=n_draws,
                 seed=config.seed,
-                converged=True,
+                converged=error <= config.probability_se_tolerance,
                 criterion=f"MC SE <= {config.probability_se_tolerance}",
                 achieved_mc_error=error,
                 duration_ms=(perf_counter() - started) * 1000,

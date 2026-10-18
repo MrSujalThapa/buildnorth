@@ -1,9 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from personal_markets.core.errors import ProviderNotConfiguredError
@@ -26,12 +26,22 @@ class Settings(BaseSettings):
     database_url: str | None = None
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     cors_origin_regex: str | None = r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$"
-    openai_api_key: str | None = None
+    openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str | None = None
     inference_provider: str = "auto"
-    spur_api_key: str | None = Field(default=None, validation_alias="SPUR_API_KEY")
+    inference_model: str | None = None
+    inference_agent_overrides: dict[str, dict[str, str]] = Field(default_factory=dict)
+    inference_max_input_bytes: int = Field(default=48_000, ge=1024, le=100_000)
+    inference_run_timeout_seconds: float = Field(default=120, gt=0, le=300)
+    byok_encryption_keys: dict[str, str] = Field(default_factory=dict, repr=False)
+    byok_active_key_id: str = "v1"
+    anthropic_api_key: str | None = Field(default=None, repr=False)
+    spur_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("PM_SPUR_API_KEY", "SPUR_API_KEY"), repr=False
+    )
     spur_base_url: str = Field(
-        default="https://ai.spuric.com/v1", validation_alias="SPUR_BASE_URL"
+        default="https://ai.spuric.com/v1",
+        validation_alias=AliasChoices("PM_SPUR_BASE_URL", "SPUR_BASE_URL")
     )
     spur_model: str | None = None
     openai_goal_model: str = "gpt-5.4-mini"
@@ -54,6 +64,15 @@ class Settings(BaseSettings):
     monid_enabled: bool = False
     monid_api_base: str | None = None
     monid_client_id: str | None = None
+    monid_api_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("PM_MONID_API_KEY", "MONID_API_KEY"), repr=False
+    )
+    monid_tool_provider: str | None = None
+    monid_tool_endpoint: str | None = None
+    monid_tool_input_template: dict[str, Any] = Field(default_factory=dict)
+    monid_max_calls: int = Field(default=5, ge=3, le=10)
+    monid_timeout_seconds: float = Field(default=25, gt=0, le=60)
+    monid_max_cost_usd: float = Field(default=0.02, ge=0, le=1)
     default_user_id: UUID = DEFAULT_USER_ID
     dev_demo_fixtures: bool = False
     integration_provider: str = "composio"

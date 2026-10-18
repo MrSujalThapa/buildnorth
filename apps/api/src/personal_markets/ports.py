@@ -39,18 +39,23 @@ class GoalArchitectProposal(BaseModel):
     model_family_compatibility: str
     clarifications_required: list[ClarificationQuestion] = Field(default_factory=list)
     notes: str = ""
+    success_unit: str | None = None
+    research_required: bool = False
+    research_questions: list[str] = Field(default_factory=list)
 
 
 class EvidenceEventProposal(BaseModel):
     event_type: str
     domain: str
     metric: str
-    numeric_value: float | None = None
+    numeric_value: float | None = Field(default=None, allow_inf_nan=False)
     categorical_value: str | None = None
     unit: str | None = None
     observed_at: str
     source_type: Literal["manual", "github", "csv", "mcp_sync"]
     summary: str
+    observation_kind: Literal["snapshot", "increment", "period", "event", "uncertain"] | None = None
+    event_identity: str | None = None
 
 
 class EvidenceAgentProposal(BaseModel):
@@ -65,12 +70,25 @@ class ResearchClaim(BaseModel):
     retrieved_at: str
     source_type: Literal["official", "frozen", "web", "dataset"]
     evidence_class: EvidenceClass
+    supporting_quote: str = ""
+    population: str = ""
+    applicability: Literal["applicable", "mismatch", "unknown"] = "unknown"
+    parameter: str | None = None
+    value: float | None = None
+    unit: str | None = None
+    contradiction: str | None = None
+    verification: Literal["candidate", "source_supported", "frozen_reference"] = "candidate"
+    material_kind: Literal["snippet", "document_text", "frozen_reference"] = "snippet"
+    source_role: Literal["primary", "commentary", "unknown"] = "unknown"
 
 
 class ResearchArtifact(BaseModel):
     claims: list[ResearchClaim] = Field(default_factory=list)
     reference_class_candidates: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
+    status: Literal["sufficient", "insufficient_evidence", "not_required"] = "insufficient_evidence"
+    tool_trace: list[dict[str, Any]] = Field(default_factory=list)
+    parameter_provenance: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class CriticArtifact(BaseModel):
@@ -93,7 +111,7 @@ class InterventionMechanismStep(BaseModel):
 class InterventionStateChange(BaseModel):
     metric: str
     operation: Literal["set", "add", "subtract"]
-    value: float
+    value: float = Field(allow_inf_nan=False)
     unit: str
     frequency: str | None = None
     scope: str = "goal_state"
@@ -198,6 +216,18 @@ class ResumePayload(BaseModel):
     cancelled: bool = False
 
 
+class ToolDefinition(BaseModel):
+    name: str = Field(pattern=r"^[a-zA-Z_][a-zA-Z0-9_]{0,63}$")
+    description: str
+    input_schema: dict[str, Any]
+
+
+class ToolCall(BaseModel):
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
 class InferenceRequest(BaseModel):
     instructions: str
     input: dict[str, Any]
@@ -209,6 +239,8 @@ class InferenceRequest(BaseModel):
     timeout_seconds: float | None = None
     user_id: UUID | None = None
     client_ip: str | None = None
+    tools: list[ToolDefinition] = Field(default_factory=list)
+    max_output_tokens: int | None = Field(default=None, ge=32, le=8192)
 
 
 class InferenceResponse(BaseModel):
@@ -219,10 +251,19 @@ class InferenceResponse(BaseModel):
     request_id: str | None = None
     retries: int = 0
     latency_ms: int = 0
+    text: str = ""
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    estimated_cost_usd: float | None = None
+    billing_mode: Literal["hosted", "byok"] = "hosted"
+    usage_reported: bool = True
 
 
 class InferenceProvider(Protocol):
     async def complete_structured(self, request: InferenceRequest) -> InferenceResponse: ...
+
+    async def complete_text(self, request: InferenceRequest) -> InferenceResponse: ...
+
+    async def complete_tools(self, request: InferenceRequest) -> InferenceResponse: ...
 
 
 class ResearchQuery(BaseModel):
@@ -230,6 +271,8 @@ class ResearchQuery(BaseModel):
     as_of: datetime
     allowed_domains: list[str] = Field(default_factory=list)
     goal_type: str | None = None
+    external_required: bool = False
+    user_id: UUID | None = None
 
 
 class ResearchResult(BaseModel):
@@ -237,6 +280,7 @@ class ResearchResult(BaseModel):
     retrieved_at: datetime
     provenance: list[dict[str, str]]
     configured: bool = True
+    tool_trace: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ResearchProvider(Protocol):

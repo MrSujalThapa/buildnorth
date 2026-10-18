@@ -11,6 +11,7 @@ Observation kinds:
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -23,6 +24,7 @@ _METRIC_ALIASES: dict[str, str] = {
     "application": "applications_submitted",
     "applications": "applications_submitted",
     "application_count": "applications_submitted",
+    "applications_submitted_count": "applications_submitted",
     "applications_sent": "applications_submitted",
     "apps_submitted": "applications_submitted",
     "job_applications": "applications_submitted",
@@ -96,10 +98,42 @@ def parse_observed_at(value: str | None) -> datetime | None:
     return parsed
 
 
+def anchor_reported_today_increment(
+    event: EvidenceEventProposal, received_at: datetime
+) -> EvidenceEventProposal:
+    """Use report receipt time for a same-day relative increment with date-only precision.
+
+    A provider may turn "five more today" into midnight. Ordering that instant before
+    a same-day snapshot silently loses the increment, although the later report says
+    it is additional. Historical dates and precise timestamps retain their meaning.
+    """
+    if (
+        event.source_type != "manual"
+        or event.observation_kind != "increment"
+        or not re.search(r"\btoday\b", event.summary, flags=re.IGNORECASE)
+        or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", event.observed_at)
+    ):
+        return event
+    try:
+        stated_day = datetime.fromisoformat(event.observed_at).date()
+    except ValueError:
+        return event
+    if abs((stated_day - received_at.date()).days) > 1:
+        return event
+    return event.model_copy(update={"observed_at": received_at.isoformat()})
+
+
 def observation_kind(
     metric: str,
     event_type: str,
+    explicit: str | None = None,
 ) -> ObservationKind:
+    if explicit == "event":
+        return "increment"
+    if explicit in {"snapshot", "increment", "period"}:
+        return explicit  # type: ignore[return-value]
+    if explicit == "uncertain":
+        raise ValueError("Observation aggregation requires clarification")
     canonical = canonicalize_metric(metric)
     normalized_type = event_type.strip().lower()
     if canonical in _PERIOD_METRICS:

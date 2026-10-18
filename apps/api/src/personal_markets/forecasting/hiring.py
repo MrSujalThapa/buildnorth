@@ -128,7 +128,7 @@ def aggregate_funnel_from_evidence(
             last_activity = observed
 
         count = float(_event_count(item))
-        kind = observation_kind(item.metric, item.event_type)
+        kind = observation_kind(item.metric, item.event_type, item.provenance.observation_kind)
         stage = _resolve_stage(metric, event_type, category, summary)
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)

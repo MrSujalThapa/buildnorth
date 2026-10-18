@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Literal
 
@@ -8,6 +8,7 @@ from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.forecasting.engine import NumericInputs, price_family
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.inputs_builder import build_numeric_inputs
+from personal_markets.forecasting.inputs_builder import proposal_from_goal as proposal_from_goal
 from personal_markets.forecasting.priceability import describe_priceability
 from personal_markets.forecasting.registry import ForecastModelRegistry
 from personal_markets.forecasting.requirements import PriceabilityReport
@@ -38,43 +39,6 @@ from personal_markets.what_if.intervention_overrides import (
 
 DEFAULT_SIM_CONFIG = SimulationConfig()
 DEFAULT_EXECUTION = 0.72
-
-
-def proposal_from_goal(goal: GoalContract) -> GoalArchitectProposal:
-    definition = goal.success_definition
-    metric = str(definition.get("metric") or definition.get("event") or "target")
-    target = definition.get("target") or definition.get("amount") or definition.get("value") or ""
-    operator = str(definition.get("operator") or "==")
-    family = _infer_model_family(goal)
-    constraints = goal.resource_constraints
-    hours = constraints.hours_per_week if constraints else None
-    return GoalArchitectProposal(
-        ready_to_commit=True,
-        title=goal.title,
-        goal_type=goal.goal_type.value,  # type: ignore[arg-type]
-        success_metric=metric,
-        success_operator=operator,
-        success_target=str(target),
-        deadline=goal.deadline.date().isoformat(),
-        state_dimensions=list(goal.state_dimensions),
-        hours_per_week=hours,
-        model_family_compatibility=family,
-    )
-
-
-def _infer_model_family(goal: GoalContract) -> str:
-    blob = f"{goal.title} {goal.success_definition} {' '.join(goal.state_dimensions)}".lower()
-    if "net_worth" in blob or "million" in blob:
-        return "exploratory_finance"
-    if any(token in blob for token in ("offer", "swe", "fde", "interview", "hiring")):
-        return "exploratory_hiring"
-    if goal.goal_type == GoalType.THRESHOLD and any(
-        token in blob for token in ("run", "10k", "race", "marathon")
-    ):
-        return "exploratory_running"
-    if any(token in blob for token in ("startup", "mrr", "seed", "fundraising")):
-        return "exploratory_startup"
-    return "exploratory_general"
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,8 +179,8 @@ def resolve_simulation_context(
 ) -> ResolvedSimulationContext:
     registry = ForecastModelRegistry()
     proposal = proposal_from_goal(goal)
-    overrides = _merged_overrides(parsed_changes)
-    numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+    # Resolve the unedited state first so relative edits are applied only once.
+    numeric = build_numeric_inputs(goal, proposal, evidence)
     model = registry.select_for(goal, numeric)
     resolved = _resolve_context(
         goal, model.descriptor.family, model.descriptor.version, numeric, evidence
@@ -235,6 +199,17 @@ def resolve_simulation_context(
             for item in parsed_changes
         ]
         assumptions = apply_parsed_changes_to_assumptions(assumptions, change_models)
+    if resolved.mode == "deadline_event":
+        overrides = {
+            item.name.removeprefix("stage_rate_"): item.value
+            for item in assumptions
+            if item.name == "weekly_application_rate" or item.name.startswith("stage_rate_")
+        }
+        scenario_numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+        scenario = _resolve_context(
+            goal, model.descriptor.family, model.descriptor.version, scenario_numeric, evidence
+        )
+        return replace(scenario, assumptions=assumptions)
     return ResolvedSimulationContext(
         priced=resolved.priced,
         message=resolved.message,
@@ -344,12 +319,11 @@ def _resolve_context(
     periods = numeric.state.get("periods")
     direction = str(numeric.state.get("direction") or "at_least")
     if current is None or target is None or periods is None:
-        return empty.model_copy(
-            update={
-                "message": "Missing current_value, target_value, or periods in domain state.",
-                "domain_state": domain_state,
-                "reference_versions": reference_versions,
-            }
+        return replace(
+            empty,
+            message="Missing current_value, target_value, or periods in domain state.",
+            domain_state=domain_state,
+            reference_versions=reference_versions,
         )
 
     assumptions = continuous_target_assumptions(
@@ -526,8 +500,8 @@ def _reference_versions(numeric: NumericInputs) -> tuple[str, ...]:
 def _evidence_watermark(evidence: list[NormalizedEvidence]) -> str:
     if not evidence:
         return "none"
-    latest = max(item.observed_at for item in evidence)
-    return latest.isoformat()
+    stamps = [item.observed_at for item in evidence if item.observed_at is not None]
+    return max(stamps).isoformat() if stamps else "none"
 
 
 def _map_source(source: str) -> AssumptionSource:

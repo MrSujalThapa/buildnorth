@@ -32,8 +32,6 @@ from personal_markets.core.errors import (
 )
 from personal_markets.ports import InferenceRequest, InferenceResponse
 
-_FOREIGN_PREFIXES = ("gpt-", "o1", "o3", "o4", "claude", "gemini")
-
 
 class SpurInferenceProvider:
     def __init__(
@@ -53,6 +51,7 @@ class SpurInferenceProvider:
             api_key=api_key,
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
+            max_retries=0,
         )
         self._default_model = default_model
         self._budget = budget
@@ -85,14 +84,14 @@ class SpurInferenceProvider:
                     retries += 1
                     await asyncio.sleep(0.2 * (2**attempt))
                     continue
-                raise wrapped from error
+                raise wrapped from None
         raise last_error or TransientProviderError("spur request failed")
 
     def _resolve_model(self, request: InferenceRequest) -> str:
         candidate = request.model or self._default_model
         lowered = candidate.strip().lower()
-        if any(lowered.startswith(prefix) for prefix in _FOREIGN_PREFIXES):
-            return self._default_model
+        if lowered != "spur-glm-5-3":
+            raise SemanticProviderError("Unsupported Spur model; select spur-glm-5-3")
         return candidate
 
     async def _once(self, request: InferenceRequest, model: str, retries: int) -> InferenceResponse:
@@ -114,6 +113,8 @@ class SpurInferenceProvider:
                 },
             ],
             "max_tokens": self._max_output_tokens,
+            "reasoning_effort": "low",
+            "extra_body": {"thinking": {"type": "enabled"}},
             "response_format": {"type": "json_object"},
         }
         if request.timeout_seconds:
@@ -156,9 +157,9 @@ def _wrap(error: Exception) -> Exception:
     if isinstance(error, AuthenticationError):
         return PermanentProviderError("spur authentication failed")
     if isinstance(error, RateLimitError | APITimeoutError | APIConnectionError):
-        return TransientProviderError(str(error) or "spur transient error")
+        return TransientProviderError("Spur rate limit, timeout or connection failure")
     if isinstance(error, APIStatusError) and error.status_code >= 500:
-        return TransientProviderError(str(error) or "spur server error")
+        return TransientProviderError("Spur server error")
     if isinstance(error, APIStatusError) and error.status_code in {400, 404, 422}:
-        return SemanticProviderError(str(error) or "spur rejected the request")
-    return PermanentProviderError(str(error) or "spur request failed")
+        return SemanticProviderError("Spur rejected the request; check model configuration")
+    return PermanentProviderError("Spur request failed")

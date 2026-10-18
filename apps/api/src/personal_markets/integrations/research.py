@@ -2,6 +2,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
+
+from personal_markets.core.config import Settings
 from personal_markets.ports import ResearchQuery, ResearchResult
 
 
@@ -63,23 +66,41 @@ class FrozenReferenceProvider:
 
 
 class MonidResearchProvider:
-    """Optional live research adapter.
+    """Conditional application API adapter. Codex MCP credentials are never reused."""
 
-    Codex MCP OAuth tokens are not application credentials. Runtime Monid stays
-    `not_configured` until product-level Monid application credentials exist.
-    """
-
-    def __init__(self, enabled: bool, api_base: str | None, client_id: str | None) -> None:
+    def __init__(
+        self,
+        enabled: bool,
+        api_base: str | None,
+        client_id: str | None,
+        *,
+        settings: Settings | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self._enabled = enabled
         self._api_base = api_base
         self._client_id = client_id
+        self._settings = settings
+        self._transport = transport
 
     @property
     def configured(self) -> bool:
-        return bool(self._enabled and self._api_base and self._client_id)
+        return bool(self._enabled and self._settings and self._settings.monid_api_key)
 
     async def search(self, query: ResearchQuery) -> ResearchResult:
-        del query
+        if self.configured and self._settings is not None:
+            from personal_markets.identity.factory import (
+                get_identity_repository,
+                get_inference_budget_service,
+            )
+            from personal_markets.integrations.monid import MonidHTTPResearch
+
+            return await MonidHTTPResearch(
+                self._settings,
+                self._transport,
+                get_inference_budget_service(),
+                get_identity_repository(),
+            ).search(query)
         return ResearchResult(
             claims=[],
             retrieved_at=datetime.now(UTC),
@@ -101,6 +122,8 @@ class CompositeResearchProvider:
 
     async def search(self, query: ResearchQuery) -> ResearchResult:
         frozen = await self._frozen.search(query)
+        if not query.external_required:
+            return frozen
         monid = await self._monid.search(query)
         limitations: list[dict[str, str]] = []
         if not monid.configured:
@@ -108,7 +131,7 @@ class CompositeResearchProvider:
                 {
                     "source": "monid",
                     "status": "not_configured",
-                    "detail": "Application Monid OAuth credentials are not provisioned.",
+                    "detail": "Application Monid API credentials are not configured.",
                 }
             )
         return ResearchResult(
@@ -116,4 +139,5 @@ class CompositeResearchProvider:
             retrieved_at=query.as_of,
             provenance=[*frozen.provenance, *monid.provenance, *limitations],
             configured=True,
+            tool_trace=monid.tool_trace,
         )

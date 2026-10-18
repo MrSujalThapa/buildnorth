@@ -1,7 +1,7 @@
 import hashlib
 from uuid import UUID, uuid4
 
-from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
 from personal_markets.evidence.domain import EvidenceCommit, NormalizedEvidence
 from personal_markets.evidence.metrics import (
     canonicalize_event,
@@ -38,6 +38,8 @@ class EvidenceService:
         if not goal:
             raise ResourceNotFoundError(f"Goal {goal_id} was not found")
         normalized: list[NormalizedEvidence] = []
+        if any(event.observation_kind == "uncertain" for event in events):
+            raise SemanticProviderError("Clarify observation aggregation before committing evidence")
         for event in events:
             event = canonicalize_event(event)
             fingerprint = evidence_fingerprint(user_id, event, goal_id=goal_id)
@@ -63,12 +65,11 @@ def evidence_fingerprint(
     user_id: UUID, event: EvidenceEventProposal, goal_id: UUID | None = None
 ) -> str:
     event = canonicalize_event(event)
-    kind = observation_kind(event.metric, event.event_type)
+    kind = observation_kind(event.metric, event.event_type, event.observation_kind)
     observed = parse_observed_at(event.observed_at)
     # Source, event type and summary are provenance, not identity. Period/day
     # keys keep distinct increments and weekly/monthly readings from collapsing.
-    canonical = "|".join(
-        [
+    parts = [
             str(user_id),
             str(goal_id or ""),
             kind,
@@ -77,7 +78,9 @@ def evidence_fingerprint(
             "" if event.numeric_value is None else f"{event.numeric_value:.6f}",
             event.categorical_value or "",
         ]
-    )
+    if event.event_identity:
+        parts.append(event.event_identity)
+    canonical = "|".join(parts)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 

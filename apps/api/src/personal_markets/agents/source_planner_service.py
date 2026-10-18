@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from personal_markets.agents.json_schema import strict_json_schema
+from personal_markets.agents.completion import complete_validated
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
@@ -107,7 +108,7 @@ class SourcePlannerService:
                     "connection_status": "not_connected",
                 }
             )
-        thread_id = f"source-plan:{goal_id}:{uuid4()}"
+        thread_id = str(uuid4())
         payload = {
             "goal": goal.model_dump(mode="json"),
             "state_dimensions": goal.state_dimensions,
@@ -122,21 +123,23 @@ class SourcePlannerService:
             instructions=prompt.text,
             input=redact(payload),
             output_schema=strict_json_schema(SourcePlannerProposal),
-            model=ladder.primary,
-            fallback_models=list(ladder.fallbacks),
+            model=None,
+            fallback_models=[],
             pool=ladder.pool,  # type: ignore[arg-type]
-            agent_name="source_planner",
+            agent_name="research",
             user_id=self._owner_id,
         )
-        response = await self._inference.complete_structured(request)
-        proposal = SourcePlannerProposal.model_validate(response.structured_output)
+        proposal, response = await complete_validated(
+            self._inference, request, SourcePlannerProposal,
+            timeout_seconds=self._settings.inference_run_timeout_seconds,
+        )
         proposal = self._validate_plan(proposal)
         proposal = self._attach_ranked_resources(proposal, available_resources, goal.model_dump(mode="json"))
         await self._run_store.record(  # type: ignore[attr-defined]
             {
                 "id": run_id,
                 "thread_id": thread_id,
-                "agent_type": "source_planner",
+                "agent_type": "research",
                 "agent_version": prompt.version,
                 "model_provider": response.provider,
                 "model_name": response.model,
@@ -153,7 +156,7 @@ class SourcePlannerService:
                     int(response.usage.get("input_tokens", 0)),
                     int(response.usage.get("output_tokens", 0)),
                 ),
-                "tool_trace": [],
+                "tool_trace": [{"tool": "source_planning", "goal_id": goal_id}],
                 "status": "completed",
             }
         )

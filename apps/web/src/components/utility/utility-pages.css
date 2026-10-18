@@ -226,6 +226,56 @@
   flex: 0 0 auto;
 }
 
+.inference-settings-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  align-items: end;
+}
+
+.inference-settings-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--app-muted);
+  min-width: 0;
+}
+
+.inference-settings-form input,
+.inference-settings-form select,
+.inference-settings-form button,
+.inference-key-row button {
+  min-height: 42px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.inference-settings-form button {
+  justify-self: start;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.inference-settings-form button:disabled { opacity: .55; cursor: default; }
+.inference-key-form { grid-template-columns: minmax(0, 1fr) auto; }
+.inference-key-row { flex-wrap: wrap; padding: 12px 0; }
+.inference-settings-form :focus-visible,
+.inference-key-row button:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+
+@media (max-width: 640px) {
+  .inference-settings-form { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 800px) {
   .invite-admin-form {
     grid-template-columns: 1fr;
