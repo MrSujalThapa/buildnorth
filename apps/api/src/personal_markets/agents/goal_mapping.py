@@ -54,20 +54,45 @@ def proposal_to_contract(
             model_requirements={"compatibility": proposal.model_family_compatibility},
             forecast_status=ForecastStatus.EXPLORATORY,
         )
+        from personal_markets.agents.model_planner import compose_spec, preferred_domain_adapter
         from personal_markets.forecasting.spec import compile_existing_spec
 
-        spec = compile_existing_spec(contract).model_copy(
-            update={
-                "units": proposal.success_unit,
-                "research_required": proposal.research_required,
-                "research_questions": proposal.research_questions,
-            }
-        )
+        if preferred_domain_adapter(contract, proposal):
+            spec_payload = (
+                compile_existing_spec(contract)
+                .model_copy(
+                    update={
+                        "units": proposal.success_unit,
+                        "research_required": proposal.research_required,
+                        "research_questions": proposal.research_questions,
+                    }
+                )
+                .model_dump(mode="json")
+            )
+        else:
+            composed = compose_spec(contract, proposal)
+            if composed is not None:
+                spec_payload = composed.model_dump(mode="json")
+                spec_payload["units"] = proposal.success_unit
+                spec_payload["research_required"] = proposal.research_required
+                spec_payload["research_questions"] = proposal.research_questions
+            else:
+                spec_payload = (
+                    compile_existing_spec(contract)
+                    .model_copy(
+                        update={
+                            "units": proposal.success_unit,
+                            "research_required": proposal.research_required,
+                            "research_questions": proposal.research_questions,
+                        }
+                    )
+                    .model_dump(mode="json")
+                )
         return contract.model_copy(
             update={
                 "model_requirements": {
                     **contract.model_requirements,
-                    "forecast_spec": spec.model_dump(mode="json"),
+                    "forecast_spec": spec_payload,
                 }
             }
         )

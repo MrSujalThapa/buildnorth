@@ -24,6 +24,7 @@ from personal_markets.core.event_loop import configure_windows_selector_event_lo
 from personal_markets.core.logging import configure_logging
 from personal_markets.core.request_context import request_context_middleware
 from personal_markets.evidence.source_api import router as evidence_sources_router
+from personal_markets.evidence.upload_api import router as upload_router
 from personal_markets.goals.api import router as goals_router
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.api import router as identity_router
@@ -122,17 +123,17 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             research=CompositeResearchProvider(
                 FrozenReferenceProvider(),
                 MonidResearchProvider(
-                    settings.monid_enabled, settings.monid_api_base, settings.monid_client_id,
-                    settings=settings
+                    settings.monid_enabled,
+                    settings.monid_api_base,
+                    settings.monid_client_id,
+                    settings=settings,
                 ),
             ),
             goals=GoalService(get_goal_repository()),
             evidence=evidence,
             run_store=PostgresAgentRunStore(engine),
             research_store=ResearchStore(engine),
-            baseline_forecasts=BaselineForecastService(
-                PostgresBaselineForecastRepository(engine)
-            ),
+            baseline_forecasts=BaselineForecastService(PostgresBaselineForecastRepository(engine)),
         )
         checkpointer_cm = AsyncPostgresSaver.from_conn_string(settings.database_url)
         checkpointer = await checkpointer_cm.__aenter__()
@@ -142,6 +143,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             inner, PostgresThreadStore(engine), PostgresReviewStore(engine)
         )
         application.state.evidence_service = evidence
+        from personal_markets.evidence.uploads import PostgresUploadStore, UploadService
+
+        application.state.upload_service = UploadService(PostgresUploadStore(engine))
         application.state.github_cursor_store = PostgresGithubCursorStore(engine)
         application.state.checkpointer = checkpointer
     else:
@@ -150,6 +154,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         workflow = build_in_memory_workflow(goal_repository=get_goal_repository())
         application.state.agent_workflow = workflow
         application.state.evidence_service = workflow._inner._deps.evidence
+        from personal_markets.evidence.uploads import UploadService, UploadStore
+
+        application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
     yield
     if checkpointer_cm is not None:
@@ -177,24 +184,37 @@ def create_app() -> FastAPI:
         )
 
     @application.exception_handler(RequestValidationError)
-    async def handle_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
+    async def handle_validation_error(
+        request: Request, error: RequestValidationError
+    ) -> JSONResponse:
         # FastAPI's default includes raw submitted values. Credential errors must never echo keys.
         if "/settings/inference/credentials" in request.url.path:
-            return JSONResponse(status_code=422, content={"error": {
-                "type": "ValidationError", "message": "Invalid provider or API key format"}},
-                headers={"Cache-Control": "no-store"})
-        return JSONResponse(status_code=422, content={"detail": [
-            {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
-            for item in error.errors()]})
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": {
+                        "type": "ValidationError",
+                        "message": "Invalid provider or API key format",
+                    }
+                },
+                headers={"Cache-Control": "no-store"},
+            )
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": [
+                    {"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
+                    for item in error.errors()
+                ]
+            },
+        )
 
     def _database_identity(request: Request) -> str:
         identity = getattr(request.app.state, "database_identity", None)
         if identity is not None:
             return str(identity)
         current = get_settings()
-        use_postgres = (
-            bool(current.database_url) and current.environment not in {"test", "pytest"}
-        )
+        use_postgres = bool(current.database_url) and current.environment not in {"test", "pytest"}
         return safe_database_identity(current.database_url) if use_postgres else "memory"
 
     @application.get("/health", response_model=HealthResponse, tags=["system"])
@@ -225,6 +245,7 @@ def create_app() -> FastAPI:
     application.include_router(what_if_router, dependencies=private)
     application.include_router(integrations_router, dependencies=private)
     application.include_router(evidence_sources_router, dependencies=private)
+    application.include_router(upload_router, dependencies=private)
     return application
 
 

@@ -26,6 +26,9 @@ export type Market = {
   events: MarketEvent[];
   history: ChartPoint[];
   historyUnavailable?: boolean;
+  modelFamily?: string;
+  modelExplanation?: string;
+  unpricedReason?: string;
 };
 
 export type WhatIfMode = "impact" | "futures" | "compare" | "paths";

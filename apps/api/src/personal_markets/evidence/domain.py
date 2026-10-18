@@ -13,7 +13,7 @@ class CorroboratingSource(BaseModel):
 
 
 class Provenance(BaseModel):
-    source_type: Literal["manual", "github", "csv", "mcp_sync"]
+    source_type: Literal["manual", "github", "csv", "mcp_sync", "upload"]
     source_authority: Literal["self_report", "platform_public", "user_file"]
     observed_vs_entered: Literal["directly_observed", "user_entered", "imported"]
     parsing_status: Literal["ok", "partial", "ambiguous"]
@@ -73,6 +73,11 @@ SOURCE_METADATA: dict[str, SourceMetadata] = {
         "source_quality": "platform_public",
         "source_authority": "platform_public",
         "observed_vs_entered": "directly_observed",
+    },
+    "upload": {
+        "source_quality": "user_imported",
+        "source_authority": "user_file",
+        "observed_vs_entered": "imported",
     },
 }
 

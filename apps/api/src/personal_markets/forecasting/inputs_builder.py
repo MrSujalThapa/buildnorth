@@ -20,6 +20,12 @@ def build_numeric_inputs(
     overrides: dict[str, Any] | None = None,
 ) -> NumericInputs | None:
     """Map validated goal/evidence into typed numerical inputs for baseline pricing."""
+    from personal_markets.forecasting.compiler import spec_from_mapping
+    from personal_markets.forecasting.composition import composition_numeric_inputs
+
+    composed_spec = spec_from_mapping(goal.model_requirements.get("forecast_spec"))
+    if composed_spec is not None:
+        return composition_numeric_inputs(goal, evidence, overrides=overrides)
     # Ordered most specific first. Finance matches any money-denominated target, so it
     # must run after the domains that also happen to be measured in dollars.
     if is_hiring_goal(goal, proposal):
@@ -30,7 +36,7 @@ def build_numeric_inputs(
         return build_startup_numeric_inputs(goal, proposal, evidence, overrides=overrides)
     if is_finance_goal(goal, proposal):
         return build_finance_numeric_inputs(goal, proposal, evidence, overrides=overrides)
-    return None
+    return composition_numeric_inputs(goal, evidence, overrides=overrides)
 
 
 def proposal_from_goal(goal: GoalContract) -> GoalArchitectProposal:

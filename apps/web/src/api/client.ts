@@ -47,6 +47,7 @@ export interface Goal {
   state_dimensions: string[];
   success_definition?: Record<string, unknown>;
   resource_constraints?: { hours_per_week?: number; budget_amount?: number; budget_currency?: string };
+  model_requirements?: Record<string, unknown>;
 }
 
 export interface WhatIfAssumption {
@@ -391,9 +392,30 @@ export interface EvidenceEvent {
   categorical_value: string | null;
   unit: string | null;
   observed_at: string;
-  source_type: "manual" | "github" | "csv";
+  source_type: "manual" | "github" | "csv" | "upload";
   summary: string;
 }
+
+export type UploadRecord = {
+  upload_id: string;
+  goal_id: string;
+  filename: string;
+  content_type: string;
+  byte_size: number;
+  sha256: string;
+  status: string;
+  preview: {
+    kind?: string;
+    columns?: string[];
+    sample_rows?: Record<string, string>[];
+    row_count?: number;
+    text_excerpt?: string;
+    ambiguous?: boolean;
+    note?: string;
+  };
+  mapping: Record<string, string> | null;
+  created_at: string;
+};
 
 export interface WorkflowSnapshot {
   thread_id: string;
@@ -526,6 +548,28 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "add_evidence", evidence_text: evidenceText }),
     }),
+  listUploads: (goalId: string, signal?: AbortSignal) =>
+    request<UploadRecord[]>(`/api/v1/goals/${goalId}/uploads`, undefined, signal),
+  uploadDataset: (goalId: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<UploadRecord>(`/api/v1/goals/${goalId}/uploads`, { method: "POST", body });
+  },
+  mapUpload: (
+    goalId: string,
+    uploadId: string,
+    mapping: {
+      metric: string;
+      value_column: string;
+      observed_at_column?: string;
+      unit?: string;
+      observation_kind?: string;
+    },
+  ) =>
+    request<{ imported: number; reprice_status: string; priced: boolean; probability: number | null; reason: string | null }>(
+      `/api/v1/goals/${goalId}/uploads/${uploadId}/map`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(mapping) },
+    ),
   syncGithub: (goalId: string, login: string) =>
     request<WorkflowSnapshot>(`/api/v1/goals/${goalId}/github-sync`, {
       method: "POST",

@@ -54,6 +54,11 @@ def validate_research(
                 limitations.append("Contradictory research: " + candidate.contradiction)
         claims.append(candidate)
         if candidate.parameter:
+            usable = (
+                candidate.verification == "frozen_reference"
+                and candidate.applicability == "applicable"
+                and candidate.value is not None
+            )
             provenance.append(
                 {
                     "parameter": candidate.parameter,
@@ -65,11 +70,12 @@ def validate_research(
                     "population": candidate.population,
                     "applicability": candidate.applicability,
                     "verification": candidate.verification,
-                    "status": "candidate",
-                    "used_by_engine": False,
+                    "status": "used" if usable else "candidate",
+                    "used_by_engine": usable,
                 }
             )
-    if external_required:
+    usable_any = any(item.get("used_by_engine") for item in provenance)
+    if external_required and not usable_any:
         limitations.append(
             "Researched parameter candidates require domain review before model use; "
             "quoted text alone does not verify a numeric prior."
@@ -78,7 +84,7 @@ def validate_research(
         claims=claims,
         reference_class_candidates=list(originals),
         limitations=list(dict.fromkeys(limitations)),
-        status="insufficient_evidence" if external_required else "sufficient",
+        status="sufficient" if usable_any or not external_required else "insufficient_evidence",
         tool_trace=retrieved.tool_trace,
         parameter_provenance=provenance,
     )

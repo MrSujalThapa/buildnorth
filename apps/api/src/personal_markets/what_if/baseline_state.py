@@ -195,8 +195,7 @@ def resolve_simulation_context(
         # agent expressed against a model assumption (such as `flow`) have to be applied
         # here, after the user's slider values, or the action silently does nothing.
         change_models = [
-            InterventionChangeResponse.model_validate(item.model_dump())
-            for item in parsed_changes
+            InterventionChangeResponse.model_validate(item.model_dump()) for item in parsed_changes
         ]
         assumptions = apply_parsed_changes_to_assumptions(assumptions, change_models)
     if resolved.mode == "deadline_event":
@@ -266,6 +265,34 @@ def _resolve_context(
     )
     if numeric is None:
         return empty
+
+    from personal_markets.forecasting.composition import price_composition
+
+    composed = price_composition(goal, numeric)
+    if composed is not None:
+        spec = goal.model_requirements.get("forecast_spec") or {}
+        domain_state = _extract_domain_state(numeric)
+        current = numeric.state.get("current_value")
+        target = numeric.state.get("target_value")
+        periods = numeric.state.get("periods")
+        direction = str(numeric.state.get("direction") or "at_least")
+        return ResolvedSimulationContext(
+            priced=composed.priced,
+            message=None if composed.priced else "; ".join(composed.limitations),
+            mode="continuous_target" if composed.priced else "unsupported",
+            current_value=None if current is None else float(current),
+            target_value=None if target is None else float(target),
+            periods=None if periods is None else int(periods),
+            direction="at_most" if direction == "at_most" else "at_least",
+            assumptions=[],
+            baseline_probability=composed.raw_probability,
+            model_family=str(spec.get("family") or "composed"),
+            model_version=str(spec.get("model_version") or "composed_v1"),
+            domain_state=domain_state,
+            reference_versions=_reference_versions(numeric),
+            evidence_count=len(evidence),
+            evidence_watermark=_evidence_watermark(evidence),
+        )
 
     registry = ForecastModelRegistry()
     model = registry.select_for(goal, numeric)
@@ -401,9 +428,7 @@ def build_compare_candidates(
     if hours <= 0:
         return []
     metric = str(
-        goal.success_definition.get("metric")
-        or goal.success_definition.get("event")
-        or "target"
+        goal.success_definition.get("metric") or goal.success_definition.get("event") or "target"
     )
     periods = resolved.periods or 1
     specs = (

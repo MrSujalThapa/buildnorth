@@ -228,6 +228,17 @@
   font-size: 14px;
 }
 
+.upload-preview {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.upload-preview select,
+.upload-preview input[type="file"] {
+  width: 100%;
+}
+
 .plugin-brand-icon {
   display: block;
   width: 22px;

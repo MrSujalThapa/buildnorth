@@ -124,12 +124,122 @@ class WhatIfService:
                 return fixture
         return await self._simulate(request, persist=False)
 
+    def _simulate_composition(
+        self, goal: GoalContract, request: WhatIfRequest, evidence: list
+    ) -> WhatIfResult | None:
+        from personal_markets.forecasting.compiler import spec_from_mapping
+        from personal_markets.forecasting.composition import (
+            composition_numeric_inputs,
+            price_composition,
+        )
+        from personal_markets.forecasting.engine import NumericInputs
+        from personal_markets.forecasting.inputs_builder import (
+            build_numeric_inputs,
+            proposal_from_goal,
+        )
+
+        spec = spec_from_mapping(goal.model_requirements.get("forecast_spec"))
+        if spec is None:
+            return None
+        proposal = proposal_from_goal(goal)
+        baseline_inputs = build_numeric_inputs(goal, proposal, evidence)
+        if baseline_inputs is None:
+            baseline_inputs = composition_numeric_inputs(goal, evidence)
+        baseline = price_composition(goal, baseline_inputs or NumericInputs())
+        if baseline is None:
+            return None
+        overrides: dict[str, float] = {}
+        unmapped: list[str] = []
+        assumption_names = set((baseline_inputs.assumptions if baseline_inputs else {}).keys())
+        for change in request.parsed_changes or []:
+            metric = change.metric
+            short = metric.split(".", 1)[-1]
+            if (
+                metric in assumption_names
+                or any(name.endswith(f".{short}") for name in assumption_names)
+                or short
+                in {
+                    "rate",
+                    "mu",
+                    "sigma",
+                    "trend",
+                    "noise",
+                    "inflow_rate",
+                }
+            ):
+                key = metric if metric in assumption_names else short
+                if change.operation == "set":
+                    overrides[key] = change.value
+                else:
+                    current = float(
+                        (baseline_inputs.assumptions if baseline_inputs else {}).get(key) or 0.0
+                    )
+                    overrides[key] = (
+                        current + change.value
+                        if change.operation == "add"
+                        else current - change.value
+                    )
+            else:
+                unmapped.append(metric)
+        if unmapped and not overrides:
+            return WhatIfResult(
+                priced=False,
+                status="NOT_PRICED",
+                message=(
+                    "This action is not mapped to a supported model parameter. "
+                    f"Unmapped: {', '.join(unmapped)}. Hypothetical causal effects were not invented."
+                ),
+                baseline_probability=baseline.raw_probability,
+                assumptions=request.assumptions,
+                receipt={
+                    "causal_status": "unmapped_intervention",
+                    "unmapped": unmapped,
+                    "hypothetical": True,
+                },
+            )
+        scenario_inputs = (
+            composition_numeric_inputs(goal, evidence, overrides=overrides) or baseline_inputs
+        )
+        scenario = price_composition(goal, scenario_inputs or baseline_inputs)
+        if (
+            not baseline.priced
+            or baseline.raw_probability is None
+            or scenario is None
+            or not scenario.priced
+        ):
+            return WhatIfResult(
+                priced=False,
+                status="NOT_PRICED",
+                message="; ".join(baseline.limitations or ["Composition is not priceable yet."]),
+                baseline_probability=baseline.raw_probability,
+                assumptions=request.assumptions,
+            )
+        uplift = (scenario.raw_probability - baseline.raw_probability) * 100.0
+        return WhatIfResult(
+            priced=True,
+            status="EXPLORATORY",
+            baseline_probability=baseline.raw_probability,
+            scenario_probability=scenario.raw_probability,
+            expected_uplift_pp=uplift,
+            assumptions=request.assumptions,
+            receipt={
+                "hypothetical": True,
+                "causal_status": "parameter_intervention",
+                "compiler_version": spec.compiler_version,
+                "overrides": overrides,
+                "limitations": scenario.limitations,
+            },
+        )
+
     async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
         goal = await self._require_goal(request.goal_id)
         model = self._registry.select(goal)
 
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
+            composed = self._simulate_composition(goal, request, evidence)
+            if composed is not None:
+                return composed
             request = self._apply_behavior_execution(goal, request, evidence)
             user_overrides = {item.name: item.value for item in request.assumptions}
             baseline_ctx = resolve_simulation_context(
@@ -205,7 +315,11 @@ class WhatIfService:
             raw_effect = raw_effect / (
                 1 + intervention.diminishing_return * abs(intervention.amount)
             )
-        elif intervention is not None and intervention.effect_per_unit is None and not request.parsed_changes:
+        elif (
+            intervention is not None
+            and intervention.effect_per_unit is None
+            and not request.parsed_changes
+        ):
             return WhatIfResult(
                 priced=False,
                 status="NOT_PRICED",
@@ -273,10 +387,15 @@ class WhatIfService:
         baseline_prob = baseline_ctx.baseline_probability or 0.0
         scenario_prob = (
             scenario_ctx.baseline_probability
-            if scenario_ctx.baseline_probability is not None else baseline_prob
+            if scenario_ctx.baseline_probability is not None
+            else baseline_prob
         )
         execution = next(
-            (item.value for item in scenario_ctx.assumptions if item.name == "execution_probability"),
+            (
+                item.value
+                for item in scenario_ctx.assumptions
+                if item.name == "execution_probability"
+            ),
             0.72,
         )
         periods = baseline_ctx.periods or 1
@@ -434,10 +553,14 @@ class WhatIfService:
         )
         if not usage.within_budget and execution_probability > 0:
             scenario = baseline + (scenario - baseline) * (scaled_execution / execution_probability)
-            conditional = baseline + (conditional - baseline) * (scaled_execution / execution_probability)
+            conditional = baseline + (conditional - baseline) * (
+                scaled_execution / execution_probability
+            )
             execution_probability = scaled_execution
 
-        delta = scenario_paired.scenario_success.astype(float) - paired.baseline_success.astype(float)
+        delta = scenario_paired.scenario_success.astype(float) - paired.baseline_success.astype(
+            float
+        )
         chunk_deltas = np.asarray(
             [float(np.mean(chunk)) for chunk in np.array_split(delta, min(20, len(delta)))]
         )
@@ -513,7 +636,11 @@ class WhatIfService:
                     profile.execution.source
                     if profile is not None
                     else next(
-                        (item.source for item in assumptions if item.name == "execution_probability"),
+                        (
+                            item.source
+                            for item in assumptions
+                            if item.name == "execution_probability"
+                        ),
                         "USER_ASSUMPTION",
                     )
                 ),
@@ -580,8 +707,12 @@ class WhatIfService:
                     status=str(receipt.get("forecast_status") or ""),
                     created_at=run.created_at.isoformat() if run.created_at else None,
                     intervention_title=title,
-                    baseline_probability=float(baseline) if isinstance(baseline, int | float) else None,
-                    scenario_probability=float(scenario) if isinstance(scenario, int | float) else None,
+                    baseline_probability=float(baseline)
+                    if isinstance(baseline, int | float)
+                    else None,
+                    scenario_probability=float(scenario)
+                    if isinstance(scenario, int | float)
+                    else None,
                     conditional_on_execution_probability=(
                         float(conditional) if isinstance(conditional, int | float) else None
                     ),
@@ -667,13 +798,17 @@ class WhatIfService:
             adjusted = []
             for action in candidates:
                 context = context_from_text(
-                    " ".join([action.title, action.action_type, goal.title, *goal.state_dimensions]),
+                    " ".join(
+                        [action.title, action.action_type, goal.title, *goal.state_dimensions]
+                    ),
                     domain=goal.state_dimensions[0] if goal.state_dimensions else "general",
                     planned_amount=action.amount,
                 )
                 estimate = self._behavior.estimate(evidence, goal, context)
                 if estimate.usable:
-                    adjusted.append(action.model_copy(update={"execution_probability": estimate.probability}))
+                    adjusted.append(
+                        action.model_copy(update={"execution_probability": estimate.probability})
+                    )
                 else:
                     adjusted.append(action)
             candidates = adjusted
@@ -1176,8 +1311,14 @@ class WhatIfService:
         evidence: list,
     ) -> WhatIfRequest:
         self._last_behavior_profile = None
-        incoming = next((item for item in request.assumptions if item.name == "execution_probability"), None)
-        if incoming is not None and incoming.source == "USER_ASSUMPTION" and abs(incoming.value - 0.72) > 1e-6:
+        incoming = next(
+            (item for item in request.assumptions if item.name == "execution_probability"), None
+        )
+        if (
+            incoming is not None
+            and incoming.source == "USER_ASSUMPTION"
+            and abs(incoming.value - 0.72) > 1e-6
+        ):
             return request
         if not evidence:
             return request

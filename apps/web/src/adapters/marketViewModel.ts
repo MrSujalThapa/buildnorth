@@ -79,7 +79,43 @@ export function evidenceToEvents(items: EvidenceEvent[]): MarketEvent[] {
   }));
 }
 
+function stringField(value: object, key: string): string | undefined {
+  const found: unknown = Object.getOwnPropertyDescriptor(value, key)?.value;
+  return typeof found === "string" ? found : undefined;
+}
+
+function stringList(value: object, key: string): string[] {
+  const found: unknown = Object.getOwnPropertyDescriptor(value, key)?.value;
+  return Array.isArray(found) ? found.filter((item): item is string => typeof item === "string") : [];
+}
+
+function firstPrimitiveKind(value: object): string | undefined {
+  const found: unknown = Object.getOwnPropertyDescriptor(value, "primitives")?.value;
+  if (!Array.isArray(found) || found.length === 0) {
+    return undefined;
+  }
+  const first: unknown = found[0];
+  return first !== null && typeof first === "object" ? stringField(first, "kind") : undefined;
+}
+
 export function toMarketDetail(goal: Goal, history: MarketHistoryPoint[], evidence: EvidenceEvent[]): Market {
   const base = toMarketCard(goal, history);
-  return { ...base, events: evidenceToEvents(evidence) };
+  const raw: unknown = goal.model_requirements?.forecast_spec;
+  const spec = raw && typeof raw === "object" ? raw : null;
+  const family = spec ? stringField(spec, "family") : undefined;
+  const primitive = spec ? firstPrimitiveKind(spec) : undefined;
+  const unpriced = spec ? stringList(spec, "unpriced_reasons") : [];
+  const reasons = unpriced.length ? unpriced : spec ? stringList(spec, "limitations") : [];
+  const explanation = family
+    ? primitive
+      ? `Modeled as ${family.replaceAll("_", " ")} using the ${primitive.replaceAll("_", " ")} primitive.`
+      : `Modeled as ${family.replaceAll("_", " ")}.`
+    : undefined;
+  return {
+    ...base,
+    events: evidenceToEvents(evidence),
+    modelFamily: family,
+    modelExplanation: explanation,
+    unpricedReason: base.odds == null ? reasons[0] : undefined,
+  };
 }

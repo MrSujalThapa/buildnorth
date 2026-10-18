@@ -52,8 +52,15 @@ class BaselineForecastService:
     ) -> PricingResult:
         _ = proposal  # semantic only; never a probability source
         numeric = inputs or NumericInputs()
-        model = self._registry.select_for(goal, numeric)
-        family_price = price_family(model, goal, numeric)
+        from personal_markets.forecasting.composition import price_composition
+
+        composed = price_composition(goal, numeric)
+        if composed is not None:
+            family_price = composed
+            model = None
+        else:
+            model = self._registry.select_for(goal, numeric)
+            family_price = price_family(model, goal, numeric)
         oulad = _oulad_limitations(goal)
         limitations = list(dict.fromkeys([*family_price.limitations, *oulad]))
         priced = family_price.priced and family_price.raw_probability is not None
@@ -69,7 +76,19 @@ class BaselineForecastService:
             )
         else:
             spec.status = "READY" if priced else "NEEDS_INPUT"
-        metadata = family_receipt_metadata(model)
+        if model is None:
+            spec_payload = goal.model_requirements.get("forecast_spec") or {}
+            metadata = {
+                "family": spec_payload.get("family") or "composed",
+                "version": spec_payload.get("model_version")
+                or spec_payload.get("compiler_version")
+                or "composed_v1",
+                "simulation_method": (family_price.transforms or {}).get("method")
+                or "composed_primitives",
+                "maximum_status": "EXPLORATORY",
+            }
+        else:
+            metadata = family_receipt_metadata(model)
         receipt: dict[str, Any] = {
             "receipt_version": 1,
             "forecast_kind": "baseline",
@@ -115,6 +134,8 @@ class BaselineForecastService:
             "created_at": datetime.now(UTC).isoformat(),
             "run_id": str(uuid4()),
             "llm_used_for_probability": False,
+            "parameter_lineage": spec.parameter_provenance or family_price.used_assumptions,
+            "compiler_version": spec.compiler_version,
         }
         return PricingResult(
             priced=priced,

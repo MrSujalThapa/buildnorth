@@ -260,6 +260,14 @@
     -0.02em;
 }
 
+.model-note p {
+  margin: 0;
+  color: var(--market-muted);
+  font-size: 14px;
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
 .recent-events {
   padding:
     22px

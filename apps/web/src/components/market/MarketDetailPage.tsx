@@ -193,7 +193,9 @@ export default function MarketDetailPage({
           ) : market.odds === null ? (
             <>
               <div className="market-price" data-testid="goal-price">Not priced</div>
-              <div className="market-price-hint">Odds are still forming.</div>
+              <div className="market-price-hint">
+                {market.unpricedReason ?? "Odds are still forming."}
+              </div>
             </>
           ) : (
             <>
@@ -226,6 +228,13 @@ export default function MarketDetailPage({
 
           <div className="chart-help">Press and drag across the chart to compare odds.</div>
         </section>
+
+        {market.modelExplanation ? (
+          <section className="market-section model-note">
+            <h2>Model</h2>
+            <p>{market.modelExplanation}</p>
+          </section>
+        ) : null}
 
         <section className="market-section recent-events">
           <h2>Recent events</h2>

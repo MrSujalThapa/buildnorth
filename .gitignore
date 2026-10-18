@@ -59,6 +59,7 @@ scripts/_phase0_db_receipts.py
 /artifacts/phase2/
 .artifacts/
 data/*.db
+data/uploads/
 data/oulad/
 data/jth/
 data/running_ww/

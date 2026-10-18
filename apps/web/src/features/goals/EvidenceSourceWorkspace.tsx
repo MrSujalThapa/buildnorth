@@ -390,6 +390,8 @@ export function EvidenceSourceWorkspace({
 
         <AgentProgress snapshot={snapshot} />
 
+        <DatasetUpload goalId={goalId} />
+
         <details className="evidence-manual">
           <summary>Add manual evidence (secondary)</summary>
           <EvidenceWorkflow
@@ -404,6 +406,106 @@ export function EvidenceSourceWorkspace({
         </details>
       </div>
     </main>
+  );
+}
+
+function DatasetUpload({ goalId }: { goalId: string }) {
+  const queryClient = useQueryClient();
+  const [valueColumn, setValueColumn] = useState("");
+  const [timeColumn, setTimeColumn] = useState("");
+  const [metric, setMetric] = useState("");
+  const uploads = useQuery({
+    queryKey: ["uploads", goalId],
+    queryFn: ({ signal }) => api.listUploads(goalId, signal),
+  });
+  const send = useMutation({
+    mutationFn: (file: File) => api.uploadDataset(goalId, file),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["uploads", goalId] });
+    },
+  });
+  const latest = uploads.data?.at(-1);
+  const map = useMutation({
+    mutationFn: () => {
+      if (!latest) throw new Error("missing upload");
+      return api.mapUpload(goalId, latest.upload_id, {
+        metric: metric || latest.preview.columns?.[1] || "measurement",
+        value_column: valueColumn || latest.preview.columns?.[1] || "",
+        observed_at_column: timeColumn || latest.preview.columns?.[0],
+        observation_kind: "snapshot",
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["evidence", goalId] });
+      void queryClient.invalidateQueries({ queryKey: ["market-history", goalId] });
+      void queryClient.invalidateQueries({ queryKey: ["goal", goalId] });
+    },
+  });
+  const columns = latest?.preview.columns ?? [];
+
+  return (
+    <details className="evidence-manual">
+      <summary>Upload a dataset or research file</summary>
+      <form
+        className="composer-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const input = event.currentTarget.elements.namedItem("dataset") as HTMLInputElement | null;
+          const file = input?.files?.[0];
+          if (file) send.mutate(file);
+        }}
+      >
+        <label htmlFor="dataset">CSV, Excel, PDF, or text</label>
+        <input id="dataset" name="dataset" type="file" accept=".csv,.xlsx,.pdf,.txt,.md" />
+        <button type="submit" disabled={send.isPending}>
+          {send.isPending ? "Uploading…" : "Upload"}
+        </button>
+        {send.error ? <p className="field-hint">{String(send.error)}</p> : null}
+      </form>
+      {latest ? (
+        <div className="upload-preview">
+          <p className="field-hint">
+            {latest.filename} · {latest.preview.kind} · {latest.preview.row_count ?? 0} rows
+            {latest.preview.note ? ` · ${latest.preview.note}` : ""}
+          </p>
+          {columns.length ? (
+            <form
+              className="composer-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                map.mutate();
+              }}
+            >
+              <label htmlFor="upload-metric">Metric name</label>
+              <input id="upload-metric" value={metric} onChange={(event) => setMetric(event.target.value)} placeholder={columns[1] ?? "subscribers"} />
+              <label htmlFor="upload-value">Value column</label>
+              <select id="upload-value" value={valueColumn} onChange={(event) => setValueColumn(event.target.value)}>
+                <option value="">Select column</option>
+                {columns.map((column) => (
+                  <option key={column} value={column}>
+                    {column}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor="upload-time">Date column</label>
+              <select id="upload-time" value={timeColumn} onChange={(event) => setTimeColumn(event.target.value)}>
+                <option value="">Select column</option>
+                {columns.map((column) => (
+                  <option key={`time-${column}`} value={column}>
+                    {column}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" disabled={map.isPending || !(valueColumn || columns[1])}>
+                {map.isPending ? "Importing…" : "Import measurements"}
+              </button>
+            </form>
+          ) : (
+            <p className="field-hint">This file is stored as research text. It is not used as model instructions.</p>
+          )}
+        </div>
+      ) : null}
+    </details>
   );
 }
 

@@ -326,3 +326,11 @@ def get_evidence_service(request: Request) -> EvidenceService:
 
 def get_github_cursor_store(request: Request) -> Any:
     return request.app.state.github_cursor_store
+
+
+def get_upload_service(request: Request) -> Any:
+    service = request.app.state.upload_service
+    from personal_markets.evidence.uploads import UploadService
+
+    assert isinstance(service, UploadService)
+    return service

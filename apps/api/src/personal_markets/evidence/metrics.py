@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 from personal_markets.ports import EvidenceEventProposal
 
-ObservationKind = Literal["snapshot", "increment", "period"]
+ObservationKind = Literal["snapshot", "increment", "period", "rate", "continuous", "categorical"]
 
 # Map observed labels onto the vocabulary already used by model families.
 _METRIC_ALIASES: dict[str, str] = {
@@ -36,6 +36,18 @@ _METRIC_ALIASES: dict[str, str] = {
     "runway": "runway_months",
     "monthly_burn": "burn_monthly",
     "burn": "burn_monthly",
+    "subscribers": "subscribers",
+    "subscriber_count": "subscribers",
+    "youtube_subscribers": "subscribers",
+    "follower_count": "subscribers",
+    "followers": "subscribers",
+    "countries": "countries_visited",
+    "countries_visited": "countries_visited",
+    "country_count": "countries_visited",
+    "customers": "customers",
+    "paying_customers": "customers",
+    "customer_count": "customers",
+    "mrr_usd": "mrr",
 }
 
 _SNAPSHOT_METRICS = frozenset(
@@ -45,6 +57,10 @@ _SNAPSHOT_METRICS = frozenset(
         "net_worth",
         "liquid_assets",
         "runway_months",
+        "subscribers",
+        "countries_visited",
+        "customers",
+        "mrr",
     }
 )
 
@@ -130,6 +146,10 @@ def observation_kind(
 ) -> ObservationKind:
     if explicit == "event":
         return "increment"
+    if explicit == "rate":
+        return "period"
+    if explicit in {"continuous", "categorical"}:
+        return "snapshot"
     if explicit in {"snapshot", "increment", "period"}:
         return explicit  # type: ignore[return-value]
     if explicit == "uncertain":

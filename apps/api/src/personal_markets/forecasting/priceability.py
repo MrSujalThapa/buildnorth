@@ -122,12 +122,48 @@ def startup_requirements() -> tuple[StateRequirement, ...]:
     )
 
 
+def composition_requirements(spec: dict[str, Any]) -> tuple[StateRequirement, ...]:
+    requirements: list[StateRequirement] = []
+    for item in spec.get("observable_inputs") or []:
+        metric = str(item.get("metric") or "")
+        if not metric:
+            continue
+        requirements.append(
+            StateRequirement(
+                key=metric,
+                label=metric.replace("_", " "),
+                unit=str(item.get("unit") or "units"),
+                why="This observable is bound to the compiled model.",
+                aliases=tuple(item.get("aliases") or ()),
+                required=bool(item.get("required", True)),
+            )
+        )
+    for name in spec.get("required_parameters") or []:
+        requirements.append(
+            StateRequirement(
+                key=name,
+                label=name.replace("_", " "),
+                unit="parameter",
+                why=(
+                    "The compiled model needs this parameter from your history "
+                    "or an explicit assumption."
+                ),
+                required=True,
+            )
+        )
+    return tuple(requirements)
+
+
 def requirements_for(
     goal: GoalContract, proposal: GoalArchitectProposal | None = None
 ) -> tuple[str, tuple[StateRequirement, ...]] | None:
     """Return the model family label and the state vocabulary it consumes."""
     # Must stay in the same order as build_numeric_inputs, or the product would report
     # requirements for a family other than the one that prices the goal.
+    spec = goal.model_requirements.get("forecast_spec") or {}
+    if int(spec.get("spec_version") or 1) == 2 and spec.get("primitives"):
+        family = str(spec.get("family") or "composed")
+        return family, composition_requirements(spec)
     if is_hiring_goal(goal, proposal):
         return "hiring_funnel", hiring_requirements()
     if is_running_goal(goal, proposal):
@@ -167,8 +203,7 @@ def describe_priceability(
             requirements=requirements,
             resolution=resolution,
             unsupported_reason=(
-                "This goal has no numeric success target, so there is nothing to "
-                "simulate against."
+                "This goal has no numeric success target, so there is nothing to simulate against."
             ),
         )
     if target.is_relative:
@@ -181,6 +216,4 @@ def describe_priceability(
                 "we need an absolute number to price it."
             ),
         )
-    return build_report(
-        model_family=family, requirements=requirements, resolution=resolution
-    )
+    return build_report(model_family=family, requirements=requirements, resolution=resolution)

@@ -42,6 +42,10 @@ class GoalArchitectProposal(BaseModel):
     success_unit: str | None = None
     research_required: bool = False
     research_questions: list[str] = Field(default_factory=list)
+    primitive_kind: str | None = None
+    primitives: list[dict[str, Any]] = Field(default_factory=list)
+    current_state_known: dict[str, str] = Field(default_factory=dict)
+    missing_inputs: list[str] = Field(default_factory=list)
 
 
 class EvidenceEventProposal(BaseModel):
@@ -52,7 +56,7 @@ class EvidenceEventProposal(BaseModel):
     categorical_value: str | None = None
     unit: str | None = None
     observed_at: str
-    source_type: Literal["manual", "github", "csv", "mcp_sync"]
+    source_type: Literal["manual", "github", "csv", "mcp_sync", "upload"]
     summary: str
     observation_kind: Literal["snapshot", "increment", "period", "event", "uncertain"] | None = None
     event_identity: str | None = None
