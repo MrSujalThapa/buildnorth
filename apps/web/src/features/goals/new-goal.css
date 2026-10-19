@@ -1,0 +1,64 @@
+.goal-composer {
+  width: min(100%, 720px);
+  padding: 54px 28px 80px;
+  color: var(--app-ink);
+}
+
+.goal-composer h1 { margin: 0; font-size: 32px; letter-spacing: -0.03em; }
+.goal-composer .page-heading p { color: var(--app-muted); line-height: 1.5; }
+.goal-composer .composer-form,
+.goal-composer .contract-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 28px;
+}
+.goal-composer label { display: grid; width: 100%; gap: 8px; font-weight: 600; }
+.goal-composer textarea,
+.goal-composer input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+  line-height: 1.5;
+}
+.goal-composer textarea { resize: vertical; }
+.goal-composer button {
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.goal-composer button:disabled { opacity: 0.5; cursor: not-allowed; }
+.goal-composer button.secondary { background: transparent; color: var(--app-ink); }
+.goal-composer a { color: var(--app-ink); text-underline-offset: 4px; }
+.goal-composer :is(textarea, input, button, a):focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 4px;
+}
+.goal-composer .notice {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--app-border);
+  overflow-wrap: anywhere;
+}
+.goal-composer .notice h2 { margin: 0; font-size: 20px; }
+.goal-composer .notice p,
+.goal-composer .field-hint,
+.goal-composer .agent-progress { color: var(--app-muted); line-height: 1.5; }
+.goal-composer .composer-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.goal-composer .agent-debug pre { overflow: auto; }
+@media (max-width: 500px) {
+  .goal-composer { padding: 32px 16px 50px; }
+}

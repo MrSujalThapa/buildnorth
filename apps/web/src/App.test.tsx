@@ -49,6 +49,15 @@ test("renders seeded goals using the template market cards", async () => {
   expect(screen.getByRole("heading", { name: "Your outcomes" })).toBeInTheDocument();
 });
 
+test.each([{ label: "empty", goals: [] }, { label: "populated", goals: seededGoals }])("goal creation is reachable from the $label markets catalog", async ({ goals }) => {
+  mockApi(goals);
+  renderApp();
+  const create = await screen.findByRole("link", { name: "Create goal" });
+  expect(create).toHaveAttribute("href", "/new");
+  fireEvent.click(create);
+  expect(await screen.findByRole("heading", { name: "New market" })).toBeInTheDocument();
+});
+
 test("theme toggle persists the explicit preference", async () => {
   mockApi([]);
   renderApp();

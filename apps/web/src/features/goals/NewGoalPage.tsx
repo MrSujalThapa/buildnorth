@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../../api/client";
 import { AgentDebug, AgentProgress } from "../agents/AgentProgress";
+import "./new-goal.css";
 
 export function NewGoalPage() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export function NewGoalPage() {
         if (data.goal) void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
       }
     },
-    onError: () => setError("The agent workflow could not start."),
+    onError: (caught) => setError(caught instanceof Error ? caught.message : "The agent workflow could not start."),
   });
 
   const resume = useMutation({
@@ -32,20 +33,21 @@ export function NewGoalPage() {
     },
     onSuccess: (data) => {
       setSnapshot(data);
+      setError(null);
       setAnswers({});
       if (data.goal && (data.status === "completed" || data.status === "limited" || data.status === "withheld")) {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
         void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
       }
     },
-    onError: () => setError("Could not continue this workflow."),
+    onError: (caught) => setError(caught instanceof Error ? caught.message : "Could not continue this workflow."),
   });
 
   const interrupt = snapshot?.interrupt;
   const busy = start.isPending || resume.isPending;
 
   return (
-    <section className="composer" aria-labelledby="new-goal-title">
+    <section className="goal-composer" aria-labelledby="new-goal-title">
       <div className="page-heading">
         <div>
           <h1 id="new-goal-title">New market</h1>
@@ -79,6 +81,7 @@ export function NewGoalPage() {
         <div className="notice" role="alert">
           <h2>Workflow unavailable</h2>
           <p>{error}</p>
+          <Link to="/settings#inference-heading">Check inference settings</Link>
         </div>
       ) : null}
       {interrupt?.type === "clarification" ? (

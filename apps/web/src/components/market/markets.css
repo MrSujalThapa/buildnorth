@@ -43,6 +43,32 @@
   gap: 22px;
 }
 
+.markets-create {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 20px;
+  padding: 10px 20px;
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.markets-create:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 4px;
+}
+
+.markets-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
 .market-card {
   width: 100%;
   padding: 24px 24px 0;

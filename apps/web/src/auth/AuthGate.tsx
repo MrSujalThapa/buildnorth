@@ -18,7 +18,9 @@ import {
 const AccountContext = createContext<AccountView | null>(null);
 
 function keepsAdminOnPage(pathname: string): boolean {
-  return pathname.startsWith("/settings") || pathname.startsWith("/connect");
+  // Send new administrators to invitation settings only from the landing route.
+  // Explicit product URLs must survive refreshes, including /new and goal details.
+  return pathname !== "/" && pathname !== "/invite";
 }
 
 export function useAccount(): AccountView | null {
