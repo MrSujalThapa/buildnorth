@@ -185,3 +185,65 @@ def test_live_evidence_alias_and_date_are_canonical_and_aware() -> None:
         rows.append(row)
     assert rows[0].metric == "applications_submitted"
     assert aggregate_funnel_from_evidence(rows).applications == 23
+
+
+class _StaticEvidence:
+    def __init__(self, rows: list) -> None:
+        self._rows = rows
+
+    async def list_for_goal(self, goal_id: object) -> list:
+        return self._rows
+
+
+@pytest.mark.asyncio
+async def test_unmapped_hiring_intervention_is_not_priced_or_persisted() -> None:
+    from personal_markets.goals.adapters import InMemoryGoalRepository
+    from personal_markets.goals.service import GoalService
+    from personal_markets.what_if.domain import WhatIfRequest
+    from personal_markets.what_if.repository import InMemorySimulationRepository
+    from personal_markets.what_if.service import WhatIfService
+
+    now = datetime.now(UTC)
+    goal = GoalContract(
+        goal_id=uuid4(),
+        title="Receive an internship offer",
+        goal_type=GoalType.DEADLINE_EVENT,
+        success_definition={"metric": "offer_received"},
+        deadline=now + timedelta(days=180),
+        state_dimensions=["applications_submitted"],
+    )
+    goals = InMemoryGoalRepository()
+    await goals.upsert_seed(goal)
+    event = EvidenceEventProposal(
+        source_type="manual", event_type="observation", domain="career",
+        metric="applications_submitted", numeric_value=18, unit="count",
+        observed_at=now.isoformat(), summary="18 applications", observation_kind="snapshot",
+    )
+    simulations = InMemorySimulationRepository()
+    service = WhatIfService(
+        GoalService(goals), simulations,
+        evidence=_StaticEvidence([proposal_to_normalized(event, "test")]),  # type: ignore[arg-type]
+    )
+    base = await service.baseline_state(str(goal.goal_id))
+    assert base.priced and base.current_value is not None and base.target_value is not None
+    request = WhatIfRequest(
+        goal_id=str(goal.goal_id),
+        current_value=base.current_value,
+        target_value=base.target_value,
+        periods=base.periods or 1,
+        assumptions=base.assumptions,
+        config=base.config,
+    )
+    unmapped = await service.simulate(request)
+    assert not unmapped.priced
+    assert unmapped.status == "NOT_PRICED"
+    assert unmapped.receipt.get("causal_status") == "unmapped_intervention"
+    assert unmapped.persisted is False
+    assert await service.explorations(str(goal.goal_id)) == []
+
+    mapped = await service.simulate(request.model_copy(update={"parsed_changes": [
+        InterventionChangeInput(metric="weekly_application_rate", operation="add", value=5,
+                                unit="applications/week", provenance="USER_ASSUMPTION"),
+    ]}))
+    assert mapped.priced and mapped.expected_uplift_pp is not None
+    assert mapped.expected_uplift_pp > 0

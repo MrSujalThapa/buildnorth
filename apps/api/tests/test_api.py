@@ -1,7 +1,8 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
-from personal_markets.core.config import get_settings
+from personal_markets.core.config import Settings
 
 
 def test_health_endpoint_and_backend_boot() -> None:
@@ -28,16 +29,61 @@ def test_health_details_are_available_outside_production() -> None:
     assert body["database"] == "memory"
 
 
+def _deployed_settings(**overrides: object) -> Settings:
+    values: dict[str, object] = {
+        "_env_file": None,
+        "environment": "staging",
+        "public_api_url": "https://api.example.com",
+        "test_auth_secret": None,
+        "dev_bootstrap_test_users": False,
+        "clerk_jwks_url": "https://clerk.example/.well-known/jwks.json",
+        "clerk_issuer": "https://clerk.example",
+        "database_url": None,
+        "mcp_enabled": False,
+    }
+    values.update(overrides)
+    return Settings(**values)  # type: ignore[arg-type]
+
+
 def test_health_details_are_hidden_in_production(monkeypatch) -> None:
-    monkeypatch.setenv("PM_ENVIRONMENT", "production")
-    get_settings.cache_clear()
-    try:
-        with TestClient(isolated_app()) as client:
-            assert client.get("/health").status_code == 200
-            assert client.get("/health/details").status_code == 404
-            assert "database" not in client.get("/health").json()
-    finally:
-        get_settings.cache_clear()
+    settings = _deployed_settings(environment="production")
+    monkeypatch.setattr("personal_markets.main.get_settings", lambda: settings)
+    with TestClient(isolated_app()) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/health/details").status_code == 404
+        assert "database" not in client.get("/health").json()
+
+
+def test_health_details_hidden_when_https_public_url_even_if_development(monkeypatch) -> None:
+    settings = _deployed_settings(environment="development")
+    monkeypatch.setattr("personal_markets.main.get_settings", lambda: settings)
+    with TestClient(isolated_app()) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/health/details").status_code == 404
+
+
+def test_startup_refuses_bootstrap_and_test_auth_when_deployed() -> None:
+    with pytest.raises(RuntimeError, match="PM_DEV_BOOTSTRAP_TEST_USERS"):
+        _deployed_settings(dev_bootstrap_test_users=True).assert_safe_startup()
+    with pytest.raises(RuntimeError, match="PM_TEST_AUTH_SECRET"):
+        _deployed_settings(test_auth_secret="x" * 32).assert_safe_startup()
+    with pytest.raises(RuntimeError, match="PM_CLERK_JWKS_URL"):
+        _deployed_settings(clerk_jwks_url=None, clerk_issuer=None).assert_safe_startup()
+    _deployed_settings().assert_safe_startup()
+
+
+def test_local_loopback_https_is_not_treated_as_deployed() -> None:
+    settings = Settings(
+        _env_file=None,
+        environment="development",
+        public_api_url="https://127.0.0.1:8000",
+        test_auth_secret="local-secret-for-tests-only-32b!!",
+        dev_bootstrap_test_users=True,
+        clerk_jwks_url=None,
+    )
+    assert not settings.is_publicly_reachable()
+    assert not settings.is_deployed()
+    settings.assert_safe_startup()
 
 
 def test_development_cors_accepts_alternate_local_vite_port() -> None:

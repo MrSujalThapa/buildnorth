@@ -5,7 +5,9 @@ from personal_markets.evidence.domain import (
     CorroboratingSource,
     NormalizedEvidence,
     Provenance,
+    SubmissionContext,
     metadata_for,
+    verification_status_for,
 )
 from personal_markets.evidence.metrics import parse_observed_at
 from personal_markets.ports import EvidenceEventProposal
@@ -21,6 +23,7 @@ def proposal_to_normalized(
     evidence_id: UUID | None = None,
     conflict: str = "none",
     raw_event_id: str | None = None,
+    submission: SubmissionContext | None = None,
 ) -> NormalizedEvidence:
     meta = metadata_for(event.source_type)
     observed = _parse_observed_at(event.observed_at)
@@ -46,25 +49,32 @@ def proposal_to_normalized(
             raw_event_id=raw_event_id,
             observation_kind=event.observation_kind,
             event_identity=event.event_identity,
+            verification_status=meta["verification_status"],
+            submission=submission,
         ),
         summary=event.summary,
         fingerprint=fingerprint,
     )
 
 
-def corroborating_source(event: EvidenceEventProposal) -> CorroboratingSource:
+def corroborating_source(
+    event: EvidenceEventProposal, submission: SubmissionContext | None = None
+) -> CorroboratingSource:
     return CorroboratingSource(
         source_type=event.source_type,
         event_type=event.event_type,
         summary=event.summary,
         observed_at=event.observed_at or None,
+        connection_id=submission.connection_id if submission else None,
     )
 
 
 def with_corroboration(
-    existing: NormalizedEvidence, event: EvidenceEventProposal
+    existing: NormalizedEvidence,
+    event: EvidenceEventProposal,
+    submission: SubmissionContext | None = None,
 ) -> NormalizedEvidence:
-    extra = corroborating_source(event)
+    extra = corroborating_source(event, submission)
     already = any(
         item.source_type == extra.source_type and item.summary == extra.summary
         for item in existing.provenance.corroborating_sources
@@ -73,11 +83,15 @@ def with_corroboration(
         existing.provenance.source_type == extra.source_type and existing.summary == extra.summary
     ):
         return existing
+    sources = [*existing.provenance.corroborating_sources, extra]
     return existing.model_copy(
         update={
             "provenance": existing.provenance.model_copy(
                 update={
-                    "corroborating_sources": [*existing.provenance.corroborating_sources, extra]
+                    "corroborating_sources": sources,
+                    "verification_status": verification_status_for(
+                        existing.provenance.source_type, sources
+                    ),
                 }
             )
         }

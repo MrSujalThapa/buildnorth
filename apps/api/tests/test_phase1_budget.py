@@ -90,6 +90,12 @@ async def test_parallel_reservations_cannot_overspend() -> None:
     assert counters.reserved_tokens <= user.hosted_quota_tokens
 
 
+def test_hosted_global_quota_remains_twenty_five_dollars() -> None:
+    settings = _settings()
+    assert settings.hosted_global_quota_usd == 25.0
+    assert settings.hosted_user_quota_usd == 2.0
+
+
 async def test_global_budget_exhaustion() -> None:
     store = InMemoryBudgetStore()
     settings = _settings()

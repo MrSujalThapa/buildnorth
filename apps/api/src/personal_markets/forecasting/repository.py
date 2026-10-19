@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -26,6 +28,7 @@ class PublishedBaseline:
     material_hash: str
     source_kind: str
     receipt: dict[str, Any]
+    published_at: datetime | None = None
 
 
 class BaselineForecastRepository(Protocol):
@@ -50,8 +53,8 @@ class InMemoryBaselineForecastRepository:
             return None
         points = self._history.setdefault(goal.goal_id, {})
         if point.material_hash not in points:
-            points[point.material_hash] = point
-        return point
+            points[point.material_hash] = replace(point, published_at=datetime.now(UTC))
+        return points[point.material_hash]
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:
         return list(self._history.get(goal_id, {}).values())
@@ -90,7 +93,7 @@ class PostgresBaselineForecastRepository:
                     "model_version": point.model_version,
                     "assumption_hash": point.assumption_hash,
                     "material_hash": point.material_hash,
-                    "receipt": json.dumps(point.receipt),
+                    "receipt": json.dumps(jsonable_receipt(point.receipt), allow_nan=False),
                 },
             )
         await self._memory.publish(goal, pricing, critic)
@@ -116,6 +119,17 @@ class PostgresBaselineForecastRepository:
         for point in points:
             memory[point.material_hash] = point
         return points
+
+
+def jsonable_receipt(value: Any) -> Any:
+    """Postgres jsonb rejects NaN/Infinity; drop those scalars rather than crash publish."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: jsonable_receipt(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [jsonable_receipt(item) for item in value]
+    return value
 
 
 def material_hash(payload: dict[str, Any]) -> str:
@@ -182,4 +196,5 @@ def _published_from_row(row: dict[str, Any]) -> PublishedBaseline:
         material_hash=str(row["material_hash"]),
         source_kind=str(row.get("source_kind") or "published_forecast"),
         receipt=receipt,
+        published_at=row.get("created_at"),
     )

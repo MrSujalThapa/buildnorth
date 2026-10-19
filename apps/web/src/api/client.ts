@@ -392,9 +392,54 @@ export interface EvidenceEvent {
   categorical_value: string | null;
   unit: string | null;
   observed_at: string;
-  source_type: "manual" | "github" | "csv" | "upload";
+  source_type: "manual" | "github" | "csv" | "upload" | "mcp_sync" | "personal_agent";
   summary: string;
 }
+
+export type McpScope = {
+  scope: string;
+  label: string;
+  description: string;
+  writes: boolean;
+  spends_credits: boolean;
+};
+
+export type McpStatus = {
+  enabled: boolean;
+  endpoint: string;
+  transport: string;
+  auth: string;
+  dynamic_client_registration: boolean;
+  scopes: McpScope[];
+  default_scopes: string[];
+  public_https: boolean;
+  tools: string[];
+};
+
+export type McpConnection = {
+  connection_id: string;
+  client_id: string;
+  client_name: string;
+  scopes: McpScope[];
+  status: "active" | "revoked";
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+};
+
+export type McpAuthorizationRequest = {
+  request_id: string;
+  client_id: string;
+  client_name: string;
+  client_uri: string | null;
+  redirect_host: string;
+  redirect_scheme: string;
+  scopes: McpScope[];
+  resource: string;
+  expires_at: string;
+  verified_client: boolean;
+  warnings: string[];
+};
 
 export type UploadRecord = {
   upload_id: string;
@@ -510,6 +555,20 @@ export const api = {
   listInvites: (signal?: AbortSignal) => request<InvitationRecord[]>("/api/v1/admin/invites", undefined, signal),
   revokeInvite: (invitationId: string) =>
     request<InvitationRecord>(`/api/v1/admin/invites/${invitationId}/revoke`, { method: "POST" }),
+  mcpStatus: (signal?: AbortSignal) => request<McpStatus>("/api/v1/mcp/status", undefined, signal),
+  mcpConnections: (signal?: AbortSignal) =>
+    request<McpConnection[]>("/api/v1/mcp/connections", undefined, signal),
+  revokeMcpConnection: (connectionId: string) =>
+    request<McpConnection>(`/api/v1/mcp/connections/${encodeURIComponent(connectionId)}`, { method: "DELETE" }),
+  mcpAuthorizationRequest: (requestId: string, signal?: AbortSignal) =>
+    request<McpAuthorizationRequest>(
+      `/api/v1/mcp/authorization-requests/${encodeURIComponent(requestId)}`, undefined, signal,
+    ),
+  decideMcpAuthorization: (requestId: string, body: { approve: boolean; scopes?: string[] }) =>
+    request<{ redirect_url: string }>(
+      `/api/v1/mcp/authorization-requests/${encodeURIComponent(requestId)}/decision`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    ),
   health: (signal?: AbortSignal) => request<Health>("/health", undefined, signal),
   goals: (signal?: AbortSignal) => request<Goal[]>("/api/v1/goals", undefined, signal),
   goal: (goalId: string, signal?: AbortSignal) => request<Goal>(`/api/v1/goals/${goalId}`, undefined, signal),

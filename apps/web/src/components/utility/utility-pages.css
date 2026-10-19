@@ -160,7 +160,7 @@
   gap: 8px;
   border: 0;
   border-radius: 10px;
-  background: var(--app-text);
+  background: var(--app-ink);
   color: var(--app-bg);
   font: inherit;
   font-size: 13px;
@@ -280,6 +280,28 @@
   .invite-admin-form {
     grid-template-columns: 1fr;
   }
+}
+
+.agent-endpoint-row,
+.agent-steps-row { padding: 16px 0; }
+.agent-endpoint-row > div,
+.agent-steps-row > div { min-width: 0; width: 100%; }
+.agent-endpoint-row .invite-created { max-width: 620px; margin: 12px 0 2px; }
+.agent-endpoint-row .invite-created button { flex: 0 0 auto; }
+.agent-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  max-width: 620px;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.agent-revoked { min-height: 56px; }
+.agent-revoked strong { color: var(--app-muted); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .agent-endpoint-row .invite-created { flex-wrap: wrap; }
+  .agent-endpoint-row .invite-created code { flex: 1 1 100%; }
 }
 
 .setting-soon {

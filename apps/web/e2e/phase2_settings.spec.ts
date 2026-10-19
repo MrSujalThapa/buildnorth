@@ -17,6 +17,11 @@ test("manage provider credentials and explicit billing without exposing saved ke
   };
   const calls: string[] = [];
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok", service: "api", version: "test" } }));
+  await page.route("**/api/v1/mcp/**", (route) => {
+    const url = route.request().url();
+    if (url.includes("/connections")) return route.fulfill({ json: [] });
+    return route.fulfill({ json: { enabled: true, resource: "http://127.0.0.1:8030/mcp" } });
+  });
   await page.route("**/api/v1/settings/inference**", async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -54,10 +59,10 @@ test("manage provider credentials and explicit billing without exposing saved ke
   await page.getByLabel("Inference mode").selectOption("byok");
   await page.getByLabel("Agent model").selectOption("gpt-5.4-mini");
   await page.getByRole("button", { name: "Save inference preference" }).click();
-  await expect(page.getByRole("status")).toContainText("Inference preference saved");
+  await expect(page.getByText("Inference preference saved.")).toBeVisible();
   await expect(page.getByText(/Your selected provider account pays/)).toBeVisible();
   await page.getByRole("button", { name: "Validate key" }).click();
-  await expect(page.getByRole("status")).toContainText("connection validated");
+  await expect(page.getByText("connection validated", { exact: false })).toBeVisible();
   await page.getByLabel("Replacement API key").fill("sk-test-openai-replacement-5678");
   await page.getByRole("button", { name: "Replace key" }).click();
   await expect(page.getByText(/Validated connection · ••••5678/)).toBeVisible();
@@ -70,7 +75,7 @@ test("manage provider credentials and explicit billing without exposing saved ke
   await expect(page.getByText(/Validated connection · ••••9012/)).toBeVisible();
   await page.getByLabel("Agent model").selectOption("claude-sonnet-5-5");
   await page.getByRole("button", { name: "Save inference preference" }).click();
-  await expect(page.getByRole("status")).toContainText("Inference preference saved");
+  await expect(page.getByText("Inference preference saved.")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("BYOK provider")).toHaveValue("anthropic");
   await expect(page.getByLabel("Agent model")).toHaveValue("claude-sonnet-5-5");
@@ -91,6 +96,11 @@ test("manage provider credentials and explicit billing without exposing saved ke
 
 test("provider failures give an actionable error and never change billing mode", async ({ page }) => {
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok", service: "api", version: "test" } }));
+  await page.route("**/api/v1/mcp/**", (route) => {
+    const url = route.request().url();
+    if (url.includes("/connections")) return route.fulfill({ json: [] });
+    return route.fulfill({ json: { enabled: true, resource: "http://127.0.0.1:8030/mcp" } });
+  });
   await page.route("**/api/v1/settings/inference", (route) => route.fulfill({ json: {
     preference: { mode: "byok", provider: "anthropic", model: "claude-sonnet-5-5" },
     credentials: [], models: [{ provider: "anthropic", model: "claude-sonnet-5-5" }],
@@ -102,7 +112,7 @@ test("provider failures give an actionable error and never change billing mode",
   await page.goto("/settings");
   await page.getByLabel("API key", { exact: true }).fill("sk-ant-test-revoked-key");
   await page.getByRole("button", { name: "Add and validate key" }).click();
-  await expect(page.getByRole("alert")).toContainText("Replace or validate your key");
+  await expect(page.getByText("Replace or validate your key")).toBeVisible();
   await expect(page.getByLabel("Inference mode")).toHaveValue("byok");
   await expect(page.getByLabel("API key", { exact: true })).toBeEmpty();
 });

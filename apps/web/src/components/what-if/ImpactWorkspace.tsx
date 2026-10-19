@@ -135,7 +135,6 @@ export default function ImpactWorkspace({
   const [receiptOpen, setReceiptOpen] = useState(false);
   const axes = DEFAULT_IMPACT_AXES;
   const points = impact.distributionPoints;
-  const stats = impact.stats;
   const resultPositive = (preview.improvementPoints ?? 0) >= 0;
   const deltaTone =
     preview.improvementPoints === null ? "neutral" : resultPositive ? "positive" : "negative";
@@ -253,6 +252,7 @@ export default function ImpactWorkspace({
                 <span>possible change</span>
               </div>
             </div>
+            {impact.causalCaption ? <p className="quiet-copy">{impact.causalCaption}</p> : null}
 
             <div className="panel-head tight">
               <div>
@@ -276,7 +276,7 @@ export default function ImpactWorkspace({
             <div className="metric-row four">
               <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
               <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
-              <div><span>Likely range</span><strong>{points.length ? `${stats.p10.toFixed(0)}–${stats.p90.toFixed(0)}%` : "—"}</strong></div>
+              <div><span>Likely range</span><strong>{impact.likelyRangeLabel}</strong></div>
               <button type="button" className="text-action" onClick={onOpenDetails}>Details</button>
             </div>
           </section>

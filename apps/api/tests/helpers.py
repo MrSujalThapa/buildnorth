@@ -22,6 +22,12 @@ from personal_markets.wiring import (
     get_what_if_service,
 )
 
+POSTGRES_MIGRATION_SKIP = (
+    "Isolated Postgres is missing required tables. Apply supabase/migrations 0001-0015 "
+    "with scripts/db_migrate.py to PM_TEST_DATABASE_URL. The default playitout_phase0_test "
+    "database is not auto-migrated."
+)
+
 
 def isolated_postgres_url() -> str | None:
     explicit = os.environ.get("PM_TEST_DATABASE_URL") or os.environ.get("PM_PHASE0_DATABASE_URL")
@@ -49,7 +55,13 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
         application.state.agent_workflow = workflow
         application.state.evidence_service = workflow._inner._deps.evidence
         application.state.github_cursor_store = InMemoryGithubCursorStore()
-        yield
+        remote = getattr(application.state, "remote_mcp", None)
+        if remote is None or getattr(remote, "_test_started", False):
+            yield
+            return
+        remote._test_started = True
+        async with remote.session_manager.run():
+            yield
 
     app.router.lifespan_context = test_lifespan
     simulation_repository = InMemorySimulationRepository()

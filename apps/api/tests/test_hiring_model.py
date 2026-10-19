@@ -397,3 +397,46 @@ def test_receipt_includes_funnel_transforms_not_strength_scores() -> None:
     assert "funnel_state" in transforms
     assert "candidate_strength" not in transforms
     assert pricing.receipt["reference_versions"]
+
+
+def _snapshot(metric: str, value: float, event_type: str, summary: str) -> NormalizedEvidence:
+    item = _evidence(metric=metric, event_type=event_type, numeric_value=value, summary=summary)
+    return item.model_copy(
+        update={"provenance": item.provenance.model_copy(update={"observation_kind": "snapshot"})}
+    )
+
+
+def test_explicit_zero_offer_snapshot_is_not_an_offer() -> None:
+    goal = _goal()
+    evidence = [
+        _snapshot("applications_submitted_cumulative", 40, "internship_application_submitted",
+                  "User reports 40 internship applications submitted in total as of today."),
+        _snapshot("offers_received_cumulative", 0, "offer_update",
+                  "User reports no internship offers received yet."),
+    ]
+    state = aggregate_funnel_from_evidence(evidence)
+    assert state.offers == 0
+    numeric = build_hiring_numeric_inputs(goal, _proposal(goal), evidence)
+    assert numeric is not None
+    assert "offer_already_received" not in str(numeric.state)
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    pricing = service.compute(
+        goal, _proposal(goal), ["ev-1"], {}, ["hiring_funnel_rates.json"], numeric
+    )
+    assert pricing.raw_probability is not None and pricing.raw_probability < 0.99
+
+
+def test_first_round_interviews_do_not_become_application_stock() -> None:
+    interviews = _snapshot(
+        "first_round_interviews_scheduled_cumulative", 2, "interview_scheduled",
+        "User reports 2 first-round interviews received.",
+    )
+    applications = _snapshot(
+        "applications_submitted_cumulative", 40, "internship_application_submitted",
+        "User reports 40 internship applications submitted in total as of today.",
+    )
+    applications = applications.model_copy(update={"observed_at": interviews.observed_at})
+    for order in ([interviews, applications], [applications, interviews]):
+        state = aggregate_funnel_from_evidence(order)
+        assert state.applications == 40
+        assert state.technicals == 2

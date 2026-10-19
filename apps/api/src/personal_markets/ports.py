@@ -1,8 +1,8 @@
 from datetime import datetime
-from typing import Any, Literal, Protocol
+from typing import Annotated, Any, Literal, Protocol
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, WithJsonSchema, field_validator
 
 from personal_markets.goals.domain import GoalContract
 
@@ -26,6 +26,19 @@ class ClarificationQuestion(BaseModel):
     why_needed: str
 
 
+# Strict structured output closes every object, so an open map can only be emitted
+# as `{}`. Providers send known values as key/value pairs; the domain keeps a dict.
+_KNOWN_STATE_WIRE_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["key", "value"],
+        "additionalProperties": False,
+    },
+}
+
+
 class GoalArchitectProposal(BaseModel):
     ready_to_commit: bool
     title: str = Field(min_length=3, max_length=200)
@@ -44,8 +57,21 @@ class GoalArchitectProposal(BaseModel):
     research_questions: list[str] = Field(default_factory=list)
     primitive_kind: str | None = None
     primitives: list[dict[str, Any]] = Field(default_factory=list)
-    current_state_known: dict[str, str] = Field(default_factory=dict)
+    current_state_known: Annotated[
+        dict[str, str], WithJsonSchema(_KNOWN_STATE_WIRE_SCHEMA)
+    ] = Field(default_factory=dict)
     missing_inputs: list[str] = Field(default_factory=list)
+
+    @field_validator("current_state_known", mode="before")
+    @classmethod
+    def _known_state_pairs(cls, value: object) -> object:
+        if isinstance(value, list):
+            return {
+                str(item["key"]): str(item["value"])
+                for item in value
+                if isinstance(item, dict) and item.get("key") is not None
+            }
+        return value
 
 
 class EvidenceEventProposal(BaseModel):
@@ -56,7 +82,7 @@ class EvidenceEventProposal(BaseModel):
     categorical_value: str | None = None
     unit: str | None = None
     observed_at: str
-    source_type: Literal["manual", "github", "csv", "mcp_sync", "upload"]
+    source_type: Literal["manual", "github", "csv", "mcp_sync", "upload", "personal_agent"]
     summary: str
     observation_kind: Literal["snapshot", "increment", "period", "event", "uncertain"] | None = None
     event_identity: str | None = None

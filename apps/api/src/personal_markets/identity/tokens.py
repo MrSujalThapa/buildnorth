@@ -74,7 +74,7 @@ def issue_test_token(
 def verify_bearer_token(token: str, settings: Settings) -> TokenClaims:
     if not token:
         raise UnauthorizedError("missing bearer token")
-    if settings.test_auth_secret and settings.environment in {"test", "pytest", "development"}:
+    if settings.test_auth_secret and not settings.is_deployed():
         try:
             payload = jwt.decode(
                 token,

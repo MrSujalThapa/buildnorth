@@ -21,8 +21,37 @@ def main() -> int:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imported.append(node.module)
         for module in imported:
-            if module.startswith(FORBIDDEN_DOMAIN_PREFIXES) or ".what_if" in module:
+            if (
+                module.startswith(FORBIDDEN_DOMAIN_PREFIXES)
+                or module.startswith("mcp")
+                or ".what_if" in module
+                or ".remote_mcp" in module
+            ):
                 violations.append(f"{relative}: forbidden import {module}")
+    route_files = [
+        ROOT / "main.py",
+        ROOT / "wiring.py",
+        *ROOT.rglob("*api.py"),
+        *ROOT.rglob("*router.py"),
+        *ROOT.rglob("remote_mcp/*.py"),
+    ]
+    forbidden_eval = (
+        "evaluate_openai_baseline",
+        "eval_hackathon_proof",
+        "eval_pass6_live_ablation",
+        "scripts.evaluate",
+        "personal_markets.evaluation",
+    )
+    seen: set[Path] = set()
+    for path in route_files:
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        text = path.read_text(encoding="utf-8")
+        for token in forbidden_eval:
+            if token in text:
+                relative = path.relative_to(ROOT)
+                violations.append(f"{relative}: deployed route must not reference {token}")
     if violations:
         print("\n".join(violations))
         return 1

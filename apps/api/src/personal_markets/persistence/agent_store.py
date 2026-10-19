@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.agents.budget import InMemoryUsageStore
-from personal_markets.evidence.domain import NormalizedEvidence
+from personal_markets.evidence.domain import NormalizedEvidence, SubmissionContext
 from personal_markets.evidence.mapping import proposal_to_normalized, with_corroboration
 from personal_markets.persistence.database import transaction
 from personal_markets.ports import EvidenceEventProposal, WorkflowSnapshot
@@ -47,14 +47,17 @@ class InMemoryEvidenceRepository:
         fingerprint: str,
         agent_run_id: UUID | None,
         conflict: str,
+        submission: SubmissionContext | None = None,
     ) -> NormalizedEvidence:
         del agent_run_id
         existing = await self.find_fingerprint(user_id, fingerprint)
         if existing:
             if existing.evidence_id is not None:
                 await self.link_goal(goal_id, existing.evidence_id)
-            return await self.record_corroboration(existing, event)
-        stored = proposal_to_normalized(event, fingerprint, conflict=conflict)
+            return await self.record_corroboration(existing, event, submission)
+        stored = proposal_to_normalized(
+            event, fingerprint, conflict=conflict, submission=submission
+        )
         assert stored.evidence_id is not None
         self._events[stored.evidence_id] = stored
         self._by_fingerprint[(user_id, fingerprint)] = stored.evidence_id
@@ -62,9 +65,12 @@ class InMemoryEvidenceRepository:
         return stored
 
     async def record_corroboration(
-        self, existing: NormalizedEvidence, event: EvidenceEventProposal
+        self,
+        existing: NormalizedEvidence,
+        event: EvidenceEventProposal,
+        submission: SubmissionContext | None = None,
     ) -> NormalizedEvidence:
-        updated = with_corroboration(existing, event)
+        updated = with_corroboration(existing, event, submission)
         if updated.evidence_id is not None:
             self._events[updated.evidence_id] = updated
         return updated
@@ -212,13 +218,16 @@ class PostgresEvidenceRepository:
         fingerprint: str,
         agent_run_id: UUID | None,
         conflict: str,
+        submission: SubmissionContext | None = None,
     ) -> NormalizedEvidence:
         existing = await self.find_fingerprint(user_id, fingerprint)
         if existing:
             if existing.evidence_id is not None:
                 await self.link_goal(goal_id, existing.evidence_id)
-            return await self.record_corroboration(existing, event)
-        stored = proposal_to_normalized(event, fingerprint, conflict=conflict)
+            return await self.record_corroboration(existing, event, submission)
+        stored = proposal_to_normalized(
+            event, fingerprint, conflict=conflict, submission=submission
+        )
         assert stored.evidence_id is not None
         payload = stored.model_dump(mode="json")
         payload["provenance"]["fingerprint"] = fingerprint
@@ -259,9 +268,12 @@ class PostgresEvidenceRepository:
         return stored
 
     async def record_corroboration(
-        self, existing: NormalizedEvidence, event: EvidenceEventProposal
+        self,
+        existing: NormalizedEvidence,
+        event: EvidenceEventProposal,
+        submission: SubmissionContext | None = None,
     ) -> NormalizedEvidence:
-        updated = with_corroboration(existing, event)
+        updated = with_corroboration(existing, event, submission)
         if updated is existing or updated.evidence_id is None:
             return existing
         payload = updated.provenance.model_dump(mode="json")

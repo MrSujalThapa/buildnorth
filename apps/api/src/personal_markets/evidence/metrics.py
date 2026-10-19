@@ -29,7 +29,15 @@ _METRIC_ALIASES: dict[str, str] = {
     "apps_submitted": "applications_submitted",
     "job_applications": "applications_submitted",
     "job_applications_submitted": "applications_submitted",
+    "product_launch": "launched",
+    "product_launched": "launched",
+    "launch_status": "launched",
+    "launch_date": "launched",
+    "product_launch_date": "launched",
+    "number_of_paying_customers": "customers",
+    "paying_customer_count": "customers",
     "monthly_recurring_revenue": "mrr",
+    "monthly_recurring_revenue_usd": "mrr",
     "revenue_monthly": "mrr",
     "weekly_mileage": "weekly_distance_km",
     "weekly_distance": "weekly_distance_km",
@@ -92,6 +100,38 @@ def canonicalize_metric(metric: str) -> str:
     normalized = metric.strip().lower().replace(" ", "_").replace("-", "_")
     normalized = "_".join(part for part in normalized.split("_") if part)
     return _METRIC_ALIASES.get(normalized, normalized)
+
+
+_STOCK_CONCEPTS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("subscriber", "follower"), "subscribers"),
+    (("countr",), "countries_visited"),
+    (("customer",), "customers"),
+    (("mrr", "monthly_recurring_revenue"), "mrr"),
+)
+_RATE_LABEL_WORDS = frozenset(
+    {"per", "rate", "gain", "gains", "growth", "frequency", "average", "avg", "velocity"}
+)
+
+
+def is_rate_label(label: str) -> bool:
+    """True for labels that describe a flow or average rather than a stock level."""
+    words = re.split(r"[^a-z0-9]+", label.lower())
+    return any(word in _RATE_LABEL_WORDS for word in words)
+
+
+def stock_concept(label: str) -> str | None:
+    """Canonical stock metric a descriptive label refers to, when unambiguous."""
+    normalized = canonicalize_metric(label)
+    if normalized in _SNAPSHOT_METRICS:
+        return normalized
+    if is_rate_label(label):
+        return None
+    matches = {
+        canonical
+        for tokens, canonical in _STOCK_CONCEPTS
+        if any(token in normalized for token in tokens)
+    }
+    return matches.pop() if len(matches) == 1 else None
 
 
 def is_snapshot_metric(metric: str) -> bool:

@@ -1,11 +1,11 @@
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
 from personal_markets.agents.api import router as agents_router
@@ -22,14 +22,14 @@ from personal_markets.core.errors import (
 )
 from personal_markets.core.event_loop import configure_windows_selector_event_loop
 from personal_markets.core.logging import configure_logging
-from personal_markets.core.request_context import request_context_middleware
+from personal_markets.core.request_context import health_details_allowed, request_context_middleware
 from personal_markets.evidence.source_api import router as evidence_sources_router
 from personal_markets.evidence.upload_api import router as upload_router
 from personal_markets.goals.api import router as goals_router
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.api import router as identity_router
-from personal_markets.identity.inference_api import router as inference_settings_router
 from personal_markets.identity.deps import get_invited_principal
+from personal_markets.identity.inference_api import router as inference_settings_router
 from personal_markets.integrations.api import router as integrations_router
 from personal_markets.integrations.research import (
     CompositeResearchProvider,
@@ -42,7 +42,6 @@ from personal_markets.wiring import (
     InMemoryGithubCursorStore,
     PersistingWorkflow,
     build_inference,
-    get_goal_repository,
 )
 
 configure_windows_selector_event_loop()
@@ -80,6 +79,7 @@ def _status_for(error: DomainError) -> int:
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     configure_logging(get_settings().log_level)
     settings = get_settings()
+    settings.assert_safe_startup()
     checkpointer_cm = None
     use_postgres = bool(settings.database_url) and settings.environment not in {"test", "pytest"}
     identity = safe_database_identity(settings.database_url) if use_postgres else "memory"
@@ -88,10 +88,12 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         "api_database",
         identity=identity,
         environment=settings.environment,
+        deployed=settings.is_deployed(),
     )
-    if settings.environment in {"production", "prod"} and not settings.resolved_clerk_jwks_url():
-        structlog.get_logger("personal_markets").error("clerk_jwks_missing")
-        raise RuntimeError("PM_CLERK_JWKS_URL is required in production")
+    structlog.get_logger("personal_markets").warning(
+        "single_worker_required",
+        reason="MCP rate limits and goal write locks are process-local asyncio state",
+    )
     if use_postgres:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
@@ -158,13 +160,18 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
         application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
-    yield
+    async with AsyncExitStack() as stack:
+        remote = getattr(application.state, "remote_mcp", None)
+        if remote is not None:
+            await stack.enter_async_context(remote.session_manager.run())
+        yield
     if checkpointer_cm is not None:
         await checkpointer_cm.__aexit__(None, None, None)
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    settings.assert_safe_startup()
     application = FastAPI(title="Personal Markets API", version="0.1.0", lifespan=lifespan)
     application.middleware("http")(request_context_middleware)
     application.add_middleware(
@@ -173,6 +180,7 @@ def create_app() -> FastAPI:
         allow_origin_regex=settings.cors_origin_regex,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
+        expose_headers=["mcp-session-id", "mcp-protocol-version", "www-authenticate"],
     )
 
     @application.exception_handler(DomainError)
@@ -228,7 +236,7 @@ def create_app() -> FastAPI:
     @application.get("/health/details", response_model=HealthDetailsResponse, tags=["system"])
     async def health_details(request: Request) -> HealthDetailsResponse:
         current = get_settings()
-        if current.environment in {"production", "prod"}:
+        if not health_details_allowed(request, current):
             raise HTTPException(status_code=404, detail="Not found")
         return HealthDetailsResponse(
             status="ok",
@@ -246,6 +254,12 @@ def create_app() -> FastAPI:
     application.include_router(integrations_router, dependencies=private)
     application.include_router(evidence_sources_router, dependencies=private)
     application.include_router(upload_router, dependencies=private)
+    if settings.mcp_enabled:
+        from personal_markets.remote_mcp.consent_api import router as remote_mcp_router
+        from personal_markets.remote_mcp.factory import mount_remote_mcp
+
+        application.include_router(remote_mcp_router)
+        mount_remote_mcp(application, settings)
     return application
 
 

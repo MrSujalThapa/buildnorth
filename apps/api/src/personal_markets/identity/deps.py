@@ -5,6 +5,7 @@ from fastapi import Depends, Request
 
 from personal_markets.core.config import get_settings
 from personal_markets.core.errors import ForbiddenError, UnauthorizedError
+from personal_markets.core.request_context import resolved_client_ip
 from personal_markets.identity.domain import Principal
 from personal_markets.identity.factory import get_identity_service
 from personal_markets.identity.service import IdentityService, require_invited
@@ -48,10 +49,7 @@ async def get_admin_principal(
 
 
 def client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    return resolved_client_ip(request)
 
 
 def as_user_id(value: str | UUID) -> UUID:

@@ -94,8 +94,14 @@ def redact(value: Any) -> Any:
     if isinstance(value, list):
         return [redact(item) for item in value]
     if isinstance(value, str):
-        return re.sub(r"(?:sk-[A-Za-z0-9_-]+|monid_live_[A-Za-z0-9_-]+)", "[redacted]", value)
+        return SECRET_PATTERN.sub("[redacted]", value)
     return value
+
+
+SECRET_PATTERN = re.compile(
+    r"(?:sk-[A-Za-z0-9_-]+|monid_live_[A-Za-z0-9_-]+|pio_(?:at|rt)_[A-Za-z0-9_-]+"
+    r"|(?<=Bearer )[A-Za-z0-9._~+/=-]{12,})"
+)
 
 
 def mark_progress(state: AgentGraphState, step: str) -> list[str]:

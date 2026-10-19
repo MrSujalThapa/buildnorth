@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from scipy.stats import poisson
+from scipy.stats import norm, poisson
 
 from personal_markets.agents.goal_mapping import proposal_to_contract
 from personal_markets.agents.model_planner import infer_primitive_kind, refine_architect_proposal
@@ -17,6 +17,7 @@ from personal_markets.forecasting.composition import composition_numeric_inputs,
 from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.forecasting.primitives import (
     funnel_path_probability,
+    price_continuous_threshold,
     price_cumulative_count,
     price_deadline_hazard,
     price_dependency_dag,
@@ -41,6 +42,21 @@ def test_count_already_at_target_is_nearly_certain() -> None:
     result = price_cumulative_count(current=15, target=15, rate=0.0, periods=4)
     assert result.priced
     assert result.probability == pytest.approx(1.0 - 1e-6)
+
+
+def test_threshold_projection_uses_normal_tail_on_both_sides_of_target() -> None:
+    below = price_continuous_threshold(
+        current=3100, target=3000, periods=10, trend=-10.1, noise=40, direction="at_most"
+    )
+    above = price_continuous_threshold(
+        current=3100, target=3000, periods=10, trend=-9.9, noise=40, direction="at_most"
+    )
+    assert below.probability == pytest.approx(norm.cdf(3000, loc=2999, scale=40), abs=1e-9)
+    assert abs(below.probability - above.probability) < 0.05
+    achieved = price_continuous_threshold(
+        current=2990, target=3000, periods=10, trend=5.0, noise=40, direction="at_most"
+    )
+    assert achieved.probability == pytest.approx(0.995)
 
 
 def test_count_without_rate_is_unpriced() -> None:

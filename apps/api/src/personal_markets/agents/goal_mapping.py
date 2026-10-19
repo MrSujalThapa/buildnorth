@@ -55,7 +55,11 @@ def proposal_to_contract(
             forecast_status=ForecastStatus.EXPLORATORY,
         )
         from personal_markets.agents.model_planner import compose_spec, preferred_domain_adapter
+        from personal_markets.forecasting.running import is_timed_race_target
         from personal_markets.forecasting.spec import compile_existing_spec
+
+        if is_timed_race_target(contract):
+            contract = contract.model_copy(update={"goal_type": GoalType.THRESHOLD})
 
         if preferred_domain_adapter(contract, proposal):
             spec_payload = (

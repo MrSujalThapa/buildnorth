@@ -88,6 +88,24 @@ def test_strict_schema_sets_additional_properties_false() -> None:
     assert schema["properties"]["notes"]["type"] == "string"
 
 
+def test_strict_schema_lets_architect_report_known_current_state() -> None:
+    from jsonschema import Draft202012Validator
+
+    schema = strict_json_schema(GoalArchitectProposal)
+    output = make_proposal().model_dump(mode="json")
+    output["current_state_known"] = [
+        {"key": "customers", "value": "50"},
+        {"key": "mrr", "value": "1900"},
+    ]
+    Draft202012Validator(schema).validate(output)
+    proposal = GoalArchitectProposal.model_validate(output)
+    assert proposal.current_state_known == {"customers": "50", "mrr": "1900"}
+    assert GoalArchitectProposal.model_validate(proposal.model_dump()).current_state_known == {
+        "customers": "50",
+        "mrr": "1900",
+    }
+
+
 def test_goal_architect_schema_rejects_empty_title() -> None:
     with pytest.raises(ValidationError):
         make_proposal(title="ab")

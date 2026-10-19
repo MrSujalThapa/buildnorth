@@ -8,8 +8,19 @@ import numpy as np
 
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
+from personal_markets.demo_fixtures import (
+    demo_fixtures_enabled,
+    fixture_action_frontier,
+    fixture_compare,
+    fixture_futures,
+    fixture_simulate,
+    fixture_target_search,
+    is_demo_goal,
+    patch_baseline_state,
+)
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
+from personal_markets.forecasting.primitives import at_numerical_bound
 from personal_markets.forecasting.registry import ForecastModelRegistry
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
@@ -38,8 +49,13 @@ from personal_markets.what_if.domain import (
     WhatIfRequest,
     WhatIfResult,
 )
+from personal_markets.what_if.futures_weights import resolve_futures_weights
+from personal_markets.what_if.intervals import sampling_uplift_interval_pp
 from personal_markets.what_if.intervention_models import InterventionChangeResponse
-from personal_markets.what_if.intervention_overrides import apply_parsed_changes_to_assumptions
+from personal_markets.what_if.intervention_overrides import (
+    apply_parsed_changes_to_assumptions,
+    unmapped_change_metrics,
+)
 from personal_markets.what_if.optimizer import ActionOptimizer, ResourceLimits
 from personal_markets.what_if.repository import InMemorySimulationRepository, SimulationRepository
 from personal_markets.what_if.resources import (
@@ -50,17 +66,6 @@ from personal_markets.what_if.resources import (
 )
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
-from personal_markets.what_if.futures_weights import resolve_futures_weights
-from personal_markets.demo_fixtures import (
-    demo_fixtures_enabled,
-    fixture_action_frontier,
-    fixture_compare,
-    fixture_futures,
-    fixture_simulate,
-    fixture_target_search,
-    is_demo_goal,
-    patch_baseline_state,
-)
 
 
 class WhatIfService:
@@ -150,7 +155,8 @@ class WhatIfService:
             return None
         overrides: dict[str, float] = {}
         unmapped: list[str] = []
-        assumption_names = set((baseline_inputs.assumptions if baseline_inputs else {}).keys())
+        baseline_assumptions = baseline_inputs.assumptions if baseline_inputs else {}
+        assumption_names = set(baseline_assumptions.keys())
         for change in request.parsed_changes or []:
             metric = change.metric
             short = metric.split(".", 1)[-1]
@@ -171,9 +177,14 @@ class WhatIfService:
                 if change.operation == "set":
                     overrides[key] = change.value
                 else:
-                    current = float(
-                        (baseline_inputs.assumptions if baseline_inputs else {}).get(key) or 0.0
-                    )
+                    qualified = [name for name in assumption_names if name.endswith(f".{short}")]
+                    source = key if key in assumption_names else None
+                    if source is None and len(qualified) == 1:
+                        source = qualified[0]
+                    if source is None:
+                        unmapped.append(metric)
+                        continue
+                    current = float(baseline_assumptions.get(source) or 0.0)
                     overrides[key] = (
                         current + change.value
                         if change.operation == "add"
@@ -181,13 +192,14 @@ class WhatIfService:
                     )
             else:
                 unmapped.append(metric)
-        if unmapped and not overrides:
+        if not overrides:
+            detail = f"Unmapped: {', '.join(unmapped)}. " if unmapped else ""
             return WhatIfResult(
                 priced=False,
                 status="NOT_PRICED",
                 message=(
                     "This action is not mapped to a supported model parameter. "
-                    f"Unmapped: {', '.join(unmapped)}. Hypothetical causal effects were not invented."
+                    f"{detail}Hypothetical causal effects were not invented."
                 ),
                 baseline_probability=baseline.raw_probability,
                 assumptions=request.assumptions,
@@ -215,19 +227,67 @@ class WhatIfService:
                 assumptions=request.assumptions,
             )
         uplift = (scenario.raw_probability - baseline.raw_probability) * 100.0
+        limitations = list(scenario.limitations)
+        bound = at_numerical_bound(baseline.raw_probability) or at_numerical_bound(
+            scenario.raw_probability
+        )
+        if bound:
+            limitations.append(
+                "One or both probabilities sit on the primitive numerical bound. "
+                "The percentage-point difference is a hypothetical model-parameter "
+                "change, not a calibrated causal effect of the described action."
+            )
+        message = (
+            limitations[-1]
+            if bound
+            else (
+                "This What If changes a fitted model parameter. It is a hypothetical "
+                "scenario, not an actionable intervention with identified causal support."
+            )
+        )
         return WhatIfResult(
             priced=True,
             status="EXPLORATORY",
+            message=message,
             baseline_probability=baseline.raw_probability,
             scenario_probability=scenario.raw_probability,
             expected_uplift_pp=uplift,
+            uplift_interval_pp=None,
             assumptions=request.assumptions,
             receipt={
                 "hypothetical": True,
                 "causal_status": "parameter_intervention",
                 "compiler_version": spec.compiler_version,
                 "overrides": overrides,
-                "limitations": scenario.limitations,
+                "limitations": limitations,
+                "numerical_bound": bound,
+            },
+        )
+
+    @staticmethod
+    def _unmapped_changes_result(
+        request: WhatIfRequest, assumptions: list
+    ) -> WhatIfResult | None:
+        if not request.parsed_changes:
+            return None
+        if request.intervention is not None and request.intervention.effect_per_unit is not None:
+            return None
+        metrics = [item.metric for item in request.parsed_changes]
+        unmapped = unmapped_change_metrics({item.name for item in assumptions}, metrics)
+        if len(unmapped) < len(metrics):
+            return None
+        return WhatIfResult(
+            priced=False,
+            status="NOT_PRICED",
+            message=(
+                "This action is not mapped to a supported model parameter. "
+                f"Unmapped: {', '.join(unmapped)}. Hypothetical causal effects were not invented."
+            ),
+            assumptions=request.assumptions,
+            receipt={
+                "causal_status": "unmapped_intervention",
+                "unmapped": unmapped,
+                "hypothetical": True,
             },
         )
 
@@ -252,10 +312,31 @@ class WhatIfService:
                 assumption_overrides=user_overrides,
             )
             if baseline_ctx.priced:
+                unpriced = self._unmapped_changes_result(request, baseline_ctx.assumptions)
+                if unpriced is not None:
+                    return unpriced
                 # Report the family that actually priced the state, not the one implied
                 # by goal type alone.
                 resolved_model = self._registry.family_named(baseline_ctx.model_family, goal)
                 if baseline_ctx.mode == "deadline_event":
+                    # Both arms share the assumption overrides, so a persisted scenario
+                    # without a mapped change would record a fabricated zero effect.
+                    if persist and not request.parsed_changes:
+                        return WhatIfResult(
+                            priced=False,
+                            status="NOT_PRICED",
+                            message=(
+                                "This action did not map to a supported model parameter. "
+                                "Hypothetical causal effects were not invented."
+                            ),
+                            baseline_probability=baseline_ctx.baseline_probability,
+                            assumptions=request.assumptions,
+                            receipt={
+                                "causal_status": "unmapped_intervention",
+                                "unmapped": [],
+                                "hypothetical": True,
+                            },
+                        )
                     return await self._simulate_deadline_event(
                         goal, request, baseline_ctx, scenario_ctx, resolved_model, persist
                     )
@@ -324,7 +405,8 @@ class WhatIfService:
                 priced=False,
                 status="NOT_PRICED",
                 message=(
-                    "Supply parsed intervention changes or an explicit exploration effect assumption."
+                    "Supply parsed intervention changes or an explicit "
+                    "exploration effect assumption."
                 ),
                 assumptions=scenario_ctx.assumptions,
                 opportunity_costs=self._opportunity_costs(intervention),
@@ -600,10 +682,7 @@ class WhatIfService:
             conditional_on_execution_probability=conditional,
             execution_probability=execution_probability,
             expected_uplift_pp=(scenario - baseline) * 100,
-            uplift_interval_pp=(
-                float(np.quantile(chunk_deltas, 0.1) * 100),
-                float(np.quantile(chunk_deltas, 0.9) * 100),
-            ),
+            uplift_interval_pp=sampling_uplift_interval_pp(chunk_deltas),
             p_uplift_positive=float(np.mean(outcome_delta > 0)),
             outcome_quantiles=dict(
                 zip(("p10", "p25", "p50", "p75", "p90"), map(float, quantile_values), strict=True)

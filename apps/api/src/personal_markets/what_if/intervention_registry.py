@@ -55,7 +55,36 @@ def goal_domain(goal: GoalContract) -> str:
     return "generic"
 
 
+_COMPOSED_PARAMETERS: dict[str, tuple[str, str]] = {
+    "cumulative_count": ("rate", "count/{time_unit}"),
+    "growth": ("mu", "log_growth/{time_unit}"),
+    "continuous_threshold": ("trend", "{unit}/{time_unit}"),
+}
+
+
+def composed_metric_units(goal: GoalContract) -> dict[str, str]:
+    """Simulator parameters of a composed forecast spec, keyed `node.parameter`, with units."""
+    spec = goal.model_requirements.get("forecast_spec")
+    if not isinstance(spec, dict) or not str(spec.get("family") or "").startswith("composed_"):
+        return {}
+    units: dict[str, str] = {}
+    for node in spec.get("primitives") or []:
+        entry = _COMPOSED_PARAMETERS.get(str(node.get("kind")))
+        if entry is None:
+            continue
+        parameter, template = entry
+        config = node.get("config") or {}
+        units[f"{node.get('id')}.{parameter}"] = template.format(
+            time_unit=config.get("time_unit") or "week",
+            unit=node.get("unit") or spec.get("units") or "units",
+        )
+    return units
+
+
 def allowed_metrics(goal: GoalContract) -> set[str]:
+    composed = composed_metric_units(goal)
+    if composed:
+        return set(composed)
     domain = goal_domain(goal)
     metrics = set(KNOWN_METRICS["generic"])
     metrics.update(KNOWN_METRICS.get(domain, set()))

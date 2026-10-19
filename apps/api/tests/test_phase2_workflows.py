@@ -82,6 +82,10 @@ def test_scenarios_a_b_c_native_protocol_to_persisted_forecast(
                     )
                 )
             ).model_dump()
+            output["current_state_known"] = [
+                {"key": key, "value": value}
+                for key, value in output["current_state_known"].items()
+            ]
         elif "pricing_status" in schema["properties"]:
             output = InterventionAgentProposal.model_validate(
                 default_agent_script(

@@ -16,6 +16,35 @@ def _assumption_source(provenance: str) -> AssumptionSource:
     return _SOURCE_MAP.get(provenance, AssumptionSource.USER)
 
 
+# Action metrics `apply_parsed_changes_to_assumptions` translates, keyed to the model
+# assumption each one needs. A change whose target assumption is absent does nothing.
+_ACTION_METRIC_TARGETS: dict[str, str] = {
+    "monthly_contribution": "flow",
+    "contribution_per_month": "flow",
+    "weekly_running_km": "flow",
+    "daily_practice_problems": "execution_probability",
+    "applications_per_week": "weekly_application_rate",
+    "burn_monthly": "flow",
+    "mock_interviews_per_week": "execution_probability",
+    "linkedin_posts_per_week": "weekly_application_rate",
+    "sleep_hours_per_night": "execution_probability",
+    "running_days_per_week": "flow",
+    "user_conversations_per_week": "execution_probability",
+    "hours_on_startup_per_week": "execution_probability",
+    "sales_calls_per_week": "weekly_application_rate",
+}
+
+
+def unmapped_change_metrics(assumption_names: set[str], metrics: list[str]) -> list[str]:
+    """Metrics that would not move any model assumption for this goal."""
+    return [
+        metric
+        for metric in metrics
+        if metric not in assumption_names
+        and _ACTION_METRIC_TARGETS.get(metric) not in assumption_names
+    ]
+
+
 def apply_parsed_changes_to_assumptions(
     assumptions: list[Assumption],
     changes: list[InterventionChangeResponse],

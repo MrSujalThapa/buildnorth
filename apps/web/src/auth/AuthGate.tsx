@@ -17,6 +17,10 @@ import {
 
 const AccountContext = createContext<AccountView | null>(null);
 
+function keepsAdminOnPage(pathname: string): boolean {
+  return pathname.startsWith("/settings") || pathname.startsWith("/connect");
+}
+
 export function useAccount(): AccountView | null {
   return useContext(AccountContext);
 }
@@ -197,7 +201,7 @@ function ClerkGate({ children }: Props) {
     if (!account || landed.current) return;
     if (account.role === "admin" && !account.invited && !capturePendingInvite()) {
       landed.current = true;
-      if (!window.location.pathname.startsWith("/settings")) {
+      if (!keepsAdminOnPage(window.location.pathname)) {
         void navigate("/settings", { replace: true });
       }
     }
@@ -289,7 +293,7 @@ function TokenGate({ children }: Props) {
 
   useEffect(() => {
     if (account?.role === "admin" && !account.invited && !capturePendingInvite()) {
-      if (!window.location.pathname.startsWith("/settings")) {
+      if (!keepsAdminOnPage(window.location.pathname)) {
         void navigate("/settings", { replace: true });
       }
     }

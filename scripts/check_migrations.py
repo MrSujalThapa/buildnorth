@@ -1,5 +1,6 @@
 from pathlib import Path
 
+REQUIRED_FILES = 15
 REQUIRED = {
     "goals",
     "source_connections",
@@ -23,6 +24,19 @@ REQUIRED = {
 def main() -> int:
     directory = Path(__file__).resolve().parents[1] / "supabase" / "migrations"
     migrations = sorted(directory.glob("*.sql"))
+    names = [path.name for path in migrations]
+    expected = [f"{index:04d}_" for index in range(1, REQUIRED_FILES + 1)]
+    missing_files = [
+        prefix for prefix in expected if not any(name.startswith(prefix) for name in names)
+    ]
+    if missing_files or len(migrations) != REQUIRED_FILES:
+        print(
+            "Expected migrations 0001-0015 "
+            f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"
+        )
+        if missing_files:
+            print(f"Missing prefixes: {', '.join(missing_files)}")
+        return 1
     sql = "\n".join(path.read_text(encoding="utf-8").lower() for path in migrations)
     missing = sorted(table for table in REQUIRED if f"create table {table}" not in sql)
     if missing:

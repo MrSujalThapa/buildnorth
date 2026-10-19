@@ -6,6 +6,7 @@ import AppShell from "./components/shell/AppShell";
 import SocialPage from "./components/utility/SocialPage";
 import { NewGoalPage } from "./features/goals/NewGoalPage";
 import { ComposioAuthLauncherPage } from "./pages/ComposioAuthLauncherPage";
+import { ConnectAuthorizePage } from "./pages/ConnectAuthorizePage";
 import { EvidenceRoute } from "./pages/EvidenceRoute";
 import { GoalDetailRoute } from "./pages/GoalDetailRoute";
 import { MarketsRoute } from "./pages/MarketsRoute";
@@ -38,6 +39,7 @@ function AppTree() {
     <ThemeProvider>
       <Routes>
         <Route path="/auth/composio/launch" element={<ComposioAuthLauncherPage />} />
+        <Route path="/connect/authorize" element={<AuthGate><ConnectAuthorizePage /></AuthGate>} />
         <Route
           path="*"
           element={

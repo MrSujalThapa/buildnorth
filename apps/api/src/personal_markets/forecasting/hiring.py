@@ -411,7 +411,7 @@ def _recency_factor(
 
 def _event_count(item: NormalizedEvidence) -> int:
     if item.numeric_value is not None and item.numeric_value >= 0:
-        return max(1, int(round(item.numeric_value)))
+        return int(round(item.numeric_value))
     return 1
 
 
@@ -448,6 +448,8 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
         return "final"
     if _matches(blob, ("leetcode", "practice", "study", "prep", "hours")):
         return "practice"
+    if "interview" in blob:
+        return "technical"
     if metric in {"stage", "interview_stage"} and category:
         mapping = {
             "application": "application",

@@ -1,10 +1,11 @@
-﻿import { Copy, Link2, Moon, Plug, ShieldCheck, Sun } from "lucide-react";
+﻿import { Copy, Link2, Moon, ShieldCheck, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type InvitationRecord } from "../../api/client";
 import { useAccount } from "../../auth/AuthGate";
 import { invitePath } from "../../auth/session";
 import "./utility-pages.css";
 import { InferenceSettings } from "./InferenceSettings";
+import { PersonalAgents } from "./PersonalAgents";
 
 type Props = {
   theme: "light" | "dark";
@@ -75,18 +76,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
 
         <InferenceSettings />
 
-        <section className="settings-group">
-          <h2>Personal agents</h2>
-          <div className="settings-list">
-            <div className="setting-row">
-              <div>
-                <strong>Remote MCP connections</strong>
-                <span>Personal agent connections are reserved and not enabled in this phase.</span>
-              </div>
-              <span className="setting-soon"><Plug size={16} /> Coming later</span>
-            </div>
-          </div>
-        </section>
+        <PersonalAgents />
 
         <section className="settings-group">
           <h2>Appearance</h2>

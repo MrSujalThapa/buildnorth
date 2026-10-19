@@ -2,7 +2,7 @@ import hashlib
 from uuid import UUID, uuid4
 
 from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
-from personal_markets.evidence.domain import EvidenceCommit, NormalizedEvidence
+from personal_markets.evidence.domain import EvidenceCommit, NormalizedEvidence, SubmissionContext
 from personal_markets.evidence.metrics import (
     canonicalize_event,
     observation_kind,
@@ -32,6 +32,7 @@ class EvidenceService:
         events: list[EvidenceEventProposal],
         agent_run_id: UUID | None,
         conflicts: list[str],
+        submission: SubmissionContext | None = None,
     ) -> EvidenceCommit:
         await self.watch_goal(goal_id)
         goal = await self._repository.goal_exists(goal_id)
@@ -40,13 +41,20 @@ class EvidenceService:
         normalized: list[NormalizedEvidence] = []
         if any(event.observation_kind == "uncertain" for event in events):
             raise SemanticProviderError("Clarify observation aggregation before committing evidence")
+        if submission is None and any(event.source_type == "personal_agent" for event in events):
+            raise SemanticProviderError(
+                "personal_agent evidence can only arrive through an authorized connection"
+            )
+        # Only pass the submission context through when present, so repositories that
+        # predate external channels keep their original call shape.
+        extra = {"submission": submission} if submission is not None else {}
         for event in events:
             event = canonicalize_event(event)
             fingerprint = evidence_fingerprint(user_id, event, goal_id=goal_id)
             existing = await self._repository.find_fingerprint(user_id, fingerprint)
             if existing and existing.evidence_id is not None:
                 await self._repository.link_goal(goal_id, existing.evidence_id)
-                recorded = await self._repository.record_corroboration(existing, event)
+                recorded = await self._repository.record_corroboration(existing, event, **extra)
                 normalized.append(recorded)
                 continue
             stored = await self._repository.insert(
@@ -56,6 +64,7 @@ class EvidenceService:
                 fingerprint=fingerprint,
                 agent_run_id=agent_run_id,
                 conflict="flagged" if conflicts else "none",
+                **extra,
             )
             normalized.append(stored)
         return EvidenceCommit(events=normalized, conflicts=conflicts)

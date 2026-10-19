@@ -6,7 +6,7 @@ from personal_markets.ports import (
     InterventionCriticArtifact,
     InterventionPricingStatus,
 )
-from personal_markets.what_if.intervention_registry import allowed_metrics
+from personal_markets.what_if.intervention_registry import allowed_metrics, composed_metric_units
 
 _PROBABILITY_TOKENS = ("probability", "odds", "likelihood", "uplift_pp", "percent_change")
 
@@ -24,6 +24,7 @@ def critique_intervention(
     limitations = list(proposal.limitations)
     pricing_status: InterventionPricingStatus = proposal.pricing_status
     permitted = allowed_metrics(goal)
+    units = composed_metric_units(goal)
 
     # The invariant is that no agent-authored number becomes a probability. Enforce it
     # on the structured changes, which are the only thing the simulator consumes.
@@ -43,6 +44,13 @@ def critique_intervention(
             continue
         if change.metric not in permitted:
             issues.append(f"Metric `{change.metric}` is not modeled for this goal family.")
+            continue
+        expected_unit = units.get(change.metric)
+        if expected_unit is not None and change.unit.strip().lower() != expected_unit.lower():
+            issues.append(
+                f"Dropped `{change.metric}`: unit `{change.unit}` does not match the model "
+                f"parameter unit `{expected_unit}`."
+            )
             continue
         if change.provenance == "FITTED" and change.strength == "NOT_PRICED":
             issues.append(f"Change `{change.metric}` lacks defensible strength.")

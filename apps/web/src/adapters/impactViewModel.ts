@@ -5,6 +5,8 @@ import type { RepresentativePoint, SimulationPoint } from "./simulationTypes";
 export type ImpactViewModel = {
   distributionPoints: SimulationPoint[];
   stats: { p10: number; p50: number; p90: number };
+  likelyRangeLabel: string;
+  causalCaption: string | null;
   fullExecutionOdds: number | null;
   followThroughPercent: number | null;
   downsideTail: number | null;
@@ -74,6 +76,26 @@ function statsFromResult(result: WhatIfResult | undefined, points: SimulationPoi
   return { p10, p50, p90 };
 }
 
+export function formatLikelyRange(stats: { p10: number; p90: number }, pointCount: number): string {
+  if (!pointCount) return "—";
+  if (!Number.isFinite(stats.p10) || !Number.isFinite(stats.p90)) return "—";
+  if (Math.abs(stats.p90 - stats.p10) < 1e-9) return "—";
+  return `${stats.p10.toFixed(0)}–${stats.p90.toFixed(0)}%`;
+}
+
+export function causalCaption(result: WhatIfResult | undefined): string | null {
+  if (!result) return null;
+  if (result.message) return result.message;
+  const status = result.receipt?.causal_status;
+  if (status === "parameter_intervention") {
+    return "This is a hypothetical model-parameter change, not a causally identified intervention.";
+  }
+  if (status === "unmapped_intervention") {
+    return "This action is not mapped to a supported mechanism. No causal effect was invented.";
+  }
+  return null;
+}
+
 function percentile(values: number[], ratio: number): number {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -103,6 +125,8 @@ export function toImpactViewModel(
   return {
     distributionPoints,
     stats,
+    likelyRangeLabel: formatLikelyRange(stats, distributionPoints.length),
+    causalCaption: causalCaption(result),
     fullExecutionOdds:
       result?.conditional_on_execution_probability != null
         ? result.conditional_on_execution_probability * 100

@@ -18,6 +18,7 @@ from personal_markets.forecasting.estimation import (
     estimate_linear_trend,
     estimate_log_growth,
     estimate_rate,
+    observed_completion,
     periods_until,
 )
 from personal_markets.forecasting.monte_carlo import monte_carlo_frequency
@@ -186,6 +187,24 @@ def _aliases(spec: ForecastSpecV2, metric: str) -> tuple[str, ...]:
     return ()
 
 
+def _apply_parameter_overrides(
+    parameters: dict[str, float],
+    sources: dict[str, str],
+    overrides: dict[str, Any],
+    metric: str,
+    node_id: str,
+) -> None:
+    for key, value in overrides.items():
+        short = key.split(".", 1)[-1]
+        qualified = key == f"{node_id}.{short}" and short in parameters
+        if key in parameters or key == metric or qualified:
+            try:
+                parameters[short] = float(value)
+                sources[short] = "user_assumption"
+            except (TypeError, ValueError):
+                pass
+
+
 def _node_state(
     goal: GoalContract,
     spec: ForecastSpecV2,
@@ -212,17 +231,14 @@ def _node_state(
             continue
         parameters.setdefault(name.split(".")[-1], float(item["value"]))
         sources[name.split(".")[-1]] = "prior"
-    for key, value in overrides.items():
-        if key in parameters or key in {metric, f"{node.id}.{key}"}:
-            short = key.split(".", 1)[-1]
-            try:
-                parameters[short] = float(value)
-                sources[short] = "user_assumption"
-            except (TypeError, ValueError):
-                pass
+    _apply_parameter_overrides(parameters, sources, overrides, metric, node.id)
     if node.kind == "deadline_hazard":
-        completed = current is not None and float(current) >= 1
-        if not completed and not any(
+        completed = (current is not None and float(current) >= 1) or observed_completion(
+            evidence, metric, aliases
+        )
+        if completed:
+            current = 1.0
+        elif not any(
             key in parameters for key in ("logit", "baseline_logit", "baseline_logits")
         ):
             gaps.append(f"hazard for {metric} (observed completion or a period logit)")
@@ -259,6 +275,8 @@ def _node_state(
             else:
                 gaps.append("performance history (at least two dated measurements)")
         parameters.setdefault("noise", 1.0)
+    # Estimated parameters exist only now; explicit What If edits must replace them too.
+    _apply_parameter_overrides(parameters, sources, overrides, metric, node.id)
     if node.kind == "funnel":
         stages = [str(item) for item in node.config.get("stages") or []]
         counts = []
@@ -563,7 +581,7 @@ def _price_sequential(
         limitations=limitations,
         diagnostics=frequency.diagnostics(
             {
-                "mean_terminal": float(np.mean(terminals)),
+                "mean_terminal": _finite_mean(terminals),
                 "horizon": horizon,
                 "join": "sequential_and",
                 "seed": int(prepared.get("seed") or 42),
@@ -577,6 +595,13 @@ def _price_sequential(
 
 def math_inf() -> float:
     return float("inf")
+
+
+def _finite_mean(values: np.ndarray) -> float | None:
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return None
+    return float(np.mean(finite))
 
 
 def _waiting_time(node: dict[str, Any], remaining: float, rng: np.random.Generator) -> float:

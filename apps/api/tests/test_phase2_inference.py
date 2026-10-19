@@ -123,6 +123,86 @@ async def test_empty_truncated_and_schema_invalid_fail_explicitly(body: dict[str
         await adapter.complete_structured(request(model="claude-sonnet-5-5"))
 
 
+def _spur_reply(text: str) -> httpx.MockTransport:
+    return httpx.MockTransport(
+        lambda _: httpx.Response(
+            200,
+            json={
+                "id": "s",
+                "choices": [{"message": {"content": text}, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 4},
+            },
+        )
+    )
+
+
+NESTED_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "primitives": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "kind": {"type": "string"}},
+                "required": ["id", "kind"],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["primitives"],
+    "additionalProperties": False,
+}
+
+
+async def test_spur_json_mode_drops_undeclared_root_notes_but_validates_fields() -> None:
+    adapter = NativeInferenceAdapter(
+        "spur", "secret", transport=_spur_reply('{"ok":true,"ok_note":"free text"}')
+    )
+    result = await adapter.complete_structured(request(model="spur-glm-5-3"))
+    assert result.structured_output == {"ok": True}
+
+    nested = NativeInferenceAdapter(
+        "spur",
+        "secret",
+        transport=_spur_reply(
+            '{"primitives":[{"id":"launch","kind":"deadline_hazard","status":"done"}]}'
+        ),
+    )
+    result = await nested.complete_structured(
+        InferenceRequest(
+            instructions="Return primitives",
+            input={},
+            output_schema=NESTED_SCHEMA,
+            model="spur-glm-5-3",
+        )
+    )
+    assert result.structured_output == {"primitives": [{"id": "launch", "kind": "deadline_hazard"}]}
+
+    invalid = NativeInferenceAdapter(
+        "spur", "secret", transport=_spur_reply('{"ok":"yes","ok_note":"free text"}')
+    )
+    with pytest.raises(SemanticProviderError):
+        await invalid.complete_structured(request(model="spur-glm-5-3"))
+
+
+async def test_schema_enforcing_provider_still_rejects_undeclared_properties() -> None:
+    body = {
+        "id": "o",
+        "output": [
+            {
+                "type": "message",
+                "content": [{"type": "output_text", "text": '{"ok":true,"ok_note":"x"}'}],
+            }
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    adapter = NativeInferenceAdapter(
+        "openai", "secret", transport=httpx.MockTransport(lambda _: httpx.Response(200, json=body))
+    )
+    with pytest.raises(SemanticProviderError):
+        await adapter.complete_structured(request(model="gpt-5.4-mini"))
+
+
 async def test_provider_error_never_echoes_key_or_body() -> None:
     secret = "sk-very-private-test-key"
     adapter = NativeInferenceAdapter(

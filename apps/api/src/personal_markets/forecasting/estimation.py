@@ -14,6 +14,7 @@ from personal_markets.evidence.metrics import (
     canonicalize_metric,
     observation_kind,
     reduce_stock_value,
+    stock_concept,
 )
 
 SourceKind = Literal[
@@ -35,15 +36,26 @@ class EstimatedParameter:
     provenance: dict[str, Any] = field(default_factory=dict)
 
 
+def _metric_keys(metric: str) -> set[str]:
+    canonical = canonicalize_metric(metric)
+    keys = {canonical}
+    concept = stock_concept(metric)
+    if concept:
+        keys.add(concept)
+    return keys
+
+
 def evidence_series(
     evidence: list[NormalizedEvidence],
     metric: str,
     aliases: tuple[str, ...] = (),
 ) -> list[tuple[datetime, float, str]]:
-    wanted = {canonicalize_metric(metric), *(canonicalize_metric(alias) for alias in aliases)}
+    wanted: set[str] = set()
+    for name in (metric, *aliases):
+        wanted |= _metric_keys(name)
     series: list[tuple[datetime, float, str]] = []
     for item in evidence:
-        if canonicalize_metric(item.metric) not in wanted:
+        if _metric_keys(item.metric).isdisjoint(wanted):
             continue
         if item.numeric_value is None or item.observed_at is None:
             continue
@@ -66,6 +78,26 @@ def current_stock(
     if not series:
         return None
     return reduce_stock_value([(stamp, value, kind) for stamp, value, kind in series])  # type: ignore[arg-type]
+
+
+_COMPLETION_VALUES = frozenset({"launched", "completed", "complete", "done", "achieved", "yes", "true"})
+
+
+def observed_completion(
+    evidence: list[NormalizedEvidence],
+    metric: str,
+    aliases: tuple[str, ...] = (),
+) -> bool:
+    """A dated categorical event such as `launched` marks a milestone as completed."""
+    wanted: set[str] = set()
+    for name in (metric, *aliases):
+        wanted |= _metric_keys(name)
+    return any(
+        not _metric_keys(item.metric).isdisjoint(wanted)
+        and item.observed_at is not None
+        and str(item.categorical_value or "").strip().lower() in _COMPLETION_VALUES
+        for item in evidence
+    )
 
 
 def estimate_rate(

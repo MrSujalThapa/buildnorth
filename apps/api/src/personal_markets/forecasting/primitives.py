@@ -27,6 +27,8 @@ PRIMITIVE_VERSIONS = {
 }
 REGISTERED_PRIMITIVES = tuple(PRIMITIVE_VERSIONS)
 _EPS = 1e-6
+# The current measurement already meets the target; residual doubt covers whether it counts.
+THRESHOLD_ACHIEVED_PROBABILITY = 0.995
 _MAX_DRAWS = 20_000
 
 
@@ -42,6 +44,11 @@ class PrimitivePrice:
 
 def _clip(probability: float) -> float:
     return float(min(max(probability, _EPS), 1.0 - _EPS))
+
+
+def at_numerical_bound(probability: float, *, eps: float = _EPS) -> bool:
+    """True when a priced probability sits on the primitive clip floor or ceiling."""
+    return probability <= eps or probability >= 1.0 - eps
 
 
 def _unpriced(
@@ -361,16 +368,13 @@ def price_continuous_threshold(
         return _unpriced("continuous_threshold", ["horizon must be positive and noise ≥ 0"])
     projected = current + trend * periods
     sigma = max(noise, _EPS)
-    if direction == "at_most":
-        if projected <= target:
-            probability = 0.995
-        else:
-            probability = float(norm.cdf(target, loc=projected, scale=sigma))
+    achieved = current <= target if direction == "at_most" else current >= target
+    if achieved:
+        probability = THRESHOLD_ACHIEVED_PROBABILITY
+    elif direction == "at_most":
+        probability = float(norm.cdf(target, loc=projected, scale=sigma))
     else:
-        if projected >= target:
-            probability = 0.995
-        else:
-            probability = float(1.0 - norm.cdf(target, loc=projected, scale=sigma))
+        probability = float(1.0 - norm.cdf(target, loc=projected, scale=sigma))
     return _priced(
         probability,
         "normal_threshold_trend",

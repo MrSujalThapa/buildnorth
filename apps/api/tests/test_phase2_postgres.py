@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
-from helpers import isolated_postgres_url
+from helpers import POSTGRES_MIGRATION_SKIP, isolated_postgres_url
 from personal_markets.identity.budget import PostgresBudgetStore
 from personal_markets.identity.credentials import (
     CredentialCipher,
@@ -34,7 +34,7 @@ async def test_encrypted_credentials_preferences_ledger_and_research_reload() ->
     try:
         async with engine.begin() as conn:
             if not await conn.scalar(text("select to_regclass('provider_credentials')")):
-                pytest.skip("Apply Phase 2 migrations 0011 and 0012 to the isolated test DB")
+                pytest.skip(POSTGRES_MIGRATION_SKIP)
             await conn.execute(
                 text("""
                 insert into app_users (id, clerk_user_id) values (:id, :clerk)
@@ -160,14 +160,14 @@ async def test_cancelled_hosted_provider_settles_postgres_reservation() -> None:
     try:
         async with engine.begin() as conn:
             if not await conn.scalar(text("select to_regclass('inference_reservations')")):
-                pytest.skip("Apply Phase 2 migrations to isolated test DB")
+                pytest.skip(POSTGRES_MIGRATION_SKIP)
             if not await conn.scalar(text("""
                 select exists (
                   select 1 from information_schema.columns
                   where table_name='inference_ledger' and column_name='billing_mode'
                 )
             """)):
-                pytest.skip("Apply Phase 2 ledger migration to isolated test DB")
+                pytest.skip(POSTGRES_MIGRATION_SKIP)
             await conn.execute(
                 text("insert into app_users (id, clerk_user_id) values (:id, :clerk)"),
                 {"id": user.user_id, "clerk": user.clerk_user_id},

@@ -142,6 +142,10 @@ class NativeInferenceAdapter:
             if isinstance(error, ValidationError):
                 path = "/".join(str(part) for part in error.absolute_path) or "root"
                 reason = f"Provider output failed schema validation at {path} ({error.validator})"
+                if error.validator == "additionalProperties" and isinstance(error.instance, dict):
+                    allowed = set((error.schema or {}).get("properties") or {})
+                    unexpected = sorted(str(key) for key in error.instance if key not in allowed)
+                    reason += f": unexpected {', '.join(unexpected)[:200]}"
             elif isinstance(error, SemanticProviderError):
                 reason = str(error)
             raw_usage = data.get("usage")
@@ -297,6 +301,8 @@ class NativeInferenceAdapter:
             output = json.loads(text_content)
             if not isinstance(output, dict):
                 raise ValueError
+            if self.provider == "spur":
+                output = _drop_undeclared_keys(output, request.output_schema)
             Draft202012Validator(request.output_schema).validate(output)
         if kind == "tools":
             tools = {tool.name: tool for tool in request.tools}
@@ -319,6 +325,26 @@ class NativeInferenceAdapter:
             )
             is not None,
         )
+
+
+def _drop_undeclared_keys(value: Any, schema: dict[str, Any]) -> Any:
+    """JSON mode does not enforce additionalProperties:false; drop extra keys recursively.
+
+    Declared fields are left in place so type/required validation still applies.
+    """
+    if not isinstance(schema, dict):
+        return value
+    if isinstance(value, dict) and isinstance(schema.get("properties"), dict):
+        declared = schema["properties"]
+        if schema.get("additionalProperties") is False:
+            value = {key: item for key, item in value.items() if key in declared}
+        return {
+            key: _drop_undeclared_keys(item, declared.get(key) or {})
+            for key, item in value.items()
+        }
+    if isinstance(value, list) and isinstance(schema.get("items"), dict):
+        return [_drop_undeclared_keys(item, schema["items"]) for item in value]
+    return value
 
 
 def _reported_usage(

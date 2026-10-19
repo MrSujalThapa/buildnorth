@@ -7,8 +7,10 @@ composition or keeps an existing domain adapter. It never assigns a probability.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 
+from personal_markets.evidence.metrics import canonicalize_metric, is_rate_label, stock_concept
 from personal_markets.forecasting.compiler import (
     CompositionGraph,
     ForecastSpecV2,
@@ -86,7 +88,13 @@ def refine_architect_proposal(proposal: GoalArchitectProposal) -> GoalArchitectP
                 "notes": (proposal.notes + " Unmeasurable outcome refused.").strip(),
             }
         )
-    kind = proposal.primitive_kind or infer_primitive_kind(proposal)
+    inferred = infer_primitive_kind(proposal)
+    kind = proposal.primitive_kind or inferred
+    # Sequential launch → then → milestone is a DAG even if the architect labelled it a
+    # funnel or growth process. The live proposal is still validated; this only selects
+    # the compiler family.
+    if inferred == "dependency_dag":
+        kind = "dependency_dag"
     clarifications = list(proposal.clarifications_required)
     if proposal.success_target in {"", "unspecified"} and not any(
         item.id == "success_target" for item in clarifications
@@ -269,7 +277,7 @@ def compose_spec(goal: GoalContract, proposal: GoalArchitectProposal) -> Forecas
                 metric=metric,
                 unit=proposal.success_unit,
                 kind="snapshot" if kind != "habit" else "categorical",
-                aliases=list(proposal.state_dimensions),
+                aliases=_stock_aliases(metric, proposal.state_dimensions),
             )
         ],
         research_required=proposal.research_required,
@@ -284,6 +292,20 @@ def compose_spec(goal: GoalContract, proposal: GoalArchitectProposal) -> Forecas
     )
     result = compile_spec(spec)
     return result.spec if result.accepted else None
+
+
+def _stock_aliases(metric: str, dimensions: list[str]) -> list[str]:
+    """Labels that name the same stock as `metric`; rate/frequency dimensions are excluded."""
+    concept = stock_concept(metric)
+    aliases = [concept] if concept and canonicalize_metric(metric) != concept else []
+    for dimension in dimensions:
+        if is_rate_label(dimension):
+            continue
+        if canonicalize_metric(dimension) == canonicalize_metric(metric) or (
+            concept is not None and stock_concept(dimension) == concept
+        ):
+            aliases.append(dimension)
+    return list(dict.fromkeys(aliases))
 
 
 def _default_config(kind: str, proposal: GoalArchitectProposal) -> dict[str, Any]:
@@ -305,50 +327,71 @@ def _default_config(kind: str, proposal: GoalArchitectProposal) -> dict[str, Any
 
 
 def _milestone_nodes(proposal: GoalArchitectProposal) -> list[PrimitiveNode]:
-    if "mrr" in _blob(proposal) or "customer" in _blob(proposal):
-        customer_target = _number_before(_blob(proposal), "customer") or 100.0
-        revenue_target = parse_number(proposal.success_target) or 5000.0
-        return [
-            PrimitiveNode(
-                id="launch",
-                kind="deadline_hazard",
-                metric="launched",
-                state_bindings={"current": "launched"},
-                config={"time_unit": "week", "target": 1.0},
-            ),
+    """Each milestone target must be stated by the user; no default targets are assumed."""
+    sources = [proposal.success_target, proposal.success_metric, proposal.title]
+    customer_target = _first_match(sources, _customer_target)
+    revenue_target = _first_match(sources, _currency_amount)
+    if (
+        revenue_target is None
+        and "mrr" in proposal.success_metric.lower()
+        and "customer" not in proposal.success_target.lower()
+    ):
+        revenue_target = parse_number(proposal.success_target)
+    if customer_target is None and revenue_target is None:
+        return []
+    nodes = [
+        PrimitiveNode(
+            id="launch",
+            kind="deadline_hazard",
+            metric="launched",
+            state_bindings={"current": "launched"},
+            config={"time_unit": "week", "target": 1.0},
+        )
+    ]
+    if customer_target is not None:
+        nodes.append(
             PrimitiveNode(
                 id="customers",
                 kind="cumulative_count",
                 metric="customers",
                 state_bindings={"current": "customers"},
-                config={
-                    "process": "poisson",
-                    "time_unit": "week",
-                    "target": customer_target,
-                },
+                config={"process": "poisson", "time_unit": "week", "target": customer_target},
                 prerequisites=["launch"],
-            ),
+            )
+        )
+    if revenue_target is not None:
+        nodes.append(
             PrimitiveNode(
                 id="revenue",
                 kind="growth",
                 metric="mrr",
                 state_bindings={"current": "mrr"},
-                config={
-                    "process": "loglinear",
-                    "time_unit": "week",
-                    "target": revenue_target,
-                },
-                prerequisites=["customers"],
-            ),
-        ]
-    return []
+                config={"process": "loglinear", "time_unit": "week", "target": revenue_target},
+                prerequisites=[nodes[-1].id],
+            )
+        )
+    return nodes
 
 
-def _number_before(blob: str, token: str) -> float | None:
-    match = re.search(rf"(\d[\d,]*)\s+{re.escape(token)}", blob)
+def _first_match(sources: list[str], extract: Callable[[str], float | None]) -> float | None:
+    for source in sources:
+        value = extract(source.lower())
+        if value is not None:
+            return value
+    return None
+
+
+def _customer_target(text: str) -> float | None:
+    match = re.search(r"(\d[\d,]*)\s+(?:[a-z]+\s+)?customers?\b", text)
+    return float(match.group(1).replace(",", "")) if match else None
+
+
+def _currency_amount(text: str) -> float | None:
+    match = re.search(r"\$\s?(\d[\d,]*(?:\.\d+)?)\s*(k\b)?", text)
     if match is None:
         return None
-    return float(match.group(1).replace(",", ""))
+    value = float(match.group(1).replace(",", ""))
+    return value * 1000 if match.group(2) else value
 
 
 def _required_parameters(kind: str) -> list[str]:

@@ -1,12 +1,16 @@
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import AliasChoices, Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from personal_markets.core.errors import ProviderNotConfiguredError
+
+_LOCAL_ENVIRONMENTS = frozenset({"development", "test", "pytest"})
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 DEFAULT_USER_ID = UUID("10000000-0000-0000-0000-000000000001")
 AUTHENTICATED_SPUR_MODEL = "spur-glm-5-3"
@@ -99,6 +103,29 @@ class Settings(BaseSettings):
     invite_ttl_hours: int = 72
     invite_max_redemptions: int = 20
     dev_bootstrap_test_users: bool = False
+    # Honor X-Forwarded-For only when the peer is in trusted_proxies. Default off so
+    # a client cannot spoof rate-limit identity. Staging behind nginx/Caddy must set
+    # PM_TRUST_FORWARDED_HEADERS=true and list the proxy addresses.
+    trust_forwarded_headers: bool = False
+    trusted_proxies: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["127.0.0.1", "::1"]
+    )
+    # Inbound remote MCP server. Public URLs are what external clients see; a hosted
+    # assistant cannot reach loopback, so deployments must set HTTPS values.
+    mcp_enabled: bool = True
+    public_api_url: str = "http://127.0.0.1:8000"
+    public_web_url: str = "http://localhost:5173"
+    mcp_access_token_ttl_seconds: int = Field(default=3600, ge=60, le=86_400)
+    mcp_refresh_token_ttl_seconds: int = Field(default=30 * 86_400, ge=3600, le=90 * 86_400)
+    mcp_auth_code_ttl_seconds: int = Field(default=300, ge=30, le=600)
+    mcp_authorization_request_ttl_seconds: int = Field(default=600, ge=60, le=3600)
+    mcp_dynamic_client_registration: bool = True
+    mcp_registrations_per_ip_hour: int = Field(default=20, ge=1, le=1000)
+    mcp_max_request_bytes: int = Field(default=64_000, ge=4096, le=1_000_000)
+    mcp_tool_calls_per_minute: int = Field(default=60, ge=1, le=1000)
+    mcp_writes_per_minute: int = Field(default=20, ge=1, le=500)
+    mcp_inference_calls_per_minute: int = Field(default=4, ge=1, le=60)
+    mcp_inference_calls_per_day: int = Field(default=40, ge=1, le=1000)
 
     def resolved_clerk_jwks_url(self) -> str | None:
         if self.clerk_jwks_url:
@@ -108,10 +135,52 @@ class Settings(BaseSettings):
             return f"{issuer}/.well-known/jwks.json"
         return None
 
+    def is_local_environment(self) -> bool:
+        return self.environment.strip().lower() in _LOCAL_ENVIRONMENTS
+
+    def is_publicly_reachable(self) -> bool:
+        """True when public_api_url is HTTPS on a non-loopback host.
+
+        Accidental `PM_ENVIRONMENT=development` on a shared staging hostname still
+        counts as publicly reachable. Local https://127.0.0.1 does not.
+        """
+        raw = (self.public_api_url or "").strip()
+        if not raw.lower().startswith("https://"):
+            return False
+        host = (urlparse(raw).hostname or "").lower()
+        return bool(host) and host not in _LOOPBACK_HOSTS
+
+    def is_deployed(self) -> bool:
+        return (not self.is_local_environment()) or self.is_publicly_reachable()
+
+    def assert_safe_startup(self) -> None:
+        """Refuse test auth/bootstrap outside a local process.
+
+        Staging and production must start with Clerk JWKS configured, no test
+        HS256 secret, and bootstrap off. A mislabelled development env that
+        advertises a public HTTPS API URL is treated as deployed.
+        """
+        if not self.is_deployed():
+            return
+        problems: list[str] = []
+        if self.dev_bootstrap_test_users:
+            problems.append("PM_DEV_BOOTSTRAP_TEST_USERS must be false")
+        if self.test_auth_secret:
+            problems.append("PM_TEST_AUTH_SECRET must be empty")
+        if not self.resolved_clerk_jwks_url():
+            problems.append("PM_CLERK_JWKS_URL is required")
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in a deployed environment: " + "; ".join(problems)
+            )
+
     @field_validator(
         "composio_enabled",
         "hosted_inference_enabled",
         "dev_bootstrap_test_users",
+        "trust_forwarded_headers",
+        "mcp_enabled",
+        "mcp_dynamic_client_registration",
         mode="before",
     )
     @classmethod
@@ -120,7 +189,7 @@ class Settings(BaseSettings):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return value
 
-    @field_validator("admin_emails", "clerk_authorized_parties", mode="before")
+    @field_validator("admin_emails", "clerk_authorized_parties", "trusted_proxies", mode="before")
     @classmethod
     def _coerce_str_list(cls, value: object, info: ValidationInfo) -> object:
         items: list[str]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 from personal_markets.forecasting.engine import NumericInputs
@@ -118,7 +119,11 @@ def continuous_target_assumptions(
         flow_min = -flow_max
         flow_step = max(1.0, round(flow_max / 200.0))
     else:
-        flow_min, flow_max, flow_step = -30.0, 0.0, 1.0
+        # Negative is improving. The fitted trend can be faster than -30 s/week or a
+        # slowdown (> 0), so the range widens to contain it.
+        flow_min = min(-30.0, math.floor(flow * 2.0))
+        flow_max = max(0.0, math.ceil(flow * 2.0))
+        flow_step = 1.0
     ref_version = _reference_version(numeric)
 
     return [

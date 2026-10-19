@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -124,8 +125,41 @@ def is_running_goal(goal: GoalContract, proposal: GoalArchitectProposal | None =
     )
 
 
+def is_timed_race_target(goal: GoalContract) -> bool:
+    """A finish-time target over a race distance, e.g. a half marathon in under 2 hours.
+
+    The architect sometimes labels the race itself a deadline event; the target is still a
+    threshold on finish time.
+    """
+    metric = str(goal.success_definition.get("metric") or "").lower()
+    text = f"{metric} {goal.title}"
+    return (
+        goal.goal_type.value == "deadline_event"
+        and str(goal.success_definition.get("operator") or "") in {"<=", "<"}
+        and (_named_race_distance(text) is not None or "10k" in text.lower())
+        and resolve_target_duration_seconds(goal) is not None
+    )
+
+
+# Official World Athletics road-race distances.
+HALF_MARATHON_KM = 21.0975
+MARATHON_KM = 42.195
+
+
+def _named_race_distance(text: str) -> float | None:
+    normalized = re.sub(r"[^a-z0-9.]+", " ", text.lower())
+    if re.search(r"\bhalf ?marathon\b", normalized):
+        return HALF_MARATHON_KM
+    if re.search(r"\bmarathon\b", normalized):
+        return MARATHON_KM
+    return None
+
+
 def goal_distance_km(goal: GoalContract) -> float:
     metric = str(goal.success_definition.get("metric") or "").lower()
+    named = _named_race_distance(metric) or _named_race_distance(goal.title)
+    if named is not None:
+        return named
     if "10k" in metric or "10_k" in metric:
         return 10.0
     if "5k" in metric or "5_k" in metric:
@@ -285,6 +319,28 @@ def running_state_to_numeric_inputs(
     )
 
 
+# A directly observed result already meets the target; residual doubt covers whether that
+# result qualifies (course, timing) rather than future performance.
+ACHIEVED_PROBABILITY = 0.995
+
+
+def _observed_target_met(inputs: NumericInputs, target: float, direction: str) -> bool:
+    observations = inputs.state.get("observations")
+    if not isinstance(observations, list):
+        return False
+    for item in observations:
+        if not isinstance(item, dict) or item.get("conversion_applied"):
+            continue
+        seconds = item.get("duration_seconds")
+        if not isinstance(seconds, int | float):
+            continue
+        if (direction == "at_most" and seconds <= target) or (
+            direction != "at_most" and seconds >= target
+        ):
+            return True
+    return False
+
+
 def price_from_numeric_inputs(inputs: NumericInputs) -> tuple[float | None, dict[str, Any]]:
     current = inputs.state.get("current_value")
     target = inputs.state.get("target_value")
@@ -305,16 +361,13 @@ def price_from_numeric_inputs(inputs: NumericInputs) -> tuple[float | None, dict
     trend_sigma = ref.trend_uncertainty_seconds_per_day * math.sqrt(max(1, periods * 7))
     sigma = math.sqrt(noise**2 + trend_sigma**2)
 
-    if direction == "at_most":
-        if projected <= target_value:
-            probability = 0.995
-        else:
-            probability = _normal_cdf(target_value, projected, sigma)
+    achieved = _observed_target_met(inputs, target_value, direction)
+    if achieved:
+        probability = ACHIEVED_PROBABILITY
+    elif direction == "at_most":
+        probability = _normal_cdf(target_value, projected, sigma)
     else:
-        if projected >= target_value:
-            probability = 0.995
-        else:
-            probability = 1.0 - _normal_cdf(target_value, projected, sigma)
+        probability = 1.0 - _normal_cdf(target_value, projected, sigma)
 
     probability = min(max(probability, 1e-6), 1.0 - 1e-6)
     transforms = inputs.state.get("pricing_transforms")
@@ -454,6 +507,15 @@ def _parse_run_observation(
             metric=metric,
         )
 
+    named = _named_race_distance(metric) or _named_race_distance(summary)
+    if named is not None:
+        if value is None:
+            return None
+        seconds = float(value)
+        if unit in {"minutes", "minute", "min"}:
+            seconds *= 60
+        return RunObservation(named, seconds, observed, metric)
+
     if "10k" in metric or "10k" in summary:
         if value is None:
             return None
@@ -475,6 +537,9 @@ def _parse_run_observation(
 
 def _distance_from_metric(metric: str, summary: str, category: str | None) -> float:
     blob = " ".join([metric, summary, category or ""]).lower()
+    named = _named_race_distance(blob)
+    if named is not None:
+        return named
     if "10" in blob and "k" in blob:
         return 10.0
     if "5" in blob and "k" in blob:
@@ -488,6 +553,9 @@ def _distance_from_summary(summary: str) -> float | None:
     if not summary:
         return None
     lowered = summary.lower()
+    named = _named_race_distance(lowered)
+    if named is not None:
+        return named
     if "10" in lowered and "k" in lowered:
         return 10.0
     if "8" in lowered and "k" in lowered:

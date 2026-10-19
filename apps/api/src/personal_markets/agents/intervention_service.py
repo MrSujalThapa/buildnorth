@@ -22,7 +22,11 @@ from personal_markets.ports import (
 from personal_markets.what_if.baseline_state import build_baseline_state
 from personal_markets.what_if.intervention_models import InterventionChangeResponse, ParseInterventionResponse
 from personal_markets.what_if.intervention_parser import parse_intervention_text
-from personal_markets.what_if.intervention_registry import allowed_metrics, goal_domain
+from personal_markets.what_if.intervention_registry import (
+    allowed_metrics,
+    composed_metric_units,
+    goal_domain,
+)
 
 
 class InterventionAgentService:
@@ -129,6 +133,7 @@ class InterventionAgentService:
             "goal": goal.model_dump(mode="json"),
             "baseline_state": baseline,
             "allowed_metrics": sorted(allowed_metrics(goal)),
+            "allowed_metric_units": composed_metric_units(goal),
             "goal_domain": goal_domain(goal),
             "research": research.model_dump(mode="json"),
             "state_dimensions": goal.state_dimensions,

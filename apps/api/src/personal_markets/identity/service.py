@@ -51,7 +51,7 @@ class IdentityService:
         stored = await self._repository.upsert_user(incoming)
         if (
             self._settings.dev_bootstrap_test_users
-            and self._settings.environment in {"development", "test", "pytest"}
+            and not self._settings.is_deployed()
             and claims.get("iss") == "playitout-test"
             and not stored.hosted_enabled
         ):

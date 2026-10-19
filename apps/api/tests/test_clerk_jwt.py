@@ -79,11 +79,19 @@ def install_trusted_jwks(monkeypatch, trusted_jwks) -> list[dict[str, Any]]:
     return decode_kwargs
 
 
-def _sign(rsa_key, *, azp: str, aud: str | None = None, ttl_seconds: int = 3600) -> str:
+def _sign(
+    rsa_key,
+    *,
+    azp: str,
+    aud: str | None = None,
+    ttl_seconds: int = 3600,
+    iss: str = ISSUER,
+    sub: str = "user_clerk_admin",
+) -> str:
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
-        "sub": "user_clerk_admin",
-        "iss": ISSUER,
+        "sub": sub,
+        "iss": iss,
         "azp": azp,
         "iat": int(now.timestamp()),
         "nbf": int((now - timedelta(seconds=5)).timestamp()),
@@ -219,3 +227,33 @@ def test_http_expired_token_is_401(
         response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 401
     assert response.json()["error"]["message"] == "token expired"
+
+
+def test_wrong_clerk_issuer_is_rejected(
+    rsa_key, clerk_settings, install_trusted_jwks
+) -> None:
+    token = _sign(rsa_key, azp=ALLOWED_AZP, iss="https://evil.clerk.accounts.dev")
+    with pytest.raises(UnauthorizedError, match="invalid token"):
+        token_mod._verify_clerk_token(token, clerk_settings)
+
+
+def test_http_wrong_issuer_is_401(
+    monkeypatch, rsa_key, clerk_settings, install_trusted_jwks
+) -> None:
+    token = _sign(rsa_key, azp=ALLOWED_AZP, iss="https://evil.clerk.accounts.dev")
+    with _http_client(monkeypatch, clerk_settings) as client:
+        response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "invalid token"
+
+
+def test_http_uninvited_clerk_identity_cannot_list_goals(
+    monkeypatch, rsa_key, clerk_settings, install_trusted_jwks
+) -> None:
+    token = _sign(rsa_key, azp=ALLOWED_AZP, sub="user_uninvited_clerk")
+    with _http_client(monkeypatch, clerk_settings) as client:
+        me = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+        goals = client.get("/api/v1/goals", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
+    assert me.json()["invited"] is False
+    assert goals.status_code == 403
