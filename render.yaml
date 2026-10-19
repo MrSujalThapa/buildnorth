@@ -23,13 +23,23 @@ services:
       - key: PM_HOSTED_INFERENCE_ENABLED
         value: "true"
       - key: PM_HOSTED_USER_QUOTA_USD
-        value: "2.0"
+        value: "5.0"
       - key: PM_HOSTED_GLOBAL_QUOTA_USD
-        value: "25.0"
+        value: "100.0"
       - key: PM_HOSTED_USER_QUOTA_TOKENS
-        value: "100000"
+        value: "5000000"
       - key: PM_HOSTED_GLOBAL_QUOTA_TOKENS
-        value: "1000000"
+        value: "100000000"
+      - key: PM_OPENAI_MAX_COST_USD
+        value: "100.0"
+      - key: PM_OPENAI_DAILY_TOKEN_BUDGET_HIGH_VOLUME
+        value: "100000000"
+      - key: PM_OPENAI_DAILY_TOKEN_BUDGET_PREMIUM
+        value: "100000000"
+      - key: PM_INFERENCE_PROVIDER
+        value: openai
+      - key: PM_INFERENCE_MODEL
+        value: gpt-5.4-mini
       - key: PM_HOSTED_USER_RPM
         value: "20"
       - key: PM_HOSTED_IP_RPM
@@ -65,6 +75,8 @@ services:
       - key: CLERK_SECRET_KEY
         sync: false
       - key: PM_SPUR_API_KEY
+        sync: false
+      - key: PM_OPENAI_API_KEY
         sync: false
       - key: PM_BYOK_ENCRYPTION_KEYS
         sync: false

@@ -74,7 +74,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
           </div>
         </section>
 
-        <InferenceSettings />
+        <InferenceSettings hosted={hosted} />
 
         <PersonalAgents />
 

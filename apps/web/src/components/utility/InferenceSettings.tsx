@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type InferencePreference, type InferenceSettings as Settings } from "../../api/client";
+import type { HostedUsage } from "../../auth/session";
 
-export function InferenceSettings() {
+export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [mode, setMode] = useState<InferencePreference["mode"]>("hosted");
   const [provider, setProvider] = useState<InferencePreference["provider"]>("openai");
@@ -43,7 +44,7 @@ export function InferenceSettings() {
 
   return (
     <section className="settings-group" aria-labelledby="inference-heading">
-      <h2 id="inference-heading">Bring your own key</h2>
+      <h2 id="inference-heading">Inference</h2>
       {!settings ? (
         <p className="setting-note">{error ? "Inference settings are unavailable." : "Loading inference settings…"}</p>
       ) : (
@@ -51,10 +52,13 @@ export function InferenceSettings() {
           <div className="settings-list">
             <div className="setting-row">
               <div>
-                <strong>Who pays for inference</strong>
+                <strong>Current mode: {settings.preference.mode === "byok" ? "BYOK" : "Hosted"}</strong>
                 <span>{settings.preference.mode === "byok"
                   ? "Your selected provider account pays for agent inference. Hosted tokens are not consumed."
                   : `Play It Out pays through ${settings.hosted_provider}. Your hosted allowance and limits apply.`}</span>
+                <span>Provider: {settings.preference.mode === "byok" ? settings.preference.provider : settings.hosted_provider} · Model: {settings.preference.mode === "byok" ? settings.preference.model || "provider default" : settings.hosted_model || "not configured"}</span>
+                {hosted ? <span>Hosted credit: ${Number(hosted.remaining_usd).toFixed(2)} / ${Number(hosted.quota_usd).toFixed(2)} remaining · Global: {hosted.kill_switch ? "disabled" : Number(hosted.global_remaining_usd || 0) <= 0 ? "exhausted" : `$${Number(hosted.global_remaining_usd).toFixed(2)} available`}</span> : null}
+                {hosted && (hosted.remaining_usd <= 0 || !hosted.enabled) ? <span>Hosted inference is unavailable for this account. Connect your own key to use BYOK.</span> : null}
               </div>
             </div>
           </div>
@@ -114,8 +118,8 @@ export function InferenceSettings() {
             setKey("");
             void perform(async () => {
               await api.saveProviderKey(provider, candidate);
-              setSettings(await api.inferenceSettings());
-              setNotice("Key validated and saved. Select BYOK and save your preference to use it.");
+                accept(await api.inferenceSettings());
+                setNotice("Key validated, encrypted, and connected. BYOK is now active.");
             });
           }}>
             <label>{credential ? "Replacement API key" : "API key"}
@@ -124,7 +128,7 @@ export function InferenceSettings() {
             </label>
             <button type="submit" disabled={busy || !key.trim()}>{credential ? "Replace key" : "Add and validate key"}</button>
           </form>
-          <p className="setting-note">Keys are encrypted on the server and never returned. Saving a key does not switch billing mode. Provider authentication or quota failures stop the request; billing never switches automatically. API billing is separate from a chat subscription.</p>
+          <p className="setting-note">Keys are encrypted on the server and never returned. Connecting a key activates BYOK. Provider authentication or quota failures stop the request without switching billing modes. API billing is separate from a chat subscription.</p>
           <p className="setting-note">BYOK usage: {settings.byok_usage.calls} calls · {settings.byok_usage.input_tokens + settings.byok_usage.output_tokens} tokens · estimated ${Number(settings.byok_usage.estimated_cost_usd).toFixed(4)}. External research tools use a separate hosted dollar allowance when available.</p>
         </>
       )}

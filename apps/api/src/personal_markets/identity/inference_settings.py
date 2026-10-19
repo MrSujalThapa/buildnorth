@@ -72,7 +72,7 @@ class InferenceSettingsService:
         ciphertext = self._cipher.encrypt(principal.user_id, provider, key)
         await NativeInferenceAdapter(provider, key).validate_key()
         try:
-            await self._store.put(principal.user_id, provider, ciphertext, key[-4:])
+            await self._store.put_and_activate(principal.user_id, provider, ciphertext, key[-4:])
             row = await self._store.get(principal.user_id, provider)
             if row is None:
                 raise ValueError

@@ -34,7 +34,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     get_settings.cache_clear()
 
 
-def test_key_lifecycle_and_explicit_mode(client: TestClient) -> None:
+def test_key_lifecycle_and_automatic_byok_activation(client: TestClient) -> None:
     url = "/api/v1/settings/inference"
     secret = "sk-phase2-private-key-1234"
     saved = client.put(url + "/credentials/openai", json={"api_key": secret})
@@ -42,7 +42,11 @@ def test_key_lifecycle_and_explicit_mode(client: TestClient) -> None:
     assert saved.json()["masked_suffix"] == "••••1234"
     assert secret not in saved.text
     first_version = saved.json()["version"]
-    assert client.get(url).json()["preference"]["mode"] == "hosted"
+    assert client.get(url).json()["preference"] == {
+        "mode": "byok",
+        "provider": "openai",
+        "model": None,
+    }
     chosen = client.put(url, json={"mode": "byok", "provider": "openai", "model": "gpt-5.4-mini"})
     assert chosen.status_code == 200, chosen.text
     validated = client.post(url + "/credentials/openai/validate")
@@ -50,12 +54,29 @@ def test_key_lifecycle_and_explicit_mode(client: TestClient) -> None:
     replaced = client.put(url + "/credentials/openai", json={"api_key": secret + "5678"})
     assert replaced.status_code == 200
     assert replaced.json()["version"] != first_version
+    assert client.get(url).json()["preference"]["mode"] == "byok"
     assert client.delete(url + "/credentials/openai").status_code == 204
     settings = client.get(url)
     assert settings.headers["cache-control"] == "no-store"
     assert settings.json()["credentials"] == []
     assert settings.json()["preference"]["mode"] == "byok"
     assert client.post(url + "/credentials/openai/validate").status_code == 503
+
+
+def test_connecting_anthropic_switches_from_hosted_without_spending_credits(
+    client: TestClient,
+) -> None:
+    url = "/api/v1/settings/inference"
+    before = client.get("/api/v1/me").json()["hosted"]
+    saved = client.put(url + "/credentials/anthropic", json={"api_key": "sk-ant-private-1234"})
+    assert saved.status_code == 200, saved.text
+    current = client.get(url).json()
+    assert current["preference"] == {"mode": "byok", "provider": "anthropic", "model": None}
+    assert current["credentials"][0]["masked_suffix"] == "••••1234"
+    assert client.get("/api/v1/me").json()["hosted"] == before
+    switched = client.put(url, json={"mode": "hosted", "provider": "anthropic", "model": None})
+    assert switched.status_code == 200, switched.text
+    assert switched.json()["preference"]["mode"] == "hosted"
 
 
 def test_validation_errors_never_echo_secrets(client: TestClient) -> None:

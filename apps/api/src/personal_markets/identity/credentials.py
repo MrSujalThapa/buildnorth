@@ -97,6 +97,9 @@ class CredentialStore(Protocol):
     async def put(
         self, owner: UUID, provider: UserProvider, ciphertext: str, suffix: str
     ) -> None: ...
+    async def put_and_activate(
+        self, owner: UUID, provider: UserProvider, ciphertext: str, suffix: str
+    ) -> None: ...
     async def delete(self, owner: UUID, provider: UserProvider) -> None: ...
     async def preference(self, owner: UUID) -> InferencePreference: ...
     async def set_preference(self, owner: UUID, preference: InferencePreference) -> None: ...
@@ -121,6 +124,12 @@ class InMemoryCredentialStore:
         self._credentials[owner, provider] = StoredCredential(
             provider, ciphertext, suffix, uuid4(), datetime.now(UTC)
         )
+
+    async def put_and_activate(
+        self, owner: UUID, provider: UserProvider, ciphertext: str, suffix: str
+    ) -> None:
+        await self.put(owner, provider, ciphertext, suffix)
+        await self.set_preference(owner, InferencePreference(mode="byok", provider=provider))
 
     async def delete(self, owner: UUID, provider: UserProvider) -> None:
         self._credentials.pop((owner, provider), None)
@@ -182,6 +191,37 @@ class PostgresCredentialStore:
                     "suffix": suffix,
                     "version": uuid4(),
                 },
+            )
+
+    async def put_and_activate(
+        self, owner: UUID, provider: UserProvider, ciphertext: str, suffix: str
+    ) -> None:
+        async with transaction(self._engine) as conn:
+            await conn.execute(
+                text("""
+                insert into provider_credentials
+                  (user_id, provider, ciphertext, suffix, version, validated_at)
+                values (:owner, :provider, :ciphertext, :suffix, :version, now())
+                on conflict (user_id, provider) do update set
+                  ciphertext=excluded.ciphertext, suffix=excluded.suffix,
+                  version=excluded.version, validated_at=excluded.validated_at, status='validated'
+                """),
+                {
+                    "owner": owner,
+                    "provider": provider,
+                    "ciphertext": ciphertext,
+                    "suffix": suffix,
+                    "version": uuid4(),
+                },
+            )
+            await conn.execute(
+                text("""
+                insert into inference_preferences (user_id, mode, provider, model)
+                values (:owner, 'byok', :provider, null)
+                on conflict (user_id) do update set
+                  mode='byok', provider=excluded.provider, model=null
+                """),
+                {"owner": owner, "provider": provider},
             )
 
     async def delete(self, owner: UUID, provider: UserProvider) -> None:

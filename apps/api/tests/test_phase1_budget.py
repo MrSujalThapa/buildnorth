@@ -90,10 +90,62 @@ async def test_parallel_reservations_cannot_overspend() -> None:
     assert counters.reserved_tokens <= user.hosted_quota_tokens
 
 
-def test_hosted_global_quota_remains_twenty_five_dollars() -> None:
+async def test_judge_dollar_allowances_are_independent_and_share_global_cap() -> None:
+    store = InMemoryBudgetStore()
+    first = _hosted("judge-first", quota_usd=5, quota_tokens=5_000_000)
+    second = _hosted("judge-second", quota_usd=5, quota_tokens=5_000_000)
+
+    async def reserve(user: Principal, amount: float):
+        return await store.reserve(
+            user_id=user.user_id,
+            clerk_user_id=user.clerk_user_id,
+            agent_name="goal_architect",
+            provider="openai",
+            model="gpt-5.4-mini",
+            amount_usd=amount,
+            tokens=100,
+            user_cap_usd=user.hosted_quota_usd,
+            user_cap_tokens=user.hosted_quota_tokens,
+            global_cap_usd=100,
+            global_cap_tokens=100_000_000,
+        )
+
+    assert await reserve(first, 4.99) is not None
+    assert await reserve(first, 0.02) is None
+    assert await reserve(second, 5.0) is not None
+    assert await reserve(second, 0.01) is None
+    assert (await store.counters("global")).reserved_usd == 9.99
+
+
+async def test_parallel_judges_cannot_cross_global_dollar_limit() -> None:
+    store = InMemoryBudgetStore()
+    judges = [_hosted(f"global-judge-{i}", quota_usd=5, quota_tokens=5_000_000) for i in range(21)]
+    results = await asyncio.gather(
+        *[
+            store.reserve(
+                user_id=user.user_id,
+                clerk_user_id=user.clerk_user_id,
+                agent_name="goal_architect",
+                provider="openai",
+                model="gpt-5.4-mini",
+                amount_usd=5,
+                tokens=100,
+                user_cap_usd=5,
+                user_cap_tokens=5_000_000,
+                global_cap_usd=100,
+                global_cap_tokens=100_000_000,
+            )
+            for user in judges
+        ]
+    )
+    assert sum(result is not None for result in results) == 20
+    assert (await store.counters("global")).reserved_usd == 100
+
+
+def test_judge_hosted_allowance_defaults() -> None:
     settings = _settings()
-    assert settings.hosted_global_quota_usd == 25.0
-    assert settings.hosted_user_quota_usd == 2.0
+    assert settings.hosted_global_quota_usd == 100.0
+    assert settings.hosted_user_quota_usd == 5.0
 
 
 async def test_global_budget_exhaustion() -> None:

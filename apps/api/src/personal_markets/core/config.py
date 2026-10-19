@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     )
     spur_base_url: str = Field(
         default="https://ai.spuric.com/v1",
-        validation_alias=AliasChoices("PM_SPUR_BASE_URL", "SPUR_BASE_URL")
+        validation_alias=AliasChoices("PM_SPUR_BASE_URL", "SPUR_BASE_URL"),
     )
     spur_model: str | None = None
     openai_goal_model: str = "gpt-5.4-mini"
@@ -61,9 +61,9 @@ class Settings(BaseSettings):
     openai_max_retries: int = 3
     openai_max_concurrency: int = 4
     openai_max_output_tokens: int = 1200
-    openai_daily_token_budget_high_volume: int = 2_500_000
-    openai_daily_token_budget_premium: int = 250_000
-    openai_max_cost_usd: float = 5.0
+    openai_daily_token_budget_high_volume: int = 100_000_000
+    openai_daily_token_budget_premium: int = 100_000_000
+    openai_max_cost_usd: float = 100.0
     github_token: str | None = None
     monid_enabled: bool = False
     monid_api_base: str | None = None
@@ -94,10 +94,10 @@ class Settings(BaseSettings):
     admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     test_auth_secret: str | None = None
     hosted_inference_enabled: bool = True
-    hosted_user_quota_usd: float = 2.0
-    hosted_user_quota_tokens: int = 100_000
-    hosted_global_quota_usd: float = 25.0
-    hosted_global_quota_tokens: int = 1_000_000
+    hosted_user_quota_usd: float = 5.0
+    hosted_user_quota_tokens: int = 5_000_000
+    hosted_global_quota_usd: float = 100.0
+    hosted_global_quota_tokens: int = 100_000_000
     hosted_user_rpm: int = 20
     hosted_ip_rpm: int = 60
     invite_ttl_hours: int = 72

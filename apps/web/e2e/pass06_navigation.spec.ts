@@ -85,3 +85,40 @@ test("administrator can revoke a generated invitation with clipboard access pend
   await expect(page.getByText(/redeemed · Revoked/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("invitation-revoked.jpg"), fullPage: true });
 });
+
+test("connecting a provider key activates BYOK in Settings without a second save", async ({ page }, testInfo) => {
+  let mode: "hosted" | "byok" = "hosted";
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => sessionStorage.setItem("pm-test-token", "local-regression-token"));
+  await page.route("**/api/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/me") return route.fulfill({ json: {
+      user_id: "local-judge", role: "user", invited: true, email_verified: true,
+      hosted: { enabled: true, quota_usd: 5, remaining_usd: 4.73, global_remaining_usd: 99, remaining_tokens: 5000000, billing_note: "Estimated" },
+    } });
+    if (path === "/api/v1/settings/inference/credentials/openai" && route.request().method() === "PUT") {
+      mode = "byok";
+      return route.fulfill({ json: { provider: "openai", status: "validated", masked_suffix: "••••1234", validated_at: "2026-10-19T00:00:00Z", version: "v1" } });
+    }
+    if (path === "/api/v1/settings/inference") return route.fulfill({ json: {
+      preference: { mode, provider: "openai", model: null },
+      credentials: mode === "byok" ? [{ provider: "openai", status: "validated", masked_suffix: "••••1234", validated_at: "2026-10-19T00:00:00Z", version: "v1" }] : [],
+      models: [], hosted_provider: "openai", hosted_model: "gpt-5.4-mini",
+      byok_usage: { calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 },
+    } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/settings");
+  await expect(page.getByText("Current mode: Hosted")).toBeVisible();
+  await expect(page.getByText(/Hosted credit: \$4\.73 \/ \$5\.00 remaining/)).toBeVisible();
+  await page.getByLabel("API key", { exact: true }).fill("sk-local-test-1234");
+  await page.getByRole("button", { name: "Add and validate key" }).click();
+  await expect(page.getByText("Current mode: BYOK")).toBeVisible();
+  await expect(page.getByText(/BYOK is now active/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Current mode: BYOK")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("judge-byok-settings.jpg"), fullPage: true });
+});
