@@ -1,4 +1,5 @@
 import { currentAccessToken, type AccountView } from "../auth/session";
+import { resolveApiBaseUrl } from "./baseUrl";
 
 export type ForecastStatus = "CALIBRATED" | "ANCHORED" | "EXPLORATORY";
 
@@ -490,11 +491,9 @@ export interface WorkflowSnapshot {
   debug: Record<string, unknown>;
 }
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-const baseUrl = configuredBaseUrl || `${window.location.protocol}//${window.location.hostname}:8000`;
-
 async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
   const token = await currentAccessToken();
+  const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     signal,
