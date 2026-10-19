@@ -42,11 +42,19 @@ class InferenceSettingsService:
                 if row:
                     credentials.append(row.metadata().model_dump(mode="json"))
             provider = hosted_provider(self._settings)
+            hosted_configured = bool(
+                {
+                    "openai": self._settings.openai_api_key,
+                    "anthropic": self._settings.anthropic_api_key,
+                    "spur": self._settings.spur_api_key,
+                }.get(provider)
+            )
             return {
                 "preference": (await self._store.preference(principal.user_id)).model_dump(),
                 "credentials": credentials,
                 "models": model_catalog(),
                 "hosted_provider": provider,
+                "hosted_configured": hosted_configured,
                 "hosted_model": self._settings.inference_model
                 or (
                     self._settings.resolved_spur_model()

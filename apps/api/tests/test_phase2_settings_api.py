@@ -117,6 +117,18 @@ def test_unsupported_model_does_not_change_saved_preference(client: TestClient) 
     assert client.get(url).json()["preference"]["model"] is None
 
 
+def test_settings_distinguishes_budget_from_missing_hosted_credential(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PM_INFERENCE_PROVIDER", "openai")
+    monkeypatch.setenv("PM_OPENAI_API_KEY", "")
+    get_settings.cache_clear()
+    response = client.get("/api/v1/settings/inference")
+    assert response.status_code == 200, response.text
+    assert response.json()["hosted_provider"] == "openai"
+    assert response.json()["hosted_configured"] is False
+
+
 def test_authentication_and_invite_are_required(client: TestClient) -> None:
     cast(FastAPI, client.app).state.auth_bypass_principal = None
     assert client.get("/api/v1/settings/inference").status_code == 401

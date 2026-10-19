@@ -104,7 +104,7 @@ test("connecting a provider key activates BYOK in Settings without a second save
     if (path === "/api/v1/settings/inference") return route.fulfill({ json: {
       preference: { mode, provider: "openai", model: null },
       credentials: mode === "byok" ? [{ provider: "openai", status: "validated", masked_suffix: "••••1234", validated_at: "2026-10-19T00:00:00Z", version: "v1" }] : [],
-      models: [], hosted_provider: "openai", hosted_model: "gpt-5.4-mini",
+      models: [], hosted_provider: "openai", hosted_configured: false, hosted_model: "gpt-5.4-mini",
       byok_usage: { calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 },
     } });
     return route.fulfill({ json: [] });

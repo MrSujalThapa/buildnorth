@@ -20,6 +20,7 @@ export type InferenceSettings = {
   credentials: CredentialMetadata[];
   models: { provider: string; model: string; structured: boolean; tools: boolean }[];
   hosted_provider: string;
+  hosted_configured: boolean;
   hosted_model: string | null;
   byok_usage: { calls: number; input_tokens: number; output_tokens: number; estimated_cost_usd: number };
 };

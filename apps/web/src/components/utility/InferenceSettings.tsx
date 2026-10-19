@@ -57,8 +57,8 @@ export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
                   ? "Your selected provider account pays for agent inference. Hosted tokens are not consumed."
                   : `Play It Out pays through ${settings.hosted_provider}. Your hosted allowance and limits apply.`}</span>
                 <span>Provider: {settings.preference.mode === "byok" ? settings.preference.provider : settings.hosted_provider} · Model: {settings.preference.mode === "byok" ? settings.preference.model || "provider default" : settings.hosted_model || "not configured"}</span>
-                {hosted ? <span>Hosted credit: ${Number(hosted.remaining_usd).toFixed(2)} / ${Number(hosted.quota_usd).toFixed(2)} remaining · Global: {hosted.kill_switch ? "disabled" : Number(hosted.global_remaining_usd || 0) <= 0 ? "exhausted" : `$${Number(hosted.global_remaining_usd).toFixed(2)} available`}</span> : null}
-                {hosted && (hosted.remaining_usd <= 0 || !hosted.enabled) ? <span>Hosted inference is unavailable for this account. Connect your own key to use BYOK.</span> : null}
+                {hosted ? <span>Hosted credit: ${Number(hosted.remaining_usd).toFixed(2)} / ${Number(hosted.quota_usd).toFixed(2)} remaining · Global balance: ${Number(hosted.global_remaining_usd || 0).toFixed(2)} · {hosted.kill_switch ? "Hosted inference disabled" : !settings.hosted_configured ? "Hosted provider not configured" : Number(hosted.global_remaining_usd || 0) <= 0 ? "Global credits exhausted" : "Hosted inference available"}</span> : null}
+                {hosted && (hosted.remaining_usd <= 0 || !hosted.enabled) ? <span>Hosted credit is unavailable for this account. Connect your own key to use BYOK.</span> : null}
               </div>
             </div>
           </div>
