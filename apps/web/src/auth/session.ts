@@ -1,3 +1,5 @@
+import { normalizePublishableKey } from "./clerkScript";
+
 export type HostedUsage = {
   enabled: boolean;
   quota_usd: number;
@@ -27,7 +29,11 @@ const TEST_TOKEN_KEY = "pm-test-token";
 const INVITE_TOKEN_KEY = "pm-invite-token";
 
 export function clerkEnabled(): boolean {
-  return Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) && import.meta.env.VITE_AUTH_BYPASS !== "true" && import.meta.env.MODE !== "test";
+  return (
+    Boolean(normalizePublishableKey(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)) &&
+    import.meta.env.VITE_AUTH_BYPASS !== "true" &&
+    import.meta.env.MODE !== "test"
+  );
 }
 
 export function readTestToken(): string | null {

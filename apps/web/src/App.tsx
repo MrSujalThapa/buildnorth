@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/react";
 import { Route, Routes } from "react-router-dom";
 import { AuthGate } from "./auth/AuthGate";
+import { clerkProviderLoadOptions, normalizePublishableKey } from "./auth/clerkScript";
 import { clerkEnabled } from "./auth/session";
 import AppShell from "./components/shell/AppShell";
 import SocialPage from "./components/utility/SocialPage";
@@ -56,9 +57,13 @@ function AppTree() {
 }
 
 export function App() {
-  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = normalizePublishableKey(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
   if (clerkEnabled() && publishableKey) {
-    return <ClerkProvider publishableKey={publishableKey}><AppTree /></ClerkProvider>;
+    return (
+      <ClerkProvider publishableKey={publishableKey} {...clerkProviderLoadOptions(publishableKey, import.meta.env.VITE_CLERK_JS_URL)}>
+        <AppTree />
+      </ClerkProvider>
+    );
   }
   return <AppTree />;
 }
