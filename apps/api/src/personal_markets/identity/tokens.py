@@ -113,6 +113,13 @@ def _verify_clerk_token(token: str, settings: Settings) -> TokenClaims:
     if not jwks_url:
         raise UnauthorizedError("authentication is not configured")
     try:
+        header = jwt.get_unverified_header(token)
+        if (
+            header.get("alg") != "RS256"
+            or not isinstance(header.get("kid"), str)
+            or not header["kid"]
+        ):
+            raise jwt.InvalidTokenError("unsupported token signing header")
         client = jwt.PyJWKClient(jwks_url)
         signing_key = client.get_signing_key_from_jwt(token)
         decode_kwargs: dict[str, Any] = {
@@ -128,7 +135,7 @@ def _verify_clerk_token(token: str, settings: Settings) -> TokenClaims:
         payload = jwt.decode(token, signing_key.key, **decode_kwargs)
     except jwt.ExpiredSignatureError as error:
         raise UnauthorizedError("token expired") from error
-    except jwt.InvalidTokenError as error:
+    except (jwt.InvalidTokenError, jwt.PyJWKClientError) as error:
         raise UnauthorizedError("invalid token") from error
     origins = authorized_origins(settings)
     azp = str(payload.get("azp") or "").rstrip("/")

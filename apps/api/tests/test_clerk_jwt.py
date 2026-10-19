@@ -257,3 +257,41 @@ def test_http_uninvited_clerk_identity_cannot_list_goals(
     assert me.status_code == 200
     assert me.json()["invited"] is False
     assert goals.status_code == 403
+
+
+@pytest.mark.parametrize("header", [
+    {"alg": "none", "typ": "JWT"},
+    {"alg": "HS256", "kid": "untrusted"},
+    {"alg": "RS256"},
+    {"alg": "RS256", "kid": ""},
+])
+def test_http_invalid_signing_header_is_401_without_jwks_lookup(
+    monkeypatch, clerk_settings, header,
+) -> None:
+    import json
+
+    def encode(value: dict[str, Any]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
+
+    def unexpected_lookup(*args, **kwargs):
+        raise AssertionError("Malformed signing headers must not fetch JWKS")
+
+    monkeypatch.setattr(token_mod.jwt.PyJWKClient, "get_signing_key_from_jwt", unexpected_lookup)
+    token = encode(header) + "." + encode({"sub": "forged", "role": "admin", "exp": 1}) + "."
+    with _http_client(monkeypatch, clerk_settings) as client:
+        response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "invalid token"
+
+
+def test_http_unknown_signing_key_is_401(
+    monkeypatch, rsa_key, clerk_settings, install_trusted_jwks,
+) -> None:
+    token = jwt.encode(
+        {"sub": "forged", "role": "admin", "exp": 1}, rsa_key,
+        algorithm="RS256", headers={"kid": "unknown-key"},
+    )
+    with _http_client(monkeypatch, clerk_settings) as client:
+        response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+    assert response.json()["error"]["message"] == "invalid token"
