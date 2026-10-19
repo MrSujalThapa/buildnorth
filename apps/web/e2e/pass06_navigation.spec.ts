@@ -34,5 +34,54 @@ test("empty catalog leads to goal creation and an actionable provider failure", 
   await page.screenshot({ path: testInfo.outputPath("goal-provider-failure.jpg"), fullPage: true });
   await page.getByRole("link", { name: "Check inference settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Social", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "No shared goals" })).toBeVisible();
+  await expect(page.getByText(/\+\d+(\.\d+)? pts/)).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test("administrator can revoke a generated invitation with clipboard access pending", async ({ page }, testInfo) => {
+  const invites: Record<string, unknown>[] = [];
+  await page.addInitScript(() => {
+    sessionStorage.setItem("pm-test-token", "local-regression-token");
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: () => new Promise<void>(() => {}) }, configurable: true,
+    });
+  });
+  await page.route("**/api/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/me") return route.fulfill({ json: {
+      user_id: "local-admin", role: "admin", invited: false, email_verified: true,
+      hosted: { quota_usd: 0, remaining_usd: 0, remaining_tokens: 0, billing_note: "Regression fixture" },
+    } });
+    if (path === "/api/v1/admin/invites" && route.request().method() === "POST") {
+      const row = {
+        invitation_id: "local-invite", kind: "shared", note: "Regression", max_redemptions: 1,
+        redemption_count: 0, expires_at: "2027-01-01T00:00:00Z", revoked_at: null,
+      };
+      invites.push(row);
+      return route.fulfill({ json: { ...row, token: "fake-regression-invitation" } });
+    }
+    if (path.endsWith("/revoke")) {
+      invites[0].revoked_at = "2026-10-19T22:00:00Z";
+      return route.fulfill({ json: invites[0] });
+    }
+    if (path === "/api/v1/admin/invites") return route.fulfill({ json: invites });
+    if (path === "/api/v1/settings/inference") return route.fulfill({ json: {
+      preference: { mode: "hosted", provider: "openai", model: null }, credentials: [], models: [],
+      hosted_provider: "none", hosted_model: null,
+      byok_usage: { calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 },
+    } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Generate link", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Generate link", exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole("button", { name: "Revoke", exact: true }).click();
+  await expect(page.getByText(/redeemed · Revoked/)).toBeVisible();
+  await expect(page.getByText(/fake-regression-invitation/)).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(/redeemed · Revoked/)).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("invitation-revoked.jpg"), fullPage: true });
 });

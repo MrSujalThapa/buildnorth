@@ -183,8 +183,8 @@ function InviteAdmin() {
       if (!created.token) throw new Error("Invitation token was not returned.");
       const url = inviteUrl(created.token);
       setSessionUrls((current) => ({ ...current, [created.invitation_id]: url }));
-      await navigator.clipboard.writeText(url);
-      setCopiedId(created.invitation_id);
+      // Clipboard permission may stay pending. Creation and revocation must not depend on it.
+      setCopiedId(null);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Invitation could not be created.");
@@ -194,8 +194,13 @@ function InviteAdmin() {
   }
 
   async function copy(invitationId: string, url: string) {
-    await navigator.clipboard.writeText(url);
-    setCopiedId(invitationId);
+    setError(null);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(invitationId);
+    } catch {
+      setError("Could not copy the invitation. Select and copy the displayed URL, or reload and generate a replacement.");
+    }
   }
 
   async function revoke(invitationId: string) {

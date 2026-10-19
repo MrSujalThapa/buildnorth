@@ -181,6 +181,8 @@
 }
 
 .invite-created code {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -199,6 +201,9 @@
   gap: 24px;
   border-bottom: 1px solid var(--app-border);
 }
+
+.invite-row > div:first-child { min-width: 0; flex: 1; }
+.invite-created button { flex: 0 0 auto; }
 
 .invite-row strong,
 .invite-row span {
@@ -274,11 +279,13 @@
 
 @media (max-width: 640px) {
   .inference-settings-form { grid-template-columns: minmax(0, 1fr); }
+  .invite-row { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px 0; }
+  .invite-row-actions { justify-content: flex-start; }
 }
 
 @media (max-width: 800px) {
   .invite-admin-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -1,11 +1,5 @@
-﻿import { ArrowUpRight, Lock, UsersRound } from "lucide-react";
+﻿import { Lock, UsersRound } from "lucide-react";
 import "./utility-pages.css";
-
-const people = [
-  { name: "Maya", note: "Training for a half marathon", change: "+3.4 pts" },
-  { name: "Theo", note: "Trying to ship his startup beta", change: "+5.1 pts" },
-  { name: "Ari", note: "Preparing for product interviews", change: "+2.2 pts" },
-];
 
 export default function SocialPage() {
   return (
@@ -28,15 +22,9 @@ export default function SocialPage() {
           <UsersRound size={42} strokeWidth={1.4} />
         </section>
 
-        <div className="social-list">
-          {people.map((person) => (
-            <button className="social-row" key={person.name} type="button">
-              <span className="social-avatar">{person.name[0]}</span>
-              <span className="social-copy"><strong>{person.name}</strong><span>{person.note}</span></span>
-              <span className="social-change">{person.change}</span>
-              <ArrowUpRight size={17} />
-            </button>
-          ))}
+        <div className="social-list" role="status">
+          <h2>No shared goals</h2>
+          <p>Social sharing is not available yet. Your goals stay private.</p>
         </div>
       </section>
     </main>

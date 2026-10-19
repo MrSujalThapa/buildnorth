@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { App } from "./App";
@@ -65,4 +65,13 @@ test("theme toggle persists the explicit preference", async () => {
   fireEvent.click(toggle);
   expect(document.documentElement.dataset.theme).toBe("dark");
   expect(window.localStorage.getItem("pm-theme")).toBe("dark");
+});
+
+test("Social is honest about unavailable sharing and does not invent probability movements", async () => {
+  mockApi([]);
+  renderApp();
+  await screen.findByRole("heading", { name: "Your outcomes" });
+  fireEvent.click(within(screen.getByRole("complementary")).getByRole("button", { name: "Social" }));
+  expect(await screen.findByRole("heading", { name: "No shared goals" })).toBeInTheDocument();
+  expect(screen.queryByText(/\+\d+(\.\d+)? pts/)).not.toBeInTheDocument();
 });
