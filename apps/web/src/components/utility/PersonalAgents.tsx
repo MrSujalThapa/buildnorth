@@ -72,7 +72,7 @@ export function PersonalAgents() {
                 <strong>Remote MCP server</strong>
                 <span>
                   {status.enabled
-                    ? "Agents that support remote MCP with OAuth can read your goals, submit evidence and run What If scenarios after you approve them. Probabilities always come from Play It Out’s models."
+                    ? "Agents that support remote MCP with OAuth can create goals, submit evidence, read historical odds and run What If scenarios after you approve them. Probabilities always come from Play It Out’s models."
                     : "Remote MCP is turned off for this deployment."}
                 </span>
                 {status.enabled ? (
@@ -112,9 +112,10 @@ export function PersonalAgents() {
               <div>
                 <strong>Model credits</strong>
                 <span>
-                  Reading goals, structured evidence and What If make no model calls. Natural-language
-                  submissions use the Evidence Agent and are paid the way you chose under “Who pays for
-                  inference”. An agent can only do this if you approve “Use model credits”.
+                  Reading goals, structured evidence and What If make no model calls. Creating a goal
+                  and natural-language submissions use Play It Out agents and are paid the way you
+                  chose under “Who pays for inference”. An agent can only do this if you approve
+                  “Create goals” and “Use model credits”.
                 </span>
               </div>
             </div>

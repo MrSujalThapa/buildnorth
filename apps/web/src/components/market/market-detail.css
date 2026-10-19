@@ -743,6 +743,19 @@
   font-size: 12px;
 }
 
+.odds-empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  color: var(--market-muted);
+}
+
+.odds-empty strong {
+  color: var(--market-text);
+  font-size: 18px;
+}
+
 @media (max-width: 640px) {
   .market-chart-wrapper {
     height: 275px;

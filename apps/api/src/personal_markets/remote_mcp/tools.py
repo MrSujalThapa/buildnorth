@@ -7,6 +7,7 @@ WhatIfService for scenarios. Nothing here computes a probability.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from collections.abc import Callable
@@ -38,8 +39,20 @@ from personal_markets.forecasting.requirements import resolve_state
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.domain import Principal
-from personal_markets.ports import EvidenceAgentProposal, EvidenceEventProposal
+from personal_markets.ports import (
+    EvidenceAgentProposal,
+    EvidenceEventProposal,
+    ResumePayload,
+    WorkflowRequest,
+)
+from personal_markets.remote_mcp.charting import (
+    filter_range,
+    is_png,
+    render_odds_png,
+    series_from_history,
+)
 from personal_markets.remote_mcp.limits import KeyedLocks, SlidingWindowLimiter
+from personal_markets.remote_mcp.odds_app import ODDS_UI_URI
 from personal_markets.remote_mcp.policy import (
     IDEMPOTENCY_KEY,
     MetricPolicy,
@@ -49,8 +62,22 @@ from personal_markets.remote_mcp.policy import (
     resolve_observed_at,
     unit_matches,
 )
-from personal_markets.remote_mcp.scopes import EVIDENCE_WRITE, INFERENCE, READ, SIMULATE
+from personal_markets.remote_mcp.scopes import (
+    EVIDENCE_WRITE,
+    GOALS_WRITE,
+    INFERENCE,
+    READ,
+    SIMULATE,
+)
 from personal_markets.remote_mcp.store import AuditRecord, RemoteMcpStore, SubmissionRecord, digest
+from personal_markets.remote_mcp.temporal import (
+    delta_pp,
+    parse_when,
+    point_view,
+    select_as_of,
+    sort_history,
+)
+from personal_markets.remote_mcp.weighted import WeightedScoreRequest, compute_weighted_score
 from personal_markets.what_if.domain import InterventionChangeInput, WhatIfRequest, WhatIfResult
 from personal_markets.what_if.intervention_overrides import unmapped_change_metrics
 
@@ -59,8 +86,12 @@ log = structlog.get_logger("personal_markets.remote_mcp")
 _MAX_LIST = 25
 _MAX_TEXT = 400
 _MAX_VECTOR = 6
+_MAX_TABLE_CHARS = 20_000
+_MAX_FILE_BYTES = 40_000
+_MAX_ROWS = 25
 _PUBLISHED_STATUSES = {"completed", "limited", "unchanged"}
 _SUPPORTED_EFFECT_SOURCES = {"FITTED", "REFERENCE"}
+_PENDING_GOAL = UUID("00000000-0000-4000-8000-000000000001")
 
 
 class ToolFailure(Exception):
@@ -292,6 +323,72 @@ class SimulationView(BaseModel):
     writes_published_history: bool = False
 
 
+class GoalCreationView(BaseModel):
+    status: Literal[
+        "needs_clarification", "needs_confirmation", "created", "cancelled", "failed", "replayed"
+    ]
+    thread_id: str
+    goal_id: str | None = None
+    questions: list[dict[str, str]] = Field(default_factory=list)
+    proposed_contract: dict[str, Any] | None = None
+    forecast: ForecastView | None = None
+    llm_used_for_probability: bool = False
+    llm_calls: int = 0
+    message: str | None = None
+
+
+class ForecastCompare(BaseModel):
+    goal_id: str
+    status: Literal["COMPARED", "NO_EARLIER_RECEIPT", "NOT_PUBLISHED"]
+    latest: dict[str, Any] | None = None
+    as_of_point: dict[str, Any] | None = None
+    delta_pp: float | None = None
+    timestamps: dict[str, str | None] = Field(default_factory=dict)
+    message: str
+
+
+class ScenarioCompare(BaseModel):
+    goal_id: str
+    hypothetical: bool = True
+    writes_published_history: bool = False
+    published_baseline: ForecastView
+    as_of_point: dict[str, Any] | None = None
+    scenarios: list[SimulationView] = Field(default_factory=list)
+    weighted_score: dict[str, Any] | None = None
+    message: str | None = None
+
+
+class StructuredRow(BaseModel):
+    metric: str = Field(min_length=1, max_length=80)
+    value: float = Field(allow_inf_nan=False, ge=-1e12, le=1e12)
+    unit: str = Field(min_length=1, max_length=40)
+    observation_kind: Literal["snapshot", "increment", "period"]
+    observed_at: str | None = Field(default=None, max_length=40)
+    period: str | None = Field(default=None, max_length=10)
+
+
+class OddsChartView(BaseModel):
+    goal_id: str
+    title: str
+    status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    range: str
+    points: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_markers: list[dict[str, Any]] = Field(default_factory=list)
+    overlay: list[dict[str, Any]] = Field(default_factory=list)
+    ui_resource: str = ODDS_UI_URI
+    interactive_host_required: bool = True
+    message: str | None = None
+
+
+class OddsImageView(BaseModel):
+    goal_id: str
+    mime_type: Literal["image/png"] = "image/png"
+    byte_size: int
+    static: bool = True
+    public_url: None = None
+    message: str
+
+
 # --- service -----------------------------------------------------------------------
 
 
@@ -304,6 +401,8 @@ class RemoteMcpTools:
         deps: Callable[[], AgentDependencies],
         goals: GoalService | None = None,
         what_if: Callable[[Principal], Any],
+        workflow: Callable[[], Any] | None = None,
+        uploads: Callable[[], Any] | None = None,
         limiter: SlidingWindowLimiter | None = None,
         locks: KeyedLocks | None = None,
     ) -> None:
@@ -312,6 +411,8 @@ class RemoteMcpTools:
         self._goal_override = goals
         self._deps = deps
         self._what_if = what_if
+        self._workflow = workflow
+        self._uploads = uploads
         self._limiter = limiter or SlidingWindowLimiter()
         self._locks = locks or KeyedLocks()
 
@@ -1102,6 +1203,598 @@ class RemoteMcpTools:
             diagnostics=_compact(result.diagnostics.model_dump()) if result.diagnostics else {},
             message=_clip(result.message),
         )
+
+    # --- goal creation ------------------------------------------------------------
+
+    def _workflow_api(self) -> Any:
+        if self._workflow is not None:
+            return self._workflow()
+        return None
+
+    async def _persisted_goal(self, caller: Caller, snapshot: Any) -> Any | None:
+        if snapshot.goal is None:
+            return None
+        try:
+            return await self._goals.get_goal(snapshot.goal.goal_id, owner_id=caller.user_id)
+        except ResourceNotFoundError:
+            return None
+
+    async def _creation_view(
+        self, caller: Caller, snapshot: Any, *, llm_calls: int
+    ) -> GoalCreationView:
+        persisted = await self._persisted_goal(caller, snapshot)
+        interrupt = snapshot.interrupt
+        proposal = None
+        questions: list[dict[str, str]] = []
+        if interrupt is not None:
+            proposal = interrupt.proposal
+            questions = [
+                {"id": item.id, "question": item.question, "why_needed": item.why_needed}
+                for item in interrupt.questions
+            ]
+        elif snapshot.goal is not None and persisted is None:
+            proposal = snapshot.goal.model_dump(mode="json")
+        if snapshot.status == "cancelled":
+            status: Literal[
+                "needs_clarification",
+                "needs_confirmation",
+                "created",
+                "cancelled",
+                "failed",
+                "replayed",
+            ] = "cancelled"
+            message = "Goal creation was cancelled. No market was created."
+        elif snapshot.status == "failed" and persisted is None:
+            status = "failed"
+            message = "The Goal Architect could not produce a measurable contract."
+        elif persisted is not None:
+            status = "created"
+            message = "Goal created. Probabilities come from PlayItOut's model, not the agent."
+        elif interrupt is not None and interrupt.type == "confirm_contract":
+            status = "needs_confirmation"
+            message = (
+                "Confirm this contract with continue_goal_creation(confirmed=true). "
+                "Nothing has been saved yet."
+            )
+        elif interrupt is not None:
+            status = "needs_clarification"
+            message = "Answer these questions with continue_goal_creation, then confirm."
+        else:
+            status = "failed"
+            message = "Goal creation did not complete."
+        forecast = None
+        if persisted is not None:
+            forecast = await self._forecast(caller, persisted)
+        safe_proposal = None
+        if proposal:
+            safe_proposal = {
+                key: _compact(proposal.get(key))
+                for key in (
+                    "title",
+                    "goal_type",
+                    "success_metric",
+                    "success_operator",
+                    "success_target",
+                    "deadline",
+                    "state_dimensions",
+                    "primitive_kind",
+                )
+                if key in proposal
+            }
+        return GoalCreationView(
+            status=status,
+            thread_id=str(snapshot.thread_id),
+            goal_id=str(persisted.goal_id) if persisted is not None else None,
+            questions=questions[:_MAX_LIST],
+            proposed_contract=safe_proposal,
+            forecast=forecast,
+            llm_used_for_probability=False,
+            llm_calls=llm_calls,
+            message=message,
+        )
+
+    def _assert_thread_owner(self, snapshot: Any, caller: Caller) -> None:
+        owner = str((snapshot.debug or {}).get("user_id") or "")
+        if owner and owner != str(caller.user_id):
+            raise ToolFailure("not_found", "Goal creation thread not found")
+        if snapshot.kind != "create_goal":
+            raise ToolFailure("invalid_argument", "This thread is not a goal-creation workflow.")
+
+    async def create_goal(
+        self, caller: Caller, intent: str, idempotency_key: str | None = None
+    ) -> GoalCreationView:
+        self.require_scope(caller, GOALS_WRITE, INFERENCE)
+        workflow = self._workflow_api()
+        if workflow is None:
+            raise ToolFailure("internal_error", "Goal creation is unavailable.", retryable=True)
+        key = idempotency_key
+        if key:
+            self._check_key(key)
+            payload = {"tool": "create_goal", "intent": intent}
+            record, created = await self._store.claim_submission(
+                SubmissionRecord(
+                    user_id=caller.user_id,
+                    idempotency_key=key,
+                    goal_id=_PENDING_GOAL,
+                    connection_id=caller.connection_id,
+                    payload_hash=_payload_hash(payload),
+                )
+            )
+            if not created:
+                stored = GoalCreationView.model_validate(record.result) if record.result else None
+                if stored is None:
+                    raise ToolFailure(
+                        "idempotency_conflict",
+                        "This idempotency_key was already used for a different submission.",
+                    )
+                if record.payload_hash != _payload_hash(payload):
+                    raise ToolFailure(
+                        "idempotency_conflict",
+                        "This idempotency_key was already used for a different submission.",
+                    )
+                return stored.model_copy(update={"status": "replayed", "llm_calls": 0})
+        try:
+            snapshot = await workflow.start(
+                WorkflowRequest(kind="create_goal", intent=intent, user_id=caller.user_id)
+            )
+        except ProviderBudgetExceededError:
+            if key:
+                await self._store.finish_submission(caller.user_id, key, "failed", {})
+            raise ToolFailure(
+                "budget_exhausted",
+                "Your model credit limit has been reached. Add a provider key in Settings "
+                "or wait until hosted credits reset.",
+            ) from None
+        except ProviderNotConfiguredError:
+            if key:
+                await self._store.finish_submission(caller.user_id, key, "failed", {})
+            raise ToolFailure(
+                "inference_unavailable",
+                "Goal Architect is not available for this account. Check inference mode "
+                "in PlayItOut Settings.",
+            ) from None
+        except (ForbiddenError, SemanticProviderError, DomainError) as error:
+            if key:
+                await self._store.finish_submission(caller.user_id, key, "failed", {})
+            raise ToolFailure("inference_failed", _clip(str(error), 200)) from None
+        view = await self._creation_view(caller, snapshot, llm_calls=1)
+        if key:
+            await self._store.finish_submission(
+                caller.user_id, key, "committed", view.model_dump(mode="json")
+            )
+        return view
+
+    async def continue_goal_creation(
+        self,
+        caller: Caller,
+        thread_id: str,
+        answers: dict[str, str] | None = None,
+        confirmed: bool | None = None,
+        cancelled: bool = False,
+    ) -> GoalCreationView:
+        self.require_scope(caller, GOALS_WRITE, INFERENCE)
+        workflow = self._workflow_api()
+        if workflow is None:
+            raise ToolFailure("internal_error", "Goal creation is unavailable.", retryable=True)
+        try:
+            parsed = UUID(thread_id)
+        except ValueError:
+            raise ToolFailure("invalid_argument", "thread_id must be a UUID") from None
+        try:
+            snapshot = await workflow.snapshot(parsed)
+        except ResourceNotFoundError:
+            raise ToolFailure("not_found", "Goal creation thread not found") from None
+        self._assert_thread_owner(snapshot, caller)
+        persisted = await self._persisted_goal(caller, snapshot)
+        if persisted is not None and not cancelled:
+            return await self._creation_view(caller, snapshot, llm_calls=0)
+        try:
+            snapshot = await workflow.resume(
+                parsed,
+                ResumePayload(answers=answers or {}, confirmed=confirmed, cancelled=cancelled),
+            )
+        except ProviderBudgetExceededError:
+            raise ToolFailure(
+                "budget_exhausted",
+                "Your model credit limit has been reached.",
+            ) from None
+        except ResourceNotFoundError:
+            raise ToolFailure("not_found", "Goal creation thread not found") from None
+        except (ForbiddenError, SemanticProviderError, DomainError) as error:
+            raise ToolFailure("inference_failed", _clip(str(error), 200)) from None
+        return await self._creation_view(caller, snapshot, llm_calls=1)
+
+    # --- history / conversational What If -----------------------------------------
+
+    async def compare_forecasts(
+        self,
+        caller: Caller,
+        goal_id: str,
+        as_of: str | None = None,
+        relative: str | None = None,
+        evidence_id: str | None = None,
+    ) -> ForecastCompare:
+        self.require_scope(caller, READ)
+        goal = await self._goal(caller, goal_id)
+        history = sort_history(await self._published(goal))
+        if not history:
+            return ForecastCompare(
+                goal_id=goal_id,
+                status="NOT_PUBLISHED",
+                message="No forecast has been published for this goal.",
+            )
+        observed_at = None
+        ingested_at = None
+        if evidence_id:
+            events = await self._deps().evidence.list_for_goal(goal.goal_id)
+            match = next(
+                (item for item in events if str(item.evidence_id) == evidence_id),
+                None,
+            )
+            if match is None:
+                raise ToolFailure("not_found", "Evidence not found")
+            observed_at = match.observed_at
+            if match.provenance.submission is not None:
+                ingested_at = match.provenance.submission.received_at
+        allowed = {None, "latest", "previous", "last_week", "before_evidence"}
+        if relative not in allowed:
+            raise ToolFailure("invalid_argument", "relative is not a supported as-of selector")
+        try:
+            bound = parse_when(as_of)
+            selected, reason = select_as_of(
+                history,
+                as_of=bound,
+                relative=relative,  # type: ignore[arg-type]
+                evidence_observed_at=observed_at,
+                now=datetime.now(UTC),
+            )
+        except ValueError as error:
+            raise ToolFailure("invalid_argument", str(error)) from None
+        latest = history[-1]
+        if selected is None:
+            return ForecastCompare(
+                goal_id=goal_id,
+                status="NO_EARLIER_RECEIPT",
+                latest=point_view(latest),
+                timestamps={
+                    "as_of": as_of,
+                    "event_observed_at": observed_at.isoformat() if observed_at else None,
+                    "ingested_at": ingested_at.isoformat() if ingested_at else None,
+                    "latest_published_at": point_view(latest)["published_at"],
+                },
+                message=reason,
+            )
+        return ForecastCompare(
+            goal_id=goal_id,
+            status="COMPARED",
+            latest=point_view(latest),
+            as_of_point=point_view(selected),
+            delta_pp=delta_pp(latest.probability, selected.probability),
+            timestamps={
+                "as_of": as_of,
+                "event_observed_at": observed_at.isoformat() if observed_at else None,
+                "ingested_at": ingested_at.isoformat() if ingested_at else None,
+                "as_of_published_at": point_view(selected)["published_at"],
+                "latest_published_at": point_view(latest)["published_at"],
+            },
+            message=(
+                "Delta is percentage points between published receipts, not a relative "
+                "percent change."
+            ),
+        )
+
+    async def compare_scenarios(
+        self,
+        caller: Caller,
+        goal_id: str,
+        scenarios: list[dict[str, Any]],
+        as_of: str | None = None,
+        relative: str | None = None,
+        weighted: dict[str, Any] | None = None,
+    ) -> ScenarioCompare:
+        self.require_scope(caller, SIMULATE)
+        goal = await self._goal(caller, goal_id)
+        published = await self._forecast(caller, goal)
+        history_before = await self._published(goal)
+        as_of_point = None
+        if as_of or relative:
+            compared = await self.compare_forecasts(
+                caller, goal_id, as_of=as_of, relative=relative
+            )
+            as_of_point = compared.as_of_point or compared.latest
+        views: list[SimulationView] = []
+        for item in scenarios[:5]:
+            label = str(item.get("label") or "scenario")
+            raw_changes = item.get("changes") or []
+            changes = [ChangeInput.model_validate(change) for change in raw_changes]
+            view = await self.simulate_intervention(caller, goal_id, changes)
+            view.message = _clip(f"{label}: {view.message or view.status}")
+            views.append(view)
+        weighted_view = None
+        extra_message = None
+        if weighted:
+            try:
+                result = compute_weighted_score(WeightedScoreRequest.model_validate(weighted))
+            except ValueError as error:
+                raise ToolFailure("invalid_argument", str(error)) from None
+            weighted_view = result.model_dump(mode="json")
+            extra_message = result.message
+        history_after = await self._published(goal)
+        if len(history_after) != len(history_before):
+            raise ToolFailure("internal_error", "What If wrote published history", retryable=False)
+        return ScenarioCompare(
+            goal_id=goal_id,
+            published_baseline=published,
+            as_of_point=as_of_point,
+            scenarios=views,
+            weighted_score=weighted_view,
+            message=extra_message
+            or "Hypothetical only. Published forecast history was not changed.",
+        )
+
+    # --- structured / file handoff ------------------------------------------------
+
+    async def submit_structured_rows(
+        self,
+        caller: Caller,
+        *,
+        goal_id: str,
+        rows: list[StructuredRow],
+        idempotency_key: str,
+        source_category: str,
+        source_identifier: str | None = None,
+        supporting_reference: str | None = None,
+    ) -> SubmissionResult:
+        self.require_scope(caller, EVIDENCE_WRITE)
+        self._check_key(idempotency_key)
+        if not rows:
+            raise ToolFailure("invalid_argument", "At least one row is required.")
+        if len(rows) > _MAX_ROWS:
+            raise ToolFailure("invalid_argument", f"At most {_MAX_ROWS} rows per call.")
+        goal = await self._goal(caller, goal_id)
+        policy = observation_policy(goal)
+        payload = {
+            "tool": "submit_structured_rows",
+            "goal_id": str(goal.goal_id),
+            "rows": [item.model_dump(mode="json") for item in rows],
+            "source": [source_category, source_identifier, supporting_reference],
+        }
+        record, created = await self._claim(caller, goal, idempotency_key, payload)
+        if not created:
+            return await self._replay(caller, record, idempotency_key)
+        events: list[EvidenceEventProposal] = []
+        for index, row in enumerate(rows):
+            metric_policy = self._validate(policy, row.metric, row.unit, row.observation_kind)
+            try:
+                when = resolve_observed_at(
+                    metric_policy, row.observed_at, row.period, datetime.now(UTC)
+                )
+            except ValueError as error:
+                raise ToolFailure("invalid_argument", str(error)) from None
+            events.append(
+                EvidenceEventProposal(
+                    event_type="agent_observation",
+                    observation_kind=row.observation_kind,
+                    domain="personal_agent",
+                    metric=metric_policy.metric,
+                    numeric_value=row.value,
+                    unit=metric_policy.unit,
+                    observed_at=when.isoformat(),
+                    source_type="personal_agent",
+                    summary=_clip(
+                        f"{metric_policy.label}: {row.value:g} {metric_policy.unit} "
+                        f"({row.observation_kind})",
+                        300,
+                    ),
+                    event_identity=self._identity(
+                        caller, idempotency_key, index, row.observation_kind
+                    ),
+                )
+            )
+        submission = self._submission(
+            caller, source_category, source_identifier, supporting_reference, idempotency_key
+        )
+        return await self._commit(caller, goal, idempotency_key, events, submission, None, 0)
+
+    async def submit_table_text(
+        self,
+        caller: Caller,
+        *,
+        goal_id: str,
+        filename: str,
+        text: str,
+        mapping: dict[str, str],
+        idempotency_key: str,
+        source_category: str,
+    ) -> SubmissionResult:
+        self.require_scope(caller, EVIDENCE_WRITE)
+        if len(text) > _MAX_TABLE_CHARS:
+            raise ToolFailure(
+                "invalid_argument",
+                f"Table text is limited to {_MAX_TABLE_CHARS} characters. Send bounded "
+                "structured rows instead of a Gmail attachment URL.",
+            )
+        if not filename.lower().endswith((".csv", ".txt", ".md")):
+            raise ToolFailure("invalid_argument", "Table text must be CSV or text.")
+        return await self._ingest_bytes(
+            caller,
+            goal_id=goal_id,
+            filename=filename,
+            content=text.encode("utf-8"),
+            content_type="text/csv",
+            mapping=mapping,
+            idempotency_key=idempotency_key,
+            source_category=source_category,
+        )
+
+    async def submit_file_bytes(
+        self,
+        caller: Caller,
+        *,
+        goal_id: str,
+        filename: str,
+        content_base64: str,
+        mapping: dict[str, str],
+        idempotency_key: str,
+        source_category: str,
+    ) -> SubmissionResult:
+        self.require_scope(caller, EVIDENCE_WRITE)
+        try:
+            content = base64.b64decode(content_base64, validate=True)
+        except Exception:
+            raise ToolFailure("invalid_argument", "content_base64 is not valid base64") from None
+        if len(content) > _MAX_FILE_BYTES:
+            raise ToolFailure(
+                "invalid_argument",
+                f"MCP file transfer is limited to {_MAX_FILE_BYTES} bytes because the "
+                "request cap is 64 KB. Send submit_structured_rows or a CSV via "
+                "submit_table_text. PlayItOut does not fetch Gmail attachment URLs.",
+            )
+        return await self._ingest_bytes(
+            caller,
+            goal_id=goal_id,
+            filename=filename,
+            content=content,
+            content_type="application/octet-stream",
+            mapping=mapping,
+            idempotency_key=idempotency_key,
+            source_category=source_category,
+        )
+
+    async def _ingest_bytes(
+        self,
+        caller: Caller,
+        *,
+        goal_id: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        mapping: dict[str, str],
+        idempotency_key: str,
+        source_category: str,
+    ) -> SubmissionResult:
+        self._check_key(idempotency_key)
+        goal = await self._goal(caller, goal_id)
+        uploads = self._uploads() if self._uploads is not None else None
+        if uploads is None:
+            raise ToolFailure(
+                "not_accepted",
+                "File ingestion is unavailable. Send submit_structured_rows instead.",
+            )
+        payload = {
+            "tool": "submit_file",
+            "goal_id": str(goal.goal_id),
+            "filename": filename,
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "mapping": mapping,
+        }
+        record, created = await self._claim(caller, goal, idempotency_key, payload)
+        if not created:
+            return await self._replay(caller, record, idempotency_key)
+        try:
+            uploaded = await uploads.ingest(
+                caller.user_id, goal.goal_id, filename, content, content_type
+            )
+            _record, events = await uploads.approve_mapping(
+                caller.user_id, uploaded.upload_id, mapping
+            )
+        except Exception as error:
+            await self._store.finish_submission(caller.user_id, idempotency_key, "failed", {})
+            raise ToolFailure("invalid_argument", _clip(str(error), 200)) from None
+        policy = observation_policy(goal)
+        normalized: list[EvidenceEventProposal] = []
+        for index, event in enumerate(events):
+            if event.numeric_value is None:
+                continue
+            kind = event.observation_kind or mapping.get("observation_kind") or "snapshot"
+            metric_policy = self._validate(
+                policy, event.metric, event.unit or mapping.get("unit") or "", kind
+            )
+            try:
+                when = resolve_observed_at(
+                    metric_policy,
+                    None if event.observed_at == "unknown" else event.observed_at,
+                    None,
+                    datetime.now(UTC),
+                )
+            except ValueError:
+                when = datetime.now(UTC)
+            normalized.append(
+                event.model_copy(
+                    update={
+                        "metric": metric_policy.metric,
+                        "unit": metric_policy.unit,
+                        "source_type": "personal_agent",
+                        "domain": "personal_agent",
+                        "observed_at": when.isoformat(),
+                        "observation_kind": kind,
+                        "event_identity": self._identity(caller, idempotency_key, index, kind),
+                    }
+                )
+            )
+        if not normalized:
+            raise ToolFailure("invalid_argument", "No numeric rows mapped to this goal's metrics.")
+        submission = self._submission(caller, source_category, filename, None, idempotency_key)
+        return await self._commit(
+            caller, goal, idempotency_key, normalized, submission, None, 0
+        )
+
+    # --- charts -------------------------------------------------------------------
+
+    async def _chart_payload(
+        self, caller: Caller, goal_id: str, range_key: str
+    ) -> tuple[Any, OddsChartView]:
+        goal = await self._goal(caller, goal_id)
+        history = await self._published(goal)
+        if range_key not in {"1D", "1W", "1M", "1Y", "ALL"}:
+            raise ToolFailure("invalid_argument", "range must be 1D, 1W, 1M, 1Y or ALL")
+        points = filter_range(series_from_history(history), range_key)  # type: ignore[arg-type]
+        events = await self._deps().evidence.list_for_goal(goal.goal_id)
+        markers = []
+        for item in events[-_MAX_LIST:]:
+            if item.observed_at is None:
+                continue
+            markers.append(
+                {
+                    "timestamp_ms": int(item.observed_at.timestamp() * 1000),
+                    "label": _clip(item.summary or item.metric, 80),
+                    "metric": item.metric,
+                    "evidence_id": str(item.evidence_id) if item.evidence_id else None,
+                    "kind": "event_observed_at",
+                }
+            )
+        status: Literal["PUBLISHED", "NOT_PUBLISHED"] = (
+            "PUBLISHED" if points else "NOT_PUBLISHED"
+        )
+        return goal, OddsChartView(
+            goal_id=str(goal.goal_id),
+            title=_clip(goal.title, 200),
+            status=status,
+            range=range_key,
+            points=points,
+            evidence_markers=markers,
+            interactive_host_required=True,
+            message=None
+            if points
+            else "No published forecast receipts. PlayItOut will not invent a series.",
+        )
+
+    async def show_odds_chart(
+        self, caller: Caller, goal_id: str, range_key: str = "ALL"
+    ) -> OddsChartView:
+        self.require_scope(caller, READ)
+        _goal, view = await self._chart_payload(caller, goal_id, range_key)
+        return view
+
+    async def get_odds_chart_image(
+        self, caller: Caller, goal_id: str, range_key: str = "ALL"
+    ) -> tuple[OddsChartView, bytes]:
+        self.require_scope(caller, READ)
+        goal, view = await self._chart_payload(caller, goal_id, range_key)
+        png = render_odds_png(view.points, title=goal.title)
+        if not is_png(png):
+            raise ToolFailure("internal_error", "Chart image could not be generated.")
+        return view, png
 
 
 def candidates_with_policy(

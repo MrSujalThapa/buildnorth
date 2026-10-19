@@ -41,6 +41,12 @@ def mount_remote_mcp(application: FastAPI, settings: Settings) -> RemoteMcp:
     def deps() -> Any:
         return application.state.agent_workflow._inner._deps
 
+    def workflow() -> Any:
+        return application.state.agent_workflow
+
+    def uploads() -> Any:
+        return getattr(application.state, "upload_service", None)
+
     def what_if(principal: Principal) -> Any:
         override = getattr(application.state, "remote_mcp_what_if", None)
         if override is not None:
@@ -57,7 +63,14 @@ def mount_remote_mcp(application: FastAPI, settings: Settings) -> RemoteMcp:
         )
 
     store = build_store(settings)
-    tools = RemoteMcpTools(settings=settings, store=store, deps=deps, what_if=what_if)
+    tools = RemoteMcpTools(
+        settings=settings,
+        store=store,
+        deps=deps,
+        what_if=what_if,
+        workflow=workflow,
+        uploads=uploads,
+    )
     remote = build_remote_mcp(settings=settings, store=store, users=_lookup_user, tools=tools)
     application.router.routes.extend(remote.routes)
     application.state.remote_mcp = remote

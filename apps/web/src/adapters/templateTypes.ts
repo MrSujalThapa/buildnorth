@@ -10,7 +10,13 @@ export type MarketEvent = {
   label: string;
   impact: number | null;
   occurredAt: string;
+  timestamp?: number;
   icon: "code" | "x" | "rocket" | "people" | "book";
+};
+
+export type ChartMarker = {
+  timestamp: number;
+  label: string;
 };
 
 export type Market = {

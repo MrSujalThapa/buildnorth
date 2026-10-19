@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 
+from personal_markets.evidence.uploads import UploadService, UploadStore
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.factory import get_identity_repository, reset_identity_state
@@ -54,6 +55,7 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
     async def test_lifespan(application: FastAPI):
         application.state.agent_workflow = workflow
         application.state.evidence_service = workflow._inner._deps.evidence
+        application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
         remote = getattr(application.state, "remote_mcp", None)
         if remote is None or getattr(remote, "_test_started", False):
@@ -83,6 +85,7 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
     app.dependency_overrides[get_github_cursor_store] = lambda: InMemoryGithubCursorStore()
     app.state.agent_workflow = workflow
     app.state.evidence_service = workflow._inner._deps.evidence
+    app.state.upload_service = UploadService(UploadStore())
     app.state.github_cursor_store = InMemoryGithubCursorStore()
     app.state.goal_repository = repository
     principal = invited_principal()

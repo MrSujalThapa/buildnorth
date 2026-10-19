@@ -55,10 +55,15 @@ from personal_markets.remote_mcp.store import (
 
 ACCESS_PREFIX = "pio_at_"
 REFRESH_PREFIX = "pio_rt_"
-_MAX_REDIRECT_URIS = 5
+# ChatGPT and Grok register several HTTPS callbacks via DCR. Still reject
+# non-https (except loopback) URIs one-by-one; this only raises the count cap.
+_MAX_REDIRECT_URIS = 16
 _TOUCH_INTERVAL = timedelta(seconds=60)
 _LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 _FORBIDDEN_SCHEMES = {"javascript", "data", "file", "vbscript", "about", "blob"}
+# Native-app callbacks observed from Cursor/Grok Bot DCR. Still reject
+# javascript/data/file and non-loopback http.
+_NATIVE_APP_SCHEMES = {"cursor"}
 
 log = structlog.get_logger("personal_markets.remote_mcp")
 
@@ -88,6 +93,12 @@ def validate_redirect_uri(uri: str) -> None:
             pass
         raise RegistrationError("invalid_redirect_uri", "http redirect URIs must be loopback")
     if scheme and scheme not in _FORBIDDEN_SCHEMES and "." in scheme:
+        return
+    if (
+        scheme in _NATIVE_APP_SCHEMES
+        and scheme not in _FORBIDDEN_SCHEMES
+        and (parts.netloc or parts.path.strip("/"))
+    ):
         return
     raise RegistrationError(
         "invalid_redirect_uri", f"redirect URI scheme {scheme!r} is not allowed"

@@ -1,0 +1,72 @@
+# Private staging API. Create this Blueprint from the Render dashboard after
+# connecting GitHub repo MrSujalThapa/buildnorth. Do not paste secrets here.
+services:
+  - type: web
+    name: playitout-staging-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: PM_ENVIRONMENT
+        value: staging
+      - key: PM_LOG_LEVEL
+        value: INFO
+      - key: PM_DEV_BOOTSTRAP_TEST_USERS
+        value: "false"
+      - key: PM_TEST_AUTH_SECRET
+        value: ""
+      - key: PM_DEV_DEMO_FIXTURES
+        value: "false"
+      - key: PM_HOSTED_INFERENCE_ENABLED
+        value: "true"
+      - key: PM_HOSTED_USER_QUOTA_USD
+        value: "2.0"
+      - key: PM_HOSTED_GLOBAL_QUOTA_USD
+        value: "25.0"
+      - key: PM_HOSTED_USER_QUOTA_TOKENS
+        value: "100000"
+      - key: PM_HOSTED_GLOBAL_QUOTA_TOKENS
+        value: "1000000"
+      - key: PM_HOSTED_USER_RPM
+        value: "20"
+      - key: PM_HOSTED_IP_RPM
+        value: "60"
+      - key: PM_MCP_ENABLED
+        value: "true"
+      - key: PM_MCP_DYNAMIC_CLIENT_REGISTRATION
+        value: "true"
+      - key: PM_TRUST_FORWARDED_HEADERS
+        value: "false"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PM_DATABASE_URL
+        sync: false
+      - key: PM_PUBLIC_API_URL
+        sync: false
+      - key: PM_PUBLIC_WEB_URL
+        sync: false
+      - key: PM_CORS_ORIGINS
+        sync: false
+      - key: PM_CORS_ORIGIN_REGEX
+        value: ""
+      - key: PM_CLERK_JWKS_URL
+        sync: false
+      - key: PM_CLERK_ISSUER
+        sync: false
+      - key: PM_CLERK_AUTHORIZED_PARTIES
+        sync: false
+      - key: PM_ADMIN_EMAILS
+        sync: false
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: PM_SPUR_API_KEY
+        sync: false
+      - key: PM_BYOK_ENCRYPTION_KEYS
+        sync: false
+      - key: PM_BYOK_ACTIVE_KEY_ID
+        value: v1

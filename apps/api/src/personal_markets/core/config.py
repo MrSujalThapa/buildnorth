@@ -174,6 +174,13 @@ class Settings(BaseSettings):
                 "Refusing to start in a deployed environment: " + "; ".join(problems)
             )
 
+    @field_validator("cors_origin_regex", mode="before")
+    @classmethod
+    def _empty_cors_regex(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator(
         "composio_enabled",
         "hosted_inference_enabled",

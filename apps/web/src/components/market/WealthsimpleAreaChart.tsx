@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import type {
+  ChartMarker,
   ChartPoint,
 } from "../../adapters/templateTypes";
 
@@ -31,9 +32,10 @@ export type ChartSelection = {
 
 type Props = {
   data: ChartPoint[];
-
+  overlay?: ChartPoint[];
+  markers?: ChartMarker[];
+  comparison?: ChartPoint | null;
   interactive?: boolean;
-
   onSelectionChange?: (
     selection:
       | ChartSelection
@@ -79,6 +81,9 @@ function nearestPointIndex(
 
 export default function WealthsimpleAreaChart({
   data,
+  overlay = [],
+  markers = [],
+  comparison = null,
   interactive = true,
   onSelectionChange,
 }: Props) {
@@ -107,6 +112,7 @@ export default function WealthsimpleAreaChart({
       startIndex: number;
       endIndex: number;
     } | null>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   if (
     data.length === 0
@@ -117,10 +123,11 @@ export default function WealthsimpleAreaChart({
   }
 
   const values =
-    data.map(
-      (point) =>
-        point.value,
-    );
+    [
+      ...data.map((point) => point.value),
+      ...overlay.map((point) => point.value),
+      ...(comparison ? [comparison.value] : []),
+    ];
 
   const min =
     Math.min(...values);
@@ -267,10 +274,14 @@ export default function WealthsimpleAreaChart({
   function handlePointerMove(
     event: React.PointerEvent<HTMLDivElement>,
   ) {
-    if (
-      !interactive ||
-      !draggingRef.current
-    ) {
+    if (!interactive) {
+      return;
+    }
+    const hover = getIndexFromPointer(event.clientX);
+    if (hover >= 0 && !draggingRef.current) {
+      setHoverIndex(hover);
+    }
+    if (!draggingRef.current) {
       return;
     }
 
@@ -434,7 +445,7 @@ export default function WealthsimpleAreaChart({
           />
 
           <Area
-            type="monotone"
+            type={data.length === 1 ? "linear" : "monotone"}
             dataKey="value"
             stroke="var(--market-chart-accent, #299f96)"
             strokeWidth={1.7}
@@ -442,12 +453,77 @@ export default function WealthsimpleAreaChart({
             strokeLinejoin="round"
             fill={`url(#${gradientId})`}
             fillOpacity={1}
-            dot={false}
+            dot={data.length === 1}
             activeDot={false}
             isAnimationActive={
               false
             }
           />
+
+          {overlay.length > 1 ? (
+            <Area
+              data={overlay}
+              type="monotone"
+              dataKey="value"
+              stroke="var(--market-chart-accent, #299f96)"
+              strokeDasharray="5 4"
+              strokeWidth={1.4}
+              fill="none"
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+          ) : null}
+
+          {markers.map((marker) => (
+            <ReferenceLine
+              key={`${marker.timestamp}-${marker.label}`}
+              x={marker.timestamp}
+              stroke="var(--market-text, #20211f)"
+              strokeOpacity={0.16}
+              strokeDasharray="3 4"
+            />
+          ))}
+
+          {comparison ? (
+            <ReferenceDot
+              x={comparison.timestamp}
+              y={comparison.value}
+              r={5}
+              fill="var(--market-text, #20211f)"
+              stroke="var(--market-chart-dot-stroke, #f8f8f5)"
+              strokeWidth={2}
+            />
+          ) : null}
+
+          {data.length === 1 ? (
+            <ReferenceDot
+              x={firstPoint.timestamp}
+              y={firstPoint.value}
+              r={6}
+              fill="var(--market-chart-accent, #299f96)"
+              stroke="var(--market-chart-dot-stroke, #f8f8f5)"
+              strokeWidth={3}
+            />
+          ) : null}
+
+          {hoverIndex !== null && data[hoverIndex] && !selection ? (
+            <>
+              <ReferenceLine
+                x={data[hoverIndex].timestamp}
+                stroke="var(--market-chart-accent, #299f96)"
+                strokeWidth={1.15}
+              />
+              <ReferenceDot
+                x={data[hoverIndex].timestamp}
+                y={data[hoverIndex].value}
+                r={6}
+                fill="var(--market-chart-accent, #299f96)"
+                stroke="var(--market-chart-dot-stroke, #f8f8f5)"
+                strokeWidth={3}
+              />
+            </>
+          ) : null}
 
           {startPoint &&
             endPoint && (

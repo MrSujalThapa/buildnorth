@@ -11,12 +11,9 @@ import {
 } from "lucide-react";
 
 import type { Market, MarketEvent } from "../../adapters/templateTypes";
+import { ODDS_EXPLORER_RANGES } from "./marketRanges";
+import OddsExplorer from "./OddsExplorer";
 import {
-  filterHistoryForRange,
-  getMarketRanges,
-  type MarketRange,
-} from "./marketRanges";
-import WealthsimpleAreaChart, {
   type ChartSelection,
 } from "./WealthsimpleAreaChart";
 import "./market-detail.css";
@@ -83,7 +80,7 @@ function formatRangeDate(start: number, end: number) {
       minute: "2-digit",
     });
 
-    return `${day.format(startDate)} ┬╖ ${time.format(startDate)} ΓÇô ${time.format(endDate)}`;
+    return `${day.format(startDate)} · ${time.format(startDate)} – ${time.format(endDate)}`;
   }
 
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -92,7 +89,7 @@ function formatRangeDate(start: number, end: number) {
     year: "numeric",
   });
 
-  return `${formatter.format(startDate)} ΓÇô ${formatter.format(endDate)}`;
+  return `${formatter.format(startDate)} – ${formatter.format(endDate)}`;
 }
 
 export default function MarketDetailPage({
@@ -102,23 +99,18 @@ export default function MarketDetailPage({
   onWhatIf,
   onEvidence,
 }: Props) {
-  const ranges = useMemo(() => getMarketRanges(market), [market]);
-  const [selectedRange, setSelectedRange] = useState<MarketRange | null>(null);
+  const ranges = ODDS_EXPLORER_RANGES;
   const [chartSelection, setChartSelection] = useState<ChartSelection | null>(null);
-
-  const activeRange =
-    selectedRange ?? ranges[Math.min(2, Math.max(ranges.length - 1, 0))];
-  const chartData = activeRange
-    ? filterHistoryForRange(market.history, activeRange)
-    : market.history;
+  const markers = useMemo(
+    () =>
+      market.events
+        .filter((event) => typeof event.timestamp === "number")
+        .map((event) => ({ timestamp: event.timestamp as number, label: event.label })),
+    [market.events],
+  );
   const singlePointSelection =
     chartSelection &&
     chartSelection.start.timestamp === chartSelection.end.timestamp;
-
-  function selectRange(range: MarketRange) {
-    setSelectedRange(range);
-    setChartSelection(null);
-  }
 
   return (
     <main className="market-page">
@@ -168,7 +160,7 @@ export default function MarketDetailPage({
                 </div>
                 <div className="selection-odds">
                   {chartSelection.start.value.toFixed(1)}%
-                  <span>ΓåÆ</span>
+                  <span>→</span>
                   {chartSelection.end.value.toFixed(1)}%
                 </div>
                 <div className="selection-change-row">
@@ -205,29 +197,12 @@ export default function MarketDetailPage({
           )}
         </section>
 
-        <section className="market-chart-section">
-          <div className="market-chart-wrapper">
-            <WealthsimpleAreaChart
-              data={chartData}
-              onSelectionChange={setChartSelection}
-            />
-          </div>
-
-          <div className="range-control" aria-label="Chart range">
-            {ranges.map((range) => (
-              <button
-                key={range.label}
-                type="button"
-                className={activeRange?.label === range.label ? "selected" : ""}
-                onClick={() => selectRange(range)}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="chart-help">Press and drag across the chart to compare odds.</div>
-        </section>
+        <OddsExplorer
+          history={market.history}
+          ranges={ranges}
+          markers={markers}
+          onSelectionChange={setChartSelection}
+        />
 
         {market.modelExplanation ? (
           <section className="market-section model-note">

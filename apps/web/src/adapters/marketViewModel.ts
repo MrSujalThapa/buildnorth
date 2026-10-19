@@ -75,6 +75,7 @@ export function evidenceToEvents(items: EvidenceEvent[]): MarketEvent[] {
     label: item.summary || item.metric,
     impact: null,
     occurredAt: new Date(item.observed_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
+    timestamp: Date.parse(item.observed_at),
     icon: evidenceIcon(item.summary || item.metric),
   }));
 }

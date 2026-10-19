@@ -235,6 +235,42 @@ async def test_unsafe_redirect_uris_are_refused(uri: str) -> None:
     assert response.status_code == 400
 
 
+async def test_chatgpt_style_https_redirect_bundle_is_accepted() -> None:
+    uris = [f"https://chatgpt.com/connector_platform_oauth_redirect/{index}" for index in range(8)]
+    async with McpHarness() as harness:
+        response = await harness.http.post(
+            "/register",
+            json={"redirect_uris": uris, "token_endpoint_auth_method": "none"},
+        )
+    assert response.status_code == 201
+
+
+async def test_too_many_redirect_uris_are_refused() -> None:
+    uris = [f"https://ok.example/cb/{index}" for index in range(17)]
+    async with McpHarness() as harness:
+        response = await harness.http.post(
+            "/register",
+            json={"redirect_uris": uris, "token_endpoint_auth_method": "none"},
+        )
+    assert response.status_code == 400
+
+
+async def test_cursor_native_redirect_is_accepted_for_grok_bot() -> None:
+    async with McpHarness() as harness:
+        response = await harness.http.post(
+            "/register",
+            json={
+                "redirect_uris": [
+                    "cursor://anysphere.cursor-mcp/oauth/callback",
+                    "https://www.cursor.com/agents/mcp/oauth/callback",
+                    "http://localhost:8787/callback",
+                ],
+                "token_endpoint_auth_method": "none",
+            },
+        )
+    assert response.status_code == 201
+
+
 async def test_registration_is_rate_limited() -> None:
     async with McpHarness() as harness:
         statuses = []

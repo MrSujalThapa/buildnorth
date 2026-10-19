@@ -5,6 +5,7 @@ which matches the current protocol revision (no protocol-level sessions) and sti
 serves clients that perform the legacy initialize handshake.
 """
 
+import base64
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, Re
 from mcp.server.mcpserver import MCPServer
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp, StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
-from mcp_types import CallToolResult, TextContent, ToolAnnotations
+from mcp_types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 from pydantic import AnyHttpUrl, Field
 from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import Request
@@ -41,6 +42,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from personal_markets.core.config import Settings
 from personal_markets.identity.domain import Principal
 from personal_markets.remote_mcp.oauth import RemoteMcpAuthorization
+from personal_markets.remote_mcp.odds_app import (
+    ODDS_EXPLORER_HTML,
+    ODDS_UI_MIME,
+    ODDS_UI_URI,
+    UI_EXTENSION_ID,
+    PlayItOutUiExtension,
+)
 from personal_markets.remote_mcp.policy import ObservationPolicy
 from personal_markets.remote_mcp.scopes import ALL_SCOPES, DEFAULT_SCOPES, TOOL_SCOPES
 from personal_markets.remote_mcp.store import RemoteMcpStore
@@ -48,13 +56,18 @@ from personal_markets.remote_mcp.tools import (
     Caller,
     ChangeInput,
     EvidenceSummary,
+    ForecastCompare,
     ForecastHistory,
     ForecastView,
+    GoalCreationView,
     GoalDetail,
     GoalList,
     InterventionRanking,
+    OddsChartView,
     RemoteMcpTools,
+    ScenarioCompare,
     SimulationView,
+    StructuredRow,
     SubmissionResult,
     ToolFailure,
 )
@@ -64,10 +77,13 @@ _T = TypeVar("_T")
 
 INSTRUCTIONS = """PlayItOut prices personal goals with deterministic models.
 Probabilities come from the model, never from you or from PlayItOut's agents.
-Typical flow: list_goals -> get_observation_policy -> submit_structured_evidence ->
-get_forecast -> simulate_intervention. Prefer submit_structured_evidence: it needs no
-model call. Evidence you submit is recorded as agent-reported; you cannot mark it
-verified. Scenarios are hypothetical and never change the published forecast."""
+Typical flow: create_goal (clarify/confirm) -> get_observation_policy ->
+submit_structured_evidence or submit_structured_rows -> get_forecast ->
+compare_forecasts -> compare_scenarios / simulate_intervention -> show_odds_chart.
+Prefer structured evidence: it needs no model call. Do not fetch Gmail attachment
+URLs. Evidence is agent-reported; you cannot mark it verified. Scenarios are
+hypothetical and never change the published forecast. Interactive charts require
+an MCP Apps host; otherwise call get_odds_chart_image for a static PNG."""
 
 _READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 _WRITE = ToolAnnotations(
@@ -310,11 +326,14 @@ def build_remote_mcp(
         name="PlayItOut",
         title="PlayItOut forecasting",
         instructions=INSTRUCTIONS,
-        version="0.4.0",
+        version="0.5.0",
         auth_server_provider=authorization,
         auth=auth,
+        extensions=[PlayItOutUiExtension()],
     )
+    _advertise_ui_on_handshake(server)
     _register_tools(server, tools, users, store)
+    _register_odds_app(server)
     security = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=_host_patterns(settings.public_api_url),
@@ -547,3 +566,252 @@ def _register_tools(
             "simulate_intervention",
             lambda who: tools.simulate_intervention(who, goal_id, changes),
         )
+
+    @server.tool(annotations=_WRITE, title="Create goal")
+    async def create_goal(
+        intent: Annotated[str, Field(min_length=3, max_length=2000)],
+        idempotency_key: Annotated[
+            str | None, Field(default=None, min_length=8, max_length=128)
+        ] = None,
+    ) -> GoalCreationView:
+        """Start PlayItOut's Goal Architect. Underspecified intents return questions.
+        A measurable contract is not saved until continue_goal_creation confirms it.
+        Uses model credits. Never invents a probability."""
+        return await run(
+            "create_goal",
+            lambda who: tools.create_goal(who, intent, idempotency_key),
+            write=True,
+            inference=True,
+        )
+
+    @server.tool(annotations=_WRITE, title="Continue goal creation")
+    async def continue_goal_creation(
+        thread_id: Annotated[str, Field(max_length=64)],
+        answers: dict[str, str] | None = None,
+        confirmed: bool | None = None,
+        cancelled: bool = False,
+    ) -> GoalCreationView:
+        """Continue a create_goal thread: answer clarification questions, confirm the
+        contract, or cancel. Survives separate tool calls. Confirmation is required
+        before a market is created."""
+        return await run(
+            "continue_goal_creation",
+            lambda who: tools.continue_goal_creation(
+                who, thread_id, answers, confirmed, cancelled
+            ),
+            write=True,
+            inference=True,
+        )
+
+    @server.tool(annotations=_READ, title="Compare forecasts")
+    async def compare_forecasts(
+        goal_id: GoalId,
+        as_of: Annotated[str | None, Field(default=None, max_length=40)] = None,
+        relative: Annotated[
+            str | None,
+            Field(default=None, pattern=r"^(latest|previous|last_week|before_evidence)$"),
+        ] = None,
+        evidence_id: Annotated[str | None, Field(default=None, max_length=64)] = None,
+    ) -> ForecastCompare:
+        """Compare the latest published receipt with an earlier one. Use as_of (ISO-8601),
+        relative=last_week|previous|before_evidence, or evidence_id. Delta is percentage
+        points. Event, ingestion and publication times are reported separately."""
+        return await run(
+            "compare_forecasts",
+            lambda who: tools.compare_forecasts(who, goal_id, as_of, relative, evidence_id),
+        )
+
+    @server.tool(annotations=_READ, title="Compare scenarios")
+    async def compare_scenarios(
+        goal_id: GoalId,
+        scenarios: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=5)],
+        as_of: Annotated[str | None, Field(default=None, max_length=40)] = None,
+        relative: Annotated[
+            str | None, Field(default=None, pattern=r"^(latest|previous|last_week)$")
+        ] = None,
+        weighted: dict[str, Any] | None = None,
+    ) -> ScenarioCompare:
+        """Run one or more hypothetical What If scenarios without writing published
+        history. Each scenario is {label, changes:[{metric,operation,value,unit}]}.
+        Optional weighted={components:[{label,score,weight,known}]} computes exam
+        arithmetic only when every weight is known; otherwise it asks a question.
+        Unsupported causal claims stay NOT_PRICED."""
+        return await run(
+            "compare_scenarios",
+            lambda who: tools.compare_scenarios(
+                who, goal_id, scenarios, as_of, relative, weighted
+            ),
+        )
+
+    @server.tool(annotations=_WRITE, title="Submit structured rows")
+    async def submit_structured_rows(
+        goal_id: GoalId,
+        rows: Annotated[list[StructuredRow], Field(min_length=1, max_length=25)],
+        idempotency_key: IdempotencyKey,
+        source_category: SourceCategory,
+        source_identifier: OptionalRef = None,
+        supporting_reference: OptionalRef = None,
+    ) -> SubmissionResult:
+        """Commit up to 25 typed observations in one call. Preferred file-handoff
+        path: agents should extract rows rather than forwarding Gmail attachments."""
+        return await run(
+            "submit_structured_rows",
+            lambda who: tools.submit_structured_rows(
+                who,
+                goal_id=goal_id,
+                rows=rows,
+                idempotency_key=idempotency_key,
+                source_category=source_category,
+                source_identifier=source_identifier,
+                supporting_reference=supporting_reference,
+            ),
+            write=True,
+        )
+
+    @server.tool(annotations=_WRITE, title="Submit table text")
+    async def submit_table_text(
+        goal_id: GoalId,
+        filename: Annotated[str, Field(min_length=4, max_length=80)],
+        text: Annotated[str, Field(min_length=3, max_length=20000)],
+        mapping: dict[str, str],
+        idempotency_key: IdempotencyKey,
+        source_category: SourceCategory,
+    ) -> SubmissionResult:
+        """Ingest a small CSV/text table through the existing upload mapper.
+        mapping needs value_column and usually metric, unit, observed_at_column,
+        observation_kind. Does not fetch URLs."""
+        return await run(
+            "submit_table_text",
+            lambda who: tools.submit_table_text(
+                who,
+                goal_id=goal_id,
+                filename=filename,
+                text=text,
+                mapping=mapping,
+                idempotency_key=idempotency_key,
+                source_category=source_category,
+            ),
+            write=True,
+        )
+
+    @server.tool(annotations=_WRITE, title="Submit file bytes")
+    async def submit_file_bytes(
+        goal_id: GoalId,
+        filename: Annotated[str, Field(min_length=4, max_length=80)],
+        content_base64: Annotated[str, Field(min_length=8, max_length=56000)],
+        mapping: dict[str, str],
+        idempotency_key: IdempotencyKey,
+        source_category: SourceCategory,
+    ) -> SubmissionResult:
+        """Optional bounded binary transfer (CSV/XLSX/PDF, decoded max 40 KB) that
+        reuses the existing upload backend. Larger files are rejected; use
+        submit_structured_rows. No URL fetching."""
+        return await run(
+            "submit_file_bytes",
+            lambda who: tools.submit_file_bytes(
+                who,
+                goal_id=goal_id,
+                filename=filename,
+                content_base64=content_base64,
+                mapping=mapping,
+                idempotency_key=idempotency_key,
+                source_category=source_category,
+            ),
+            write=True,
+        )
+
+    _CHART_META = {"ui": {"resourceUri": ODDS_UI_URI}}
+
+    @server.tool(
+        annotations=_READ,
+        title="Show odds chart",
+        meta=_CHART_META,
+    )
+    async def show_odds_chart(
+        goal_id: GoalId,
+        range: Annotated[str, Field(pattern=r"^(1D|1W|1M|1Y|ALL)$")] = "ALL",
+    ) -> OddsChartView:
+        """Published forecast history for an interactive Odds Explorer. Hosts that
+        implement MCP Apps (io.modelcontextprotocol/ui) should render ui://playitout/odds-explorer.
+        Other hosts should call get_odds_chart_image. Never invents points."""
+        return await run(
+            "show_odds_chart",
+            lambda who: tools.show_odds_chart(who, goal_id, range),
+        )
+
+    @server.tool(annotations=_READ, title="Get odds chart image")
+    async def get_odds_chart_image(
+        goal_id: GoalId,
+        range: Annotated[str, Field(pattern=r"^(1D|1W|1M|1Y|ALL)$")] = "ALL",
+    ) -> CallToolResult:
+        """Static PNG of published odds for hosts that cannot render MCP Apps.
+        Owner-bound: requires a valid access token. No public URL is issued."""
+
+        async def _image(who: Caller) -> CallToolResult:
+            view, png = await tools.get_odds_chart_image(who, goal_id, range)
+            payload = view.model_dump(mode="json")
+            payload.update(
+                {
+                    "mime_type": "image/png",
+                    "byte_size": len(png),
+                    "static": True,
+                    "public_url": None,
+                    "message": (
+                        "Static PNG. Interactive controls are not available in this payload."
+                    ),
+                }
+            )
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=json.dumps(payload)),
+                    ImageContent(
+                        type="image",
+                        data=base64.b64encode(png).decode("ascii"),
+                        mime_type="image/png",
+                    ),
+                ],
+                structured_content=payload,
+            )
+
+        return await run("get_odds_chart_image", _image)
+
+
+def _advertise_ui_on_handshake(server: MCPServer) -> None:
+    """Handshake-era initialize (2025-06-18) sieves `capabilities.extensions`.
+
+    The official SDK still registers `io.modelcontextprotocol/ui` on the 2026
+    extensions map. Handshake clients only see `experimental`, so the same
+    settings are copied there. Tool `_meta.ui.resourceUri` is the actual
+    MCP Apps linkage and does not depend on this advertisement.
+    """
+    inner = server._lowlevel_server
+    original = inner.create_initialization_options
+    settings = {"resourceUri": ODDS_UI_URI, "mimeType": ODDS_UI_MIME}
+
+    def create_initialization_options(
+        notification_options: Any = None,
+        experimental_capabilities: dict[str, dict[str, Any]] | None = None,
+        extensions: dict[str, dict[str, Any]] | None = None,
+    ) -> Any:
+        experimental = dict(experimental_capabilities or {})
+        experimental.setdefault(UI_EXTENSION_ID, settings)
+        return original(
+            notification_options,
+            experimental,
+            extensions,
+        )
+
+    inner.create_initialization_options = create_initialization_options  # type: ignore[method-assign]
+
+
+def _register_odds_app(server: MCPServer) -> None:
+    @server.resource(
+        ODDS_UI_URI,
+        name="Odds Explorer",
+        title="PlayItOut Odds Explorer",
+        description="Interactive historical probability chart. Data comes from show_odds_chart.",
+        mime_type=ODDS_UI_MIME,
+        meta={"ui": {"csp": {"connectDomains": [], "resourceDomains": []}}},
+    )
+    async def odds_explorer() -> str:
+        return ODDS_EXPLORER_HTML

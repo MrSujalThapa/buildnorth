@@ -72,6 +72,11 @@ def test_startup_refuses_bootstrap_and_test_auth_when_deployed() -> None:
     _deployed_settings().assert_safe_startup()
 
 
+def test_empty_cors_origin_regex_is_disabled() -> None:
+    settings = _deployed_settings(cors_origin_regex="  ")
+    assert settings.cors_origin_regex is None
+
+
 def test_local_loopback_https_is_not_treated_as_deployed() -> None:
     settings = Settings(
         _env_file=None,

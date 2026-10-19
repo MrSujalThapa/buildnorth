@@ -29,6 +29,14 @@ const MONTH =
 const YEAR =
   365 * DAY;
 
+export const ODDS_EXPLORER_RANGES: MarketRange[] = [
+  { label: "1D", amount: 1, unit: "day" },
+  { label: "1W", amount: 1, unit: "week" },
+  { label: "1M", amount: 1, unit: "month" },
+  { label: "1Y", amount: 1, unit: "year" },
+  { label: "ALL", unit: "all" },
+];
+
 export function getMarketRanges(
   market: Market,
 ): MarketRange[] {

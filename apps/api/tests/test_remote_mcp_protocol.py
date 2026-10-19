@@ -12,6 +12,15 @@ EXPECTED_TOOLS = {
     "get_evidence_summary",
     "get_observation_policy",
     "get_best_interventions",
+    "create_goal",
+    "continue_goal_creation",
+    "compare_forecasts",
+    "compare_scenarios",
+    "submit_structured_rows",
+    "submit_table_text",
+    "submit_file_bytes",
+    "show_odds_chart",
+    "get_odds_chart_image",
     "submit_structured_evidence",
     "submit_observation",
     "simulate_intervention",
@@ -36,6 +45,7 @@ async def test_metadata_discovery() -> None:
     assert prm["authorization_servers"] == [f"{API}/"]
     assert set(prm["scopes_supported"]) == {
         "goals:read",
+        "goals:write",
         "evidence:write",
         "whatif:simulate",
         "inference:use",
