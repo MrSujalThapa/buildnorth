@@ -122,3 +122,31 @@ test("connecting a provider key activates BYOK in Settings without a second save
   expect(errors).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("judge-byok-settings.jpg"), fullPage: true });
 });
+
+test("administrator can redeem a private invitation and retain hosted entitlement", async ({ page }) => {
+  let invited = false;
+  await page.addInitScript(() => sessionStorage.setItem("pm-test-token", "local-regression-token"));
+  await page.route("**/api/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/me") return route.fulfill({ json: {
+      user_id: "local-admin", role: "admin", invited, email_verified: true,
+      hosted: { enabled: invited, quota_usd: invited ? 5 : 0, remaining_usd: invited ? 5 : 0, remaining_tokens: 5000000, global_remaining_usd: 100, billing_note: "Estimated" },
+    } });
+    if (path === "/api/v1/invites/redeem") {
+      invited = true;
+      return route.fulfill({ json: {
+        user_id: "local-admin", role: "admin", invited, email_verified: true,
+        hosted: { enabled: true, quota_usd: 5, remaining_usd: 5, remaining_tokens: 5000000, global_remaining_usd: 100, billing_note: "Estimated" },
+      } });
+    }
+    return route.fulfill({ json: [] });
+  });
+  const redemption = page.waitForResponse((response) => response.url().endsWith("/api/v1/invites/redeem"));
+  await page.goto("/invite/local-private-invite");
+  expect((await redemption).status()).toBe(200);
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByText(/\$5\.00 remaining of \$5\.00/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/\$5\.00 remaining of \$5\.00/)).toBeVisible();
+});

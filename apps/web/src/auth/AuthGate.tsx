@@ -57,9 +57,9 @@ function InviteScreen({
     setBusy(true);
     try {
       const account = await api.redeemInvite(value.trim());
+      void navigate("/", { replace: true });
       clearPendingInvite();
       onRedeemed(account);
-      void navigate("/", { replace: true });
     } catch (caught) {
       setBusy(false);
       setError(caught instanceof Error ? caught.message : "Invitation could not be redeemed.");
@@ -246,6 +246,9 @@ function ClerkGate({ children }: Props) {
     );
   }
   const pending = capturePendingInvite();
+  if (account?.role === "admin" && !account.invited && pending) {
+    return <InviteScreen onRedeemed={setAccount} onSignOut={() => { void signOut(); }} />;
+  }
   if (account?.role === "admin") {
     return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
   }
@@ -303,6 +306,9 @@ function TokenGate({ children }: Props) {
 
   if (!token) return children;
   if (!ready) return <LoadingScreen />;
+  if (account?.role === "admin" && !account.invited && capturePendingInvite()) {
+    return <InviteScreen onRedeemed={setAccount} />;
+  }
   if (account?.role === "admin") {
     return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
   }

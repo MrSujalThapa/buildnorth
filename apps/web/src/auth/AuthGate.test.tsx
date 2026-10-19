@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { api } from "../api/client";
 import { ThemeProvider } from "../theme/ThemeProvider";
@@ -49,3 +49,23 @@ for (const mode of ["clerk", "token"] as const) {
     });
   }
 }
+
+test("administrator can redeem a legitimate private invitation for hosted testing", async () => {
+  window.history.replaceState({}, "", "/invite/private-admin-entitlement");
+  vi.spyOn(session, "clerkEnabled").mockReturnValue(true);
+  vi.spyOn(api, "me").mockResolvedValue({
+    user_id: "admin", clerk_user_id: "clerk-admin", email: "admin@example.test",
+    email_verified: true, role: "admin", invited: false, hosted: {} as session.HostedUsage,
+  });
+  const redeem = vi.spyOn(api, "redeemInvite").mockResolvedValue({
+    user_id: "admin", clerk_user_id: "clerk-admin", email: "admin@example.test",
+    email_verified: true, role: "admin", invited: true,
+    hosted: { quota_usd: 5, remaining_usd: 5 } as session.HostedUsage,
+  });
+  render(<BrowserRouter>
+    <ThemeProvider><AuthGate><Location /></AuthGate></ThemeProvider>
+  </BrowserRouter>);
+  await waitFor(() => expect(redeem).toHaveBeenCalledWith("private-admin-entitlement"));
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/"));
+  expect(session.readPendingInvite()).toBeNull();
+});
