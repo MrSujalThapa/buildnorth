@@ -28,7 +28,9 @@ function mockApi(goals: unknown = []) {
     let payload: unknown = goals;
     if (url.endsWith("/health")) payload = { status: "ok", service: "api", version: "test" };
     else if (url.includes("/history/")) payload = [];
-    else if (url.includes("/plugins")) payload = [];
+    else if (url.includes("/plugins")) payload = { items: [], provider_status: "unavailable" };
+    else if (url.includes("/goals/dashboard")) payload = { goals, histories: {}, collections: [] };
+    else if (url.includes("/profile")) payload = { account: { email: "judge@example.test", profile: {} }, goal_count: 0, collection_count: 0, radar: { dimensions: [] }, privacy: "private" };
     else if (url.includes("/goals/") && !url.endsWith("/goals")) payload = (goals as typeof seededGoals)[0] ?? {};
     else if (url.endsWith("/goals")) payload = goals;
     return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -52,9 +54,10 @@ test("renders seeded goals using the template market cards", async () => {
 test.each([{ label: "empty", goals: [] }, { label: "populated", goals: seededGoals }])("goal creation is reachable from the $label markets catalog", async ({ goals }) => {
   mockApi(goals);
   renderApp();
-  const create = await screen.findByRole("link", { name: "Create goal" });
+  const create = await screen.findByRole("link", { name: "New goal" });
   expect(create).toHaveAttribute("href", "/new");
-  fireEvent.click(create);
+  fireEvent.click(screen.getByRole("button", { name: "Create" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "New goal" }));
   expect(await screen.findByRole("heading", { name: "New market" })).toBeInTheDocument();
 });
 

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from personal_markets.core.config import Settings
-from personal_markets.integrations.mcp_domain import MCPToolDescriptor, MCPResourceDescriptor
+from personal_markets.integrations.mcp_domain import MCPResourceDescriptor, MCPToolDescriptor
+
+_TOOLKIT_CACHE_TTL_SECONDS = 600.0
+_toolkit_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
 
 @dataclass(frozen=True)
@@ -65,39 +69,75 @@ class ComposioIntegrationGateway:
         if self._client is None:
             return CatalogPage(items=[], next_cursor=None, total_items=0)
 
-        def _call() -> CatalogPage:
-            params: dict[str, Any] = {"limit": limit}
+        catalog = await self._cached_toolkits()
+        needle = (search or "").strip().lower()
+        if needle:
+            catalog = [
+                item
+                for item in catalog
+                if needle
+                in " ".join(
+                    str(item.get(key) or "") for key in ("slug", "name", "description")
+                ).lower()
+            ]
+        start = 0
+        if cursor:
+            try:
+                start = max(0, int(cursor))
+            except ValueError:
+                start = 0
+        page = catalog[start : start + limit]
+        next_cursor = str(start + limit) if start + limit < len(catalog) else None
+        return CatalogPage(items=page, next_cursor=next_cursor, total_items=len(catalog))
+
+    async def _cached_toolkits(self) -> list[dict[str, Any]]:
+        cache_key = "composio:toolkits"
+        cached = _toolkit_cache.get(cache_key)
+        now = time.monotonic()
+        if cached and cached[0] > now:
+            return cached[1]
+        items = await asyncio.to_thread(self._fetch_toolkits)
+        _toolkit_cache[cache_key] = (now + _TOOLKIT_CACHE_TTL_SECONDS, items)
+        return items
+
+    def _fetch_toolkits(self) -> list[dict[str, Any]]:
+        assert self._client is not None
+        collected: list[dict[str, Any]] = []
+        cursor = None
+        for _ in range(8):
+            params: dict[str, Any] = {"limit": 50}
             if cursor:
                 params["cursor"] = cursor
-            response = self._client.toolkits.list(**params)
-            items = []
+            try:
+                response = self._client.toolkits.list(**params)
+            except TypeError:
+                response = self._client.toolkits.list(limit=50)
             for item in getattr(response, "items", []) or []:
                 meta = getattr(item, "meta", None) or {}
-                slug = getattr(item, "slug", "")
-                name = getattr(item, "name", "")
-                description = meta.get("description") if isinstance(meta, dict) else getattr(meta, "description", "")
-                if search:
-                    haystack = f"{slug} {name} {description}".lower()
-                    if search.lower() not in haystack:
-                        continue
-                items.append(
+                collected.append(
                     {
-                        "slug": slug,
-                        "name": name,
-                        "description": description,
-                        "logo": meta.get("logo") if isinstance(meta, dict) else getattr(meta, "logo", None),
+                        "slug": getattr(item, "slug", ""),
+                        "name": getattr(item, "name", ""),
+                        "description": meta.get("description")
+                        if isinstance(meta, dict)
+                        else getattr(meta, "description", ""),
+                        "logo": meta.get("logo")
+                        if isinstance(meta, dict)
+                        else getattr(meta, "logo", None),
                         "categories": meta.get("categories") if isinstance(meta, dict) else [],
-                        "tools_count": meta.get("tools_count") if isinstance(meta, dict) else None,
+                        "tools_count": meta.get("tools_count")
+                        if isinstance(meta, dict)
+                        else None,
                         "auth_schemes": list(getattr(item, "auth_schemes", []) or []),
                     }
                 )
-            return CatalogPage(
-                items=items[:limit],
-                next_cursor=getattr(response, "next_cursor", None),
-                total_items=getattr(response, "total_items", None),
-            )
+            cursor = getattr(response, "next_cursor", None)
+            if not cursor:
+                break
+        return collected
 
-        return await asyncio.to_thread(_call)
+    def invalidate_toolkit_cache(self) -> None:
+        _toolkit_cache.clear()
 
     async def ensure_auth_config(self, toolkit_slug: str) -> str:
         assert self._client is not None

@@ -24,7 +24,12 @@ from personal_markets.identity.budget import InferenceBudgetService
 from personal_markets.identity.credentials import CredentialCipher, CredentialStore, UserProvider
 from personal_markets.identity.domain import Principal
 from personal_markets.identity.inference_audit import InferenceAudit
-from personal_markets.integrations.inference_catalog import capability, default_model
+from personal_markets.integrations.inference_catalog import (
+    capability,
+    default_model,
+    hosted_allowlist,
+    resolve_capability,
+)
 from personal_markets.integrations.inference_http import CompletionKind, NativeInferenceAdapter
 from personal_markets.ports import InferenceRequest, InferenceResponse
 
@@ -32,13 +37,9 @@ from personal_markets.ports import InferenceRequest, InferenceResponse
 def hosted_provider(settings: Settings) -> str:
     chosen = settings.inference_provider.lower().strip()
     if chosen == "auto":
-        if settings.spur_api_key:
-            return "spur"
-        if settings.openai_api_key:
-            return "openai"
-        if settings.anthropic_api_key:
-            return "anthropic"
-        return "none"
+        # Hosted inference is Spur-funded. OpenAI/Anthropic keys are BYOK-only and
+        # must never become an implicit hosted fallback.
+        return "spur" if settings.spur_api_key else "none"
     if chosen not in {"spur", "openai", "anthropic", "none"}:
         raise ProviderNotConfiguredError("Unsupported hosted provider configuration")
     return chosen
@@ -92,30 +93,36 @@ class InferenceRouter:
             raise ProviderNotConfiguredError("Hosted inference is not configured")
         override = self._settings.inference_agent_overrides.get(request.agent_name, {})
         if mode == "hosted":
-            provider = override.get("provider", provider)
-            legacy = {
-                "goal_architect": self._settings.openai_goal_model,
-                "evidence": self._settings.openai_evidence_model,
-                "research": self._settings.openai_research_model,
-                "intervention": self._settings.openai_intervention_model,
-                "source_planner": self._settings.openai_source_planner_model,
-            }
+            override_provider = override.get("provider")
+            if override_provider and override_provider != provider:
+                raise SemanticProviderError(
+                    "Hosted inference cannot switch providers per agent; "
+                    "use BYOK to choose OpenAI or Anthropic"
+                )
             configured_model = (
                 self._settings.inference_model
                 or (
                     self._settings.resolved_spur_model()
                     if provider == "spur"
-                    else legacy.get(request.agent_name)
-                    if provider == "openai"
                     else None
                 )
                 or default_model(provider)
             )
-            model = request.model or preference.model or override.get("model") or configured_model
+            allowlist = hosted_allowlist(provider, configured_model)
+            if request.model and request.model not in allowlist:
+                raise SemanticProviderError(
+                    "Hosted inference can only use the platform-authorized model"
+                )
+            candidate = preference.model or override.get("model") or configured_model
+            model = candidate if candidate in allowlist else configured_model
         else:
             # A user's selected provider/model takes precedence over hosted agent settings.
             model = request.model or preference.model or default_model(provider)
-        cap = capability(provider, model)
+        cap = resolve_capability(provider, model) if mode == "byok" else capability(provider, model)
+        if kind == "structured" and not cap.structured:
+            raise SemanticProviderError(
+                "Selected model does not support structured forecasting output"
+            )
         if kind == "tools" and not cap.tools:
             raise SemanticProviderError("Selected model does not support tool calling")
         if request.fallback_models:
@@ -255,7 +262,12 @@ class InferenceRouter:
             usage = response.usage if response and response.usage_reported else known_usage
             used_in = usage.get("input_tokens", 0) if usage is not None else input_bound
             used_out = usage.get("output_tokens", 0) if usage is not None else output_limit
-            cost = capability(provider, request.model or "").estimate(used_in, used_out)
+            priced = (
+                resolve_capability(provider, request.model or "")
+                if mode == "byok"
+                else capability(provider, request.model or "")
+            )
+            cost = priced.estimate(used_in, used_out)
             if response and not response.usage_reported:
                 response.usage = {"input_tokens": used_in, "output_tokens": used_out}
                 response.estimated_cost_usd = cost

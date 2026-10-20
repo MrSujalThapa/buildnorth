@@ -37,6 +37,13 @@ const seededGoals = [
 
 async function mockApi(page: Page, goals: unknown[] = seededGoals) {
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok", service: "api", version: "test" } }));
+  await page.route("**/api/v1/goals/dashboard", (route) => {
+    const items = Array.isArray(goals) ? goals : [];
+    const histories = Object.fromEntries(
+      items.map((goal) => [(goal as { goal_id: string }).goal_id, []]),
+    );
+    return route.fulfill({ json: { goals: items, histories } });
+  });
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: goals }));
   await page.route("**/api/v1/what-if/history/**", (route) => route.fulfill({ json: [] }));
 }

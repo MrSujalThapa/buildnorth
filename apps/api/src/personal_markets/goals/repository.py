@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from personal_markets.goals.domain import GoalContract
@@ -18,3 +18,11 @@ class GoalRepository(Protocol):
     async def upsert_seed(self, goal: GoalContract) -> bool: ...
 
     async def create(self, goal: GoalContract, user_id: UUID) -> GoalContract: ...
+
+    async def archive_for_user(self, goal_id: UUID, user_id: UUID) -> bool: ...
+
+    async def restore_for_user(self, goal_id: UUID, user_id: UUID) -> bool: ...
+
+    async def merge_requirements(
+        self, goal_id: UUID, user_id: UUID, patch: dict[str, Any]
+    ) -> GoalContract | None: ...

@@ -160,13 +160,20 @@ class IntegrationGatewayService:
         cursor: str | None = None,
         limit: int = 20,
         user_id: UUID | None = None,
+        reconcile: bool = False,
     ) -> dict[str, object]:
         owner = self._owner(user_id)
-        await self._reconcile_connections(owner)
-        connections = {item.plugin_id: item for item in await self._repository.list_connections(owner)}
-        local_views = await self.views(owner)
-        local_by_id = {view.definition.id: view for view in local_views if view.definition.id in {"manual", "csv"}}
+        if reconcile:
+            await self._reconcile_connections(owner)
+        stored_connections = await self._repository.list_connections(owner)
+        connections = {item.plugin_id: item for item in stored_connections}
+        local_views = await self._local_plugin_views(connections)
+        provider_status = "available" if self._composio.available else "unavailable"
+        provider_message = None
         if not self._composio.available:
+            provider_message = (
+                "Connected-app catalog is unavailable. Manual and CSV evidence still work."
+            )
             filtered = [
                 view
                 for view in local_views
@@ -177,37 +184,45 @@ class IntegrationGatewayService:
                 "items": [item.model_dump(mode="json") for item in filtered[:limit]],
                 "next_cursor": None,
                 "total_items": len(filtered),
+                "provider_status": provider_status,
+                "provider_message": provider_message,
             }
-        page = await self._composio.search_toolkits(search=search, cursor=cursor, limit=limit)
+        try:
+            page = await self._composio.search_toolkits(search=search, cursor=cursor, limit=limit)
+        except Exception:
+            provider_status = "error"
+            provider_message = (
+                "The integration catalog could not be loaded. Retry, or use Manual / CSV evidence."
+            )
+            return {
+                "items": [item.model_dump(mode="json") for item in local_views],
+                "next_cursor": None,
+                "total_items": len(local_views),
+                "provider_status": provider_status,
+                "provider_message": provider_message,
+            }
         items: list[PluginView] = []
         for row in page.items:
-            plugin_id = str(row.get("slug") or "")
-            if not plugin_id:
-                continue
-            stored = connections.get(plugin_id)
-            if stored is None:
-                connection = PluginConnection(plugin_id=plugin_id, status=PluginStatus.NOT_CONNECTED)
-            else:
-                caps = await self._repository.list_capabilities(stored.id)
-                connection = self._connection_view(stored, permissions=[cap.operation for cap in caps])
-            definition = PluginDefinition(
-                id=plugin_id,
-                name=str(row.get("name") or plugin_id),
-                description=str(row.get("description") or ""),
-                category=str((row.get("categories") or [{"name": "integration"}])[0].get("name", "integration")),
-                provider_type="composio",
-                logo_url=str(row.get("logo") or "") or None,
-                used_for=[f"{row.get('tools_count')} tools available"] if row.get("tools_count") else [],
-            )
-            items.append(PluginView(definition=definition, connection=connection))
+            view = self._toolkit_view(row, connections)
+            if view is not None:
+                items.append(view)
         if not search and not cursor:
-            for local_id in ("manual", "csv"):
-                if local_id in local_by_id:
-                    items.insert(0, local_by_id[local_id])
+            remote = [item for item in items if item.definition.id not in {"manual", "csv"}]
+            items = [*local_views, *remote]
+        elif search:
+            extra = [
+                view
+                for view in local_views
+                if search.lower() in f"{view.definition.name} {view.definition.description}".lower()
+                and view.definition.id not in {item.definition.id for item in items}
+            ]
+            items = [*extra, *items]
         return {
             "items": [item.model_dump(mode="json") for item in items],
             "next_cursor": page.next_cursor,
-            "total_items": page.total_items,
+            "total_items": page.total_items if page.total_items is not None else len(items),
+            "provider_status": provider_status,
+            "provider_message": provider_message,
         }
 
     def _connection_view(
@@ -232,59 +247,60 @@ class IntegrationGatewayService:
             error=None if stored.status == "connected" else stored.status,
         )
 
-    async def views(self, user_id: UUID | None = None) -> list[PluginView]:
-        owner = self._owner(user_id)
-        await self._reconcile_connections(owner)
-        connections = {item.plugin_id: item for item in await self._repository.list_connections(owner)}
+    async def views(
+        self, user_id: UUID | None = None, *, reconcile: bool = False
+    ) -> list[PluginView]:
+        catalog = await self.search_catalog(limit=50, user_id=user_id, reconcile=reconcile)
+        return [PluginView.model_validate(item) for item in catalog["items"]]
+
+    async def _local_plugin_views(
+        self, connections: dict[str, PluginConnectionRecord]
+    ) -> list[PluginView]:
         views: list[PluginView] = []
         for definition in PLUGIN_DEFINITIONS:
             if definition.id not in {"manual", "csv"}:
                 continue
             stored = connections.get(definition.id)
             if stored is None:
-                connection = PluginConnection(plugin_id=definition.id, status=PluginStatus.NOT_CONNECTED)
-            else:
-                caps = await self._repository.list_capabilities(stored.id)
-                connection = self._connection_view(stored, permissions=[cap.operation for cap in caps])
-            views.append(PluginView(definition=definition, connection=connection))
-        if self._composio.available:
-            page = await self._composio.search_toolkits(limit=50)
-            for row in page.items:
-                plugin_id = str(row.get("slug") or "")
-                if not plugin_id or plugin_id in {"manual", "csv"}:
-                    continue
-                stored = connections.get(plugin_id)
-                if stored is None:
-                    connection = PluginConnection(plugin_id=plugin_id, status=PluginStatus.NOT_CONNECTED)
-                else:
-                    caps = await self._repository.list_capabilities(stored.id)
-                    connection = self._connection_view(stored, permissions=[cap.operation for cap in caps])
-                definition = PluginDefinition(
-                    id=plugin_id,
-                    name=str(row.get("name") or plugin_id),
-                    description=str(row.get("description") or ""),
-                    category=str((row.get("categories") or [{"name": "integration"}])[0].get("name", "integration")),
-                    provider_type="composio",
-                    logo_url=str(row.get("logo") or "") or None,
-                    used_for=[f"{row.get('tools_count')} tools available"] if row.get("tools_count") else [],
+                connection = PluginConnection(
+                    plugin_id=definition.id, status=PluginStatus.NOT_CONNECTED
                 )
-                views.append(PluginView(definition=definition, connection=connection))
-        seen = {view.definition.id for view in views}
-        for plugin_id, stored in connections.items():
-            if plugin_id in seen:
-                continue
-            caps = await self._repository.list_capabilities(stored.id)
-            connection = self._connection_view(stored, permissions=[cap.operation for cap in caps])
-            definition = PluginDefinition(
-                id=plugin_id,
-                name=plugin_id.replace("_", " ").title(),
-                description=f"Connected {plugin_id} integration",
-                category="integration",
-                provider_type=stored.gateway_provider or "composio",
-                used_for=["Connected provider"],
-            )
+            else:
+                connection = self._connection_view(stored)
             views.append(PluginView(definition=definition, connection=connection))
         return views
+
+    def _toolkit_view(
+        self, row: dict[str, Any], connections: dict[str, PluginConnectionRecord]
+    ) -> PluginView | None:
+        plugin_id = str(row.get("slug") or "")
+        if not plugin_id or plugin_id in {"manual", "csv"}:
+            return None
+        stored = connections.get(plugin_id)
+        if stored is None:
+            connection = PluginConnection(plugin_id=plugin_id, status=PluginStatus.NOT_CONNECTED)
+        else:
+            connection = self._connection_view(stored)
+        categories = row.get("categories") or [{"name": "integration"}]
+        category = "integration"
+        if isinstance(categories, list) and categories:
+            first = categories[0]
+            if isinstance(first, dict):
+                category = str(first.get("name") or "integration")
+            elif isinstance(first, str):
+                category = first
+        definition = PluginDefinition(
+            id=plugin_id,
+            name=str(row.get("name") or plugin_id),
+            description=str(row.get("description") or ""),
+            category=category,
+            provider_type="composio",
+            logo_url=str(row.get("logo") or "") or None,
+            used_for=(
+                [f"{row.get('tools_count')} tools available"] if row.get("tools_count") else []
+            ),
+        )
+        return PluginView(definition=definition, connection=connection)
 
     async def connect_managed(
         self,

@@ -106,23 +106,31 @@ export function EvidenceWorkflow({ goalId, initialSnapshot = null, onSnapshotCha
       ) : (
         <form
           id="evidence"
-          className="composer-form"
+          className="composer-form evidence-manual-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (evidenceText.trim()) addEvidence.mutate();
           }}
         >
-          <label htmlFor="evidence-input">Add evidence</label>
+          <label htmlFor="evidence-input">What happened?</label>
+          <p className="field-hint">
+            Manual notes are user-entered. They are not treated as independently verified source records.
+          </p>
           <textarea
             id="evidence-input"
             rows={4}
             value={evidenceText}
             onChange={(event) => setEvidenceText(event.target.value)}
-            placeholder="I failed a Meta phone screen today but studied LeetCode for 3 hours."
+            placeholder="I finished book 5 of 20 today and averaged 40 pages."
           />
           <button type="submit" disabled={addEvidence.isPending || !evidenceText.trim()}>
             {addEvidence.isPending ? "Reading evidence…" : "Submit evidence"}
           </button>
+          {addEvidence.isPending ? <p role="status">Processing evidence and updating the forecast…</p> : null}
+          {!evidenceText.trim() ? (
+            <p className="field-hint">Submit stays disabled until you describe a measurable event.</p>
+          ) : null}
+          {addEvidence.isError ? <p className="field-hint">{String(addEvidence.error)}</p> : null}
         </form>
       )}
     </Wrapper>

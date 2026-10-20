@@ -231,6 +231,89 @@
   flex: 0 0 auto;
 }
 
+.inference-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0 8px;
+}
+
+.inference-card {
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  background: var(--app-surface);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inference-card.selected {
+  border-color: rgba(41, 159, 150, 0.42);
+  background: var(--app-accent-soft);
+}
+
+.inference-card h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.inference-card p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.inference-meta {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.inference-meta div {
+  display: grid;
+  gap: 2px;
+}
+
+.inference-meta dt {
+  font-size: 11px;
+  color: var(--app-muted);
+}
+
+.inference-meta dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.inference-card > button {
+  justify-self: start;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.inference-card > button:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.inference-byok-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 800px) {
+  .inference-mode-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .inference-settings-form {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

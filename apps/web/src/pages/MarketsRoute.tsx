@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
@@ -7,28 +7,40 @@ import MarketsPage from "../components/market/MarketsPage";
 
 export function MarketsRoute() {
   const navigate = useNavigate();
-  const goals = useQuery({ queryKey: ["goals"], queryFn: ({ signal }) => api.goals(signal) });
-
-  const historyQueries = useQueries({
-    queries: (goals.data ?? []).map((goal) => ({
-      queryKey: ["market-history", goal.goal_id],
-      queryFn: ({ signal }: { signal?: AbortSignal }) => api.marketHistory(goal.goal_id, signal),
-      enabled: Boolean(goal.goal_id),
-    })),
+  const queryClient = useQueryClient();
+  const dashboard = useQuery({
+    queryKey: ["goals", "dashboard"],
+    queryFn: ({ signal }) => api.goalsDashboard(signal),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 
   const markets = useMemo(() => {
-    if (!goals.data) return [];
-    return goals.data.map((goal, index) => {
-      const query = historyQueries[index];
-      return {
-        ...toMarketCard(goal, query?.data ?? []),
-        historyUnavailable: Boolean(query?.isError),
-      };
-    });
-  }, [goals.data, historyQueries]);
+    const goals = dashboard.data?.goals ?? [];
+    const histories = dashboard.data?.histories ?? {};
+    return goals.map((goal) => ({
+      ...toMarketCard(goal, histories[goal.goal_id] ?? []),
+      historyUnavailable: false,
+    }));
+  }, [dashboard.data]);
 
-  if (goals.isLoading) {
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["goals"] });
+
+  const createCollection = useMutation({
+    mutationFn: (name: string) => api.createCollection({ name }),
+    onSuccess: invalidate,
+  });
+  const archiveGoals = useMutation({
+    mutationFn: (goalIds: string[]) => api.archiveGoals(goalIds),
+    onSuccess: invalidate,
+  });
+  const moveGoals = useMutation({
+    mutationFn: ({ collectionId, goalIds }: { collectionId: string; goalIds: string[] }) =>
+      api.addGoalsToCollection(collectionId, goalIds),
+    onSuccess: invalidate,
+  });
+
+  if (dashboard.isLoading && !dashboard.data) {
     return (
       <main className="markets-page">
         <section className="markets-shell">
@@ -38,13 +50,13 @@ export function MarketsRoute() {
     );
   }
 
-  if (goals.isError) {
+  if (dashboard.isError && !dashboard.data) {
     return (
       <main className="markets-page">
         <section className="markets-shell">
           <div className="unpriced-state">
             <strong>Markets unavailable</strong>
-            <span>Could not reach GET /api/v1/goals.</span>
+            <span>Could not reach GET /api/v1/goals/dashboard.</span>
           </div>
         </section>
       </main>
@@ -54,7 +66,12 @@ export function MarketsRoute() {
   return (
     <MarketsPage
       markets={markets}
+      collections={dashboard.data?.collections ?? []}
       onSelectMarket={(marketId) => { void navigate(`/goals/${marketId}`); }}
+      onOpenCollection={(collectionId) => { void navigate(`/collections/${collectionId}`); }}
+      onCreateCollection={(name) => createCollection.mutateAsync(name)}
+      onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds)}
+      onMoveToCollection={(collectionId, goalIds) => moveGoals.mutateAsync({ collectionId, goalIds })}
     />
   );
 }

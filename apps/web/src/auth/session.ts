@@ -11,8 +11,16 @@ export type HostedUsage = {
   remaining_usd: number;
   remaining_tokens: number;
   global_remaining_usd: number | null;
+  hosted_available?: boolean;
   kill_switch: boolean;
   billing_note: string;
+};
+
+export type UserProfile = {
+  display_name: string | null;
+  username: string | null;
+  bio: string | null;
+  avatar_value: string | null;
 };
 
 export type AccountView = {
@@ -23,6 +31,7 @@ export type AccountView = {
   role: "user" | "admin";
   invited: boolean;
   hosted: HostedUsage;
+  profile?: UserProfile;
 };
 
 const TEST_TOKEN_KEY = "pm-test-token";

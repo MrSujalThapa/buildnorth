@@ -4,6 +4,8 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 
+from personal_markets.collections.repository import InMemoryCollectionRepository
+from personal_markets.collections.service import CollectionService
 from personal_markets.evidence.uploads import UploadService, UploadStore
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.service import GoalService
@@ -16,6 +18,8 @@ from personal_markets.wiring import (
     InMemoryGithubCursorStore,
     build_in_memory_workflow,
     get_agent_workflow,
+    get_collection_repository,
+    get_collection_service,
     get_evidence_service,
     get_github_cursor_store,
     get_goal_service,
@@ -24,7 +28,7 @@ from personal_markets.wiring import (
 )
 
 POSTGRES_MIGRATION_SKIP = (
-    "Isolated Postgres is missing required tables. Apply supabase/migrations 0001-0015 "
+    "Isolated Postgres is missing required tables. Apply supabase/migrations 0001-0016 "
     "with scripts/db_migrate.py to PM_TEST_DATABASE_URL. The default playitout_phase0_test "
     "database is not auto-migrated."
 )
@@ -47,6 +51,7 @@ def isolated_postgres_url() -> str | None:
 def isolated_app(*, inference: Any | None = None) -> FastAPI:
     reset_identity_state()
     get_integration_repository.cache_clear()
+    get_collection_repository.cache_clear()
     repository = InMemoryGoalRepository()
     workflow = build_in_memory_workflow(inference=inference, goal_repository=repository)
     app = create_app()
@@ -68,6 +73,11 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
     app.router.lifespan_context = test_lifespan
     simulation_repository = InMemorySimulationRepository()
     app.dependency_overrides[get_goal_service] = lambda: GoalService(repository)
+    collection_repository = InMemoryCollectionRepository()
+    app.dependency_overrides[get_collection_service] = lambda: CollectionService(
+        collection_repository, GoalService(repository)
+    )
+    app.state.collection_repository = collection_repository
     async def _what_if(request: Request):
         from personal_markets.identity.deps import get_principal
         from personal_markets.identity.factory import get_identity_service

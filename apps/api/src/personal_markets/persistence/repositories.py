@@ -22,14 +22,21 @@ class PostgresGoalRepository:
 
     async def list(self) -> list[GoalContract]:
         async with self._engine.connect() as connection:
-            rows = (await connection.execute(text("select * from goals order by title"))).mappings()
+            rows = (
+                await connection.execute(
+                    text("select * from goals where status = 'active' order by title")
+                )
+            ).mappings()
             return [self._to_domain(dict(row)) for row in rows]
 
     async def list_for_user(self, user_id: UUID) -> list[GoalContract]:
         async with self._engine.connect() as connection:
             rows = (
                 await connection.execute(
-                    text("select * from goals where user_id = :user_id order by title"),
+                    text(
+                        "select * from goals where user_id = :user_id"
+                        " and status = 'active' order by title"
+                    ),
                     {"user_id": user_id},
                 )
             ).mappings()
@@ -40,7 +47,8 @@ class PostgresGoalRepository:
             row = (
                 (
                     await connection.execute(
-                        text("select * from goals where id = :id"), {"id": goal_id}
+                        text("select * from goals where id = :id and status = 'active'"),
+                        {"id": goal_id},
                     )
                 )
                 .mappings()
@@ -53,7 +61,10 @@ class PostgresGoalRepository:
             row = (
                 (
                     await connection.execute(
-                        text("select * from goals where id = :id and user_id = :user_id"),
+                        text(
+                            "select * from goals where id = :id and user_id = :user_id"
+                            " and status = 'active'"
+                        ),
                         {"id": goal_id, "user_id": user_id},
                     )
                 )
@@ -95,6 +106,59 @@ class PostgresGoalRepository:
         stored = await self.get(goal.goal_id)
         assert stored is not None
         return stored
+
+    async def archive_for_user(self, goal_id: UUID, user_id: UUID) -> bool:
+        async with transaction(self._engine) as connection:
+            result = await connection.execute(
+                text(
+                    "update goals set status = 'archived', updated_at = now()"
+                    " where id = :id and user_id = :user_id and status = 'active'"
+                ),
+                {"id": goal_id, "user_id": user_id},
+            )
+        return bool(result.rowcount)
+
+    async def restore_for_user(self, goal_id: UUID, user_id: UUID) -> bool:
+        async with transaction(self._engine) as connection:
+            result = await connection.execute(
+                text(
+                    "update goals set status = 'active', updated_at = now()"
+                    " where id = :id and user_id = :user_id and status = 'archived'"
+                ),
+                {"id": goal_id, "user_id": user_id},
+            )
+        return bool(result.rowcount)
+
+    async def merge_requirements(
+        self, goal_id: UUID, user_id: UUID, patch: dict[str, Any]
+    ) -> GoalContract | None:
+        async with transaction(self._engine) as connection:
+            result = await connection.execute(
+                text(
+                    """
+                    update goals
+                    set model_requirements_json = coalesce(model_requirements_json, '{}'::jsonb)
+                      || cast(:patch as jsonb),
+                        updated_at = now()
+                    where id = :id and user_id = :user_id
+                    """
+                ),
+                {"id": goal_id, "user_id": user_id, "patch": json.dumps(patch)},
+            )
+        if not result.rowcount:
+            return None
+        async with self._engine.connect() as connection:
+            row = (
+                (
+                    await connection.execute(
+                        text("select * from goals where id = :id and user_id = :user_id"),
+                        {"id": goal_id, "user_id": user_id},
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        return self._to_domain(dict(row)) if row else None
 
     @staticmethod
     def _to_domain(row: dict[str, Any]) -> GoalContract:

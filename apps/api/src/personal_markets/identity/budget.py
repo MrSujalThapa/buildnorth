@@ -53,6 +53,13 @@ class InferenceBudgetService:
             - global_counters.reserved_usd
             - global_counters.spent_usd,
         )
+        hosted_available = (
+            principal.hosted_enabled
+            and not kill
+            and remaining_usd > 0
+            and remaining_tokens > 0
+            and global_remaining > 0
+        )
         return HostedUsage(
             enabled=principal.hosted_enabled and not kill,
             quota_usd=principal.hosted_quota_usd,
@@ -63,7 +70,8 @@ class InferenceBudgetService:
             spent_tokens=counters.spent_tokens,
             remaining_usd=remaining_usd,
             remaining_tokens=remaining_tokens,
-            global_remaining_usd=global_remaining,
+            global_remaining_usd=global_remaining if principal.role == "admin" else None,
+            hosted_available=hosted_available,
             kill_switch=kill,
         )
 

@@ -1,23 +1,32 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import secrets
 from datetime import UTC, datetime, timedelta
 
 from personal_markets.core.config import Settings
-from personal_markets.core.errors import ForbiddenError, ResourceNotFoundError, UnauthorizedError
+from personal_markets.core.errors import (
+    ConflictError,
+    ForbiddenError,
+    ResourceNotFoundError,
+    SemanticProviderError,
+    UnauthorizedError,
+)
 from personal_markets.identity.clerk_users import lookup_verified_email
 from personal_markets.identity.domain import (
     AccountView,
     HostedUsage,
     Invitation,
     Principal,
+    UserProfile,
     user_id_for_clerk,
 )
 from personal_markets.identity.repository import IdentityRepository
 from personal_markets.identity.tokens import TokenClaims
 
 _MAX_SHARED_REDEMPTIONS = 20
+_USERNAME = re.compile(r"^[a-z0-9_]{3,24}$")
 
 
 class IdentityService:
@@ -157,6 +166,7 @@ class IdentityService:
         return await self._repository.list_invitations()
 
     async def account_view(self, principal: Principal, usage: HostedUsage) -> AccountView:
+        profile = await self._repository.get_profile(principal.user_id)
         return AccountView(
             user_id=principal.user_id,
             clerk_user_id=principal.clerk_user_id,
@@ -165,7 +175,31 @@ class IdentityService:
             role=principal.role,
             invited=principal.invited,
             hosted=usage,
+            profile=profile,
         )
+
+    async def update_profile(self, principal: Principal, patch: UserProfile) -> UserProfile:
+        current = await self._repository.get_profile(principal.user_id)
+        username = patch.username if patch.username is not None else current.username
+        if username:
+            normalized = username.strip().lower()
+            if not _USERNAME.match(normalized):
+                raise SemanticProviderError(
+                    "username must be 3-24 characters of a-z, 0-9, or underscore"
+                )
+            if await self._repository.username_taken(normalized, principal.user_id):
+                raise ConflictError("that username is already taken")
+            username = normalized
+        display = patch.display_name if patch.display_name is not None else current.display_name
+        bio = patch.bio if patch.bio is not None else current.bio
+        avatar = patch.avatar_value if patch.avatar_value is not None else current.avatar_value
+        updated = UserProfile(
+            display_name=(display or "").strip() or None,
+            username=username or None,
+            bio=(bio or "").strip() or None,
+            avatar_value=(avatar or "").strip() or None,
+        )
+        return await self._repository.upsert_profile(principal.user_id, updated)
 
 
 def require_authenticated(principal: Principal | None) -> Principal:

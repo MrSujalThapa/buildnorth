@@ -67,6 +67,7 @@ class HostedUsage(BaseModel):
     remaining_usd: float = 0.0
     remaining_tokens: int = 0
     global_remaining_usd: float | None = None
+    hosted_available: bool = False
     kill_switch: bool = False
     billing_note: str = Field(
         default=(
@@ -74,6 +75,13 @@ class HostedUsage(BaseModel):
             "a hard upstream provider billing ceiling."
         )
     )
+
+
+class UserProfile(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
+    username: str | None = None
+    bio: str | None = Field(default=None, max_length=280)
+    avatar_value: str | None = Field(default=None, max_length=32)
 
 
 class AccountView(BaseModel):
@@ -84,3 +92,4 @@ class AccountView(BaseModel):
     role: Role
     invited: bool
     hosted: HostedUsage
+    profile: UserProfile = Field(default_factory=UserProfile)

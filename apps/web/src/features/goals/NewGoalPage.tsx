@@ -20,6 +20,7 @@ export function NewGoalPage() {
       setError(null);
       if (data.status === "completed" || data.status === "limited" || data.status === "withheld") {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
+        void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         if (data.goal) void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
       }
     },
@@ -37,6 +38,7 @@ export function NewGoalPage() {
       setAnswers({});
       if (data.goal && (data.status === "completed" || data.status === "limited" || data.status === "withheld")) {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
+        void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
       }
     },

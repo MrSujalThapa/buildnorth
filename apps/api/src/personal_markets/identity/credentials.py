@@ -129,7 +129,11 @@ class InMemoryCredentialStore:
         self, owner: UUID, provider: UserProvider, ciphertext: str, suffix: str
     ) -> None:
         await self.put(owner, provider, ciphertext, suffix)
-        await self.set_preference(owner, InferencePreference(mode="byok", provider=provider))
+        previous = self._preferences.get(owner)
+        model = previous.model if previous is not None and previous.provider == provider else None
+        await self.set_preference(
+            owner, InferencePreference(mode="byok", provider=provider, model=model)
+        )
 
     async def delete(self, owner: UUID, provider: UserProvider) -> None:
         self._credentials.pop((owner, provider), None)
@@ -219,7 +223,13 @@ class PostgresCredentialStore:
                 insert into inference_preferences (user_id, mode, provider, model)
                 values (:owner, 'byok', :provider, null)
                 on conflict (user_id) do update set
-                  mode='byok', provider=excluded.provider, model=null
+                  mode='byok',
+                  provider=excluded.provider,
+                  model=case
+                    when inference_preferences.provider = excluded.provider
+                    then inference_preferences.model
+                    else null
+                  end
                 """),
                 {"owner": owner, "provider": provider},
             )

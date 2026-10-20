@@ -27,7 +27,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     async def validate(_self: NativeInferenceAdapter) -> None:
         return None
 
+    async def list_models(_self: NativeInferenceAdapter) -> dict[str, object]:
+        return {"data": [{"id": "gpt-5.4-mini", "display_name": "GPT-5.4 mini"}]}
+
     monkeypatch.setattr(NativeInferenceAdapter, "validate_key", validate)
+    monkeypatch.setattr(NativeInferenceAdapter, "list_models", list_models)
     app = isolated_app()
     with TestClient(app) as test_client:
         yield test_client

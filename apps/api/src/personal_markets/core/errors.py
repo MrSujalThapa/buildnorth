@@ -14,6 +14,10 @@ class ForbiddenError(DomainError):
     pass
 
 
+class ConflictError(DomainError):
+    pass
+
+
 class ProviderNotConfiguredError(DomainError):
     pass
 

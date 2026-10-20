@@ -112,11 +112,23 @@ export function toMarketDetail(goal: Goal, history: MarketHistoryPoint[], eviden
       ? `Modeled as ${family.replaceAll("_", " ")} using the ${primitive.replaceAll("_", " ")} primitive.`
       : `Modeled as ${family.replaceAll("_", " ")}.`
     : undefined;
+  const publicationRaw = goal.model_requirements?.last_publication;
+  const publication =
+    publicationRaw && typeof publicationRaw === "object"
+      ? {
+          status: stringField(publicationRaw, "status") ?? "unknown",
+          category: stringField(publicationRaw, "category") ?? null,
+          reason: stringField(publicationRaw, "reason") ?? null,
+          issues: stringList(publicationRaw, "issues"),
+          required_actions: stringList(publicationRaw, "required_actions"),
+        }
+      : undefined;
   return {
     ...base,
     events: evidenceToEvents(evidence),
     modelFamily: family,
     modelExplanation: explanation,
-    unpricedReason: base.odds == null ? reasons[0] : undefined,
+    unpricedReason: base.odds == null ? (publication?.reason ?? reasons[0]) : undefined,
+    publication,
   };
 }

@@ -21,7 +21,7 @@ from personal_markets.core.errors import (
     SemanticProviderError,
     TransientProviderError,
 )
-from personal_markets.integrations.inference_catalog import capability
+from personal_markets.integrations.inference_catalog import resolve_capability
 from personal_markets.ports import InferenceRequest, InferenceResponse, ToolCall
 
 CompletionKind = Literal["structured", "text", "tools"]
@@ -88,6 +88,32 @@ class NativeInferenceAdapter:
         if response.status_code != 200:
             raise provider_error(self.provider, response.status_code) from None
 
+    async def list_models(self) -> dict[str, Any]:
+        try:
+            async with httpx.AsyncClient(
+                transport=self._transport, timeout=15, follow_redirects=False
+            ) as client:
+                response = await client.get(
+                    self._base.rstrip("/") + "/models",
+                    headers=self._headers(),
+                    params={"limit": 100} if self.provider == "anthropic" else None,
+                )
+        except httpx.HTTPError:
+            raise TransientProviderError(
+                "Provider model listing timed out or could not connect"
+            ) from None
+        if response.status_code in {401, 403}:
+            raise provider_error(self.provider, response.status_code) from None
+        if response.status_code != 200:
+            raise provider_error(self.provider, response.status_code) from None
+        try:
+            payload = response.json()
+        except ValueError:
+            raise SemanticProviderError("Provider returned a malformed model list") from None
+        if not isinstance(payload, (dict, list)):
+            raise SemanticProviderError("Provider model list must be an object or array")
+        return payload if isinstance(payload, dict) else {"data": payload}
+
     async def complete_structured(self, request: InferenceRequest) -> InferenceResponse:
         return await self.complete(request, "structured")
 
@@ -99,7 +125,11 @@ class NativeInferenceAdapter:
 
     async def complete(self, request: InferenceRequest, kind: CompletionKind) -> InferenceResponse:
         model = request.model or ""
-        cap = capability(self.provider, model)
+        cap = resolve_capability(self.provider, model)
+        if kind == "structured" and not cap.structured:
+            raise SemanticProviderError(
+                "Selected model does not support structured forecasting output"
+            )
         if kind == "tools" and (not cap.tools or not request.tools):
             raise SemanticProviderError("Tool calling is unavailable for this model/request")
         limit = max(request.max_output_tokens or 1200, cap.minimum_output_tokens)

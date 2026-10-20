@@ -26,6 +26,23 @@ type Props = {
   onEvidence?: () => void;
 };
 
+function categoryCopy(category?: string | null) {
+  switch (category) {
+    case "missing_user_information":
+      return "The model is missing starting progress, pace, or another user-supplied input.";
+    case "missing_evidence":
+      return "There is not enough linked evidence to support a published probability.";
+    case "insufficient_model":
+      return "No applicable calibrated numerical family can price this goal yet.";
+    case "unsupported_assumptions":
+      return "The remaining assumptions are not calibrated enough to publish odds.";
+    case "provider_failure":
+      return "The inference provider could not complete this workflow.";
+    default:
+      return "The critic blocked publication until the issues below are resolved.";
+  }
+}
+
 function EventIcon({ event }: { event: MarketEvent }) {
   const props = { size: 19, strokeWidth: 1.9 };
 
@@ -177,10 +194,12 @@ export default function MarketDetailPage({
                 </div>
               </>
             )
-          ) : criticDecision === "withhold" ? (
+          ) : criticDecision === "withhold" || market.publication?.status === "withheld" ? (
             <>
               <div className="market-price" data-testid="goal-price">Withheld</div>
-              <div className="market-price-hint">Forecast withheld by critic.</div>
+              <div className="market-price-hint">
+                {market.publication?.reason ?? "Forecast withheld by critic."}
+              </div>
             </>
           ) : market.odds === null ? (
             <>
@@ -203,6 +222,36 @@ export default function MarketDetailPage({
           markers={markers}
           onSelectionChange={setChartSelection}
         />
+
+        {market.publication?.status === "withheld" || criticDecision === "withhold" ? (
+          <section className="market-section withheld-note">
+            <h2>Why odds are withheld</h2>
+            <p>
+              PlayItOut will not invent a probability for this goal.{" "}
+              {categoryCopy(market.publication?.category)}
+            </p>
+            {market.publication?.issues?.length ? (
+              <ul>
+                {market.publication.issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            ) : null}
+            {market.publication?.required_actions?.length ? (
+              <div className="withheld-actions">
+                <strong>Next</strong>
+                {market.publication.required_actions.map((action) => (
+                  <p key={action}>{action}</p>
+                ))}
+                {onEvidence ? (
+                  <button type="button" className="secondary-action" onClick={onEvidence}>
+                    Add evidence
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {market.modelExplanation ? (
           <section className="market-section model-note">

@@ -8,10 +8,12 @@ import SocialPage from "./components/utility/SocialPage";
 import { NewGoalPage } from "./features/goals/NewGoalPage";
 import { ComposioAuthLauncherPage } from "./pages/ComposioAuthLauncherPage";
 import { ConnectAuthorizePage } from "./pages/ConnectAuthorizePage";
+import { CollectionDetailRoute } from "./pages/CollectionDetailRoute";
 import { EvidenceRoute } from "./pages/EvidenceRoute";
 import { GoalDetailRoute } from "./pages/GoalDetailRoute";
 import { MarketsRoute } from "./pages/MarketsRoute";
 import { PluginsRoute } from "./pages/PluginsRoute";
+import { ProfileRoute } from "./pages/ProfileRoute";
 import { SettingsRoute } from "./pages/SettingsRoute";
 import { WhatIfRoute } from "./pages/WhatIfRoute";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -25,8 +27,10 @@ function AppRoutes() {
       <Route path="/goals/:goalId" element={<GoalDetailRoute />} />
       <Route path="/goals/:goalId/evidence" element={<EvidenceRoute />} />
       <Route path="/goals/:goalId/what-if" element={<WhatIfRoute />} />
+      <Route path="/collections/:collectionId" element={<CollectionDetailRoute />} />
       <Route path="/plugins" element={<PluginsRoute />} />
       <Route path="/social" element={<SocialPage />} />
+      <Route path="/profile" element={<ProfileRoute />} />
       <Route path="/settings" element={<SettingsRoute />} />
       <Route path="/invite" element={<MarketsRoute />} />
       <Route path="/invite/:token" element={<MarketsRoute />} />

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     cors_origin_regex: str | None = r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$"
     openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str | None = None
-    inference_provider: str = "auto"
+    inference_provider: str = "spur"
     inference_model: str | None = None
     inference_agent_overrides: dict[str, dict[str, str]] = Field(default_factory=dict)
     inference_max_input_bytes: int = Field(default=48_000, ge=1024, le=100_000)

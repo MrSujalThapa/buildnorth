@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.identity.domain import Invitation, Principal, RedeemResult
+from personal_markets.identity.domain import Invitation, Principal, RedeemResult, UserProfile
 from personal_markets.persistence.database import transaction
 
 
@@ -24,6 +24,7 @@ class InMemoryIdentityRepository:
         self.invites: dict[UUID, Invitation] = {}
         self.invite_hashes: dict[str, UUID] = {}
         self.redemptions: dict[tuple[UUID, UUID], datetime] = {}
+        self.profiles: dict[UUID, UserProfile] = {}
 
     async def upsert_user(self, principal: Principal) -> Principal:
         existing = self.users.get(principal.user_id)
@@ -117,6 +118,20 @@ class InMemoryIdentityRepository:
 
     async def list_invitations(self) -> list[Invitation]:
         return list(self.invites.values())
+
+    async def get_profile(self, user_id: UUID) -> UserProfile:
+        return self.profiles.get(user_id) or UserProfile()
+
+    async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile:
+        self.profiles[user_id] = profile
+        return profile
+
+    async def username_taken(self, username: str, user_id: UUID) -> bool:
+        needle = username.lower()
+        return any(
+            (row.username or "").lower() == needle and owner != user_id
+            for owner, row in self.profiles.items()
+        )
 
     async def grant_entitlement(
         self,
@@ -404,6 +419,71 @@ class PostgresIdentityRepository:
                 },
             )
         return bool(result.rowcount)
+
+    async def get_profile(self, user_id: UUID) -> UserProfile:
+        async with self._engine.connect() as connection:
+            row = (
+                (
+                    await connection.execute(
+                        text(
+                            """
+                            select display_name, username, bio, avatar_value
+                            from app_users where id = :id
+                            """
+                        ),
+                        {"id": user_id},
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            return UserProfile()
+        return UserProfile(
+            display_name=row.get("display_name"),
+            username=row.get("username"),
+            bio=row.get("bio"),
+            avatar_value=row.get("avatar_value"),
+        )
+
+    async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile:
+        async with transaction(self._engine) as connection:
+            await connection.execute(
+                text(
+                    """
+                    update app_users
+                    set display_name = :display_name,
+                        username = :username,
+                        bio = :bio,
+                        avatar_value = :avatar_value
+                    where id = :id
+                    """
+                ),
+                {
+                    "id": user_id,
+                    "display_name": profile.display_name,
+                    "username": profile.username,
+                    "bio": profile.bio,
+                    "avatar_value": profile.avatar_value,
+                },
+            )
+        return await self.get_profile(user_id)
+
+    async def username_taken(self, username: str, user_id: UUID) -> bool:
+        async with self._engine.connect() as connection:
+            row = (
+                await connection.execute(
+                    text(
+                        """
+                        select 1 from app_users
+                        where lower(username) = lower(:username) and id <> :id
+                        limit 1
+                        """
+                    ),
+                    {"username": username, "id": user_id},
+                )
+            ).first()
+        return row is not None
 
     @staticmethod
     def _to_principal(row: dict[str, Any]) -> Principal:

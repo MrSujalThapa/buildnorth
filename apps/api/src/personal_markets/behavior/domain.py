@@ -15,6 +15,11 @@ DimensionKey = Literal[
     "recovery",
     "evidence_quality",
     "goal_relevance",
+    "career",
+    "learning",
+    "health",
+    "personal",
+    "projects",
 ]
 ExecutionSource = Literal["FITTED", "PRIOR", "USER_ASSUMPTION", "EXPLORATION_ASSUMPTION"]
 

@@ -18,6 +18,7 @@ function activeFromPath(pathname: string) {
   if (pathname.startsWith("/plugins")) return "plugins";
   if (pathname.startsWith("/social")) return "social";
   if (pathname.startsWith("/settings")) return "settings";
+  if (pathname.startsWith("/profile")) return "profile";
   return "market";
 }
 
@@ -27,7 +28,8 @@ export default function AppShell({ children }: Props) {
   const active = activeFromPath(location.pathname);
   const { theme, toggle } = useTheme();
   const account = useAccount();
-  const profileLabel = account?.email?.split("@")[0] || "Sujal";
+  const profileLabel =
+    account?.profile?.username || account?.profile?.display_name || account?.email?.split("@")[0] || "Profile";
 
   return (
     <div className={`app-shell theme-${theme}`}>
@@ -53,7 +55,7 @@ export default function AppShell({ children }: Props) {
           <button type="button" onClick={toggle} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
             {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}<span>Theme</span>
           </button>
-          <button type="button" onClick={() => { void navigate("/settings"); }} aria-label="Open profile settings">
+          <button type="button" onClick={() => { void navigate("/profile"); }} aria-label="Open profile" aria-current={active === "profile" ? "page" : undefined}>
             <UserRound size={19} /><span>{profileLabel}</span>
           </button>
         </div>

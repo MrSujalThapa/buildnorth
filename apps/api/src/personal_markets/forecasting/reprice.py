@@ -126,6 +126,8 @@ class BaselineRepriceService:
                 required_actions=[],
             )
         if critic.decision == "withhold":
+            if self._owner_id is not None:
+                await self._goals.record_publication(goal_id, self._owner_id, critic, "withheld")
             return RepriceResult(
                 status="withheld",
                 reason=critic.issues[0] if critic.issues else "The critic withheld publication.",
@@ -153,6 +155,8 @@ class BaselineRepriceService:
                 )
 
         status = await self._forecasts.publish(goal, pricing, critic)
+        if self._owner_id is not None:
+            await self._goals.record_publication(goal_id, self._owner_id, critic, status)
         return RepriceResult(
             status=status,
             probability=pricing.raw_probability,

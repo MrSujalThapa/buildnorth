@@ -767,4 +767,7 @@ class LangGraphAgentWorkflow:
         )
         pricing = PricingResult.model_validate(state["pricing"])
         status = await self._deps.baseline_forecasts.publish(goal, pricing, critic)
+        await self._deps.goals.record_publication(
+            goal.goal_id, UUID(state["user_id"]), critic, status
+        )
         return {"status": status, "current_step": "publish"}

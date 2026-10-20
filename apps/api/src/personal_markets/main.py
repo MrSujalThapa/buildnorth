@@ -9,8 +9,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from personal_markets.agents.api import router as agents_router
+from personal_markets.collections.api import router as collections_router
 from personal_markets.core.config import get_settings, safe_database_identity
 from personal_markets.core.errors import (
+    ConflictError,
     DomainError,
     ForbiddenError,
     PermanentProviderError,
@@ -37,6 +39,7 @@ from personal_markets.integrations.research import (
     MonidResearchProvider,
 )
 from personal_markets.persistence.research_store import ResearchStore
+from personal_markets.profile.api import router as profile_router
 from personal_markets.what_if.api import router as what_if_router
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
@@ -64,6 +67,8 @@ def _status_for(error: DomainError) -> int:
         return 401
     if isinstance(error, ForbiddenError):
         return 403
+    if isinstance(error, ConflictError):
+        return 409
     if isinstance(error, ProviderNotConfiguredError):
         return 503
     if isinstance(error, ProviderBudgetExceededError):
@@ -247,8 +252,10 @@ def create_app() -> FastAPI:
 
     private = [Depends(get_invited_principal)]
     application.include_router(identity_router)
+    application.include_router(profile_router, dependencies=private)
     application.include_router(inference_settings_router)
     application.include_router(goals_router, dependencies=private)
+    application.include_router(collections_router, dependencies=private)
     application.include_router(agents_router, dependencies=private)
     application.include_router(what_if_router, dependencies=private)
     application.include_router(integrations_router, dependencies=private)

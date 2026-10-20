@@ -37,9 +37,11 @@ services:
       - key: PM_OPENAI_DAILY_TOKEN_BUDGET_PREMIUM
         value: "100000000"
       - key: PM_INFERENCE_PROVIDER
-        value: openai
+        value: spur
       - key: PM_INFERENCE_MODEL
-        value: gpt-5.4-mini
+        value: spur-glm-5-3
+      - key: PM_COMPOSIO_ENABLED
+        value: "true"
       - key: PM_HOSTED_USER_RPM
         value: "20"
       - key: PM_HOSTED_IP_RPM
@@ -82,3 +84,5 @@ services:
         sync: false
       - key: PM_BYOK_ACTIVE_KEY_ID
         value: v1
+      - key: COMPOSIO_API_KEY
+        sync: false

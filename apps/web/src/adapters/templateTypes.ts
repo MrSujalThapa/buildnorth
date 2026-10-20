@@ -35,6 +35,13 @@ export type Market = {
   modelFamily?: string;
   modelExplanation?: string;
   unpricedReason?: string;
+  publication?: {
+    status: string;
+    category?: string | null;
+    reason?: string | null;
+    issues?: string[];
+    required_actions?: string[];
+  };
 };
 
 export type WhatIfMode = "impact" | "futures" | "compare" | "paths";

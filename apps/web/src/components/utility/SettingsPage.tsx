@@ -74,7 +74,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
           </div>
         </section>
 
-        <InferenceSettings hosted={hosted} />
+        <InferenceSettings hosted={hosted} isAdmin={account?.role === "admin"} />
 
         <PersonalAgents />
 

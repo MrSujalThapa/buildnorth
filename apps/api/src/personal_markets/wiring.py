@@ -123,25 +123,46 @@ def get_goal_service() -> GoalService:
     return GoalService(get_goal_repository())
 
 
-def get_what_if_service(
-    principal: Annotated[Principal, Depends(get_invited_principal)],
-) -> Any:
+@lru_cache
+def get_collection_repository():
+    from personal_markets.collections.repository import (
+        InMemoryCollectionRepository,
+        PostgresCollectionRepository,
+    )
+
+    if not _use_postgres():
+        return InMemoryCollectionRepository()
+    return PostgresCollectionRepository(create_engine(get_settings().database_url or ""))
+
+
+def get_collection_service():
+    from personal_markets.collections.service import CollectionService
+
+    return CollectionService(get_collection_repository(), get_goal_service())
+
+
+@lru_cache
+def get_evidence_repository() -> Any:
     from personal_markets.persistence.agent_store import (
         InMemoryEvidenceRepository,
         PostgresEvidenceRepository,
     )
+
+    if not _use_postgres():
+        return InMemoryEvidenceRepository()
+    return PostgresEvidenceRepository(create_engine(get_settings().database_url or ""))
+
+
+def get_what_if_service(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> Any:
     from personal_markets.what_if.service import WhatIfService
 
-    owner_id = principal.user_id
-    if _use_postgres():
-        evidence_repo = PostgresEvidenceRepository(create_engine(get_settings().database_url or ""))
-    else:
-        evidence_repo = InMemoryEvidenceRepository()
     return WhatIfService(
         get_goal_service(),
         get_simulation_repository(),
-        evidence=EvidenceService(evidence_repo),
-        owner_id=owner_id,
+        evidence=EvidenceService(get_evidence_repository()),
+        owner_id=principal.user_id,
     )
 
 

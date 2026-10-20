@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { api, type InferencePreference, type InferenceSettings as Settings } from "../../api/client";
+import { useEffect, useMemo, useState } from "react";
+import { api, type InferenceModelOption, type InferencePreference, type InferenceSettings as Settings } from "../../api/client";
 import type { HostedUsage } from "../../auth/session";
 
-export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
+export function InferenceSettings({
+  hosted,
+  isAdmin = false,
+}: {
+  hosted?: HostedUsage | null;
+  isAdmin?: boolean;
+}) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [mode, setMode] = useState<InferencePreference["mode"]>("hosted");
   const [provider, setProvider] = useState<InferencePreference["provider"]>("openai");
   const [model, setModel] = useState("");
+  const [modelQuery, setModelQuery] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +23,7 @@ export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
     setSettings(next);
     setMode(next.preference.mode);
     setProvider(next.preference.provider);
-    setModel(next.preference.model || "");
+    setModel(next.preference.model || next.recommended_model || "");
   }
 
   useEffect(() => {
@@ -38,9 +45,29 @@ export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
     finally { setBusy(false); }
   }
 
-  const activeProvider = mode === "byok" ? provider : settings?.hosted_provider;
-  const models = settings?.models.filter((item) => item.provider === activeProvider) || [];
   const credential = settings?.credentials.find((item) => item.provider === provider);
+  const hostedLabel = settings?.hosted_provider === "spur" ? "Spur" : settings?.hosted_provider || "not configured";
+  const byokModels = useMemo(() => {
+    const listed = settings?.discovered_models?.[provider] || settings?.models.filter((item) => item.provider === provider) || [];
+    const needle = modelQuery.trim().toLowerCase();
+    if (!needle) return listed;
+    return listed.filter((item) =>
+      `${item.display_name || ""} ${item.model}`.toLowerCase().includes(needle),
+    );
+  }, [settings, provider, modelQuery]);
+
+  function modelLabel(item: InferenceModelOption): string {
+    const name = item.display_name || item.model;
+    const flags = [
+      item.structured ? "forecasting" : "not for forecasting",
+      item.pricing_available === false ? "cost estimate unavailable" : null,
+    ].filter(Boolean);
+    return `${name}${flags.length ? ` · ${flags.join(" · ")}` : ""}`;
+  }
+
+  const hostedAvailable = hosted
+    ? hosted.hosted_available ?? (!hosted.kill_switch && hosted.remaining_usd > 0 && (hosted.global_remaining_usd == null || hosted.global_remaining_usd > 0) && Boolean(settings?.hosted_configured))
+    : false;
 
   return (
     <section className="settings-group" aria-labelledby="inference-heading">
@@ -53,82 +80,162 @@ export function InferenceSettings({ hosted }: { hosted?: HostedUsage | null }) {
             <div className="setting-row">
               <div>
                 <strong>Current mode: {settings.preference.mode === "byok" ? "BYOK" : "Hosted"}</strong>
-                <span>{settings.preference.mode === "byok"
-                  ? "Your selected provider account pays for agent inference. Hosted tokens are not consumed."
-                  : `Play It Out pays through ${settings.hosted_provider}. Your hosted allowance and limits apply.`}</span>
-                <span>Provider: {settings.preference.mode === "byok" ? settings.preference.provider : settings.hosted_provider} · Model: {settings.preference.mode === "byok" ? settings.preference.model || "provider default" : settings.hosted_model || "not configured"}</span>
-                {hosted ? <span>Hosted credit: ${Number(hosted.remaining_usd).toFixed(2)} / ${Number(hosted.quota_usd).toFixed(2)} remaining · Global balance: ${Number(hosted.global_remaining_usd || 0).toFixed(2)} · {hosted.kill_switch ? "Hosted inference disabled" : !settings.hosted_configured ? "Hosted provider not configured" : Number(hosted.global_remaining_usd || 0) <= 0 ? "Global credits exhausted" : "Hosted inference available"}</span> : null}
-                {hosted && (hosted.remaining_usd <= 0 || !hosted.enabled) ? <span>Hosted credit is unavailable for this account. Connect your own key to use BYOK.</span> : null}
+                <span>
+                  Provider: {settings.preference.mode === "byok" ? settings.preference.provider : hostedLabel}
+                  {" · "}
+                  Model: {settings.preference.mode === "byok" ? settings.preference.model || "provider default" : settings.hosted_model || "not configured"}
+                </span>
               </div>
             </div>
           </div>
-          <form className="inference-settings-form" onSubmit={(event) => {
-            event.preventDefault();
-            void perform(async () => {
-              accept(await api.saveInferencePreference({ mode, provider, model: model || null }));
-              setNotice("Inference preference saved.");
-            });
-          }}>
-            <label>Inference mode
-              <select value={mode} disabled={busy} onChange={(event) => {
-                setMode(event.target.value as InferencePreference["mode"]); setModel("");
+
+          <div className="inference-mode-grid">
+            <article className={`inference-card${mode === "hosted" ? " selected" : ""}`}>
+              <h3>PlayItOut credits</h3>
+              <p>Hosted inference runs on Spur. Your personal allowance is used; BYOK keys are not charged here.</p>
+              <dl className="inference-meta">
+                <div><dt>Provider</dt><dd>Spur</dd></div>
+                <div><dt>Model</dt><dd>{settings.hosted_model || "not configured"}</dd></div>
+                <div>
+                  <dt>Personal credit</dt>
+                  <dd>
+                    {hosted
+                      ? `$${Number(hosted.remaining_usd).toFixed(2)} / $${Number(hosted.quota_usd).toFixed(2)} remaining`
+                      : "Sign in to see your remaining credit."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Availability</dt>
+                  <dd>
+                    {hosted?.kill_switch
+                      ? "Hosted inference disabled"
+                      : !settings.hosted_configured
+                        ? "Hosted provider not configured"
+                        : hostedAvailable
+                          ? "Hosted inference available"
+                          : "Hosted credit is unavailable for this account"}
+                  </dd>
+                </div>
+                {isAdmin && hosted && hosted.global_remaining_usd != null ? (
+                  <div>
+                    <dt>Platform remaining</dt>
+                    <dd>${Number(hosted.global_remaining_usd).toFixed(2)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <button
+                type="button"
+                disabled={busy || mode === "hosted"}
+                onClick={() => void perform(async () => {
+                  accept(await api.saveInferencePreference({ mode: "hosted", provider, model: null }));
+                  setNotice("Hosted Spur credits are now active.");
+                })}
+              >
+                Use PlayItOut credits
+              </button>
+            </article>
+
+            <article className={`inference-card${mode === "byok" ? " selected" : ""}`}>
+              <h3>My API key</h3>
+              <p>Your OpenAI or Anthropic account pays for agent inference. Hosted Spur credits are not consumed.</p>
+              <form className="inference-settings-form inference-byok-form" onSubmit={(event) => {
+                event.preventDefault();
+                void perform(async () => {
+                  accept(await api.saveInferencePreference({ mode: "byok", provider, model: model || null }));
+                  setNotice("BYOK preference saved.");
+                });
               }}>
-                <option value="hosted">Hosted — Play It Out pays</option>
-                <option value="byok">BYOK — your provider account pays</option>
-              </select>
-            </label>
-            <label>BYOK provider
-              <select value={provider} disabled={busy} onChange={(event) => {
-                setProvider(event.target.value as InferencePreference["provider"]); setModel(""); setKey("");
-              }}>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </label>
-            <label>Agent model
-              <select value={model} disabled={busy} onChange={(event) => setModel(event.target.value)}>
-                <option value="">Provider default{mode === "hosted" && settings.hosted_model ? ` (${settings.hosted_model})` : ""}</option>
-                {models.map((item) => <option key={item.model} value={item.model}>{item.model}</option>)}
-              </select>
-            </label>
-            <button type="submit" disabled={busy}>{busy ? "Working…" : "Save inference preference"}</button>
-          </form>
-          <div className="setting-row inference-key-row">
-            <div>
-              <strong>{provider === "openai" ? "OpenAI" : "Anthropic"} key</strong>
-              <span>{credential ? `${credential.status === "validated" ? "Validated connection" : "Key needs validation or replacement"} · ${credential.masked_suffix} · ${new Date(credential.validated_at).toLocaleDateString()}` : "No key saved for this provider."}</span>
-            </div>
-            {credential ? <div className="invite-row-actions">
-              <button type="button" disabled={busy} onClick={() => void perform(async () => {
-                await api.validateProviderKey(provider);
-                setSettings(await api.inferenceSettings());
-                setNotice("Provider connection validated.");
-              })}>Validate key</button>
-              <button type="button" disabled={busy} onClick={() => void perform(async () => {
-                await api.deleteProviderKey(provider);
+                <label>Provider
+                  <select value={provider} disabled={busy} onChange={(event) => {
+                    setProvider(event.target.value as InferencePreference["provider"]);
+                    setModel("");
+                    setKey("");
+                    setModelQuery("");
+                  }}>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
+                </label>
+                <label>Search models
+                  <input
+                    type="search"
+                    value={modelQuery}
+                    disabled={busy}
+                    placeholder="Filter compatible models"
+                    onChange={(event) => setModelQuery(event.target.value)}
+                  />
+                </label>
+                <label>Compatible model
+                  <select value={model} disabled={busy} onChange={(event) => setModel(event.target.value)}>
+                    <option value="">{settings.recommended_model ? `Recommended (${settings.recommended_model})` : "Provider default"}</option>
+                    {byokModels.map((item) => (
+                      <option key={item.model} value={item.model} disabled={!item.structured}>
+                        {modelLabel(item)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="submit" disabled={busy || !credential}>Save BYOK preference</button>
+              </form>
+              <div className="setting-row inference-key-row">
+                <div>
+                  <strong>{provider === "openai" ? "OpenAI" : "Anthropic"} key</strong>
+                  <span>
+                    {credential
+                      ? `${credential.status === "validated" ? "Validated connection" : "Key needs validation or replacement"} · ${credential.masked_suffix} · ${new Date(credential.validated_at).toLocaleDateString()}`
+                      : "No key saved for this provider."}
+                  </span>
+                </div>
+                {credential ? <div className="invite-row-actions">
+                  <button type="button" disabled={busy} onClick={() => void perform(async () => {
+                    await api.validateProviderKey(provider);
+                    setSettings(await api.inferenceSettings());
+                    setNotice("Provider connection validated.");
+                  })}>Validate key</button>
+                  <button type="button" disabled={busy} onClick={() => void perform(async () => {
+                    await api.deleteProviderKey(provider);
+                    setKey("");
+                    setSettings(await api.inferenceSettings());
+                    setNotice("Key deleted. BYOK stays selected until you change it.");
+                  })}>Delete key</button>
+                </div> : null}
+              </div>
+              <form className="inference-settings-form inference-key-form" onSubmit={(event) => {
+                event.preventDefault();
+                const candidate = key;
                 setKey("");
-                setSettings(await api.inferenceSettings());
-                setNotice("Key deleted. BYOK stays selected until you change it.");
-              })}>Delete key</button>
-            </div> : null}
+                void perform(async () => {
+                  await api.saveProviderKey(provider, candidate);
+                  accept(await api.inferenceSettings());
+                  setNotice("Key validated, encrypted, and connected. BYOK is now active.");
+                });
+              }}>
+                <label htmlFor="byok-api-key">{credential ? "Replacement API key" : "API key"}
+                  <input
+                    id="byok-api-key"
+                    type="password"
+                    autoComplete="off"
+                    spellCheck={false}
+                    minLength={12}
+                    maxLength={512}
+                    required
+                    value={key}
+                    disabled={busy}
+                    onChange={(event) => setKey(event.target.value)}
+                  />
+                </label>
+                <button type="submit" disabled={busy || !key.trim()}>
+                  {credential ? "Replace key" : "Connect and use my key"}
+                </button>
+              </form>
+            </article>
           </div>
-          <form className="inference-settings-form inference-key-form" onSubmit={(event) => {
-            event.preventDefault();
-            const candidate = key;
-            setKey("");
-            void perform(async () => {
-              await api.saveProviderKey(provider, candidate);
-                accept(await api.inferenceSettings());
-                setNotice("Key validated, encrypted, and connected. BYOK is now active.");
-            });
-          }}>
-            <label>{credential ? "Replacement API key" : "API key"}
-              <input type="password" autoComplete="off" spellCheck={false} minLength={12} maxLength={512}
-                required value={key} disabled={busy} onChange={(event) => setKey(event.target.value)} />
-            </label>
-            <button type="submit" disabled={busy || !key.trim()}>{credential ? "Replace key" : "Add and validate key"}</button>
-          </form>
-          <p className="setting-note">Keys are encrypted on the server and never returned. Connecting a key activates BYOK. Provider authentication or quota failures stop the request without switching billing modes. API billing is separate from a chat subscription.</p>
+          <p className="setting-note">
+            Hosted credit: {hosted ? `$${Number(hosted.remaining_usd).toFixed(2)} / $${Number(hosted.quota_usd).toFixed(2)} remaining` : "unavailable"}
+            {hosted && !settings.hosted_configured ? " · Hosted provider not configured" : ""}
+            {hosted && hosted.remaining_usd <= 0 ? " · Hosted credit is unavailable for this account. Connect your own key to use BYOK." : ""}
+          </p>
+          <p className="setting-note">Keys are encrypted on the server and never returned. Connecting a key activates BYOK. Provider authentication or quota failures stop the request without switching billing modes. Your provider account pays for BYOK usage.</p>
           <p className="setting-note">BYOK usage: {settings.byok_usage.calls} calls · {settings.byok_usage.input_tokens + settings.byok_usage.output_tokens} tokens · estimated ${Number(settings.byok_usage.estimated_cost_usd).toFixed(4)}. External research tools use a separate hosted dollar allowance when available.</p>
         </>
       )}

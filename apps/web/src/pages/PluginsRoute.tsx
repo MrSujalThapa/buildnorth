@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, type PluginConnectResponse, type PluginView } from "../api/client";
 import PluginsPage from "../components/plugins/PluginsPage";
@@ -39,6 +39,7 @@ function deliverAuthUrl(
 export function PluginsRoute() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
@@ -48,10 +49,17 @@ export function PluginsRoute() {
   const authRequestIdRef = useRef<string | null>(null);
   const pendingAuthUrlRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedQuery(query.trim()), 280);
+    return () => window.clearTimeout(handle);
+  }, [query]);
+
   const plugins = useQuery({
-    queryKey: ["plugins", query],
-    queryFn: ({ signal }) => api.plugins(signal, query.trim() || undefined),
-    refetchOnWindowFocus: true,
+    queryKey: ["plugins", debouncedQuery],
+    queryFn: ({ signal }) => api.pluginsCatalog(signal, debouncedQuery || undefined),
+    placeholderData: keepPreviousData,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
   });
 
   const clearAuthUi = () => {
@@ -137,7 +145,8 @@ export function PluginsRoute() {
     },
   });
 
-  const pluginViews = plugins.data ?? [];
+  const pluginViews = plugins.data?.items ?? [];
+  const providerMessage = plugins.data?.provider_message ?? (plugins.isError ? "Plugins could not be loaded. Retry in a moment." : null);
 
   const pendingPlugins = useMemo(
     () => pluginViews.filter((plugin) => plugin.connection.status === "pending_auth" && !isPluginConnected(plugin)),
@@ -275,8 +284,14 @@ export function PluginsRoute() {
 
   return (
     <>
-      {authNotice || blockedAuthUrl ? (
+      {authNotice || blockedAuthUrl || providerMessage ? (
         <div className="plugins-auth-notice" role="status">
+          {providerMessage ? <p>{providerMessage}</p> : null}
+          {plugins.isError ? (
+            <p>
+              <button type="button" onClick={() => void plugins.refetch()}>Retry catalog</button>
+            </p>
+          ) : null}
           {authNotice ? <p>{authNotice}</p> : null}
           {blockedAuthUrl ? (
             <p>
@@ -303,7 +318,8 @@ export function PluginsRoute() {
             plugin?.connection.status === "unavailable"
           );
         }}
-        isLoading={plugins.isLoading || plugins.isFetching}
+        isLoading={plugins.isLoading && !plugins.data}
+        isRefreshing={plugins.isFetching && Boolean(plugins.data)}
       />
     </>
   );

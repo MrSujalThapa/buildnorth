@@ -64,12 +64,14 @@ export function GoalDetailRoute() {
   }
 
   const market = toMarketDetail(goal.data, history.data ?? [], evidence.data ?? []);
+  const withheld =
+    workflowSnapshot?.critic?.decision === "withhold" || market.publication?.status === "withheld";
 
   return (
     <>
       <MarketDetailPage
         market={market}
-        criticDecision={workflowSnapshot?.critic?.decision}
+        criticDecision={withheld ? "withhold" : workflowSnapshot?.critic?.decision}
         onBack={() => { void navigate("/markets"); }}
         onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
         onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}

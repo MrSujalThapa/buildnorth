@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok", service: "api", version: "test" } }));
+  await page.route("**/api/v1/goals/dashboard", (route) => route.fulfill({ json: { goals: [], histories: {} } }));
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [] }));
 });
 

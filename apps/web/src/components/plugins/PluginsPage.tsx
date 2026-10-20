@@ -27,6 +27,7 @@ export type PluginsPageProps = {
   onToggleConnection: (pluginId: string) => void;
   isConnectionDisabled?: (pluginId: string) => boolean;
   isLoading?: boolean;
+  isRefreshing?: boolean;
 };
 
 export default function PluginsPage({
@@ -39,6 +40,7 @@ export default function PluginsPage({
   onToggleConnection,
   isConnectionDisabled,
   isLoading = false,
+  isRefreshing = false,
 }: PluginsPageProps) {
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -66,7 +68,7 @@ export default function PluginsPage({
         <header className="plugins-header">
           <div>
             <h1>Plugins</h1>
-            <p>Connect the tools that can contribute data to your goals.</p>
+            <p>Connect the tools that can contribute data to your goals.{isRefreshing ? " Updating catalog…" : ""}</p>
           </div>
           <label className="plugin-search">
             <Search size={18} />

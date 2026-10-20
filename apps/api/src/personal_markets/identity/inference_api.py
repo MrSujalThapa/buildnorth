@@ -44,6 +44,26 @@ async def settings(owner: Owner, service: Service, response: Response) -> dict[s
     return await service.view(owner)
 
 
+@router.get("/models")
+async def discovered_models(
+    owner: Owner, service: Service, response: Response, provider: UserProvider | None = None
+) -> dict[str, Any]:
+    response.headers["Cache-Control"] = "no-store"
+    current = await service.view(owner, refresh_models=True)
+    if provider is None:
+        return {
+            "models": current["models"],
+            "discovered_models": current["discovered_models"],
+            "recommended_model": current["recommended_model"],
+        }
+    listed = await service.discover_models(owner, provider, refresh=True)
+    return {
+        "provider": provider,
+        "models": listed,
+        "recommended_model": current["recommended_model"],
+    }
+
+
 @router.put("")
 async def preference(
     body: InferencePreference, owner: Owner, service: Service, response: Response

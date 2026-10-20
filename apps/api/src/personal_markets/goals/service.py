@@ -1,8 +1,10 @@
 from uuid import UUID
 
-from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.core.errors import ForbiddenError, ResourceNotFoundError
 from personal_markets.goals.domain import GoalContract
+from personal_markets.goals.publication import publication_snapshot
 from personal_markets.goals.repository import GoalRepository
+from personal_markets.ports import CriticArtifact
 
 
 class GoalService:
@@ -28,3 +30,37 @@ class GoalService:
 
     async def create_goal(self, goal: GoalContract, user_id: UUID) -> GoalContract:
         return await self._repository.create(goal, user_id)
+
+    async def archive_goal(self, goal_id: UUID, owner_id: UUID) -> None:
+        archived = await self._repository.archive_for_user(goal_id, owner_id)
+        if not archived:
+            existing = await self._repository.get(goal_id)
+            if existing is not None:
+                raise ForbiddenError("only the owner can archive this goal")
+            raise ResourceNotFoundError(f"Goal {goal_id} was not found")
+
+    async def archive_goals(self, goal_ids: list[UUID], owner_id: UUID) -> dict[str, int]:
+        archived = 0
+        missing = 0
+        for goal_id in goal_ids:
+            if await self._repository.archive_for_user(goal_id, owner_id):
+                archived += 1
+            else:
+                missing += 1
+        return {"archived": archived, "skipped": missing}
+
+    async def restore_goal(self, goal_id: UUID, owner_id: UUID) -> None:
+        restored = await self._repository.restore_for_user(goal_id, owner_id)
+        if not restored:
+            raise ResourceNotFoundError(f"Goal {goal_id} was not found")
+
+    async def record_publication(
+        self,
+        goal_id: UUID,
+        owner_id: UUID,
+        critic: CriticArtifact,
+        status: str,
+    ) -> None:
+        await self._repository.merge_requirements(
+            goal_id, owner_id, {"last_publication": publication_snapshot(critic, status)}
+        )

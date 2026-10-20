@@ -57,7 +57,11 @@ from personal_markets.what_if.intervention_overrides import (
     unmapped_change_metrics,
 )
 from personal_markets.what_if.optimizer import ActionOptimizer, ResourceLimits
-from personal_markets.what_if.repository import InMemorySimulationRepository, SimulationRepository
+from personal_markets.what_if.repository import (
+    InMemorySimulationRepository,
+    MarketHistoryPoint,
+    SimulationRepository,
+)
 from personal_markets.what_if.resources import (
     budget_from_goal,
     evaluate_resource_usage,
@@ -730,26 +734,47 @@ class WhatIfService:
             return await self._persist(request, result, model_family, model_version)
         return result
 
+    def _history_response(self, point: MarketHistoryPoint) -> MarketHistoryPointResponse:
+        return MarketHistoryPointResponse(
+            id=str(point.id),
+            probability=point.probability,
+            forecast_status=point.forecast_status,
+            evidence_watermark=point.evidence_watermark,
+            model_family=point.model_family,
+            model_version=point.model_version,
+            assumption_hash=point.assumption_hash,
+            simulation_run_id=(
+                str(point.simulation_artifact_id) if point.simulation_artifact_id else None
+            ),
+            source_kind=point.source_kind,
+            created_at=point.created_at.isoformat() if point.created_at else None,
+        )
+
     async def history(self, goal_id: str) -> list[MarketHistoryPointResponse]:
         await self._require_goal(goal_id)
         points = await self._repository.history(UUID(goal_id))
-        return [
-            MarketHistoryPointResponse(
-                id=str(point.id),
-                probability=point.probability,
-                forecast_status=point.forecast_status,
-                evidence_watermark=point.evidence_watermark,
-                model_family=point.model_family,
-                model_version=point.model_version,
-                assumption_hash=point.assumption_hash,
-                simulation_run_id=(
-                    str(point.simulation_artifact_id) if point.simulation_artifact_id else None
-                ),
-                source_kind=point.source_kind,
-                created_at=point.created_at.isoformat() if point.created_at else None,
-            )
-            for point in points
-        ]
+        return [self._history_response(point) for point in points]
+
+    async def histories(self, goal_ids: list[str]) -> dict[str, list[MarketHistoryPointResponse]]:
+        unique: list[UUID] = []
+        seen: set[UUID] = set()
+        for raw in goal_ids:
+            goal_id = UUID(raw)
+            if goal_id in seen:
+                continue
+            seen.add(goal_id)
+            await self._require_goal(str(goal_id))
+            unique.append(goal_id)
+        return await self.histories_for_owned(unique)
+
+    async def histories_for_owned(
+        self, goal_ids: list[UUID]
+    ) -> dict[str, list[MarketHistoryPointResponse]]:
+        grouped = await self._repository.history_for_goals(goal_ids)
+        return {
+            str(goal_id): [self._history_response(point) for point in grouped.get(goal_id, [])]
+            for goal_id in goal_ids
+        }
 
     async def explorations(self, goal_id: str) -> list[WhatIfExplorationResponse]:
         await self._require_goal(goal_id)

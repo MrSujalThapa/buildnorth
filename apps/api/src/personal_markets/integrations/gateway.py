@@ -24,8 +24,15 @@ class UnifiedIntegrationGateway:
         search: str | None = None,
         cursor: str | None = None,
         limit: int = 20,
+        reconcile: bool = False,
     ) -> dict[str, object]:
-        return await self._mcp.search_catalog(search=search, cursor=cursor, limit=limit, user_id=self._user_id)
+        return await self._mcp.search_catalog(
+            search=search,
+            cursor=cursor,
+            limit=limit,
+            user_id=self._user_id,
+            reconcile=reconcile,
+        )
 
     async def connect_managed(self, plugin_id: str, gateway_provider: str = "composio") -> dict[str, object]:
         return await self._mcp.connect_managed(

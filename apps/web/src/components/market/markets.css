@@ -11,7 +11,248 @@
 }
 
 .markets-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-end;
   margin-bottom: 36px;
+}
+
+.markets-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.markets-select,
+.create-split-main,
+.create-split-caret {
+  min-height: 36px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-ink);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.markets-select {
+  padding: 0 12px;
+  font-weight: 600;
+}
+
+.markets-select.is-active {
+  background: var(--app-ink);
+  color: var(--app-bg);
+}
+
+.create-split {
+  position: relative;
+  display: inline-flex;
+}
+
+.create-split-main {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  border-radius: 8px 0 0 8px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+}
+
+.create-split-caret {
+  width: 28px;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: var(--app-ink);
+  color: var(--app-bg);
+}
+
+.create-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 8;
+  min-width: 180px;
+  display: grid;
+  padding: 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  background: var(--app-surface);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--app-ink) 12%, transparent);
+}
+
+.create-menu a,
+.create-menu button {
+  display: block;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.create-menu a:hover,
+.create-menu button:hover {
+  background: color-mix(in srgb, var(--app-ink) 6%, transparent);
+}
+
+.markets-actionbar,
+.collection-create,
+.confirm-card,
+.profile-card,
+.evidence-manual-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface);
+}
+
+.markets-actionbar select,
+.collection-create input,
+.file-drop-label {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-bg);
+  color: inherit;
+}
+
+.confirm-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--app-ink) 28%, transparent);
+}
+
+.confirm-card {
+  width: min(420px, calc(100% - 32px));
+  display: grid;
+}
+
+.confirm-card h2 {
+  margin: 0;
+}
+
+.market-card.is-selected {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.collection-chart,
+.collection-chart-plot,
+.collection-detail-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.collection-detail-chart {
+  min-height: 240px;
+  margin-bottom: 24px;
+}
+
+.collection-chart-empty,
+.collection-tooltip {
+  padding: 8px 10px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.collection-tooltip {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+}
+
+.collection-legend,
+.collection-goal-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.collection-legend button,
+.collection-goal-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.collection-legend i,
+.collection-goal-list i {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+}
+
+.collection-legend .is-off {
+  opacity: 0.4;
+}
+
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+  font-weight: 700;
+}
+
+.avatar-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.avatar-picker label {
+  display: grid;
+  place-items: center;
+}
+
+.file-drop-label {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  text-align: center;
+}
+
+.file-drop-label input[type="file"] {
+  width: 100%;
+}
+
+.withheld-note ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.danger {
+  border: 1px solid #c85f3e;
+  background: #c85f3e;
+  color: #fff;
 }
 
 .markets-eyebrow {

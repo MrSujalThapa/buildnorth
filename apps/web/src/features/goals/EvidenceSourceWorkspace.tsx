@@ -392,8 +392,11 @@ export function EvidenceSourceWorkspace({
 
         <DatasetUpload goalId={goalId} />
 
-        <details className="evidence-manual">
-          <summary>Add manual evidence (secondary)</summary>
+        <section className="evidence-manual-card">
+          <h2>Manual evidence</h2>
+          <p className="field-hint">
+            Use this for notes the connected sources cannot see. Connected records remain the stronger evidence class.
+          </p>
           <EvidenceWorkflow
             goalId={goalId}
             embedded
@@ -403,7 +406,7 @@ export function EvidenceSourceWorkspace({
               onSnapshotChange?.(value);
             }}
           />
-        </details>
+        </section>
       </div>
     </main>
   );
@@ -444,10 +447,10 @@ function DatasetUpload({ goalId }: { goalId: string }) {
   const columns = latest?.preview.columns ?? [];
 
   return (
-    <details className="evidence-manual">
-      <summary>Upload a dataset or research file</summary>
+    <section className="evidence-manual-card">
+      <h2>Upload a dataset</h2>
       <form
-        className="composer-form"
+        className="composer-form file-drop"
         onSubmit={(event) => {
           event.preventDefault();
           const input = event.currentTarget.elements.namedItem("dataset") as HTMLInputElement | null;
@@ -455,8 +458,10 @@ function DatasetUpload({ goalId }: { goalId: string }) {
           if (file) send.mutate(file);
         }}
       >
-        <label htmlFor="dataset">CSV, Excel, PDF, or text</label>
-        <input id="dataset" name="dataset" type="file" accept=".csv,.xlsx,.pdf,.txt,.md" />
+        <label className="file-drop-label" htmlFor="dataset">
+          <span>Drop a CSV, Excel, PDF, or text file, or choose one</span>
+          <input id="dataset" name="dataset" type="file" accept=".csv,.xlsx,.pdf,.txt,.md" />
+        </label>
         <button type="submit" disabled={send.isPending}>
           {send.isPending ? "Uploading…" : "Upload"}
         </button>
@@ -505,7 +510,7 @@ function DatasetUpload({ goalId }: { goalId: string }) {
           )}
         </div>
       ) : null}
-    </details>
+    </section>
   );
 }
 

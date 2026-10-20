@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from personal_markets.integrations.gateway import UnifiedIntegrationGateway
-from personal_markets.integrations.plugins import PluginView
 from personal_markets.wiring import get_integration_gateway
 
 router = APIRouter(prefix="/api/v1/plugins", tags=["plugins"])
@@ -25,16 +24,9 @@ async def plugins(
     gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
     search: str | None = Query(default=None),
     cursor: str | None = Query(default=None),
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
 ) -> dict[str, object]:
-    if search or cursor:
-        return await gateway.search_catalog(search=search, cursor=cursor, limit=limit)
-    items = await gateway.views()
-    return {
-        "items": [item.model_dump(mode="json") for item in items],
-        "next_cursor": None,
-        "total_items": len(items),
-    }
+    return await gateway.search_catalog(search=search, cursor=cursor, limit=limit)
 
 
 @router.post("/{plugin_id}/connect")

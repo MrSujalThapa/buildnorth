@@ -67,6 +67,10 @@ class SimulationRepository(Protocol):
 
     async def history(self, goal_id: UUID) -> list[MarketHistoryPoint]: ...
 
+    async def history_for_goals(
+        self, goal_ids: list[UUID]
+    ) -> dict[UUID, list[MarketHistoryPoint]]: ...
+
     async def list_runs(
         self, goal_id: UUID, *, run_kind: str | None = "impact", limit: int = 50
     ) -> list[PersistedSimulation]: ...
@@ -105,6 +109,9 @@ class InMemorySimulationRepository:
 
     async def history(self, goal_id: UUID) -> list[MarketHistoryPoint]:
         return list(self._history.get(goal_id, {}).values())
+
+    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[MarketHistoryPoint]]:
+        return {goal_id: await self.history(goal_id) for goal_id in goal_ids}
 
     async def list_runs(
         self, goal_id: UUID, *, run_kind: str | None = "impact", limit: int = 50
@@ -198,6 +205,25 @@ class PostgresSimulationRepository:
                 )
             ).mappings()
             return [self._history_point(dict(row)) for row in rows]
+
+    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[MarketHistoryPoint]]:
+        if not goal_ids:
+            return {}
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        "select * from market_forecast_history "
+                        "where goal_id = any(:ids) order by created_at"
+                    ),
+                    {"ids": list(goal_ids)},
+                )
+            ).mappings()
+            grouped: dict[UUID, list[MarketHistoryPoint]] = {goal_id: [] for goal_id in goal_ids}
+            for row in rows:
+                point = self._history_point(dict(row))
+                grouped.setdefault(point.goal_id, []).append(point)
+            return grouped
 
     async def list_runs(
         self, goal_id: UUID, *, run_kind: str | None = "impact", limit: int = 50

@@ -19,7 +19,8 @@ test("empty catalog leads to goal creation and an actionable provider failure", 
   await page.goto("/markets");
   await expect(page.getByText("No goals yet")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("markets-create.jpg"), fullPage: true });
-  await page.getByRole("link", { name: "Create goal", exact: true }).click();
+  await page.getByRole("button", { name: "Create" }).click();
+  await page.getByRole("menuitem", { name: "New goal" }).click();
   await expect(page).toHaveURL(/\/new$/);
   await page.reload();
   await expect(page.getByRole("heading", { name: "New market" })).toBeVisible();
@@ -113,7 +114,7 @@ test("connecting a provider key activates BYOK in Settings without a second save
   await expect(page.getByText("Current mode: Hosted")).toBeVisible();
   await expect(page.getByText(/Hosted credit: \$4\.73 \/ \$5\.00 remaining/)).toBeVisible();
   await page.getByLabel("API key", { exact: true }).fill("sk-local-test-1234");
-  await page.getByRole("button", { name: "Add and validate key" }).click();
+  await page.getByRole("button", { name: "Connect and use my key" }).click();
   await expect(page.getByText("Current mode: BYOK")).toBeVisible();
   await expect(page.getByText(/BYOK is now active/)).toBeVisible();
   await page.reload();

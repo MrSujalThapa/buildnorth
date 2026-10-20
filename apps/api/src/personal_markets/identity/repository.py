@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
-from personal_markets.identity.domain import Invitation, Principal, RedeemResult
+from personal_markets.identity.domain import Invitation, Principal, RedeemResult, UserProfile
 
 
 class IdentityRepository(Protocol):
@@ -34,6 +34,12 @@ class IdentityRepository(Protocol):
     async def revoke_invitation(self, invitation_id: UUID, now: datetime) -> Invitation | None: ...
 
     async def list_invitations(self) -> list[Invitation]: ...
+
+    async def get_profile(self, user_id: UUID) -> UserProfile: ...
+
+    async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile: ...
+
+    async def username_taken(self, username: str, user_id: UUID) -> bool: ...
 
     async def grant_entitlement(
         self,

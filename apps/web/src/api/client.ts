@@ -15,10 +15,23 @@ export type CredentialMetadata = {
   version: string;
   validated_at: string;
 };
+export type InferenceModelOption = {
+  provider: string;
+  model: string;
+  structured: boolean;
+  tools: boolean;
+  display_name?: string | null;
+  pricing_available?: boolean;
+  compatibility?: string;
+  source?: string;
+  pricing_basis?: string;
+};
 export type InferenceSettings = {
   preference: InferencePreference;
   credentials: CredentialMetadata[];
-  models: { provider: string; model: string; structured: boolean; tools: boolean }[];
+  models: InferenceModelOption[];
+  discovered_models?: Record<string, InferenceModelOption[]>;
+  recommended_model?: string | null;
   hosted_provider: string;
   hosted_configured: boolean;
   hosted_model: string | null;
@@ -258,6 +271,55 @@ export interface PluginCatalogResponse {
   items: PluginView[];
   next_cursor: string | null;
   total_items: number | null;
+  provider_status?: "available" | "unavailable" | "error";
+  provider_message?: string | null;
+}
+
+export interface CollectionProgress {
+  label: string;
+  value: number | null;
+  available: number;
+  total: number;
+  incomplete: boolean;
+  methodology: string;
+  notes: string[];
+}
+
+export interface CollectionSeries {
+  goal_id: string;
+  title: string;
+  color: string;
+  points: { timestamp: string | number | null; value: number }[];
+  withheld: boolean;
+}
+
+export interface CollectionView {
+  collection: {
+    collection_id: string;
+    owner_id: string;
+    name: string;
+    description: string;
+    icon: string | null;
+    color: string | null;
+    position: number;
+    goal_ids: string[];
+  };
+  progress: CollectionProgress;
+  series: CollectionSeries[];
+}
+
+export interface GoalsDashboard {
+  goals: Goal[];
+  histories: Record<string, MarketHistoryPoint[]>;
+  collections?: CollectionView[];
+}
+
+export interface ProfilePayload {
+  account: AccountView;
+  goal_count: number;
+  collection_count: number;
+  radar: BehaviorProfile;
+  privacy: string;
 }
 
 export interface PluginConnectResponse {
@@ -571,7 +633,49 @@ export const api = {
     ),
   health: (signal?: AbortSignal) => request<Health>("/health", undefined, signal),
   goals: (signal?: AbortSignal) => request<Goal[]>("/api/v1/goals", undefined, signal),
+  goalsDashboard: (signal?: AbortSignal) =>
+    request<GoalsDashboard>("/api/v1/goals/dashboard", undefined, signal),
   goal: (goalId: string, signal?: AbortSignal) => request<Goal>(`/api/v1/goals/${goalId}`, undefined, signal),
+  archiveGoal: (goalId: string) =>
+    request<{ status: string }>(`/api/v1/goals/${goalId}`, { method: "DELETE" }),
+  archiveGoals: (goalIds: string[]) =>
+    request<{ archived: number; skipped: number }>("/api/v1/goals/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal_ids: goalIds }),
+    }),
+  restoreGoal: (goalId: string) =>
+    request<{ status: string }>(`/api/v1/goals/${goalId}/restore`, { method: "POST" }),
+  collections: (signal?: AbortSignal) => request<CollectionView[]>("/api/v1/collections", undefined, signal),
+  createCollection: (body: { name: string; description?: string; goal_ids?: string[] }) =>
+    request<CollectionView>("/api/v1/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  collection: (collectionId: string, signal?: AbortSignal) =>
+    request<CollectionView>(`/api/v1/collections/${collectionId}`, undefined, signal),
+  patchCollection: (collectionId: string, body: Record<string, unknown>) =>
+    request<CollectionView>(`/api/v1/collections/${collectionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  deleteCollection: (collectionId: string) =>
+    request<{ status: string }>(`/api/v1/collections/${collectionId}`, { method: "DELETE" }),
+  addGoalsToCollection: (collectionId: string, goalIds: string[]) =>
+    request<CollectionView>(`/api/v1/collections/${collectionId}/goals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goal_ids: goalIds }),
+    }),
+  profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
+  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string }) =>
+    request<AccountView>("/api/v1/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   evidence: (goalId: string, signal?: AbortSignal) =>
     request<EvidenceEvent[]>(`/api/v1/goals/${goalId}/evidence`, undefined, signal),
   startThread: (body: { kind: string; intent?: string; goal_id?: string; evidence_text?: string; github_login?: string }) =>
@@ -674,12 +778,15 @@ export const api = {
   marketHistory: (goalId: string, signal?: AbortSignal) => request<MarketHistoryPoint[]>(`/api/v1/what-if/history/${goalId}`, undefined, signal),
   whatIfExplorations: (goalId: string, signal?: AbortSignal) =>
     request<WhatIfExploration[]>(`/api/v1/what-if/explorations/${goalId}`, undefined, signal),
-  plugins: async (signal?: AbortSignal, search?: string, cursor?: string) => {
+  pluginsCatalog: (signal?: AbortSignal, search?: string, cursor?: string) => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (cursor) params.set("cursor", cursor);
     const suffix = params.toString() ? `?${params.toString()}` : "";
-    const body = await request<PluginCatalogResponse>(`/api/v1/plugins${suffix}`, undefined, signal);
+    return request<PluginCatalogResponse>(`/api/v1/plugins${suffix}`, undefined, signal);
+  },
+  plugins: async (signal?: AbortSignal, search?: string, cursor?: string) => {
+    const body = await api.pluginsCatalog(signal, search, cursor);
     return body.items;
   },
   searchPlugins: (search: string, cursor?: string, signal?: AbortSignal) => {

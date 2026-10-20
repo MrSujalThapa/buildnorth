@@ -5,6 +5,8 @@ import WealthsimpleAreaChart from "./WealthsimpleAreaChart";
 type Props = {
   market: Market;
   onClick: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
 };
 
 function signedPercent(
@@ -18,12 +20,15 @@ function signedPercent(
 export default function MarketCard({
   market,
   onClick,
+  selectMode = false,
+  selected = false,
 }: Props) {
   return (
     <button
       type="button"
-      className="market-card"
+      className={`market-card${selectMode ? " is-selectable" : ""}${selected ? " is-selected" : ""}`}
       onClick={onClick}
+      aria-pressed={selectMode ? selected : undefined}
     >
       <div className="market-card-header">
         <div className="market-card-title-block">
