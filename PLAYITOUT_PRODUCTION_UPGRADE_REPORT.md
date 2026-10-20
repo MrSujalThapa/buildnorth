@@ -7,7 +7,7 @@ Live API: https://playitout-api.onrender.com
 
 This report distinguishes **local mocked tests** from **real deployed browser verification**. Compiling or unit-testing is not treated as production-ready proof.
 
-Paid inference this session: **$0.00**. No live Spur or Anthropic completion was issued, to stay under the $0.10 verification cap until a costed call is approved.
+Paid inference this session: **$0.00** so far. The $0.10 verification ceiling is authorized; a live Spur/Anthropic completion will be issued against the deployed API after this SHA is live, not against local `.env`.
 
 ---
 
@@ -17,7 +17,7 @@ Hosted inference is fail-closed on Spur. `auto` with a Spur key selects Spur; wi
 
 Provider-backed model discovery lists IDs returned by the user's saved credentials. Unknown IDs are not invented. Structured/tool compatibility is classified separately from mere text generation. Hosted users may only use the platform allowlist (currently `spur-glm-5-3`).
 
-Dashboard reads use `GET /api/v1/goals/dashboard` instead of N+1 history fetches. Plugin catalog reads no longer reconcile Composio on every GET; toolkit metadata is cached; Composio errors keep Manual and CSV visible.
+Dashboard reads use `GET /api/v1/goals/dashboard` instead of N+1 history fetches. Plugin catalog reads no longer reconcile Composio on every GET; toolkit metadata is cached; Composio errors keep Manual and CSV visible. Agent `POST` with `Prefer: respond-async` persists a running thread snapshot, returns immediately, then continues on the same Render worker; the client polls `GET /api/v1/agent/threads/{id}`. Sync remains the default for existing tests and scripts.
 
 Collections are first-class owner-scoped rows (`collections`, `collection_goals`). Aggregate collection figures are labeled **progress**, never joint probability. Goals archive via `status='archived'` rather than hard delete. Profiles are stored on `app_users` and are distinct from Clerk identity.
 
@@ -29,15 +29,15 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 
 | Phase | Code | Local tests | Live production |
 | --- | --- | --- | --- |
-| 1 Inference (Spur, BYOK, discovery) | Implemented | PASS | NOT TESTED (no paid call) |
-| 2 Latency (RQ, dashboard, DB pool, plugin cache) | Implemented except async agent jobs | PASS targeted | PARTIAL (Render cold start observed) |
+| 1 Inference (Spur, BYOK, discovery) | Implemented | PASS | NOT TESTED (no paid call yet) |
+| 2 Latency (RQ, dashboard, DB pool, plugin cache, async agents) | Implemented | PASS targeted | PARTIAL (Render cold start observed) |
 | 3 Composio / Plugins | Implemented catalog/error path | PASS mocked | NOT TESTED |
 | 4 Settings privacy + Hosted/BYOK split | Implemented | PASS | NOT TESTED this session |
 | 5 Create menu, select, archive | Implemented | PASS | NOT TESTED |
-| 6 Collections + progress | Implemented | PASS | BLOCKED on migration 0016 |
-| 7 Profile + radar | Implemented | PASS | BLOCKED on migration 0016 |
+| 6 Collections + progress | Implemented | PASS | Local 0016 applied; hosted pending Render migrate |
+| 7 Profile + radar | Implemented | PASS | Local 0016 applied; hosted pending Render migrate |
 | 8 Withheld + evidence UX | Implemented | PASS classifier | NOT TESTED in deployed UI |
-| 9 Deploy + this report | Report written | Partial suite | Deploy of this SHA not done |
+| 9 Deploy + this report | Report updated | Targeted suite PASS | `9ffa538` pushed; follow-up SHA in flight |
 
 ---
 
@@ -58,8 +58,10 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 ## 4. Commit SHAs
 
 - Previous `HEAD`: `386dfc4`
-- This upgrade: `a36af19` — *Ship judge-facing product upgrades without inventing odds or hosted OpenAI fallback.*
-- Not pushed to origin in this session (live deploy, migration 0016, and paid inference still open).
+- `a36af19` — *Ship judge-facing product upgrades without inventing odds or hosted OpenAI fallback.*
+- `e3ebeaa` — *Record the upgrade commit SHA in the production report.*
+- `9ffa538` — *Refuse silent local Postgres when migrating PlayItOut schema.* Pushed to `origin/main`.
+- Follow-up on `main`: async agent start (`Prefer: respond-async`), Profile lint, Hosted/BYOK picker controls. SHA recorded after commit.
 
 ---
 
@@ -72,9 +74,13 @@ Additive migration:
   - unique `lower(username)`
   - `collections` and `collection_goals`
 
-Target is the hosted Supabase project behind Render `PM_DATABASE_URL`, not the local CLI database on port 54322. Inspect `schema_migrations` before applying; skip files already recorded. This session did not apply 0016: local env is loopback, hosted MCP SQL timed out.
+Target is the hosted Supabase project behind Render `PM_DATABASE_URL`, not the local CLI database on port 54322. Inspect `schema_migrations` before applying; skip files already recorded.
 
-No destructive SQL. Hosted budgets were not reset. No second database was created.
+Local dry-run (development, loopback `127.0.0.1:54322/postgres`): **0016 applied**, `pending (none)`, `collections_table True`. Local `.env` is intentionally not production.
+
+Hosted: do **not** apply from this machine. Render start command runs `scripts/db_migrate.py` against the service `PM_DATABASE_URL`. After the pushed SHA boots, verify collections/profile via the authenticated API. Previously connected Supabase MCP is not authoritative.
+
+No destructive SQL. Hosted budgets were not reset. No second database was created. `supabase db push` was not used.
 
 ---
 
@@ -123,7 +129,7 @@ Median/p95 of warm authenticated page navigations were **not** collected with a 
 | React Query 60s stale, no refetchOnWindowFocus | Cached navigations | NOT TESTED |
 | Plugin debounce 280ms + toolkit cache | Fewer Composio calls | NOT TESTED |
 | Engine LRU + pool | Less connection churn | NOT TESTED |
-| Async agent jobs | Not implemented | FAIL |
+| Async agent jobs | `Prefer: respond-async` seeds a running snapshot then continues after the HTTP response; client polls `GET /api/v1/agent/threads/{id}` | Local PASS; live NOT TESTED |
 
 Target of sub-second warm cached navigation is **not claimed** until a post-deploy waterfall is captured.
 
@@ -192,14 +198,14 @@ These are **not** live provider proofs.
 
 ## 14. Remaining blockers and owner actions
 
-1. **Apply migration 0016** on the **hosted** Supabase database that Render already uses via `PM_DATABASE_URL` (session-mode, port 5432). Do not migrate local `127.0.0.1:54322` as a substitute, and do not run `supabase db push` until `schema_migrations` has been inspected. This session: local `.env` still points at loopback; hosted SQL via Supabase MCP timed out, so 0016 was **not** applied. Operator: `uv run python scripts/db_migrate.py --dry-run` with the Render URL, then apply if `0016_collections_profiles.sql` is pending.
-2. **Deploy this SHA** to Render and Vercel. Current live process is still the previous deployment; `/health` showed a Render cold start, not this code.
-3. **Authorize a Spur and Anthropic completion** if live inference must be proven. Estimated cost was not independently verified against Spur invoices; do not spend without approval.
-4. **Confirm `PM_COMPOSIO_ENABLED` and `COMPOSIO_API_KEY`** on Render only if Plugins is still empty after deploy. Do not reprint secrets here.
+1. **Hosted 0016** is applied only by Render `db_migrate.py` on boot. Local 0016 is already applied and must not be treated as hosted proof.
+2. **Deploy the follow-up SHA** to Render and Vercel (`9ffa538` is on `origin/main`; async/lint follow-up is next).
+3. **Live Spur and Anthropic completions** remain within the $0.10 ceiling after the API is serving this code. Spur catalog estimates are still unverified invoices.
+4. **Confirm Composio** on Render only if Plugins is still empty after deploy. Do not reprint secrets.
 5. **Warm the Render service** before judging; cold start dominates first-hit latency.
-6. **Async agent execution** is still synchronous. Long workflows still block `POST /api/v1/agent/threads`.
+6. **Async agents** now return a running snapshot when the client sends `Prefer: respond-async`. Crash mid-run can leave `status=running` on a single Render worker until retry.
 7. **Featured plugin logos / OAuth round-trip** need a real Composio account connection after deploy.
-8. Full UI primitive audit is incomplete; evidence and markets controls were restyled, not every legacy form.
+8. Evidence upload mapping still uses native `<select>` for CSV columns; Hosted/BYOK and Markets move-to now use PlayItOut buttons.
 
 ---
 
@@ -236,7 +242,7 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 2B React Query SWR | PASS code |
 | 2C Dashboard batch + plugin cache | PASS unit |
 | 2D DB/engine | PASS code; live query plans NOT TESTED |
-| 2E Async agents | FAIL — still synchronous |
+| 2E Async agents | PASS code + unit (`Prefer: respond-async`); live NOT TESTED |
 | 3A Empty catalog diagnosis | PASS code |
 | 3B Judge OAuth | NOT TESTED |
 | 3C Plugin browsing polish | PARTIAL |
@@ -255,11 +261,12 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 8B Evidence form | PASS code |
 | 9 Tests / typecheck | PASS targeted |
 | Hosted Supabase is the production database | PASS (intended: Render `PM_DATABASE_URL`; local `.env` still loopback) |
-| Inspect migrations before apply | PASS dry-run on local; hosted MCP SQL timed out |
+| Inspect migrations before apply | PASS local dry-run (0016 applied, none pending). Hosted inspected only via Render migrate-on-boot, not MCP. |
 | `supabase db push` not used | PASS |
-| 0016 applied on hosted DB | BLOCKED (no hosted SQL session this turn) |
-| Render reads/writes hosted DB | PARTIAL — live `/health` 200, `/api/v1/goals` 401 (auth before DB); `/health/details` correctly 404. Hosted Postgres MCP timed out, so row-level proof was not collected. |
-| 9 Live deploy of this SHA | FAIL |
+| 0016 applied on local DB | PASS (`127.0.0.1:54322`, `collections_table True`) |
+| 0016 applied on hosted DB | NOT TESTED until Render boots this SHA and collections/profile are read with a real session |
+| Render reads/writes hosted DB | PARTIAL — `/health` 200, `/api/v1/goals` 401, `/health/details` 404 by design. Row-level hosted proof after migrate-on-boot. |
+| 9 Live deploy of this SHA | `9ffa538` pushed; follow-up SHA not yet serving |
 | 9 Two-user live isolation | NOT TESTED |
 | 9 Mobile/desktop live | NOT TESTED this SHA |
 

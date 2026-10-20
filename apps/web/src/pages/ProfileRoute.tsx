@@ -75,11 +75,15 @@ export function ProfileRoute() {
             onSubmit={(event) => {
               event.preventDefault();
               const form = new FormData(event.currentTarget);
+              const text = (name: string) => {
+                const value = form.get(name);
+                return typeof value === "string" ? value : "";
+              };
               save.mutate({
-                display_name: String(form.get("display_name") ?? ""),
-                username: String(form.get("username") ?? ""),
-                bio: String(form.get("bio") ?? ""),
-                avatar_value: String(form.get("avatar_value") ?? fields.avatar_value ?? ""),
+                display_name: text("display_name"),
+                username: text("username"),
+                bio: text("bio"),
+                avatar_value: text("avatar_value") || fields.avatar_value || "",
               });
             }}
           >

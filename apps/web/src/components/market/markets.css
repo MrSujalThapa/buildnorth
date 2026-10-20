@@ -117,7 +117,30 @@
   background: var(--app-surface);
 }
 
-.markets-actionbar select,
+.move-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.markets-actionbar .choice-row button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-bg);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.markets-actionbar .choice-row button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .collection-create input,
 .file-drop-label {
   min-height: 36px;

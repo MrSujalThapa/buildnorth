@@ -310,6 +310,74 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.choice-row legend {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+
+.choice-row button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.choice-row button[aria-pressed="true"],
+.model-picker button[aria-selected="true"] {
+  background: var(--app-ink);
+  color: var(--app-bg);
+  border-color: var(--app-ink);
+}
+
+.model-picker {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-bg);
+}
+
+.model-picker button {
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.model-picker button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-ink) 6%, transparent);
+}
+
+.model-picker button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 @media (max-width: 800px) {
   .inference-mode-grid { grid-template-columns: minmax(0, 1fr); }
 }

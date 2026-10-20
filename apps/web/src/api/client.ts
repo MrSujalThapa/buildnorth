@@ -554,6 +554,18 @@ export interface WorkflowSnapshot {
   debug: Record<string, unknown>;
 }
 
+const ASYNC_JSON_HEADERS = { "Content-Type": "application/json", Prefer: "respond-async" };
+
+async function watchThread(snapshot: WorkflowSnapshot, signal?: AbortSignal): Promise<WorkflowSnapshot> {
+  let current = snapshot;
+  const deadline = Date.now() + 120_000;
+  while (current.status === "running" && Date.now() < deadline) {
+    await new Promise((resolve) => window.setTimeout(resolve, 400));
+    current = await request<WorkflowSnapshot>(`/api/v1/agent/threads/${current.thread_id}`, undefined, signal);
+  }
+  return current;
+}
+
 async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
   const token = await currentAccessToken();
   const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
@@ -678,18 +690,24 @@ export const api = {
     }),
   evidence: (goalId: string, signal?: AbortSignal) =>
     request<EvidenceEvent[]>(`/api/v1/goals/${goalId}/evidence`, undefined, signal),
-  startThread: (body: { kind: string; intent?: string; goal_id?: string; evidence_text?: string; github_login?: string }) =>
-    request<WorkflowSnapshot>("/api/v1/agent/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-  resumeThread: (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
-    request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/resume`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+  startThread: async (body: { kind: string; intent?: string; goal_id?: string; evidence_text?: string; github_login?: string }) =>
+    watchThread(
+      await request<WorkflowSnapshot>("/api/v1/agent/threads", {
+        method: "POST",
+        headers: ASYNC_JSON_HEADERS,
+        body: JSON.stringify(body),
+      }),
+    ),
+  getThread: (threadId: string, signal?: AbortSignal) =>
+    request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
+  resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
+    watchThread(
+      await request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/resume`, {
+        method: "POST",
+        headers: ASYNC_JSON_HEADERS,
+        body: JSON.stringify(body),
+      }),
+    ),
   addManualState: (
     goalId: string,
     entries: { key: string; label: string; value: number; unit: string }[],
@@ -705,12 +723,14 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ entries }),
     }),
-  addEvidence: (goalId: string, evidenceText: string) =>
-    request<WorkflowSnapshot>(`/api/v1/goals/${goalId}/evidence`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "add_evidence", evidence_text: evidenceText }),
-    }),
+  addEvidence: async (goalId: string, evidenceText: string) =>
+    watchThread(
+      await request<WorkflowSnapshot>(`/api/v1/goals/${goalId}/evidence`, {
+        method: "POST",
+        headers: ASYNC_JSON_HEADERS,
+        body: JSON.stringify({ kind: "add_evidence", evidence_text: evidenceText }),
+      }),
+    ),
   listUploads: (goalId: string, signal?: AbortSignal) =>
     request<UploadRecord[]>(`/api/v1/goals/${goalId}/uploads`, undefined, signal),
   uploadDataset: (goalId: string, file: File) => {

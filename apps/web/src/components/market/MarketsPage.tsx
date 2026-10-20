@@ -108,23 +108,27 @@ export default function MarketsPage({
         {selectMode ? (
           <div className="markets-actionbar" role="toolbar" aria-label="Goal selection">
             <span>{selected.length} selected</span>
-            <label>
-              Move to
-              <select
-                value=""
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value && selected.length) void onMoveToCollection(value, selected).then(exitSelect);
-                }}
-              >
-                <option value="">Choose collection</option>
-                {collections.map((item) => (
-                  <option key={item.collection.collection_id} value={item.collection.collection_id}>
-                    {item.collection.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="move-menu">
+              <span>Move to</span>
+              {collections.length ? (
+                <div className="choice-row" role="group" aria-label="Move selected goals to a collection">
+                  {collections.map((item) => (
+                    <button
+                      key={item.collection.collection_id}
+                      type="button"
+                      disabled={!selected.length}
+                      onClick={() => {
+                        void onMoveToCollection(item.collection.collection_id, selected).then(exitSelect);
+                      }}
+                    >
+                      {item.collection.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="field-hint">Create a collection first.</span>
+              )}
+            </div>
             <button type="button" className="danger" disabled={!selected.length} onClick={() => setConfirmDelete(true)}>
               Delete
             </button>

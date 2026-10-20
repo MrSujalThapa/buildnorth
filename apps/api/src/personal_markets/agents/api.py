@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from personal_markets.core.config import get_settings
@@ -50,11 +50,50 @@ class ResumeBody(BaseModel):
     cancelled: bool = False
 
 
+def _wants_async(http: Request) -> bool:
+    return "respond-async" in (http.headers.get("prefer") or "").lower()
+
+
+async def _start_workflow(
+    workflow: AgentWorkflow,
+    request: WorkflowRequest,
+    http: Request,
+    background: BackgroundTasks,
+) -> WorkflowSnapshot:
+    if request.thread_id is None:
+        request = request.model_copy(update={"thread_id": uuid4()})
+    seed_running = getattr(workflow, "seed_running", None)
+    start_later = getattr(workflow, "start_later", None)
+    if _wants_async(http) and callable(seed_running) and callable(start_later):
+        seeded = await seed_running(request)
+        background.add_task(start_later, request)
+        return seeded
+    return await workflow.start(request)
+
+
+async def _resume_workflow(
+    workflow: AgentWorkflow,
+    thread_id: UUID,
+    payload: ResumePayload,
+    http: Request,
+    background: BackgroundTasks,
+) -> WorkflowSnapshot:
+    mark_running = getattr(workflow, "mark_running", None)
+    resume_later = getattr(workflow, "resume_later", None)
+    if _wants_async(http) and callable(mark_running) and callable(resume_later):
+        running = await mark_running(thread_id)
+        background.add_task(resume_later, thread_id, payload)
+        return running
+    return await workflow.resume(thread_id, payload)
+
+
 @router.post("/agent/threads", response_model=WorkflowSnapshot)
 async def start_thread(
     body: CreateThreadBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
+    http: Request,
+    background: BackgroundTasks,
 ) -> WorkflowSnapshot:
     if body.mcp_records:
         raise ForbiddenError("Connector records require the authorized connector ingestion path")
@@ -69,7 +108,7 @@ async def start_thread(
                          for event in body.evidence_events] if body.evidence_events else None,
         user_id=principal.user_id,
     )
-    return await workflow.start(request)
+    return await _start_workflow(workflow, request, http, background)
 
 
 @router.get("/agent/threads/{thread_id}", response_model=WorkflowSnapshot)
@@ -89,12 +128,17 @@ async def resume_thread(
     body: ResumeBody,
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
+    http: Request,
+    background: BackgroundTasks,
 ) -> WorkflowSnapshot:
     snapshot = await workflow.snapshot(thread_id)
     _assert_thread_owner(snapshot, principal)
-    return await workflow.resume(
+    return await _resume_workflow(
+        workflow,
         thread_id,
         ResumePayload(answers=body.answers, confirmed=body.confirmed, cancelled=body.cancelled),
+        http,
+        background,
     )
 
 
@@ -128,9 +172,12 @@ async def add_manual_evidence(
     workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
     goals: Annotated[Any, Depends(get_goal_service)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
+    http: Request,
+    background: BackgroundTasks,
 ) -> WorkflowSnapshot:
     await goals.get_goal(goal_id, owner_id=principal.user_id)
-    return await workflow.start(
+    return await _start_workflow(
+        workflow,
         WorkflowRequest(
             kind="add_evidence",
             goal_id=goal_id,
@@ -138,7 +185,9 @@ async def add_manual_evidence(
             evidence_events=[event.model_copy(update={"source_type": "manual"})
                              for event in body.evidence_events] if body.evidence_events else None,
             user_id=principal.user_id,
-        )
+        ),
+        http,
+        background,
     )
 
 

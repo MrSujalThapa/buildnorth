@@ -1,6 +1,8 @@
 from functools import lru_cache
 from typing import Annotated, Any
+from uuid import UUID, uuid4
 
+import structlog
 from fastapi import Depends, Request
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -40,7 +42,12 @@ from personal_markets.persistence.agent_store import (
 )
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresGoalRepository
-from personal_markets.ports import InferenceProvider
+from personal_markets.ports import (
+    InferenceProvider,
+    ResumePayload,
+    WorkflowRequest,
+    WorkflowSnapshot,
+)
 
 
 class InMemoryGithubCursorStore:
@@ -68,6 +75,54 @@ class PersistingWorkflow:
         await self._maybe_review(snapshot)
         return snapshot
 
+    async def seed_running(self, request: WorkflowRequest) -> WorkflowSnapshot:
+        thread_id = request.thread_id or uuid4()
+        snapshot = WorkflowSnapshot(
+            thread_id=thread_id,
+            kind=request.kind,
+            status="running",
+            current_step="parse_request",
+            progress=["Starting the agent workflow"],
+            debug={"user_id": str(request.user_id) if request.user_id else "", "async": True},
+        )
+        await self._threads.upsert(snapshot)
+        return snapshot
+
+    async def mark_running(self, thread_id: UUID) -> WorkflowSnapshot:
+        stored = await self.snapshot(thread_id)
+        running = stored.model_copy(
+            update={
+                "status": "running",
+                "interrupt": None,
+                "progress": [*list(stored.progress or []), "Continuing the agent workflow"],
+            }
+        )
+        await self._threads.upsert(running)
+        return running
+
+    async def start_later(self, request: WorkflowRequest) -> None:
+        try:
+            await self.start(request)
+        except Exception:
+            await self._fail(request.thread_id)
+
+    async def resume_later(self, thread_id: UUID, payload: ResumePayload) -> None:
+        try:
+            await self.resume(thread_id, payload)
+        except Exception:
+            await self._fail(thread_id)
+
+    async def _fail(self, thread_id: UUID | None) -> None:
+        structlog.get_logger("personal_markets.agents").exception("agent_workflow_failed")
+        if thread_id is None:
+            return
+        stored = await self._threads.get(thread_id)
+        if stored is None or stored.status != "running":
+            return
+        await self._threads.upsert(
+            stored.model_copy(update={"status": "failed", "current_step": "failed"})
+        )
+
     async def resume(self, thread_id: Any, payload: Any) -> Any:
         snapshot = await self._inner.resume(thread_id, payload)
         await self._threads.upsert(snapshot)
@@ -88,7 +143,6 @@ class PersistingWorkflow:
     async def _maybe_review(self, snapshot: Any) -> None:
         if self._reviews is None or snapshot.goal is None or snapshot.critic is None:
             return
-        from uuid import uuid4
 
         await self._reviews.append(
             {

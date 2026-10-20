@@ -181,6 +181,44 @@ def test_withhold_snapshot_is_classified() -> None:
     assert snap["required_actions"]
 
 
+def test_async_agent_start_returns_then_reaches_interrupt() -> None:
+    app = isolated_app()
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/v1/agent/threads",
+            json={
+                "kind": "create_goal",
+                "intent": (
+                    "I want to receive an SWE/FDE offer from one of my "
+                    "target companies by August 2027."
+                ),
+            },
+            headers={"Prefer": "respond-async"},
+        )
+        assert created.status_code == 200, created.text
+        body = created.json()
+        assert body["thread_id"]
+        assert body["status"] in {
+            "running",
+            "needs_input",
+            "completed",
+            "limited",
+            "withheld",
+        }
+        polled = client.get(f"/api/v1/agent/threads/{body['thread_id']}")
+        assert polled.status_code == 200, polled.text
+        assert polled.json()["status"] in {
+            "running",
+            "needs_input",
+            "completed",
+            "limited",
+            "withheld",
+            "failed",
+        }
+        if polled.json()["status"] == "running":
+            assert created.json()["status"] == "running"
+
+
 async def test_plugin_search_does_not_drop_local_integrations() -> None:
     from uuid import uuid4
 

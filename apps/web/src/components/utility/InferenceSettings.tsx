@@ -145,17 +145,25 @@ export function InferenceSettings({
                   setNotice("BYOK preference saved.");
                 });
               }}>
-                <label>Provider
-                  <select value={provider} disabled={busy} onChange={(event) => {
-                    setProvider(event.target.value as InferencePreference["provider"]);
-                    setModel("");
-                    setKey("");
-                    setModelQuery("");
-                  }}>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                  </select>
-                </label>
+                <fieldset className="choice-row">
+                  <legend>Provider</legend>
+                  {(["openai", "anthropic"] as const).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      aria-pressed={provider === item}
+                      disabled={busy}
+                      onClick={() => {
+                        setProvider(item);
+                        setModel("");
+                        setKey("");
+                        setModelQuery("");
+                      }}
+                    >
+                      {item === "openai" ? "OpenAI" : "Anthropic"}
+                    </button>
+                  ))}
+                </fieldset>
                 <label>Search models
                   <input
                     type="search"
@@ -165,16 +173,29 @@ export function InferenceSettings({
                     onChange={(event) => setModelQuery(event.target.value)}
                   />
                 </label>
-                <label>Compatible model
-                  <select value={model} disabled={busy} onChange={(event) => setModel(event.target.value)}>
-                    <option value="">{settings.recommended_model ? `Recommended (${settings.recommended_model})` : "Provider default"}</option>
-                    {byokModels.map((item) => (
-                      <option key={item.model} value={item.model} disabled={!item.structured}>
-                        {modelLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="model-picker" role="listbox" aria-label="Compatible model">
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={!model}
+                    disabled={busy}
+                    onClick={() => setModel("")}
+                  >
+                    {settings.recommended_model ? `Recommended (${settings.recommended_model})` : "Provider default"}
+                  </button>
+                  {byokModels.map((item) => (
+                    <button
+                      key={item.model}
+                      type="button"
+                      role="option"
+                      aria-selected={model === item.model}
+                      disabled={busy || !item.structured}
+                      onClick={() => setModel(item.model)}
+                    >
+                      {modelLabel(item)}
+                    </button>
+                  ))}
+                </div>
                 <button type="submit" disabled={busy || !credential}>Save BYOK preference</button>
               </form>
               <div className="setting-row inference-key-row">

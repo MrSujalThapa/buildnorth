@@ -18,6 +18,10 @@ export function NewGoalPage() {
     onSuccess: (data) => {
       setSnapshot(data);
       setError(null);
+      if (data.status === "failed") {
+        setError("The agent workflow failed. Check inference settings and try again.");
+        return;
+      }
       if (data.status === "completed" || data.status === "limited" || data.status === "withheld") {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
         void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
@@ -36,6 +40,10 @@ export function NewGoalPage() {
       setSnapshot(data);
       setError(null);
       setAnswers({});
+      if (data.status === "failed") {
+        setError("The agent workflow failed. Check inference settings and try again.");
+        return;
+      }
       if (data.goal && (data.status === "completed" || data.status === "limited" || data.status === "withheld")) {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
         void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
@@ -56,7 +64,7 @@ export function NewGoalPage() {
           <p>Describe an outcome. The system will formalize it before anything is priced.</p>
         </div>
       </div>
-      {!interrupt ? (
+      {!interrupt && snapshot?.status !== "running" ? (
         <form
           className="composer-form"
           onSubmit={(event) => {
