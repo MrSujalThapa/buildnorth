@@ -57,7 +57,9 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 
 ## 4. Commit SHAs
 
-Recorded after the local commits in this session. See git log on `main`. This working tree was uncommitted at the start of the upgrade (`HEAD` previously `386dfc4` plus local changes).
+- Previous `HEAD`: `386dfc4`
+- This upgrade: `a36af19` — *Ship judge-facing product upgrades without inventing odds or hosted OpenAI fallback.*
+- Not pushed to origin in this session (live deploy, migration 0016, and paid inference still open).
 
 ---
 
