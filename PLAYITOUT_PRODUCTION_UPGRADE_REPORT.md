@@ -61,7 +61,7 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 - `a36af19` — *Ship judge-facing product upgrades without inventing odds or hosted OpenAI fallback.*
 - `e3ebeaa` — *Record the upgrade commit SHA in the production report.*
 - `9ffa538` — *Refuse silent local Postgres when migrating PlayItOut schema.* Pushed to `origin/main`.
-- Follow-up on `main`: async agent start (`Prefer: respond-async`), Profile lint, Hosted/BYOK picker controls. SHA recorded after commit.
+- `192ffaa` — *Return agent workflows without blocking the HTTP request.* Pushed; Vercel build of this SHA failed on `MarketsRoute` `Promise<void>` typing (`tsc -b`). Follow-up commit fixes that build.
 
 ---
 

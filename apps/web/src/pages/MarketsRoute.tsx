@@ -69,9 +69,11 @@ export function MarketsRoute() {
       collections={dashboard.data?.collections ?? []}
       onSelectMarket={(marketId) => { void navigate(`/goals/${marketId}`); }}
       onOpenCollection={(collectionId) => { void navigate(`/collections/${collectionId}`); }}
-      onCreateCollection={(name) => createCollection.mutateAsync(name)}
-      onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds)}
-      onMoveToCollection={(collectionId, goalIds) => moveGoals.mutateAsync({ collectionId, goalIds })}
+      onCreateCollection={(name) => createCollection.mutateAsync(name).then(() => undefined)}
+      onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds).then(() => undefined)}
+      onMoveToCollection={(collectionId, goalIds) =>
+        moveGoals.mutateAsync({ collectionId, goalIds }).then(() => undefined)
+      }
     />
   );
 }
