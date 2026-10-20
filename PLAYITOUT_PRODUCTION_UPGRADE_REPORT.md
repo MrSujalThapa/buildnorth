@@ -7,7 +7,7 @@ Live API: https://playitout-api.onrender.com
 
 This report distinguishes **local mocked tests** from **real deployed browser verification**. Compiling or unit-testing is not treated as production-ready proof.
 
-Paid inference this session: **$0.00** so far. The $0.10 verification ceiling is authorized; a live Spur/Anthropic completion will be issued against the deployed API after this SHA is live, not against local `.env`.
+Paid inference this session: **$0.00**. The $0.10 ceiling is authorized, but a signed-in Clerk session is required to call hosted Spur or BYOK. The production sign-in wall is Google OAuth; this session could not complete it.
 
 ---
 
@@ -29,15 +29,15 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 
 | Phase | Code | Local tests | Live production |
 | --- | --- | --- | --- |
-| 1 Inference (Spur, BYOK, discovery) | Implemented | PASS | NOT TESTED (no paid call yet) |
-| 2 Latency (RQ, dashboard, DB pool, plugin cache, async agents) | Implemented | PASS targeted | PARTIAL (Render cold start observed) |
-| 3 Composio / Plugins | Implemented catalog/error path | PASS mocked | NOT TESTED |
-| 4 Settings privacy + Hosted/BYOK split | Implemented | PASS | NOT TESTED this session |
-| 5 Create menu, select, archive | Implemented | PASS | NOT TESTED |
-| 6 Collections + progress | Implemented | PASS | Local 0016 applied; hosted pending Render migrate |
-| 7 Profile + radar | Implemented | PASS | Local 0016 applied; hosted pending Render migrate |
-| 8 Withheld + evidence UX | Implemented | PASS classifier | NOT TESTED in deployed UI |
-| 9 Deploy + this report | Report updated | Targeted suite PASS | `9ffa538` pushed; follow-up SHA in flight |
+| 1 Inference (Spur, BYOK, discovery) | Implemented | PASS | NOT TESTED (Clerk Google sign-in required) |
+| 2 Latency (RQ, dashboard, DB pool, plugin cache, async agents) | Implemented | PASS targeted | PARTIAL — warm `/health` median **155 ms** (n=5); first-hit cold start still observed |
+| 3 Composio / Plugins | Implemented catalog/error path | PASS mocked | NOT TESTED (401 without session; catalog behind auth) |
+| 4 Settings privacy + Hosted/BYOK split | Implemented | PASS | Bundle live (`PlayItOut credits` in production JS); UI not exercised signed-in |
+| 5 Create menu, select, archive | Implemented | PASS | Bundle live (`New collection` in production JS); UI not exercised signed-in |
+| 6 Collections + progress | Implemented | PASS | Local 0016 applied. Hosted: `GET /api/v1/collections` **401** (router live). Row-level table proof needs a session |
+| 7 Profile + radar | Implemented | PASS | `GET /api/v1/profile` **401**. Vercel `/profile` exists. Not exercised signed-in |
+| 8 Withheld + evidence UX | Implemented | PASS classifier | NOT TESTED in deployed signed-in UI |
+| 9 Deploy + this report | Report updated | Targeted suite PASS | Vercel **0e2eaef** Ready. Render `/health` 200 JSON. GitHub CI still fails on pre-existing ruff |
 
 ---
 
@@ -51,7 +51,9 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 6. **No goal deletion.** Soft-archive using existing `status`.
 7. **Username in sidebar opened Settings.** Now `/profile`.
 8. **Collection service in tests used a new in-memory repo per request.** Shared repository in `isolated_app`.
-9. **Render cold start.** Unauthenticated `/health` returned the Render “Application loading” interstitial rather than JSON. This is a primary live latency source, separate from app code.
+9. **Render cold start.** Unauthenticated `/health` returned the Render “Application loading” interstitial rather than JSON. This is a primary live latency source, separate from app code. After wake, five probes: 335 / 214 / 155 / 128 / 146 ms (median 155 ms).
+10. **Vercel `tsc -b` vs local `tsc --noEmit`.** Markets `mutateAsync` returned `CollectionView` where the page typed `Promise<void>`. Local typecheck passed; Vercel `npm run build` (`tsc -b && vite build`) failed until `0e2eaef`.
+11. **GitHub CI lint.** After Profile ESLint was fixed, `uv run ruff check .` still reports hundreds of pre-existing E501/I001 findings. Not introduced by this upgrade; not mass-rewritten.
 
 ---
 
@@ -61,7 +63,8 @@ Withhold snapshots persist on `goals.model_requirements_json.last_publication` s
 - `a36af19` — *Ship judge-facing product upgrades without inventing odds or hosted OpenAI fallback.*
 - `e3ebeaa` — *Record the upgrade commit SHA in the production report.*
 - `9ffa538` — *Refuse silent local Postgres when migrating PlayItOut schema.* Pushed to `origin/main`.
-- `192ffaa` — *Return agent workflows without blocking the HTTP request.* Pushed; Vercel build of this SHA failed on `MarketsRoute` `Promise<void>` typing (`tsc -b`). Follow-up commit fixes that build.
+- `192ffaa` — *Return agent workflows without blocking the HTTP request.*
+- `0e2eaef` — *Fix the Vercel production build for the Markets create flow.* **Vercel Ready** (`FvgiDWbZY2km65zvFBxNNeotce4T`). Live bundle `index-0jpWn8rs.js` contains `PlayItOut credits`, `New collection`, and `Prefer: respond-async`.
 
 ---
 
@@ -97,14 +100,16 @@ Additive unless noted:
 - `GET /api/v1/me` includes `profile` and `hosted.hosted_available`; `global_remaining_usd` is null for non-admins
 - `GET /api/v1/settings/inference/models` (from earlier phase work)
 - Goal `model_requirements.last_publication` for withheld/published snapshots
+- `Prefer: respond-async` on agent start/resume/evidence returns a running snapshot; poll `GET /api/v1/agent/threads/{id}` (default remains synchronous)
 
 ---
 
 ## 7. Screenshots / real UI tests
 
-- Local Vitest: `apps/web/src/App.test.tsx` 6/6 PASS (create menu, markets shell).
+- Local Vitest: `apps/web/src/App.test.tsx` plus InferenceSettings and NewGoalPage — PASS.
 - Playwright pass06 mocks updated for the Create split control. Fixture-backed only.
-- Live deployed UI for this SHA: **NOT TESTED**. Render `/health` was still in cold-start interstitial when probed.
+- Live Vercel `0e2eaef` Sign in page loaded (Google OAuth). Production JS includes Hosted/BYOK copy and the create-menu strings.
+- Signed-in Markets / Settings / Plugins / Profile / inference: **NOT TESTED** (Clerk Google).
 
 ---
 
@@ -125,7 +130,7 @@ Median/p95 of warm authenticated page navigations were **not** collected with a 
 
 | Change | Expected effect | Live after deploy |
 | --- | --- | --- |
-| Dashboard batch | One round-trip for markets | NOT TESTED |
+| Dashboard batch | One round-trip for markets | Route live (`GET /api/v1/goals/dashboard` 401 unauthenticated) |
 | React Query 60s stale, no refetchOnWindowFocus | Cached navigations | NOT TESTED |
 | Plugin debounce 280ms + toolkit cache | Fewer Composio calls | NOT TESTED |
 | Engine LRU + pool | Less connection churn | NOT TESTED |
@@ -198,30 +203,28 @@ These are **not** live provider proofs.
 
 ## 14. Remaining blockers and owner actions
 
-1. **Hosted 0016** is applied only by Render `db_migrate.py` on boot. Local 0016 is already applied and must not be treated as hosted proof.
-2. **Deploy the follow-up SHA** to Render and Vercel (`9ffa538` is on `origin/main`; async/lint follow-up is next).
-3. **Live Spur and Anthropic completions** remain within the $0.10 ceiling after the API is serving this code. Spur catalog estimates are still unverified invoices.
-4. **Confirm Composio** on Render only if Plugins is still empty after deploy. Do not reprint secrets.
-5. **Warm the Render service** before judging; cold start dominates first-hit latency.
-6. **Async agents** now return a running snapshot when the client sends `Prefer: respond-async`. Crash mid-run can leave `status=running` on a single Render worker until retry.
-7. **Featured plugin logos / OAuth round-trip** need a real Composio account connection after deploy.
-8. Evidence upload mapping still uses native `<select>` for CSV columns; Hosted/BYOK and Markets move-to now use PlayItOut buttons.
+1. **Signed-in production pass.** Google Clerk on https://buildnorth-delta.vercel.app is required for Spur, BYOK, Plugins OAuth, collections rows, and archive/create. This session reached the sign-in wall only.
+2. **Hosted 0016 row proof.** Local applied. Render `db_migrate.py` runs on Docker boot against `PM_DATABASE_URL`. Unauthenticated `GET /api/v1/collections` is 401 (router mounted). Confirm `collections` rows after signing in.
+3. **GitHub CI.** ESLint errors from the profile form are fixed. `ruff check .` still fails on hundreds of pre-existing findings. Vercel does not wait on that CI job.
+4. **Live Spur/Anthropic** still $0.00; stay under $0.10 after a session exists. Spur catalog estimates remain unverified invoices.
+5. **Warm Render** before judging. Cold start still dominates the first hit; warm `/health` median 155 ms.
+6. **Async agents.** `Prefer: respond-async` is in the live bundle. Crash mid-run can leave `status=running` on the single Render worker.
+7. **Composio OAuth** still needs a signed-in Plugins connection.
+8. CSV upload column mapping still uses native `<select>`.
 
 ---
 
 ## 15. Judge-readiness assessment
 
-**Not production-ready** as a deployed judge experience for this SHA.
+**Code is on the live URLs; signed-in judge proof is still open.**
 
-The product code now covers the requested judge loop: Spur-hosted mode in software, one-step BYOK, model discovery, cached navigation, honest plugin errors, Hosted vs BYOK settings, goal archive, collections with honest progress, a private profile radar, and withheld-forecast explanation. That is **local/unit evidence**.
-
-A judge hitting the current Vercel/Render pair has **not** been shown this SHA. Live Spur inference, live Anthropic usage (beyond prior key validation), live Composio catalog/OAuth, migration 0016, and post-deploy performance numbers remain open.
+Vercel production is serving `0e2eaef` (bundle includes Hosted credits UI, create menu, and async agent polling). Render `/health` returns JSON when warm. Collections, profile, and dashboard routes exist (401 without a session). What remains is a Google-signed-in pass for Spur, BYOK, Composio, and hosted `0016` rows.
 
 ### Requirement matrix
 
 | Requirement | Status |
 | --- | --- |
-| 1A.1 Deployed API recognizes Spur | NOT TESTED (health cold start; env claimed configured) |
+| 1A.1 Deployed API recognizes Spur | NOT TESTED signed-in; API is up (`/health` 200) |
 | 1A.2 Spur credits usable | NOT TESTED |
 | 1A.3 Exact Spur model/API/tools | PASS code inspection (`tools=False`, json_object); live FAIL/NOT TESTED |
 | 1A.4 Hosted workflows | NOT TESTED live |
@@ -238,7 +241,7 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 1C Provider-backed discovery | PASS unit (no invented IDs) |
 | 1C Searchable picker + persist | PASS frontend code |
 | 1C Hosted allowlist only | PASS unit |
-| 2A Measure first | PARTIAL — cold start documented; warm p50/p95 missing |
+| 2A Measure first | PARTIAL — warm `/health` median 155 ms (n=5); authenticated page waterfalls missing |
 | 2B React Query SWR | PASS code |
 | 2C Dashboard batch + plugin cache | PASS unit |
 | 2D DB/engine | PASS code; live query plans NOT TESTED |
@@ -247,9 +250,9 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 3B Judge OAuth | NOT TESTED |
 | 3C Plugin browsing polish | PARTIAL |
 | 4A Hide global budget | PASS unit |
-| 4B Split Hosted/BYOK UI | PASS mocked e2e |
+| 4B Split Hosted/BYOK UI | PASS mocked e2e; live bundle contains `PlayItOut credits` |
 | 4C Consistent primitives | PARTIAL |
-| 5A Create menu | PASS unit |
+| 5A Create menu | PASS unit; live bundle contains `New collection` |
 | 5B Select mode | PASS code |
 | 5C Safe deletion | PASS unit (soft archive) |
 | 6A Collection model | PASS unit |
@@ -259,15 +262,15 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 7B Aggregated radar | PASS code |
 | 8A Withheld explanation | PASS unit + persist |
 | 8B Evidence form | PASS code |
-| 9 Tests / typecheck | PASS targeted |
+| 9 Tests / typecheck | PASS targeted local; GitHub CI ruff still red on pre-existing issues; Vercel `tsc -b` PASS on `0e2eaef` |
 | Hosted Supabase is the production database | PASS (intended: Render `PM_DATABASE_URL`; local `.env` still loopback) |
 | Inspect migrations before apply | PASS local dry-run (0016 applied, none pending). Hosted inspected only via Render migrate-on-boot, not MCP. |
 | `supabase db push` not used | PASS |
 | 0016 applied on local DB | PASS (`127.0.0.1:54322`, `collections_table True`) |
-| 0016 applied on hosted DB | NOT TESTED until Render boots this SHA and collections/profile are read with a real session |
-| Render reads/writes hosted DB | PARTIAL — `/health` 200, `/api/v1/goals` 401, `/health/details` 404 by design. Row-level hosted proof after migrate-on-boot. |
-| 9 Live deploy of this SHA | `9ffa538` pushed; follow-up SHA not yet serving |
+| 0016 applied on hosted DB | NOT TESTED at row level (no session). Router is live (`/api/v1/collections` 401). |
+| Render reads/writes hosted DB | PARTIAL — `/health` 200, authenticated routes 401, `/health/details` 404 by design |
+| 9 Live deploy of this SHA | PASS Vercel `0e2eaef`. Render JSON `/health` 200 on the same API host |
 | 9 Two-user live isolation | NOT TESTED |
 | 9 Mobile/desktop live | NOT TESTED this SHA |
 
-**Definition of done:** not met for the live judge URL until deploy, migration, and a bounded live inference/plugin pass succeed.
+**Definition of done:** frontend/API SHAs are live. Remaining: signed-in Spur/BYOK/Composio under $0.10, hosted `0016` row proof, and authenticated navigation waterfalls.
