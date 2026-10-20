@@ -1,6 +1,6 @@
 from pathlib import Path
 
-REQUIRED_FILES = 15
+REQUIRED_FILES = 16
 REQUIRED = {
     "goals",
     "source_connections",
@@ -31,7 +31,7 @@ def main() -> int:
     ]
     if missing_files or len(migrations) != REQUIRED_FILES:
         print(
-            "Expected migrations 0001-0015 "
+            "Expected migrations 0001-0016 "
             f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"
         )
         if missing_files:

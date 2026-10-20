@@ -37,12 +37,17 @@ def main() -> None:
     if not settings.database_url:
         raise SystemExit("PM_DATABASE_URL is not configured")
     url = make_url(settings.database_url)
+    host = (url.host or "").lower()
+    print("migration_target", f"{url.host}:{url.port}/{url.database}")
     apply(url.render_as_string(hide_password=False), url.database or "default")
-    test = url.set(database="playitout_phase0_test")
-    try:
-        apply(test.render_as_string(hide_password=False), "playitout_phase0_test")
-    except Exception as error:
-        print("isolated test db skipped:", type(error).__name__, error)
+    if host in {"127.0.0.1", "localhost", "::1"}:
+        test = url.set(database="playitout_phase0_test")
+        try:
+            apply(test.render_as_string(hide_password=False), "playitout_phase0_test")
+        except Exception as error:
+            print("isolated test db skipped:", type(error).__name__, error)
+        return
+    print("skipping extra database on hosted target")
 
 
 if __name__ == "__main__":

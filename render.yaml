@@ -54,6 +54,7 @@ services:
         value: "false"
       - key: PYTHONUNBUFFERED
         value: "1"
+      # Hosted Supabase session-mode Postgres. Do not point this at local :54322.
       - key: PM_DATABASE_URL
         sync: false
       - key: PM_PUBLIC_API_URL

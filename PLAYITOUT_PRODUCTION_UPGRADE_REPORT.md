@@ -72,9 +72,9 @@ Additive migration:
   - unique `lower(username)`
   - `collections` and `collection_goals`
 
-Not applied to production in this session. Supabase MCP `list_migrations` timed out. **Owner action:** apply 0016 before judging collections/profile against production.
+Target is the hosted Supabase project behind Render `PM_DATABASE_URL`, not the local CLI database on port 54322. Inspect `schema_migrations` before applying; skip files already recorded. This session did not apply 0016: local env is loopback, hosted MCP SQL timed out.
 
-No destructive SQL. Hosted budgets were not reset.
+No destructive SQL. Hosted budgets were not reset. No second database was created.
 
 ---
 
@@ -192,7 +192,7 @@ These are **not** live provider proofs.
 
 ## 14. Remaining blockers and owner actions
 
-1. **Apply migration 0016** on production Supabase. Until then collections and profile PATCH will fail against Postgres.
+1. **Apply migration 0016** on the **hosted** Supabase database that Render already uses via `PM_DATABASE_URL` (session-mode, port 5432). Do not migrate local `127.0.0.1:54322` as a substitute, and do not run `supabase db push` until `schema_migrations` has been inspected. This session: local `.env` still points at loopback; hosted SQL via Supabase MCP timed out, so 0016 was **not** applied. Operator: `uv run python scripts/db_migrate.py --dry-run` with the Render URL, then apply if `0016_collections_profiles.sql` is pending.
 2. **Deploy this SHA** to Render and Vercel. Current live process is still the previous deployment; `/health` showed a Render cold start, not this code.
 3. **Authorize a Spur and Anthropic completion** if live inference must be proven. Estimated cost was not independently verified against Spur invoices; do not spend without approval.
 4. **Confirm `PM_COMPOSIO_ENABLED` and `COMPOSIO_API_KEY`** on Render only if Plugins is still empty after deploy. Do not reprint secrets here.
@@ -254,6 +254,11 @@ A judge hitting the current Vercel/Render pair has **not** been shown this SHA. 
 | 8A Withheld explanation | PASS unit + persist |
 | 8B Evidence form | PASS code |
 | 9 Tests / typecheck | PASS targeted |
+| Hosted Supabase is the production database | PASS (intended: Render `PM_DATABASE_URL`; local `.env` still loopback) |
+| Inspect migrations before apply | PASS dry-run on local; hosted MCP SQL timed out |
+| `supabase db push` not used | PASS |
+| 0016 applied on hosted DB | BLOCKED (no hosted SQL session this turn) |
+| Render reads/writes hosted DB | PARTIAL — live `/health` 200, `/api/v1/goals` 401 (auth before DB); `/health/details` correctly 404. Hosted Postgres MCP timed out, so row-level proof was not collected. |
 | 9 Live deploy of this SHA | FAIL |
 | 9 Two-user live isolation | NOT TESTED |
 | 9 Mobile/desktop live | NOT TESTED this SHA |
