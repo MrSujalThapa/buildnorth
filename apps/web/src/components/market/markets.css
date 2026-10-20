@@ -461,6 +461,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
+  align-items: start;
 }
 
 .markets-create {
@@ -576,6 +577,10 @@
   height: 44px;
 }
 
+.market-card-chart.is-sparse {
+  height: 94px;
+}
+
 @media (max-width: 760px) {
   .markets-grid {
     grid-template-columns: 1fr;
@@ -610,5 +615,13 @@
     width: calc(100% + 40px);
     height: 155px;
     margin: 15px -20px 0;
+  }
+
+  .market-card-chart.is-empty {
+    height: 36px;
+  }
+
+  .market-card-chart.is-sparse {
+    height: 82px;
   }
 }

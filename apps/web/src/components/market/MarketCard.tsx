@@ -59,7 +59,7 @@ export default function MarketCard({
           : `${signedPercent(market.todayReturn)} today`}
       </div>
 
-      <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : ""}`}>
+      <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : market.history.length === 1 ? " is-sparse" : ""}`}>
         {!market.historyUnavailable && market.history.length ? (
           <WealthsimpleAreaChart
             data={
