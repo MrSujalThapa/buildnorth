@@ -7,7 +7,7 @@ Live API: https://playitout-api.onrender.com
 
 This report distinguishes **local mocked tests** from **real deployed browser verification**. Compiling or unit-testing is not treated as production-ready proof.
 
-Paid inference this session: **$0.00**. The $0.10 ceiling is authorized, but a signed-in Clerk session is required to call hosted Spur or BYOK. The production sign-in wall is Google OAuth; this session could not complete it.
+The earlier sections below record the pre-sign-in state. The dated acceptance addendum at the end supersedes their live-status and blocker statements. No additional paid inference was deliberately initiated in the remediation pass; the preexisting BYOK ledger could not be used to isolate a per-pass charge.
 
 ---
 
@@ -274,3 +274,67 @@ Vercel production is serving `0e2eaef` (bundle includes Hosted credits UI, creat
 | 9 Mobile/desktop live | NOT TESTED this SHA |
 
 **Definition of done:** frontend/API SHAs are live. Remaining: signed-in Spur/BYOK/Composio under $0.10, hosted `0016` row proof, and authenticated navigation waterfalls.
+
+---
+
+## Signed-in production acceptance addendum — 2026-10-19
+
+This section supersedes earlier statements that Google sign-in was unavailable. Tests used the signed-in administrator in Chrome against `https://buildnorth-delta.vercel.app` and `https://playitout-api.onrender.com`. Local tests and deployed behavior remain separate. Code repairs `3b85f67` and changelog `a5dd3a8` were pushed to `main`; production rechecks below must be read with their stated deployment state.
+
+| Workflow | Status | Real browser evidence / limitation |
+| --- | --- | --- |
+| Admin session and navigation | PASS | Settings showed Administrator and $5.00/$5.00 personal, $100.00 global. Markets, Plugins, Settings and Profile opened in the same signed-in Chrome context; a full reload retained the session. Direct `/api/v1/me` response body was not independently captured. |
+| Hosted `0016` tables | PASS (functional row proof) | Markets created collection `a9e16eaa-92a0-4dce-a26a-d0d6bc53e80f`; a full browser reload showed it again. Goal assignment changed it to 0/1 members. Profile GET showed 1 goal and 1 collection. These are authenticated Render-backed reads/writes of the new tables and profile columns. The migration ledger itself was not queried. |
+| Markets / selection / collection | PASS | Goal selection enabled the move action; assigning the reading goal updated the collection count. Empty collection detail loaded. Goal deletion was not exercised because it would archive the only real goal. |
+| Profile read / radar | PASS | Profile showed account details and an insufficient-evidence radar. No fabricated radar values were displayed. |
+| Profile save | FAIL on old deployment; repair pending live recheck | Clicking Save profile twice at `/profile` returned `TypeError: Failed to fetch`. API CORS allowed GET/POST/PUT/DELETE but omitted PATCH, so browser PATCH preflight failed. `3b85f67` adds PATCH and a regression test. No profile data changed. |
+| What If manual retry | FAIL on old deployment; repair pending live recheck | On reading goal `2771b9fc-89d1-5885-a080-a88eb0425ce7`, natural-language submission requested missing books-read count and a generic `rate`. Entering 5 books and rate 1 left Pricing pending before `Failed to fetch`; refresh showed no priced baseline. Local repair consumes manual count/rate evidence, names rate “Books per week,” retries queued scenarios, and persists composed explorations. A live numerical comparison is still unverified. |
+| Evidence / GitHub source | FAIL UX; sync NOT TESTED | Evidence listed 49 unrelated sources and raw `GITHUB_*` capabilities; source plan said “Source plan unavailable.” Connected GitHub appeared. Local repair scopes the page to connected sources, validates owner/repository and activity selection, makes source planning on-demand, and fail-closes unsupported activity. Actual provider sync has not completed in browser. |
+| Composio catalog | PASS | Plugins loaded 52 real provider entries; GitHub showed Connected and a connected account. A fresh OAuth transition was not exercised. |
+| Settings / BYOK display | PASS for read; inference NOT TESTED | Anthropic key appeared validated, mode BYOK, model `claude-sonnet-5-5`; hosted Spur model `spur-glm-5-3` available. The live picker was cramped; CSS repair is local until deployment. No key material was read or printed. |
+| Spur agent goal creation | NOT TESTED | No fresh hosted inference was initiated after the session's cost baseline proved ambiguous. Credit counters stayed $5.00/$5.00 when inspected. No agent completion is claimed. |
+| Anthropic BYOK inference | NOT TESTED | Saved key validation was visible; validation alone does not prove model output. The ledger already showed 108 calls / 529,968 tokens / estimated $1.9796 before reliable per-pass accounting. No fresh BYOK inference is claimed. |
+| Graph rendering / withheld reason | NOT TESTED | Existing reading goal had no published odds; collection had 0/1 measurable goals. Insufficient evidence states rendered, but no priced graph or withheld-forecast explanation was tested. |
+| Mobile / console | FAIL / FAIL | At 390×844, collection progress text overlapped the title on Markets; local responsive fix awaits production recheck. Console warned that Clerk development keys were loaded on production. No additional console error was captured in the browser log sample. |
+| Second-user isolation / invite redemption | NOT TESTED | No authorized second test session was available in this pass. Existing invitation rows were visible; no uncontrolled invitation was created. |
+
+**Latency evidence.** Three warm unauthenticated `GET /health` probes returned 200 in 518, 277 and 188 ms (median 277 ms). These numbers exclude browser rendering, Clerk, authenticated DB queries and cold starts; they are not a before/after page-performance result. Authenticated routes visibly spent time in loading states, but the browser control's locator wait did not yield a reliable timed sample. p50/p95 authenticated navigation and API latency remain unmeasured, so no speedup is claimed.
+
+**New code tests.** `uv run python -m pytest apps/api/tests/test_composition_overrides.py apps/api/tests/test_phase3_scenarios.py apps/api/tests/test_mcp_integration.py apps/api/tests/test_source_planner.py -q`: 39 passed. Profile PATCH CORS preflight regression: 1 passed. `npm run build`: passed; JS 949.99 kB uncompressed / 271.56 kB gzip, with Vite large-chunk warning. `npm run lint`: 0 errors, 10 warnings. Selected Ruff check still reports line-length issues, including pre-existing ones; broad Ruff baseline remains red. These results are local, not live provider proofs.
+
+**Paid inference cost for this addendum:** no additional paid inference was intentionally run. An exact per-pass delta cannot be computed from the existing BYOK ledger, so $0.00 is not claimed as a measured provider bill. Hosted personal/global budgets were not reset.
+
+**Judge-readiness:** **not ready for external invited beta/judges yet.** A real Spur agent goal and Anthropic BYOK completion, a priced What If retry with persistence, GitHub evidence sync, production PATCH repair, mobile repair, and authenticated p50/p95 measurements still need live proof. The production Clerk development-key warning is a configuration blocker; no production secrets or auth settings were changed during this pass.
+
+---
+
+## Post-deployment live acceptance — 2026-10-20 (supersedes the preceding addendum)
+
+The same signed-in administrator Chrome session tested Vercel and Render after `3b85f67`/`a5dd3a8` deployed. Render's live logs identified its database as `aws-0-us-east-1.pooler.supabase.com:5432/postgres`. Functional reads and writes prove the `0016` collection/profile schema exists in that hosted database; the migration ledger was not queried. This is stronger evidence than a protected route's 401 response.
+
+| Workflow | Status | Deployed browser/API evidence and limits |
+| --- | --- | --- |
+| Admin Google session, navigation, refresh | PASS | Administrator role and hosted budget appeared in Settings; Markets, Plugins, Settings, Profile and goal pages opened; full reload retained access. Render logged `/api/v1/me` 200, though its JSON body was not separately captured. |
+| Hosted Supabase `0016` schema | PASS (functional) | Collection `a9e16eaa-92a0-4dce-a26a-d0d6bc53e80f` was created, reloaded and assigned a goal. Profile read returned goal/collection counts. Migration ledger version remains unverified. |
+| Spur-hosted agent and goal persistence | PASS | Hosted mode produced a validated habit contract for four piano practices weekly; confirming created goal `71c86259-ac88-531b-84ea-adab6fc716f6`, present after full reload. Hosted usage rose 1,616 tokens; personal credit displayed $5.00→$4.99 and global $100.00→$99.99. |
+| Anthropic BYOK agent and accounting | PASS | Saved validated key, selected `claude-sonnet-5-5`, generated a 12-session guitar contract and confirmed persistent goal `b436955c-7726-5748-b7b8-4aa8dad9823e`. Usage changed 108→109 calls, 529,968→532,811 tokens, estimated $1.9796→$1.9884 (+$0.0088). Hosted balance remained $4.99. Key material was not exposed. |
+| Baseline and numerical What If | PASS with calibration limit | Reading goal `2771b9fc-89d1-5885-a080-a88eb0425ce7`: after entering five books and one book/week, baseline priced at 10.6% (rounded 11%). “Read 2 books per week” showed 11%→92%, +81.7 percentage points, explicitly exploratory/uncalibrated. Past What If persisted after full reload; Render logged parse, simulate and fast-reprice POST 200. “Read 30 minutes daily” remained unpriced because no minutes-to-books causal rate exists; the UI did not invent one. |
+| Graph, Markets and withheld reason | PASS | Goal detail rendered the published 10.6% chart and controls; Markets tile showed 11%. Newly created goal displayed a withheld-forecast explanation instead of fabricated odds. |
+| Collections / goal selection | PASS (partial) | Selection and move updated collection to 0/1 members. Collection detail and refresh worked. Progress remained unavailable despite the reading goal's priced forecast; whether that is an intended current-state metric or a defect needs product review. Goal archive/deletion was not exercised. |
+| Profile read and edit | PASS | Profile rendered counts and insufficient-evidence radar; Save closed the editor after deployment. Render logged successful `OPTIONS /api/v1/profile` with PATCH allowed. Earlier pre-deploy failure was the CORS allowlist defect fixed in `3b85f67`. |
+| Composio catalog / connection | PASS / NOT TESTED | Plugins showed 52 actual catalog entries and an existing Connected GitHub account. New OAuth authorization and a repository activity sync were not completed; connection status alone does not prove integration ingestion. |
+| Evidence and source controls | PASS (display) / NOT TESTED (ingestion) | Deployed Evidence showed one relevant connected GitHub source, an on-demand “Find relevant sources” control, manual evidence composer, and repository/activity settings. On-demand agent planning and provider sync were not run within the cost ceiling. A follow-up CSS grid repair for the manual composer is pending deployment. |
+| BYOK/hosted Settings | PASS (behavior) | Mode switch, model selection, saved key state and hosted counters worked. A follow-up repair prevents the hosted Spur model from being submitted as an Anthropic BYOK model; pending deployment. |
+| Invitations / second-user isolation | NOT TESTED in this pass | Earlier Pass 06 created/redeemed/revoked a bounded invite. No new invite or authorized second account was used here, so isolation is not claimed. |
+| Mobile responsiveness | PASS for overlap repair; limitation remains | A fresh signed-in Chrome tab at 390×844 showed the collection title, progress label and 0/1 count on separate lines without overlap. Settings and bottom navigation fit. Markets cards still leave substantial empty vertical space and a small loading indicator, so visual polish is incomplete. |
+| Console / unexpected failures | FAIL (configuration) | Console showed Clerk development-key warning on production. No other console error was seen in the captured sample. A newly opened Chrome tab later stayed at “Checking your session”; its cause and repeatability are unproven. |
+
+**Cost boundary.** BYOK ledger increased from the pre-pass $1.9796 to $2.0612 after the agent and What If checks: +$0.0816 estimated, 108→113 calls, 529,968→552,643 tokens. Hosted credits displayed about $0.01 consumed. The application's combined estimate is about $0.09, under the $0.10 ceiling; an actual upstream Spur invoice was not available. No additional paid calls should be made in this pass.
+
+**Performance.** Warm unauthenticated `/health` measurements were 518/277/188 ms (median 277 ms); a later probe was 607 ms. In a fresh signed-in Chrome tab, Plugins navigation showed a loading state at 0.3 seconds and the 52-item catalog at about 20.5 seconds. Settings shell appeared at 0.07 seconds, invitations by 7.0 seconds, and inference balances/ledger by 9.5 seconds. These are coarse end-to-end UI observations with external catalog and sequential auth/data loading, not isolated API timings; the sample is too small for p50/p95 or a valid old-versus-new speedup claim. The published What If calculation took roughly 20+ seconds end to end, including agent parsing and baseline work. This remains a judge-experience concern.
+
+**Visual evidence:** [mobile Markets screenshot](docs/pass06_mobile_markets.png) and [desktop Markets screenshot](docs/pass06_desktop_markets.png) captured from the signed-in deployed browser. The screenshots show the repaired mobile overlap and the remaining empty card space.
+
+**Follow-up code and verification.** Pending fixes make unpriced scenarios persistent with an actionable explanation, constrain the manual Evidence layout, prevent the hosted Spur model leaking into the Anthropic BYOK selection, and fix stretched credit-setting buttons. Targeted backend tests: 33 passed. Settings web tests: 2 passed. Production web build passed (950.27 kB JS, 271.64 kB gzip; chunk-size warning). `git diff --check` passed. These follow-up fixes require a deployed visual recheck and are not counted as live PASS above.
+
+**Judge-readiness:** core hosted/BYOK agents and numerical exploratory forecasting now have real production proof. **Not ready for broad external invited beta or judges** until Clerk production keys are configured, slow authenticated views and empty card space are addressed, follow-up UI fixes are deployed/rechecked, and connector ingestion is proven. No production secrets or budgets were changed during this acceptance pass.

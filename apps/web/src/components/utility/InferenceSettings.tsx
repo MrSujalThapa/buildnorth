@@ -23,7 +23,7 @@ export function InferenceSettings({
     setSettings(next);
     setMode(next.preference.mode);
     setProvider(next.preference.provider);
-    setModel(next.preference.model || next.recommended_model || "");
+    setModel(next.preference.mode === "byok" ? next.preference.model || "" : "");
   }
 
   useEffect(() => {
@@ -55,6 +55,14 @@ export function InferenceSettings({
       `${item.display_name || ""} ${item.model}`.toLowerCase().includes(needle),
     );
   }, [settings, provider, modelQuery]);
+  const recommendedModel = settings?.preference.mode === "byok"
+    && settings.preference.provider === provider
+    && settings.recommended_model
+    && (settings.discovered_models?.[provider] || settings.models).some(
+      (item) => item.model === settings.recommended_model,
+    )
+    ? settings.recommended_model
+    : null;
 
   function modelLabel(item: InferenceModelOption): string {
     const name = item.display_name || item.model;
@@ -181,7 +189,7 @@ export function InferenceSettings({
                     disabled={busy}
                     onClick={() => setModel("")}
                   >
-                    {settings.recommended_model ? `Recommended (${settings.recommended_model})` : "Provider default"}
+                    {recommendedModel ? `Recommended (${recommendedModel})` : "Provider default"}
                   </button>
                   {byokModels.map((item) => (
                     <button

@@ -198,12 +198,14 @@ class WhatIfService:
                 unmapped.append(metric)
         if not overrides:
             detail = f"Unmapped: {', '.join(unmapped)}. " if unmapped else ""
-            return WhatIfResult(
+            result = WhatIfResult(
                 priced=False,
                 status="NOT_PRICED",
                 message=(
                     "This action is not mapped to a supported model parameter. "
-                    f"{detail}Hypothetical causal effects were not invented."
+                    f"{detail}Describe a change in the measured rate, or add evidence "
+                    "linking this action to that rate. Hypothetical causal effects "
+                    "were not invented."
                 ),
                 baseline_probability=baseline.raw_probability,
                 assumptions=request.assumptions,
@@ -213,6 +215,9 @@ class WhatIfService:
                     "hypothetical": True,
                 },
             )
+            if persist:
+                return await self._persist(request, result, spec.family, spec.compiler_version)
+            return result
         scenario_inputs = (
             composition_numeric_inputs(goal, evidence, overrides=overrides) or baseline_inputs
         )

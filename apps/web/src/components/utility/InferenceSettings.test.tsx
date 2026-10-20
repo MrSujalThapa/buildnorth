@@ -29,3 +29,24 @@ test("connecting a key activates BYOK and displays remaining hosted credit", asy
   expect(api.saveProviderKey).toHaveBeenCalledTimes(1);
   expect(api.saveInferencePreference).not.toHaveBeenCalled();
 });
+
+test("hosted Spur model is never submitted as an Anthropic BYOK model", async () => {
+  const settings: Settings = {
+    preference: { mode: "hosted", provider: "anthropic", model: null },
+    credentials: [{ provider: "anthropic", status: "validated", masked_suffix: "••••1234", version: "v", validated_at: "2026-10-19T00:00:00Z" }],
+    models: [],
+    discovered_models: { anthropic: [] },
+    recommended_model: "spur-glm-5-3",
+    hosted_provider: "spur",
+    hosted_configured: true,
+    hosted_model: "spur-glm-5-3",
+    byok_usage: { calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost_usd: 0 },
+  };
+  vi.spyOn(api, "inferenceSettings").mockResolvedValue(settings);
+  const save = vi.spyOn(api, "saveInferencePreference").mockResolvedValue(settings);
+  render(<InferenceSettings />);
+  expect(await screen.findByRole("button", { name: "Save BYOK preference" })).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: "Provider default" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Save BYOK preference" }));
+  await waitFor(() => expect(save).toHaveBeenCalledWith({ mode: "byok", provider: "anthropic", model: null }));
+});

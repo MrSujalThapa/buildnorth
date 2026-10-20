@@ -829,6 +829,9 @@ export default function WhatIfPage({
                       {item.created_at ? new Date(item.created_at).toLocaleString() : "Saved run"}
                     </span>
                     <span className="meta">Loads the saved prompt; rerun to refresh results.</span>
+                    {item.scenario_probability == null ? (
+                      <span className="meta">Unpriced · add a measurable rate to compare odds.</span>
+                    ) : null}
                   </div>
                   <div className="past-metrics">
                     <span>

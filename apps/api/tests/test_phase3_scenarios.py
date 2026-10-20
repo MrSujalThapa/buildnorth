@@ -414,6 +414,26 @@ async def test_composed_scenario_persists_without_publishing_forecast() -> None:
     assert await service._repository.history(goal.goal_id) == []
 
 
+@pytest.mark.asyncio
+async def test_unmapped_composed_scenario_is_saved_without_inventing_odds() -> None:
+    goal, history = _country_goal_and_history()
+    service = WhatIfService.__new__(WhatIfService)
+    service._repository = InMemorySimulationRepository()
+    service._engine = SimulationEngine()
+    request = WhatIfRequest(
+        goal_id=str(goal.goal_id), current_value=6, target_value=15, periods=100,
+        assumptions=[], parsed_changes=[],
+    )
+    result = await service._simulate_composition(goal, request, history, persist=True)
+    assert result is not None and not result.priced and result.run_id
+    assert result.scenario_probability is None
+    assert "measured rate" in result.message
+    runs = await service._repository.list_runs(goal.goal_id)
+    assert len(runs) == 1
+    assert runs[0].receipt["scenario"]["causal_status"] == "unmapped_intervention"
+    assert await service._repository.history(goal.goal_id) == []
+
+
 def test_scenario_e_running_keeps_domain_adapter() -> None:
     proposal = refine_architect_proposal(
         _proposal(
