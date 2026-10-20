@@ -105,6 +105,28 @@ def main() -> None:
                 row[0] for row in connection.execute("SELECT filename FROM schema_migrations")
             }
             print("recorded previously applied migrations")
+        # Early hosted deployments applied 0016 before this ledger tracked it.
+        # Recognize the complete existing schema so an additive rollout does not
+        # try to recreate its named CHECK constraints.
+        if "0016_collections_profiles.sql" not in applied and {
+            "collections", "collection_goals"
+        }.issubset(existing):
+            profile_columns = {
+                row[0]
+                for row in connection.execute(
+                    """
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'app_users'
+                    """
+                )
+            }
+            if {"display_name", "username", "bio", "avatar_value"}.issubset(profile_columns):
+                connection.execute(
+                    "INSERT INTO schema_migrations (filename) VALUES (%s) ON CONFLICT DO NOTHING",
+                    ("0016_collections_profiles.sql",),
+                )
+                applied.add("0016_collections_profiles.sql")
+                print("recorded existing 0016 collections/profile schema")
         pending = [path for path in files if path.name not in applied]
         print("applied", ",".join(sorted(applied)) or "(none)")
         print("pending", ",".join(path.name for path in pending) or "(none)")
