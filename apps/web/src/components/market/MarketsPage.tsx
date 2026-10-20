@@ -14,6 +14,7 @@ type Props = {
   onOpenCollection: (collectionId: string) => void;
   onCreateCollection: (name: string) => Promise<void>;
   onArchiveGoals: (goalIds: string[]) => Promise<void>;
+  onDeleteCollections: (collectionIds: string[]) => Promise<void>;
   onMoveToCollection: (collectionId: string, goalIds: string[]) => Promise<void>;
 };
 
@@ -24,14 +25,18 @@ export default function MarketsPage({
   onOpenCollection,
   onCreateCollection,
   onArchiveGoals,
+  onDeleteCollections,
   onMoveToCollection,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [collectionName, setCollectionName] = useState("");
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [selectionError, setSelectionError] = useState(false);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -47,7 +52,10 @@ export default function MarketsPage({
   function exitSelect() {
     setSelectMode(false);
     setSelected([]);
+    setSelectedCollections([]);
+    setMoreOpen(false);
     setConfirmDelete(false);
+    setSelectionError(false);
   }
 
   return (
@@ -57,7 +65,6 @@ export default function MarketsPage({
           <div>
             <div className="markets-eyebrow">MARKETS</div>
             <h1>Your outcomes</h1>
-            <p>Track how new evidence changes the odds of the things you care about.</p>
           </div>
           <div className="markets-toolbar">
             <button
@@ -105,36 +112,6 @@ export default function MarketsPage({
           </div>
         </header>
 
-        {selectMode ? (
-          <div className="markets-actionbar" role="toolbar" aria-label="Goal selection">
-            <span>{selected.length} selected</span>
-            <div className="move-menu">
-              <span>Move to</span>
-              {collections.length ? (
-                <div className="choice-row" role="group" aria-label="Move selected goals to a collection">
-                  {collections.map((item) => (
-                    <button
-                      key={item.collection.collection_id}
-                      type="button"
-                      disabled={!selected.length}
-                      onClick={() => {
-                        void onMoveToCollection(item.collection.collection_id, selected).then(exitSelect);
-                      }}
-                    >
-                      {item.collection.name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <span className="field-hint">Create a collection first.</span>
-              )}
-            </div>
-            <button type="button" className="danger" disabled={!selected.length} onClick={() => setConfirmDelete(true)}>
-              Delete
-            </button>
-          </div>
-        ) : null}
-
         {creatingCollection ? (
           <form
             className="collection-create"
@@ -170,7 +147,9 @@ export default function MarketsPage({
               <CollectionCard
                 key={collection.collection.collection_id}
                 collection={collection}
-                onOpen={() => onOpenCollection(collection.collection.collection_id)}
+                selectMode={selectMode}
+                selected={selectedCollections.includes(collection.collection.collection_id)}
+                onOpen={() => selectMode ? setSelectedCollections((current) => current.includes(collection.collection.collection_id) ? current.filter((id) => id !== collection.collection.collection_id) : [...current, collection.collection.collection_id]) : onOpenCollection(collection.collection.collection_id)}
               />
             ))}
           </div>
@@ -196,22 +175,42 @@ export default function MarketsPage({
         </div>
       </section>
 
+      {selectMode ? (
+        <div className="markets-actionbar" role="toolbar" aria-label="Selection actions">
+          <strong>{selected.length + selectedCollections.length} selected</strong>
+          <button type="button" className="danger" disabled={!selected.length && !selectedCollections.length} onClick={() => setConfirmDelete(true)}>Delete / Archive</button>
+          <button type="button" disabled title="Coming soon">Share</button>
+          <div className="selection-more">
+            <button type="button" aria-label="More selection actions" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>···</button>
+            {moreOpen ? <div className="selection-more-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setSelected(markets.map((market) => market.id)); setSelectedCollections(collections.map((item) => item.collection.collection_id)); setMoreOpen(false); }}>Select all</button>
+              {selected.length ? collections.map((item) => <button key={item.collection.collection_id} type="button" role="menuitem" onClick={() => { void onMoveToCollection(item.collection.collection_id, selected).then(exitSelect); }}>Move to {item.collection.name}</button>) : null}
+            </div> : null}
+          </div>
+        </div>
+      ) : null}
+
       {confirmDelete ? (
         <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="delete-goals-title">
           <div className="confirm-card">
-            <h2 id="delete-goals-title">Delete {selected.length} goal{selected.length === 1 ? "" : "s"}?</h2>
+            <h2 id="delete-goals-title">Remove selected items?</h2>
             <p>
-              Goals are archived, not erased. Forecast history, evidence, and usage accounting stay intact. You can restore a goal later.
+              Goals will be archived. Collections will be deleted, while their goals and history stay.
             </p>
+            {selectionError ? <p role="alert">Could not remove every selected item. Please try again.</p> : null}
             <div className="composer-actions">
               <button
                 type="button"
                 className="danger"
                 onClick={() => {
-                  void onArchiveGoals(selected).then(exitSelect);
+                  setSelectionError(false);
+                  void Promise.all([
+                    selected.length ? onArchiveGoals(selected) : Promise.resolve(),
+                    selectedCollections.length ? onDeleteCollections(selectedCollections) : Promise.resolve(),
+                  ]).then(exitSelect).catch(() => setSelectionError(true));
                 }}
               >
-                Archive goals
+                Confirm
               </button>
               <button type="button" className="secondary" onClick={() => setConfirmDelete(false)}>
                 Keep

@@ -365,17 +365,13 @@ class ComposioIntegrationGateway:
                     "list_folders",
                     "list_labels",
                     "list_threads",
+                    "search_notion_page",
+                    "list_accessible_repositories",
                 )
             )
         ]
         if not resource_tools:
-            return [
-                MCPResourceDescriptor(
-                    uri=f"composio://{toolkit_slug}/default",
-                    name=f"{toolkit_slug} default scope",
-                    description="Use toolkit default read scope for this goal.",
-                )
-            ]
+            return []
         tool = resource_tools[0]
         payload = await self.execute_tool(
             user_id,
@@ -384,23 +380,43 @@ class ComposioIntegrationGateway:
             connected_account_id=connected_account_id,
         )
         resources: list[MCPResourceDescriptor] = []
-        rows = payload.get("records") or payload.get("items") or payload.get("data") or []
+        rows = (
+            payload.get("records") or payload.get("items") or payload.get("results")
+            or payload.get("data") or []
+        )
         if isinstance(rows, dict):
-            rows = rows.get("items") or rows.get("repositories") or rows.get("results") or []
+            rows = (
+                rows.get("items") or rows.get("repositories") or rows.get("results")
+                or rows.get("data") or []
+            )
         if not isinstance(rows, list):
             return resources
         for row in rows[:50]:
             if not isinstance(row, dict):
                 continue
+            title = row.get("title")
+            if isinstance(title, list):
+                title = "".join(
+                    str(part.get("plain_text") or (part.get("text") or {}).get("content") or "")
+                    for part in title if isinstance(part, dict)
+                )
+            if not title and isinstance(row.get("properties"), dict):
+                for prop in row["properties"].values():
+                    if isinstance(prop, dict) and prop.get("type") == "title":
+                        title = "".join(
+                            str(part.get("plain_text") or (part.get("text") or {}).get("content") or "")
+                            for part in prop.get("title", []) if isinstance(part, dict)
+                        )
+                        break
             resource_id = str(
                 row.get("full_name")
                 or row.get("id")
                 or row.get("name")
                 or row.get("slug")
                 or row.get("url")
-                or row.get("title")
+                or title
             )
-            label = str(row.get("full_name") or row.get("name") or row.get("title") or resource_id)
+            label = str(row.get("full_name") or row.get("name") or title or resource_id)
             resource_type = str(
                 row.get("object")
                 or row.get("type")
@@ -450,11 +466,15 @@ class ComposioIntegrationGateway:
                 kwargs["connected_account_id"] = connected_account_id
             result = self._client.tools.execute(tool_slug, user_id=str(user_id), **kwargs)
             if isinstance(result, dict):
+                if result.get("successful") is False or result.get("success") is False or result.get("isError") is True:
+                    raise RuntimeError(str(result.get("error") or result.get("message") or "Provider read failed"))
                 data = result.get("data") or result.get("response_data") or result
                 if isinstance(data, dict):
                     return data
                 return {"records": data}
             data = getattr(result, "data", result)
+            if getattr(result, "successful", True) is False:
+                raise RuntimeError(str(getattr(result, "error", None) or "Provider read failed"))
             if isinstance(data, dict):
                 return data
             return {"records": data}

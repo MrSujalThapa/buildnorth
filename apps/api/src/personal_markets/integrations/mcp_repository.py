@@ -107,6 +107,16 @@ class InMemoryIntegrationRepository:
             inserted.append(row)
         return inserted
 
+    async def list_job_raw_records(
+        self, owner_id: UUID, job_ids: list[UUID]
+    ) -> list[RawSourceRecord]:
+        requested = {str(job_id) for job_id in job_ids}
+        return [
+            row for row in self.raw_records
+            if row.cursor_context.get("user_id") == str(owner_id)
+            and row.cursor_context.get("goal_sync_job_id") in requested
+        ]
+
     async def update_connection(self, connection_id: UUID, **fields: Any) -> PluginConnectionRecord:
         record = self.connections[connection_id]
         updated = record.model_copy(update=fields)
@@ -457,12 +467,12 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
                     insert into raw_source_events (
                       id, user_id, source_type, external_event_id, content_fingerprint,
                       observed_at, raw_payload_ref, raw_payload_json, plugin_connection_id,
-                      sync_run_id, payload_hash, tool_identity, retrieved_at
+                      sync_run_id, payload_hash, tool_identity, retrieved_at, goal_sync_job_id
                     ) values (
                       :id, :user_id, :source_type, :external_event_id, :fingerprint,
                       :observed_at, :payload_ref, cast(:payload as jsonb), :plugin_connection_id,
-                      :sync_run_id, :payload_hash, :tool_identity, :retrieved_at
-                    ) on conflict (source_type, external_event_id) do nothing
+                      :sync_run_id, :payload_hash, :tool_identity, :retrieved_at, :goal_sync_job_id
+                    ) on conflict do nothing
                     """),
                     {
                         "id": row.id,
@@ -478,11 +488,50 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
                         "payload_hash": row.payload_hash,
                         "tool_identity": row.tool_identity,
                         "retrieved_at": row.retrieved_at,
+                        "goal_sync_job_id": row.cursor_context.get("goal_sync_job_id"),
                     },
                 )
                 if result.rowcount:
                     inserted.append(row)
         return inserted
+
+    async def list_job_raw_records(
+        self, owner_id: UUID, job_ids: list[UUID]
+    ) -> list[RawSourceRecord]:
+        if not job_ids:
+            return []
+        async with self._engine.connect() as connection:
+            rows = (
+                await connection.execute(
+                    text("""
+                    select id, plugin_connection_id, external_event_id, tool_identity,
+                           retrieved_at, raw_payload_json, payload_hash, sync_run_id,
+                           source_type, goal_sync_job_id
+                    from raw_source_events
+                    where user_id = :owner_id and goal_sync_job_id = any(:job_ids)
+                    order by ingested_at, id
+                    """),
+                    {"owner_id": owner_id, "job_ids": job_ids},
+                )
+            ).mappings().all()
+        return [
+            RawSourceRecord(
+                id=row["id"],
+                plugin_connection_id=row["plugin_connection_id"],
+                external_id=row["external_event_id"],
+                tool_identity=row["tool_identity"],
+                retrieved_at=row["retrieved_at"],
+                payload=row["raw_payload_json"],
+                payload_hash=row["payload_hash"],
+                sync_run_id=row["sync_run_id"],
+                cursor_context={
+                    "user_id": str(owner_id),
+                    "source_type": row["source_type"],
+                    "goal_sync_job_id": str(row["goal_sync_job_id"]),
+                },
+            )
+            for row in rows
+        ]
 
     async def save_goal_recipe(self, recipe: GoalSyncRecipeRecord) -> GoalSyncRecipeRecord:
         async with transaction(self._engine) as connection:

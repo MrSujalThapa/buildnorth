@@ -24,13 +24,13 @@
 
 .execution-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
 .execution-profile svg {
-  width: min(100%, 240px);
+  width: min(100%, 360px);
   height: auto;
 }
 
@@ -58,7 +58,7 @@
 
 .radar-label {
   fill: var(--what-if-muted, var(--app-muted));
-  font-size: 8px;
+  font-size: 10px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 

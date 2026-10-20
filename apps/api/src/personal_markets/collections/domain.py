@@ -42,3 +42,11 @@ class CollectionView(BaseModel):
     collection: CollectionRecord
     progress: CollectionProgress
     series: list[CollectionSeries] = Field(default_factory=list)
+    portfolio_odds: float | None = None
+    change_pp: float | None = None
+    priced_goals: int = 0
+    total_goals: int = 0
+    portfolio_methodology: str = (
+        "Equal-weight average of currently published member-goal probabilities. "
+        "This is a portfolio summary, not the probability that every goal succeeds."
+    )

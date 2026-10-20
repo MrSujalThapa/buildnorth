@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+import time
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -30,6 +33,8 @@ from personal_markets.integrations.plugins import (
 )
 
 _MCP_DEFAULT_USER_ID = DEFAULT_USER_ID
+_SYNC_TOOL_TIMEOUT_SECONDS = 30
+_log = logging.getLogger(__name__)
 
 
 class IntegrationGatewayService:
@@ -211,7 +216,8 @@ class IntegrationGatewayService:
                 items.append(view)
         if not search and not cursor:
             remote = [item for item in items if item.definition.id not in {"manual", "csv"}]
-            items = [*local_views, *remote]
+            local_ids = {item.definition.id for item in local_views}
+            items = [*local_views, *(item for item in remote if item.definition.id not in local_ids)]
         elif search:
             extra = [
                 view
@@ -261,7 +267,7 @@ class IntegrationGatewayService:
     ) -> list[PluginView]:
         views: list[PluginView] = []
         for definition in PLUGIN_DEFINITIONS:
-            if definition.id not in {"manual", "csv"}:
+            if definition.id not in {"manual", "csv"} and definition.id not in connections:
                 continue
             stored = connections.get(definition.id)
             if stored is None:
@@ -271,6 +277,18 @@ class IntegrationGatewayService:
             else:
                 connection = self._connection_view(stored)
             views.append(PluginView(definition=definition, connection=connection))
+        known = {item.definition.id for item in views}
+        for plugin_id, stored in connections.items():
+            if plugin_id in known:
+                continue
+            views.append(PluginView(
+                definition=PluginDefinition(
+                    id=plugin_id, name=plugin_id.replace("_", " ").title(),
+                    description="Connected source", category="integration",
+                    provider_type="composio",
+                ),
+                connection=self._connection_view(stored),
+            ))
         return views
 
     def _toolkit_view(
@@ -525,6 +543,7 @@ class IntegrationGatewayService:
         *,
         user_id: UUID | None = None,
         steps: list[SyncRecipeStep] | None = None,
+        goal_sync_job_id: UUID | None = None,
     ) -> dict[str, Any]:
         owner = self._owner(user_id)
         await self._reconcile_connections(owner)
@@ -560,12 +579,34 @@ class IntegrationGatewayService:
                 if cursor and cursor.cursor_value:
                     arguments["since"] = cursor.cursor_value
                 if not step.tool_name:
-                    continue
-                payload = await transport.call_tool(step.tool_name, arguments)
+                    raise ValueError("Saved source has no supported read action. Select a source again.")
+                started = time.perf_counter()
+                try:
+                    payload = await asyncio.wait_for(
+                        transport.call_tool(step.tool_name, arguments),
+                        timeout=_SYNC_TOOL_TIMEOUT_SECONDS,
+                    )
+                finally:
+                    _log.info(
+                        "source_sync_provider_call",
+                        extra={
+                            "sync_run_id": str(run.id),
+                            "provider": plugin_id,
+                            "tool": step.tool_name,
+                            "duration_ms": round((time.perf_counter() - started) * 1000),
+                        },
+                    )
                 raw_payload = payload.get("raw") or payload
-                if isinstance(raw_payload, dict) and int(raw_payload.get("status_code") or 0) >= 400:
+                if isinstance(raw_payload, dict) and (
+                    int(raw_payload.get("status_code") or 0) >= 400
+                    or raw_payload.get("successful") is False
+                    or raw_payload.get("success") is False
+                    or raw_payload.get("isError") is True
+                    or (raw_payload.get("error") and not raw_payload.get("results"))
+                ):
                     raise RuntimeError(
-                        f"{step.tool_name} failed: {raw_payload.get('message') or raw_payload}"
+                        f"{plugin_id} read failed: "
+                        f"{raw_payload.get('message') or raw_payload.get('error') or 'permission or provider error'}"
                     )
                 tool_rows = payload.get("records")
                 if tool_rows is None:
@@ -583,7 +624,17 @@ class IntegrationGatewayService:
                     user_id=str(owner),
                     recipe_step=step,
                 )
-                rows = normalized
+                rows = [
+                    row.model_copy(
+                        update={
+                            "cursor_context": {
+                                **row.cursor_context,
+                                **({"goal_sync_job_id": str(goal_sync_job_id)} if goal_sync_job_id else {}),
+                            }
+                        }
+                    )
+                    for row in normalized
+                ]
                 records_read += len(rows)
                 raw_rows.extend(rows)
                 next_cursor = payload.get("next_cursor")

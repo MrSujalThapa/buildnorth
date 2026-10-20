@@ -193,11 +193,13 @@ class IdentityService:
         display = patch.display_name if patch.display_name is not None else current.display_name
         bio = patch.bio if patch.bio is not None else current.bio
         avatar = patch.avatar_value if patch.avatar_value is not None else current.avatar_value
+        dimensions = patch.dimensions if "dimensions" in patch.model_fields_set else current.dimensions
         updated = UserProfile(
             display_name=(display or "").strip() or None,
             username=username or None,
             bio=(bio or "").strip() or None,
             avatar_value=(avatar or "").strip() or None,
+            dimensions=dimensions,
         )
         return await self._repository.upsert_profile(principal.user_id, updated)
 

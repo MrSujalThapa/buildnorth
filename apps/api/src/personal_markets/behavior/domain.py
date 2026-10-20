@@ -6,21 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Confidence = Literal["high", "medium", "low", "insufficient"]
-DimensionKey = Literal[
-    "follow_through",
-    "consistency",
-    "commitment_realism",
-    "momentum",
-    "reliability",
-    "recovery",
-    "evidence_quality",
-    "goal_relevance",
-    "career",
-    "learning",
-    "health",
-    "personal",
-    "projects",
-]
+DimensionKey = str
 ExecutionSource = Literal["FITTED", "PRIOR", "USER_ASSUMPTION", "EXPLORATION_ASSUMPTION"]
 
 

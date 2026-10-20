@@ -292,7 +292,8 @@ test.describe("Resource-specific evidence", () => {
       }),
     );
     await page.goto(`/goals/${CAREER}/evidence`);
-    await expect(page.getByText("Execution profile")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/Evidence/i).first()).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: /Find relevant sources/i }).click();
     await page.getByRole("button", { name: /Notion/i }).first().click();
     await expect(page.getByText("LeetCode journal")).toBeVisible({ timeout: 30_000 });
     const labels = await page.locator(".evidence-resource-list strong").allTextContents();
@@ -362,11 +363,45 @@ test.describe("Resource-specific evidence", () => {
         },
       }),
     );
+    await page.route("**/api/v1/plugins/github/resources", (route) => route.fulfill({ json: [
+      { uri: "composio://github/MrSujalThapa/playitout", name: "MrSujalThapa/playitout", resource_type: "repository" },
+      { uri: "composio://github/someone/unrelated", name: "someone/unrelated", resource_type: "repository" },
+    ] }));
     await page.goto(`/goals/${CAREER}/evidence`);
+    await page.getByRole("button", { name: /Find relevant sources/i }).click();
     await page.getByRole("button", { name: /GitHub/i }).first().click();
     await expect(page.getByText("MrSujalThapa/playitout")).toBeVisible();
     await page.getByText("MrSujalThapa/playitout").click();
-    await expect(page.getByRole("button", { name: /Approve sync recipe/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Save source/i })).toBeVisible();
+  });
+
+  test("source sync status survives reload and reports completion", async ({ page }, testInfo) => {
+    let status: "queued" | "completed" | null = null;
+    const job = () => ({
+      id: "30000000-0000-0000-0000-000000000001", owner_id: "10000000-0000-0000-0000-000000000001",
+      goal_id: CAREER, status, created_at: "2026-10-20T12:00:00Z", updated_at: "2026-10-20T12:00:00Z",
+      started_at: null, finished_at: null,
+      receipt: status === "completed" ? { records_scanned: 1, records_added: 0, duplicates: 1 } : {},
+      error: null,
+    });
+    await page.route("**/api/v1/goals/*/evidence/sources/recipes", (route) => route.fulfill({ json: [
+      { goal_id: CAREER, plugin_id: "notion", label: "Book report", approved: true, steps: [] },
+    ] }));
+    await page.route(`**/api/v1/goals/${CAREER}/evidence/sources/sync`, (route) => {
+      if (route.request().method() === "POST") {
+        status = "queued";
+        return route.fulfill({ status: 202, json: job() });
+      }
+      return route.fulfill({ json: status ? job() : null });
+    });
+    await page.goto(`/goals/${CAREER}/evidence`);
+    await page.getByRole("button", { name: "Sync sources" }).click();
+    await expect(page.getByText("Sync queued")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("Sync queued")).toBeVisible();
+    status = "completed";
+    await expect(page.getByText("No new updates")).toBeVisible({ timeout: 10_000 });
+    await page.screenshot({ path: `test-results/remediation-evidence-sync-${testInfo.project.name}.png`, fullPage: true });
   });
 
   test("What If keeps execution-adjusted odds separate", async ({ page }) => {

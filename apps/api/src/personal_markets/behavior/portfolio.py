@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
-
 from personal_markets.behavior.domain import (
     BehaviorDimension,
     BehaviorProfile,
@@ -11,38 +9,18 @@ from personal_markets.behavior.service import BehaviorService
 from personal_markets.collections.progress import measurable_progress
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.goals.domain import GoalContract
-
-CATEGORY_ORDER = (
-    ("career", "Career"),
-    ("learning", "Learning"),
-    ("health", "Health / Fitness"),
-    ("personal", "Personal"),
-    ("projects", "Projects / Startups"),
-)
-
-_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
-    ("career", ("job", "career", "interview", "offer", "promotion", "employment")),
-    ("learning", ("school", "university", "course", "read", "book", "degree", "learn")),
-    ("health", ("run", "fitness", "health", "weight", "marathon", "sleep", "workout")),
-    ("projects", ("startup", "company", "revenue", "founder", "mrr", "hackathon", "ship")),
-]
-
-
-def categorize(goal: GoalContract) -> str:
-    blob = f"{goal.title} {goal.goal_type} {' '.join(goal.state_dimensions)}".lower()
-    for key, tokens in _PATTERNS:
-        if any(token in blob for token in tokens):
-            return key
-    return "personal"
+from personal_markets.identity.domain import ProfileDimension
 
 
 def portfolio_profile(
     goals: list[GoalContract],
     evidence_by_goal: dict[str, list[NormalizedEvidence]],
+    *,
+    dimensions: list[ProfileDimension] | None = None,
 ) -> BehaviorProfile:
-    """Cross-goal radar. Missing categories stay limited rather than fabricated."""
+    """User-defined radar over comparable goal evidence; unknown scores stay null."""
     behavior = BehaviorService()
-    grouped: dict[str, list[tuple[GoalContract, float | None]]] = defaultdict(list)
+    scores_by_goal: dict[str, float | None] = {}
     n_raw = 0
     n_eff = 0.0
     for goal in goals:
@@ -56,18 +34,21 @@ def portfolio_profile(
                 n_eff += estimate.n_eff
         progress = measurable_progress(goal)
         score = execution if execution is not None else progress
-        grouped[categorize(goal)].append((goal, score))
+        scores_by_goal[str(goal.goal_id)] = score
 
-    dimensions: list[BehaviorDimension] = []
-    for key, label in CATEGORY_ORDER:
-        rows = grouped.get(key, [])
-        scores = [score for _, score in rows if score is not None]
+    categories = dimensions if dimensions else [
+        ProfileDimension(label=goal.title[:32], goal_ids=[goal.goal_id]) for goal in goals
+    ]
+    radar_dimensions: list[BehaviorDimension] = []
+    for index, category in enumerate(categories):
+        rows = [scores_by_goal[str(goal_id)] for goal_id in category.goal_ids if str(goal_id) in scores_by_goal]
+        scores = [score for score in rows if score is not None]
         limited = len(scores) == 0
         value = None if limited else sum(scores) / len(scores)
-        dimensions.append(
+        radar_dimensions.append(
             BehaviorDimension(
-                key=key,  # type: ignore[arg-type]
-                label=label,
+                key=f"dimension-{index}",
+                label=category.label,
                 value=value,
                 display_percent=None if limited or value is None else int(round(value * 100)),
                 limited_evidence=limited,
@@ -78,19 +59,16 @@ def portfolio_profile(
                     recency_weighted_completion=value,
                     sources=["goal_progress", "follow_through"],
                     n_eff=float(len(scores)),
-                    formula=(
-                        f"{label}: mean of usable follow-through or measurable progress "
-                        "across goals in this category. Null when neither is available."
-                    ),
+                    formula="Mean of usable follow-through or measurable progress for assigned goals.",
                     details=[
-                        f"{len(rows)} goals in {label}",
+                        f"{len(rows)} assigned goals",
                         f"{len(scores)} with a usable score",
                     ],
                 ),
             )
         )
 
-    usable = [item.value for item in dimensions if item.value is not None]
+    usable = [item.value for item in radar_dimensions if item.value is not None]
     from datetime import UTC, datetime
 
     from personal_markets.behavior.domain import ExecutionEstimate
@@ -113,7 +91,7 @@ def portfolio_profile(
             usable=bool(usable),
             notes=["Portfolio radar is a category summary, not a personality score."],
         ),
-        dimensions=dimensions,
+        dimensions=radar_dimensions,
         disclaimer=(
             "This radar summarizes observed follow-through and measurable progress "
             "across your goals. Empty axes mean there is not enough data yet."

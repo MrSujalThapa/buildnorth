@@ -2,21 +2,20 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.behavior.service import BehaviorService
+from personal_markets.core.errors import ResourceNotFoundError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
-from personal_markets.integrations.goal_sync_service import GoalSyncService
-from personal_markets.integrations.mcp_domain import SyncRecipeStep
-from personal_markets.ports import SourcePlannerProposal, WorkflowSnapshot
+from personal_markets.integrations.goal_sync_jobs import GoalSyncJob, get_goal_sync_job_store
+from personal_markets.ports import SourcePlannerProposal
 from personal_markets.wiring import (
     get_evidence_service,
     get_goal_service,
-    get_goal_sync_service,
     get_source_planner_service,
 )
 
@@ -24,11 +23,12 @@ router = APIRouter(prefix="/api/v1/goals", tags=["evidence-sources"])
 
 
 class SaveRecipeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     label: str = Field(min_length=1)
     resource_ids: list[str] = Field(default_factory=list)
     approved: bool = True
     activity_types: list[str] = Field(default_factory=list)
-    steps: list[SyncRecipeStep] | None = None
 
 
 @router.get("/{goal_id}/evidence/sources/plan", response_model=SourcePlannerProposal)
@@ -60,7 +60,6 @@ async def save_goal_recipe(
         plugin_id,
         label=body.label,
         resource_ids=body.resource_ids,
-        steps=body.steps,
         approved=body.approved,
         activity_types=body.activity_types or None,
     )
@@ -80,9 +79,35 @@ async def behavior_profile(
     return profile.model_dump(mode="json")
 
 
-@router.post("/{goal_id}/evidence/sources/sync")
+@router.post("/{goal_id}/evidence/sources/sync", status_code=202, response_model=GoalSyncJob)
 async def sync_goal_sources(
     goal_id: UUID,
-    sync: Annotated[GoalSyncService, Depends(get_goal_sync_service)],
-) -> WorkflowSnapshot | dict[str, object]:
-    return await sync.sync_goal_sources(str(goal_id))
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> GoalSyncJob:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    return await get_goal_sync_job_store().enqueue(principal.user_id, goal_id)
+
+
+@router.get("/{goal_id}/evidence/sources/sync", response_model=GoalSyncJob | None)
+async def latest_goal_sync(
+    goal_id: UUID,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> GoalSyncJob | None:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    return await get_goal_sync_job_store().latest(principal.user_id, goal_id)
+
+
+@router.get("/{goal_id}/evidence/sources/sync/{run_id}", response_model=GoalSyncJob)
+async def goal_sync_status(
+    goal_id: UUID,
+    run_id: UUID,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> GoalSyncJob:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    job = await get_goal_sync_job_store().get(principal.user_id, goal_id, run_id)
+    if job is None:
+        raise ResourceNotFoundError("Source sync not found")
+    return job

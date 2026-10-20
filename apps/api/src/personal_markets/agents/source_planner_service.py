@@ -174,7 +174,6 @@ class SourcePlannerService:
         *,
         label: str,
         resource_ids: list[str] | None = None,
-        steps: list[SyncRecipeStep] | None = None,
         approved: bool = True,
         activity_types: list[str] | None = None,
     ) -> GoalSyncRecipeRecord:
@@ -183,7 +182,7 @@ class SourcePlannerService:
         connection = await self._repository.get_connection(owner, plugin_id)  # type: ignore[attr-defined]
         if connection is None:
             raise KeyError(f"plugin {plugin_id} is not connected")
-        recipe_steps = steps or await self.build_recipe_steps(
+        recipe_steps = await self.build_recipe_steps(
             plugin_id,
             resource_ids or [],
             label,
@@ -211,17 +210,14 @@ class SourcePlannerService:
         connection_id: UUID,
         activity_types: list[str] | None = None,
     ) -> list[SyncRecipeStep]:
+        if plugin_id in {"notion", "github"} and not resource_ids:
+            raise SemanticProviderError("Choose a page or repository before saving this source.")
         capabilities: list[ReadCapabilityRecord] = await self._repository.list_capabilities(connection_id)  # type: ignore[attr-defined]
         selected = _select_capabilities(capabilities, activity_types)
         if activity_types and not selected:
             raise SemanticProviderError("No supported read action matches the selected activity.")
         if not selected:
-            return [
-                SyncRecipeStep(
-                    capability_id=f"{plugin_id}.selected.read",
-                    arguments={"label": label, "resource_ids": resource_ids},
-                )
-            ]
+            raise SemanticProviderError("This connection has no supported read action. Reconnect it and try again.")
         targets = resource_ids or [label]
         steps: list[SyncRecipeStep] = []
         for capability in selected:
@@ -293,7 +289,14 @@ class SourcePlannerService:
         for rec in proposal.irrelevant:
             seen.add(rec.plugin_id)
             resources = by_plugin.get(rec.plugin_id) or rec.resources
-            irrelevant.append(rec.model_copy(update={"resources": resources}))
+            if any(item.recommended for item in resources):
+                recommended.append(rec.model_copy(update={
+                    "relevance": "recommended",
+                    "rationale": "An accessible resource title matches this goal.",
+                    "resources": resources,
+                }))
+            else:
+                irrelevant.append(rec.model_copy(update={"resources": resources}))
         for plugin_id, resources in by_plugin.items():
             if plugin_id in seen:
                 continue
@@ -322,6 +325,7 @@ def _select_capabilities(
     capabilities: list[ReadCapabilityRecord],
     activity_types: list[str] | None,
 ) -> list[ReadCapabilityRecord]:
+    capabilities = [cap for cap in capabilities if cap.approved and cap.operation == "read"]
     if not capabilities:
         return []
     if activity_types:
@@ -348,6 +352,11 @@ def _select_capabilities(
         if matched:
             return matched
         return []
+    if any((cap.tool_name or "").startswith("NOTION_") for cap in capabilities):
+        for name in ("NOTION_GET_PAGE_MARKDOWN", "NOTION_FETCH_ALL_BLOCK_CONTENTS", "NOTION_FETCH_BLOCK_CONTENTS"):
+            match = next((cap for cap in capabilities if cap.tool_name == name), None)
+            if match is not None:
+                return [match]
     return [
         min(
             capabilities,
@@ -374,6 +383,7 @@ def _arguments_for_resource(target: str, label: str, capability: ReadCapabilityR
         "spreadsheet_id",
         "spreadsheetId",
         "page_id",
+        "block_id",
         "database_id",
         "calendar_id",
         "calendarId",

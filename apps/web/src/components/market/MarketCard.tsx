@@ -30,12 +30,9 @@ export default function MarketCard({
       onClick={onClick}
       aria-pressed={selectMode ? selected : undefined}
     >
+      {selectMode ? <span className="selection-indicator" aria-hidden="true">{selected ? "✓" : ""}</span> : null}
       <div className="market-card-header">
         <div className="market-card-title-block">
-          <div className="market-card-category">
-            {market.category}
-          </div>
-
           <h2>
             {market.title}
           </h2>
@@ -58,17 +55,12 @@ export default function MarketCard({
         }`}
       >
         {market.todayReturn == null
-          ? "— today"
+          ? "—"
           : `${signedPercent(market.todayReturn)} today`}
       </div>
 
-      <div className="market-card-chart">
-        {market.historyUnavailable ? (
-          <div className="unpriced-state">
-            <strong>History unavailable</strong>
-            <span>Could not load published forecast history.</span>
-          </div>
-        ) : (
+      <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : ""}`}>
+        {!market.historyUnavailable && market.history.length ? (
           <WealthsimpleAreaChart
             data={
               market.history
@@ -77,7 +69,7 @@ export default function MarketCard({
               false
             }
           />
-        )}
+        ) : null}
       </div>
     </button>
   );

@@ -54,8 +54,10 @@ class UnifiedIntegrationGateway:
         )
         return {"plugin_id": plugin_id, "connection_id": str(record.id), "status": record.status}
 
-    async def sync(self, plugin_id: str, *, steps=None) -> dict[str, object]:
-        return await self._mcp.sync(plugin_id, user_id=self._user_id, steps=steps)
+    async def sync(self, plugin_id: str, *, steps=None, goal_sync_job_id=None) -> dict[str, object]:
+        return await self._mcp.sync(
+            plugin_id, user_id=self._user_id, steps=steps, goal_sync_job_id=goal_sync_job_id
+        )
 
     async def disconnect(self, plugin_id: str) -> None:
         await self._mcp.disconnect(plugin_id, user_id=self._user_id)

@@ -1,5 +1,6 @@
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, suppress
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -165,11 +166,21 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
         application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
+    from personal_markets.integrations.goal_sync_worker import goal_sync_worker
+
+    sync_stop = asyncio.Event()
+    sync_worker = asyncio.create_task(goal_sync_worker(application, sync_stop))
     async with AsyncExitStack() as stack:
         remote = getattr(application.state, "remote_mcp", None)
         if remote is not None:
             await stack.enter_async_context(remote.session_manager.run())
-        yield
+        try:
+            yield
+        finally:
+            sync_stop.set()
+            sync_worker.cancel()
+            with suppress(asyncio.CancelledError):
+                await sync_worker
     if checkpointer_cm is not None:
         await checkpointer_cm.__aexit__(None, None, None)
 

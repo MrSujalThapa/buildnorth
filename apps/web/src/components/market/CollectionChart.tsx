@@ -79,7 +79,7 @@ export default function CollectionChart({ series, interactive = true }: Props) {
                 dataKey={item.goal_id}
                 stroke={item.color}
                 strokeWidth={2}
-                dot={false}
+                dot={item.points.length === 1 ? { r: 4 } : false}
                 connectNulls
                 isAnimationActive={false}
               />

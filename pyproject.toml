@@ -29,6 +29,7 @@ dependencies = [
   "structlog>=25.4,<26",
   "uvicorn[standard]>=0.35,<1",
   "mcp>=2.3,<3",
+  "pillow>=11,<13",
 ]
 
 [build-system]

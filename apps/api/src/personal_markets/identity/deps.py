@@ -1,6 +1,9 @@
 from typing import Annotated
+import time
+from typing import Annotated
 from uuid import UUID
 
+import structlog
 from fastapi import Depends, Request
 
 from personal_markets.core.config import get_settings
@@ -26,8 +29,15 @@ async def get_principal(
     settings = get_settings()
     token = _bearer_token(request)
     if token:
+        started = time.perf_counter()
         claims = verify_bearer_token(token, settings)
-        return await identity.principal_from_claims(claims)
+        verified_ms = round((time.perf_counter() - started) * 1000)
+        principal = await identity.principal_from_claims(claims)
+        structlog.get_logger(__name__).info(
+            "identity_timing", verified_ms=verified_ms,
+            principal_ms=round((time.perf_counter() - started) * 1000) - verified_ms,
+        )
+        return principal
     bypass = getattr(request.app.state, "auth_bypass_principal", None)
     if bypass is not None and settings.environment in {"test", "pytest"}:
         return bypass

@@ -8,14 +8,12 @@ from personal_markets.collections.domain import (
     CollectionSeries,
     CollectionView,
 )
+from personal_markets.collections.portfolio import portfolio_summary
 from personal_markets.collections.progress import aggregate_progress
 from personal_markets.collections.repository import PALETTE, new_collection
-from personal_markets.core.errors import ForbiddenError, ResourceNotFoundError
+from personal_markets.core.errors import ConflictError, ForbiddenError, ResourceNotFoundError
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
-
-MAX_SERIES = 6
-
 
 class CollectionService:
     def __init__(self, repository, goals: GoalService) -> None:
@@ -68,6 +66,11 @@ class CollectionService:
         position: int | None = None,
     ) -> CollectionRecord:
         row = await self.get_for(collection_id, owner_id)
+        if name is not None and any(
+            item.collection_id != collection_id and item.name.casefold() == name.strip().casefold()
+            for item in await self._repository.list_for_user(owner_id)
+        ):
+            raise ConflictError("A collection with that name already exists")
         members = row.goal_ids if goal_ids is None else await self._owned_ids(owner_id, goal_ids)
         updated = row.model_copy(
             update={
@@ -112,7 +115,7 @@ class CollectionService:
         by_id = {goal.goal_id: goal for goal in goals}
         members = [by_id[goal_id] for goal_id in row.goal_ids if goal_id in by_id]
         series: list[CollectionSeries] = []
-        for index, goal in enumerate(members[:MAX_SERIES]):
+        for index, goal in enumerate(members):
             publication = goal.model_requirements.get("last_publication")
             withheld = isinstance(publication, dict) and publication.get("status") == "withheld"
             points = []
@@ -134,10 +137,15 @@ class CollectionService:
                     withheld=withheld,
                 )
             )
+        odds, change, coverage = portfolio_summary(series)
         return CollectionView(
             collection=row,
             progress=aggregate_progress(members),
             series=series,
+            portfolio_odds=odds,
+            change_pp=change,
+            priced_goals=coverage,
+            total_goals=len(members),
         )
 
     async def _owned_ids(self, owner_id: UUID, goal_ids: list[UUID]) -> list[UUID]:

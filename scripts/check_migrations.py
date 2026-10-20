@@ -1,6 +1,7 @@
 from pathlib import Path
+import re
 
-REQUIRED_FILES = 16
+REQUIRED_FILES = 19
 REQUIRED = {
     "goals",
     "source_connections",
@@ -18,6 +19,8 @@ REQUIRED = {
     "scenario_outcomes",
     "agent_runs",
     "evaluation_runs",
+    "profile_photos",
+    "goal_sync_jobs",
 }
 
 
@@ -31,14 +34,17 @@ def main() -> int:
     ]
     if missing_files or len(migrations) != REQUIRED_FILES:
         print(
-            "Expected migrations 0001-0016 "
+            "Expected migrations 0001-0018 "
             f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"
         )
         if missing_files:
             print(f"Missing prefixes: {', '.join(missing_files)}")
         return 1
     sql = "\n".join(path.read_text(encoding="utf-8").lower() for path in migrations)
-    missing = sorted(table for table in REQUIRED if f"create table {table}" not in sql)
+    missing = sorted(
+        table for table in REQUIRED
+        if not re.search(rf"create table (?:if not exists )?{table}\b", sql)
+    )
     if missing:
         print(f"Migration is missing tables: {', '.join(missing)}")
         return 1

@@ -4,37 +4,32 @@ import CollectionChart from "./CollectionChart";
 type Props = {
   collection: CollectionView;
   onOpen: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
 };
 
-function progressLabel(collection: CollectionView) {
-  const value = collection.progress.value;
-  if (value == null) return "Progress unavailable";
-  return `${Math.round(value * 100)}% progress`;
-}
-
-export default function CollectionCard({ collection, onOpen }: Props) {
+export default function CollectionCard({ collection, onOpen, selectMode = false, selected = false }: Props) {
+  const odds = collection.portfolio_odds;
+  const change = collection.change_pp;
   return (
-    <button type="button" className="market-card collection-card" onClick={onOpen}>
+    <div className={`market-card collection-card${selectMode ? " is-selectable" : ""}${selected ? " is-selected" : ""}`} role="button" tabIndex={0} aria-pressed={selectMode ? selected : undefined} onClick={onOpen} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } }} aria-label={selectMode ? `Select ${collection.collection.name} collection` : `Open ${collection.collection.name} collection`}>
+      {selectMode ? <span className="selection-indicator" aria-hidden="true">{selected ? "✓" : ""}</span> : null}
       <div className="market-card-header">
         <div className="market-card-title-block">
-          <div className="market-card-category">Collection</div>
           <h2>{collection.collection.name}</h2>
         </div>
-        <div className="market-card-odds">{progressLabel(collection)}</div>
+        <div className="market-card-odds">{odds == null ? "—" : `${odds.toFixed(0)}%`}</div>
       </div>
-      <div className="market-card-return">
-        {collection.progress.available}/{collection.progress.total} goals measured · not a joint probability
+      <div className={`market-card-return${change == null ? "" : change >= 0 ? " positive" : " negative"}`}>
+        {change == null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(1)} pp today`}
       </div>
       <div className="market-card-chart">
         {collection.series.some((item) => item.points.length) ? (
           <CollectionChart series={collection.series} interactive={false} />
         ) : (
-          <div className="unpriced-state">
-            <strong>{collection.progress.total ? "No measured progress yet" : "Empty collection"}</strong>
-            <span>{collection.progress.total ? "Add measurable evidence to a goal." : "Add a goal to see its progress here."}</span>
-          </div>
+          <div className="collection-chart-empty" aria-label="No published odds to chart" />
         )}
       </div>
-    </button>
+    </div>
   );
 }

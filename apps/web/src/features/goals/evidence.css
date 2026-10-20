@@ -317,11 +317,55 @@
 .evidence-sync-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 14px;
   align-items: center;
   margin-top: 24px;
   padding-top: 20px;
   border-top: 1px solid var(--app-border);
+}
+
+.evidence-sync-bar > div > strong {
+  font-size: 13px;
+}
+
+.evidence-recipe-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.evidence-recipe-list li {
+  padding: 5px 9px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.evidence-sync-bar > button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--app-ink);
+  border-radius: 8px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.evidence-sync-bar > button:disabled { opacity: .55; cursor: default; }
+
+.evidence-sync-status {
+  margin: 12px 0 0;
+  color: var(--app-accent);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .evidence-manual {

@@ -340,3 +340,37 @@ The same signed-in administrator Chrome session tested Vercel and Render after `
 **Deployment-transition failure:** on `/settings` immediately after the Render rollout, hosted usage and inference settings showed “Failed to fetch” while the already-loaded admin identity and budget remained visible. No HTTP status was captured in browser network tooling. This coincided with Render's switch from `a5dd3a8` to `5496a97`. After Render confirmed `5496a97` Live, a full reload restored inference settings, Anthropic validated-key state, 113-call BYOK ledger and $4.99/$5.00 hosted balance. Treat the first failure as transient deployment availability; no persistent frontend or provider defect was established.
 
 **Judge-readiness:** core hosted/BYOK agents and numerical exploratory forecasting now have real production proof. **Not ready for broad external invited beta or judges** until Clerk production keys are configured, slow authenticated views and empty card space are addressed, follow-up UI fixes are deployed/rechecked, and connector ingestion is proven. No production secrets or budgets were changed during this acceptance pass.
+
+---
+
+## Critical product remediation in progress — 2026-10-20
+
+This tracks 19 concrete outcomes in the latest request. Base commit: `2a5b790629832bbc8ae0c1ed3a209323bef01006` on `main`. **This working tree has not been committed or deployed.** Production still serves the earlier build. Local implementation and fixture tests are marked PARTIAL until production acceptance. No new paid inference was initiated.
+
+| # | Outcome | Status | Evidence and remaining work |
+| --- | --- | --- | --- |
+| 1 | Minimal goal cards, genuine odds/change | PARTIAL | Local cards omit category and invented `+0.0%`; desktop/mobile fixture browser checks pass. Production recheck pending. |
+| 2 | Minimal Markets heading/actions | PARTIAL | Local heading and toolbar simplified; fixture browser checked. Production recheck pending. |
+| 3 | Collection cards with portfolio odds/change | PARTIAL | Local card uses new portfolio fields and a dash for missing data; production recheck pending. |
+| 4 | Equal-weight portfolio math and comparable change | PARTIAL | Pure calculation over valid published histories and UTC-day comparable membership; unit tests pass. No live collection with multiple priced goals was available. |
+| 5 | Multiline chart and sparse histories | PARTIAL | Local chart uses all goal histories and one-point dots; fixture browser checked. Multi-series live interaction and keyboard details still need acceptance. |
+| 6 | Collection rename, membership, deletion | PARTIAL | Local edit and confirmation flows, name conflict guard, optional Personal rename. Hosted read/write for this version not tested. |
+| 7 | Compact Photos-style selection | PARTIAL | Local goal/collection selection, Cancel, bottom bar, archive/delete confirmation, disabled Share, More/Move; fixture browser checked. |
+| 8 | Restrained Profile header and editor | PARTIAL | Local composition and styled dialog inspected at desktop/mobile widths. Production acceptance pending. |
+| 9 | Private uploaded profile image | PARTIAL | JPEG/PNG/WebP validation, bounded WebP re-encode, owner-keyed storage, upload/replace/remove and crop-position controls, plus additive `0017` migration; local API and fixture browser tests pass. Hosted persistence and isolation not tested. |
+| 10 | Custom radar dimensions | PARTIAL | User-defined ordered dimensions and goal assignments, unknown scores remain unfilled; unit test and fixture browser pass. |
+| 11 | GitHub repository picker and real record | PARTIAL | Local authorized-resource picker replaces typed owner/repo. No actual provider record fetched this pass. |
+| 12 | Notion page picker and real content | PARTIAL | Local page picker, current content-fetch capability preference and revision-aware dedupe; real `Oct 20th book report` content was inspected in Notion, but no provider sync or goal update was run. |
+| 13 | Resource relevance | PARTIAL | Book-report title promotes Notion for a reading goal in a unit test. Live source-plan failure remains undiagnosed; its model call was avoided under the spending restriction. |
+| 14 | Sync result and durable receipt | PARTIAL | Provider failures surface and empty responses create no synthetic records. New goal-level job and receipt persist stages, counts, workflow and forecast outcome. Additive `0019` scopes raw-record deduplication by owner and links fetched records to jobs for manual retry after failure. No real double-sync result or hosted database proof exists. |
+| 15 | Async, restart-safe sync and latency target | PARTIAL | POST now acknowledges a persisted job; a worker claims queued work and marks stranded active work timed out without replaying billable inference. Local restart-like test and browser reload polling pass. Hosted restart, authenticated p50/p95 and sub-two-second proof remain. |
+| 16 | OAuth Pending to Connected automatically | PARTIAL | Locally, saved pending/connected accounts are included even when absent from the first catalog page, allowing polling to find them. Fresh real OAuth transition not tested. |
+| 17 | Minimal copy and styled controls across routes | PARTIAL | Markets, collection detail, Profile, Plugins, and source workspace revised. Full route-by-route visual and console audit remains. |
+| 18 | Preserve forecasting/auth/What If regressions | PARTIAL | Full backend suite passed after the seed upsert was updated for `0019`; 64 web unit tests and 14 fixture-backed browser cases pass. No deployed flow test. No probabilities, histories, budgets, or credentials changed. |
+| 19 | Deployed authenticated desktop/mobile acceptance | NOT TESTED | Existing signed-in Chrome confirmed old production defects and real Notion page. This tree was not deployed, so no new authenticated acceptance or before/after production screenshots exist. |
+
+**Local verification:** the full backend suite and isolated Postgres migration tests passed, including two owners ingesting one external event ID. Web production build passed (959.66 kB JS / 274.11 kB gzip; Vite chunk warning); ESLint passed with zero errors and ten existing warnings; 64 Vitest cases passed. Fourteen fixture-backed desktop/mobile Playwright cases passed, including photo crop/upload/reload/remove and sync reload/polling. Architecture, migration sanity, and `git diff --check` passed. Local after screenshots: `apps/web/test-results/remediation-markets-desktop.png`, `remediation-markets-mobile-chromium.png`, `remediation-profile-desktop.png`, `remediation-profile-mobile-chromium.png`, `remediation-evidence-sync-desktop.png`, and `remediation-evidence-sync-mobile-chromium.png`. The authenticated production baseline was inspected but no before screenshot artifact was saved.
+
+**Performance:** no trustworthy before/after authenticated latency sample was captured. Prior warm `/health` numbers do not describe Markets or sync. Instrumentation is local; deployed p50/p95 is unavailable. This remains a release blocker.
+
+**Release decision:** local verification and release preparation are in progress. Migrations `0017`–`0019` were applied to isolated local Postgres; hosted deployment and acceptance are outstanding. Actual GitHub/Notion agent sync needs explicit approval for additional paid inference under the request's spending constraint.

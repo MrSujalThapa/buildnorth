@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   api,
@@ -86,7 +86,7 @@ function buildSourceCards(plan: SourcePlannerProposal | undefined, plugins: Plug
       relevance: irrelevantIds.has(id) ? "low relevance" : connected ? "available" : "not connected",
       rationale:
         plan?.irrelevant.find((item) => item.plugin_id === id)?.rationale ??
-        (connected ? "Connected but not prioritized for this goal." : "Connect to include in planning."),
+        (connected ? "Connected" : "Connect to use"),
       connected,
       lastSyncLabel: display.lastSyncLabel,
       contributes: display.reads,
@@ -110,10 +110,10 @@ export function EvidenceSourceWorkspace({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [planRequested, setPlanRequested] = useState(false);
   const [selectedResources, setSelectedResources] = useState<Record<string, string[]>>({});
-  const [repositories, setRepositories] = useState<Record<string, string>>({});
   const [resourceRefs, setResourceRefs] = useState<Record<string, string>>({});
   const [activityTypes, setActivityTypes] = useState<Record<string, string[]>>({});
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const plugins = useQuery({
     queryKey: ["plugins"],
@@ -129,6 +129,21 @@ export function EvidenceSourceWorkspace({
     queryFn: ({ signal }) => api.evidenceSourceRecipes(goalId, signal),
     enabled: Boolean(goalId),
   });
+  const syncJob = useQuery({
+    queryKey: ["evidence-source-sync", goalId],
+    queryFn: ({ signal }) => api.latestEvidenceSourceSync(goalId, signal),
+    enabled: Boolean(goalId),
+    refetchInterval: (query) => ["queued", "fetching_sources", "processing_evidence", "updating_forecast"].includes(query.state.data?.status ?? "") ? 2000 : false,
+  });
+  const syncActive = ["queued", "fetching_sources", "processing_evidence", "updating_forecast"].includes(syncJob.data?.status ?? "");
+  useEffect(() => {
+    if (syncJob.data?.status !== "completed") return;
+    void queryClient.invalidateQueries({ queryKey: ["evidence", goalId] });
+    void queryClient.invalidateQueries({ queryKey: ["goal", goalId] });
+    void queryClient.invalidateQueries({ queryKey: ["market-history", goalId] });
+    void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
+    void queryClient.invalidateQueries({ queryKey: ["what-if-baseline", goalId] });
+  }, [goalId, queryClient, syncJob.data?.id, syncJob.data?.status]);
   const cards = useMemo(
     () => buildSourceCards(sourcePlan.data, plugins.data ?? []),
     [plugins.data, sourcePlan.data],
@@ -148,22 +163,14 @@ export function EvidenceSourceWorkspace({
         activity_types: body.activityTypes,
       }),
     onSuccess: () => {
+      setSyncMessage("Source saved");
       void queryClient.invalidateQueries({ queryKey: ["evidence-source-recipes", goalId] });
     },
   });
 
   const syncSources = useMutation({
-    mutationFn: () => api.syncEvidenceSources(goalId),
-    onSuccess: (data) => {
-      if ("thread_id" in data) {
-        setSnapshot(data);
-        onSnapshotChange?.(data);
-      }
-      void queryClient.invalidateQueries({ queryKey: ["evidence", goalId] });
-      void queryClient.invalidateQueries({ queryKey: ["goal", goalId] });
-      void queryClient.invalidateQueries({ queryKey: ["market-history", goalId] });
-      void queryClient.invalidateQueries({ queryKey: ["what-if-baseline", goalId] });
-    },
+    mutationFn: () => { setSyncMessage(null); return api.syncEvidenceSources(goalId); },
+    onSuccess: (data) => { queryClient.setQueryData(["evidence-source-sync", goalId], data); },
   });
 
   const toggleActivity = (pluginId: string, activity: string) => {
@@ -175,16 +182,14 @@ export function EvidenceSourceWorkspace({
     });
   };
 
-  const buildResourceIds = (pluginId: string, card: SourceCardModel) => {
+  const buildResourceIds = (pluginId: string) => {
     if (pluginId === "github") {
-      const repository = (repositories.github ?? "").trim();
+      const repository = selectedResources.github?.[0] ?? "";
       const branch = (resourceRefs.github ?? "").trim();
       return repository ? [`${repository}${branch ? `@${branch}` : ""}`] : [];
     }
-    const base =
-      selectedResources[pluginId]?.length
-        ? (selectedResources[pluginId] ?? [])
-        : card.resources.map((item) => item.resource_id);
+    const base = selectedResources[pluginId] ?? [];
+    if (pluginId === "notion") return base;
     const ref = (resourceRefs[pluginId] ?? "").trim();
     if (!ref) return base;
     return base.map((resourceId) => (resourceId.includes("@") ? resourceId : `${resourceId}@${ref}`));
@@ -192,6 +197,7 @@ export function EvidenceSourceWorkspace({
 
   const toggleResource = (pluginId: string, resourceId: string) => {
     setSelectedResources((current) => {
+      if (pluginId === "github") return { ...current, [pluginId]: [resourceId] };
       const existing = new Set(current[pluginId] ?? []);
       if (existing.has(resourceId)) existing.delete(resourceId);
       else existing.add(resourceId);
@@ -290,15 +296,12 @@ export function EvidenceSourceWorkspace({
                         </span>
                         <span>
                           <strong>{card.name}</strong>
-                          <small>{card.rationale}</small>
+                          {card.rationale && card.rationale !== "Connected" ? <small>{card.rationale}</small> : null}
                           <span className="evidence-source-meta">
-                            <span className={`evidence-pill ${section.key === "recommended" ? "recommended" : ""}`}>
-                              {card.relevance}
-                            </span>
+                            {section.key === "recommended" ? <span className="evidence-pill recommended">Suggested</span> : null}
                             <span className={`evidence-pill ${card.connected ? "connected" : ""}`}>
                               {card.connected ? "Connected" : "Not connected"}
                             </span>
-                            {card.lastSyncLabel ? <span className="evidence-pill">{card.lastSyncLabel}</span> : null}
                           </span>
                         </span>
                       </button>
@@ -307,21 +310,17 @@ export function EvidenceSourceWorkspace({
                           source={card}
                           selectedResources={selectedResources[card.pluginId] ?? []}
                           resourceRef={resourceRefs[card.pluginId] ?? ""}
-                          repository={repositories[card.pluginId] ?? ""}
                           selectedActivities={activityTypes[card.pluginId] ?? []}
                           onResourceRefChange={(value) =>
                             setResourceRefs((current) => ({ ...current, [card.pluginId]: value }))
-                          }
-                          onRepositoryChange={(value) =>
-                            setRepositories((current) => ({ ...current, [card.pluginId]: value }))
                           }
                           onToggleActivity={(activity) => toggleActivity(card.pluginId, activity)}
                           onToggleResource={(resourceId) => toggleResource(card.pluginId, resourceId)}
                           onApprove={() =>
                             saveRecipe.mutate({
                               pluginId: card.pluginId,
-                              label: card.pluginId === "github" ? (repositories.github ?? "").trim() : card.resources[0]?.label ?? card.name,
-                              resourceIds: buildResourceIds(card.pluginId, card),
+                              label: card.resources.find((item) => selectedResources[card.pluginId]?.includes(item.resource_id))?.label ?? card.name,
+                              resourceIds: buildResourceIds(card.pluginId),
                               activityTypes: activityTypes[card.pluginId],
                             })
                           }
@@ -339,21 +338,35 @@ export function EvidenceSourceWorkspace({
         {savedRecipes.length ? (
           <div className="evidence-sync-bar">
             <div>
-              <strong>{savedRecipes.length} approved recipe(s)</strong>
-              <ul className="evidence-recipe-list">
+              <strong>{savedRecipes.length} saved source{savedRecipes.length === 1 ? "" : "s"}</strong>
+              <ul className="evidence-recipe-list" aria-label="Saved sources">
                 {savedRecipes.map((recipe: SourceRecipeRecord) => (
                   <li key={`${recipe.plugin_id}-${recipe.label}`}>
-                    <strong>{recipe.plugin_id}</strong>: {recipe.label}
-                    {recipe.steps?.length ? <span className="field-hint"> · {recipe.steps.length} read action(s)</span> : null}
+                    {recipe.label}
                   </li>
                 ))}
               </ul>
             </div>
-            <button type="button" disabled={syncSources.isPending} onClick={() => syncSources.mutate()}>
-              {syncSources.isPending ? "Syncing…" : "Sync approved sources"}
+            <button type="button" disabled={syncSources.isPending || syncActive} onClick={() => syncSources.mutate()}>
+              {syncActive ? "Syncing…" : "Sync sources"}
             </button>
           </div>
         ) : null}
+
+        {syncMessage ? <p className="field-hint" role="status">{syncMessage}</p> : null}
+        {syncJob.data ? <p className="evidence-sync-status" role="status">{
+          syncJob.data.status === "queued" ? "Sync queued" :
+          syncJob.data.status === "fetching_sources" ? "Fetching sources…" :
+          syncJob.data.status === "processing_evidence" ? "Processing evidence…" :
+          syncJob.data.status === "updating_forecast" ? "Updating forecast…" :
+          syncJob.data.status === "completed" ?
+            Number(syncJob.data.receipt.records_added ?? 0) > 0
+              ? `Synced · ${Number(syncJob.data.receipt.records_added)} new record${Number(syncJob.data.receipt.records_added) === 1 ? "" : "s"}`
+              : "No new updates"
+            : syncJob.data.error ?? "Sync failed. Try again."
+        }</p> : null}
+        {saveRecipe.isError ? <p className="field-hint" role="alert">Could not save source: {String(saveRecipe.error)}</p> : null}
+        {syncSources.isError ? <p className="field-hint" role="alert">Sync failed: {String(syncSources.error)}</p> : null}
 
         <AgentProgress snapshot={snapshot} />
 
@@ -511,10 +524,8 @@ function SourceResourcePanel({
   source,
   selectedResources,
   resourceRef,
-  repository,
   selectedActivities,
   onResourceRefChange,
-  onRepositoryChange,
   onToggleActivity,
   onToggleResource,
   onApprove,
@@ -523,20 +534,19 @@ function SourceResourcePanel({
   source: SourceCardModel;
   selectedResources: string[];
   resourceRef: string;
-  repository: string;
   selectedActivities: string[];
   onResourceRefChange: (value: string) => void;
-  onRepositoryChange: (value: string) => void;
   onToggleActivity: (activity: string) => void;
   onToggleResource: (resourceId: string) => void;
   onApprove: () => void;
   approvePending: boolean;
 }) {
+  const [resourceQuery, setResourceQuery] = useState("");
   const resources = useQuery({
     queryKey: ["plugin-resources", source.pluginId],
     queryFn: ({ signal }) => api.pluginResources(source.pluginId, signal),
     staleTime: 60_000,
-    enabled: source.pluginId !== "github",
+    enabled: source.connected,
   });
   const capabilities = useQuery({
     queryKey: ["plugin-capabilities", source.pluginId],
@@ -550,16 +560,8 @@ function SourceResourcePanel({
   ];
   const activityOptions = source.pluginId === "github"
     ? githubActivities.filter((activity) => (capabilities.data ?? []).some((item) => activity.tools.includes(item.tool_name ?? "")))
-    : (capabilities.data ?? []).slice(0, 6).map((item) => ({ value: item.label.toLowerCase(), label: item.label }));
-  const validRepository = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository.trim());
-  const rankedPlan = [...source.resources].sort((left, right) => {
-    const rank = (item: (typeof source.resources)[number]) =>
-      item.recommended || item.goal_relevance === "high" ? 0 : item.goal_relevance === "medium" ? 1 : 2;
-    return rank(left) - rank(right);
-  });
-  const options =
-    resources.data?.length
-      ? resources.data
+    : [];
+  const options = (resources.data ?? [])
           .map((item) => {
             const resourceId = item.uri.replace(/^composio:\/\/[^/]+\//, "") || item.name;
             const planned = source.resources.find((row) => row.resource_id === resourceId || row.label === item.name);
@@ -577,38 +579,29 @@ function SourceResourcePanel({
               recommended: planned?.recommended ?? false,
             };
           })
-          .sort((left, right) => Number(right.recommended) - Number(left.recommended))
-      : rankedPlan;
+          .sort((left, right) => Number(right.recommended) - Number(left.recommended));
+  const visibleOptions = options.filter((item) => item.label.toLowerCase().includes(resourceQuery.toLowerCase()));
 
   return (
     <div className="evidence-resource-panel">
       <h3>{source.pluginId === "github" ? "GitHub evidence" : "Choose what counts as evidence"}</h3>
-      {source.pluginId === "github" ? (
-        <label className="evidence-ref-field">
-          <span>Repository</span>
-          <input value={repository} onChange={(event) => onRepositoryChange(event.target.value)} placeholder="owner/repository" autoComplete="off" />
-        </label>
-      ) : null}
       {resources.isLoading ? <p className="field-hint">Loading resources…</p> : null}
-      {source.pluginId !== "github" && options.length ? (
+      {options.length > 6 ? <input className="evidence-resource-search" type="search" aria-label={`Search ${source.name} sources`} placeholder={source.pluginId === "github" ? "Search repositories" : "Search pages"} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
+      {options.length ? (
         <ul className="evidence-resource-list">
-          {options.map((resource) => {
+          {visibleOptions.map((resource) => {
             const checked = selectedResources.includes(resource.resource_id);
             return (
               <li key={resource.resource_id}>
                 <label>
                   <input
-                    type="checkbox"
+                    type={source.pluginId === "github" ? "radio" : "checkbox"}
                     checked={checked}
                     onChange={() => onToggleResource(resource.resource_id)}
                   />
                   <strong>{resource.label}</strong>
                   <span>
-                    {resource.resource_type ? `${resource.resource_type} · ` : ""}
-                    {resource.goal_relevance ? `${resource.goal_relevance} relevance · ` : ""}
-                    {resource.rationale}
-                    {resource.state_variables?.length ? ` · state: ${resource.state_variables.join(", ")}` : ""}
-                    {source.lastSyncLabel ? ` · ${source.lastSyncLabel}` : ""}
+                    {resource.resource_type === "private" ? "Private" : resource.resource_type === "public" ? "Public" : ""}
                   </span>
                 </label>
               </li>
@@ -616,14 +609,14 @@ function SourceResourcePanel({
           })}
         </ul>
       ) : null}
-      {source.pluginId === "github" || source.pluginId === "notion" || source.pluginId === "google_sheets" ? (
+      {source.pluginId === "github" || source.pluginId === "google_sheets" ? (
         <label className="evidence-ref-field">
           <span>
             {source.pluginId === "github"
               ? "Branch (optional)"
               : source.pluginId === "google_sheets"
                 ? "Tab or range (optional)"
-                : "Page scope (optional)"}
+                : "Range (optional)"}
           </span>
           <input
             name={`resource-ref-${source.pluginId}`}
@@ -653,8 +646,9 @@ function SourceResourcePanel({
           </div>
         </fieldset>
       ) : null}
-      {source.pluginId === "github" && repository && !validRepository ? <p className="field-hint" role="alert">Enter a repository as owner/name.</p> : null}
-      <button type="button" disabled={approvePending || !source.connected || (source.pluginId === "github" && (!validRepository || !selectedActivities.length))} onClick={onApprove}>
+      {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
+      {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
+      <button type="button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={onApprove}>
         {approvePending ? "Saving…" : "Save source"}
       </button>
     </div>

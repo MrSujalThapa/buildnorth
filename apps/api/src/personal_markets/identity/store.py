@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -427,7 +428,7 @@ class PostgresIdentityRepository:
                     await connection.execute(
                         text(
                             """
-                            select display_name, username, bio, avatar_value
+                            select display_name, username, bio, avatar_value, profile_dimensions_json
                             from app_users where id = :id
                             """
                         ),
@@ -444,6 +445,7 @@ class PostgresIdentityRepository:
             username=row.get("username"),
             bio=row.get("bio"),
             avatar_value=row.get("avatar_value"),
+            dimensions=row.get("profile_dimensions_json") or [],
         )
 
     async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile:
@@ -455,7 +457,8 @@ class PostgresIdentityRepository:
                     set display_name = :display_name,
                         username = :username,
                         bio = :bio,
-                        avatar_value = :avatar_value
+                        avatar_value = :avatar_value,
+                        profile_dimensions_json = cast(:dimensions as jsonb)
                     where id = :id
                     """
                 ),
@@ -465,6 +468,7 @@ class PostgresIdentityRepository:
                     "username": profile.username,
                     "bio": profile.bio,
                     "avatar_value": profile.avatar_value,
+                    "dimensions": json.dumps([item.model_dump(mode="json") for item in profile.dimensions]),
                 },
             )
         return await self.get_profile(user_id)

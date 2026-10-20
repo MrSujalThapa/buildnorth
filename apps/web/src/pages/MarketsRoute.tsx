@@ -39,6 +39,10 @@ export function MarketsRoute() {
       api.addGoalsToCollection(collectionId, goalIds),
     onSuccess: invalidate,
   });
+  const deleteCollections = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => api.deleteCollection(id))),
+    onSuccess: invalidate,
+  });
 
   if (dashboard.isLoading && !dashboard.data) {
     return (
@@ -71,6 +75,7 @@ export function MarketsRoute() {
       onOpenCollection={(collectionId) => { void navigate(`/collections/${collectionId}`); }}
       onCreateCollection={(name) => createCollection.mutateAsync(name).then(() => undefined)}
       onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds).then(() => undefined)}
+      onDeleteCollections={(ids) => deleteCollections.mutateAsync(ids).then(() => undefined)}
       onMoveToCollection={(collectionId, goalIds) =>
         moveGoals.mutateAsync({ collectionId, goalIds }).then(() => undefined)
       }

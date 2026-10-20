@@ -249,7 +249,7 @@ class PostgresSeedRepository:
             ) values (
               :id, :user_id, :source_type, :external_event_id, :fingerprint,
               :observed_at, :payload_ref, cast(:payload as jsonb)
-            ) on conflict (source_type, external_event_id) do nothing
+            ) on conflict do nothing
         """),
             {
                 **row,

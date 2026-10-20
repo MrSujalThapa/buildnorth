@@ -306,6 +306,11 @@ export interface CollectionView {
   };
   progress: CollectionProgress;
   series: CollectionSeries[];
+  portfolio_odds: number | null;
+  change_pp: number | null;
+  priced_goals: number;
+  total_goals: number;
+  portfolio_methodology: string;
 }
 
 export interface GoalsDashboard {
@@ -337,6 +342,19 @@ export interface SourceRecipeRecord {
   label: string;
   approved: boolean;
   steps: { capability_id: string; tool_name?: string | null; arguments: Record<string, unknown> }[];
+}
+
+export interface GoalSyncJob {
+  id: string;
+  owner_id: string;
+  goal_id: string;
+  status: "queued" | "fetching_sources" | "processing_evidence" | "updating_forecast" | "completed" | "failed" | "timed_out";
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  receipt: Record<string, unknown>;
+  error: string | null;
 }
 
 export interface MissingStateInput {
@@ -592,6 +610,18 @@ async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal
   return (await response.json()) as T;
 }
 
+async function profilePhoto(signal?: AbortSignal): Promise<Blob | null> {
+  const token = await currentAccessToken();
+  const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
+  const response = await fetch(`${baseUrl}/api/v1/profile/photo`, {
+    signal,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Could not load profile photo");
+  return response.blob();
+}
+
 export const api = {
   inferenceSettings: (signal?: AbortSignal) =>
     request<InferenceSettings>("/api/v1/settings/inference", undefined, signal),
@@ -682,7 +712,14 @@ export const api = {
       body: JSON.stringify({ goal_ids: goalIds }),
     }),
   profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
-  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string }) =>
+  profilePhoto,
+  uploadProfilePhoto: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<{ status: string }>("/api/v1/profile/photo", { method: "PUT", body });
+  },
+  removeProfilePhoto: () => request<{ status: string }>("/api/v1/profile/photo", { method: "DELETE" }),
+  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string; dimensions?: { label: string; goal_ids: string[] }[] }) =>
     request<AccountView>("/api/v1/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -853,8 +890,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   syncEvidenceSources: (goalId: string) =>
-    request<WorkflowSnapshot | { status: string; message?: string }>(
+    request<GoalSyncJob>(
       `/api/v1/goals/${goalId}/evidence/sources/sync`,
       { method: "POST" },
     ),
+  latestEvidenceSourceSync: (goalId: string, signal?: AbortSignal) =>
+    request<GoalSyncJob | null>(`/api/v1/goals/${goalId}/evidence/sources/sync`, undefined, signal),
 };

@@ -21,6 +21,7 @@ export type UserProfile = {
   username: string | null;
   bio: string | null;
   avatar_value: string | null;
+  dimensions: { label: string; goal_ids: string[] }[];
 };
 
 export type AccountView = {

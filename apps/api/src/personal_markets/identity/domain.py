@@ -77,11 +77,17 @@ class HostedUsage(BaseModel):
     )
 
 
+class ProfileDimension(BaseModel):
+    label: str = Field(min_length=1, max_length=32)
+    goal_ids: list[UUID] = Field(default_factory=list)
+
+
 class UserProfile(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     username: str | None = None
     bio: str | None = Field(default=None, max_length=280)
     avatar_value: str | None = Field(default=None, max_length=32)
+    dimensions: list[ProfileDimension] = Field(default_factory=list, max_length=12)
 
 
 class AccountView(BaseModel):

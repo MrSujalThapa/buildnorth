@@ -68,7 +68,7 @@ export default function PluginsPage({
         <header className="plugins-header">
           <div>
             <h1>Plugins</h1>
-            <p>Connect the tools that can contribute data to your goals.{isRefreshing ? " Updating catalog…" : ""}</p>
+            {isRefreshing ? <span role="status" className="field-hint">Updating…</span> : null}
           </div>
           <label className="plugin-search">
             <Search size={18} />

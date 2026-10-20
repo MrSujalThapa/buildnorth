@@ -1,8 +1,11 @@
+import asyncio
+import time
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+import structlog
 
 from personal_markets.collections.service import CollectionService
 from personal_markets.goals.domain import GoalContract
@@ -34,11 +37,23 @@ async def dashboard(
     collections: Annotated[CollectionService, Depends(get_collection_service)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> dict[str, Any]:
+    started = time.perf_counter()
     goals = await service.list_goals(owner_id=principal.user_id)
-    histories = await what_if.histories_for_owned([goal.goal_id for goal in goals])
+    goals_ms = round((time.perf_counter() - started) * 1000)
+    parallel_started = time.perf_counter()
+    histories, rows = await asyncio.gather(
+        what_if.histories_for_owned([goal.goal_id for goal in goals]),
+        collections.list_for(principal.user_id),
+    )
+    reads_ms = round((time.perf_counter() - parallel_started) * 1000)
     views = []
-    for row in await collections.list_for(principal.user_id):
+    for row in rows:
         views.append(await collections.view(row, goals, histories))
+    structlog.get_logger(__name__).info(
+        "dashboard_timing", goals_ms=goals_ms, reads_ms=reads_ms,
+        total_ms=round((time.perf_counter() - started) * 1000),
+        goal_count=len(goals), collection_count=len(rows),
+    )
     return {
         "goals": [goal.model_dump(mode="json") for goal in goals],
         "histories": histories,

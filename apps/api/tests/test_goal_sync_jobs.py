@@ -1,0 +1,146 @@
+import asyncio
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+from helpers import isolated_app
+from personal_markets.goals.domain import GoalContract, GoalType
+from personal_markets.integrations.goal_sync_jobs import (
+    InMemoryGoalSyncJobStore,
+    get_goal_sync_job_store,
+)
+from personal_markets.integrations.goal_sync_worker import execute_goal_sync_job, goal_sync_worker
+from personal_markets.integrations.mcp_domain import RawSourceRecord
+from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
+
+
+@pytest.mark.asyncio
+async def test_sync_jobs_dedupe_and_scope_by_owner() -> None:
+    store = InMemoryGoalSyncJobStore()
+    owner, other, goal = uuid4(), uuid4(), uuid4()
+    first = await store.enqueue(owner, goal)
+    repeat = await store.enqueue(owner, goal)
+    assert first.id == repeat.id
+    assert await store.get(other, goal, first.id) is None
+    claimed = await store.claim()
+    assert claimed and claimed.id == first.id
+    await store.update(first.id, status="completed", finished_at=datetime.now(UTC))
+    assert (await store.enqueue(owner, goal)).id != first.id
+
+
+@pytest.mark.asyncio
+async def test_stranded_sync_is_reported_without_automatic_retry() -> None:
+    store = InMemoryGoalSyncJobStore()
+    job = await store.enqueue(uuid4(), uuid4())
+    await store.claim()
+    await store.update(job.id, started_at=datetime.now(UTC) - timedelta(minutes=5))
+    assert await store.expire_stranded() == 1
+    assert (await store.get(job.owner_id, job.goal_id, job.id)).status == "timed_out"
+    assert await store.claim() is None
+
+
+@pytest.mark.asyncio
+async def test_manual_retry_carries_failed_job_records_with_owner_scope() -> None:
+    store = InMemoryGoalSyncJobStore()
+    repository = InMemoryIntegrationRepository()
+    owner, other, goal_id = uuid4(), uuid4(), uuid4()
+    first = await store.enqueue(owner, goal_id)
+    record = RawSourceRecord(
+        id=uuid4(),
+        plugin_connection_id=uuid4(),
+        external_id="page-1",
+        tool_identity="NOTION_GET_PAGE_MARKDOWN",
+        retrieved_at=datetime.now(UTC),
+        payload={"content": "Six books finished"},
+        payload_hash="hash-1",
+        sync_run_id=uuid4(),
+        cursor_context={"user_id": str(owner), "goal_sync_job_id": str(first.id)},
+    )
+    await repository.append_raw_records([record])
+    await store.update(first.id, status="failed", finished_at=datetime.now(UTC))
+    retry = await store.enqueue(owner, goal_id)
+    assert retry.receipt["replay_job_ids"] == [str(first.id)]
+    assert await repository.list_job_raw_records(owner, [first.id]) == [record]
+    assert await repository.list_job_raw_records(other, [first.id]) == []
+    await store.update(retry.id, status="failed", finished_at=datetime.now(UTC))
+    next_retry = await store.enqueue(owner, goal_id)
+    assert next_retry.receipt["replay_job_ids"] == [str(first.id), str(retry.id)]
+
+
+def test_goal_sync_api_acknowledges_job_and_recovers_status() -> None:
+    get_goal_sync_job_store.cache_clear()
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal.user_id
+    goal = GoalContract(
+        goal_id=uuid4(),
+        title="Read 20 books",
+        goal_type=GoalType.CONTINUOUS_TARGET,
+        success_definition={"metric": "books_read", "target": 20},
+        deadline=datetime.now(UTC) + timedelta(days=60),
+        state_dimensions=["books_read"],
+    )
+    asyncio.run(app.state.agent_workflow._inner._deps.goals._repository.create(goal, owner))
+    path = f"/api/v1/goals/{goal.goal_id}/evidence/sources/sync"
+    with TestClient(app) as client:
+        queued = client.post(path)
+        assert queued.status_code == 202
+        job_id = queued.json()["id"]
+        assert client.get(path).json()["id"] == job_id
+        assert client.get(f"{path}/{job_id}").status_code == 200
+        assert client.get(f"{path}/{uuid4()}").status_code == 404
+        assert client.get(path).json()["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_worker_completes_queued_job_without_recipes() -> None:
+    get_goal_sync_job_store.cache_clear()
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal.user_id
+    goal = GoalContract(
+        goal_id=uuid4(),
+        title="Read 20 books",
+        goal_type=GoalType.CONTINUOUS_TARGET,
+        success_definition={"metric": "books_read", "target": 20},
+        deadline=datetime.now(UTC) + timedelta(days=60),
+        state_dimensions=["books_read"],
+    )
+    await app.state.agent_workflow._inner._deps.goals._repository.create(goal, owner)
+    store = get_goal_sync_job_store()
+    queued = await store.enqueue(owner, goal.goal_id)
+    claimed = await store.claim()
+    assert claimed and claimed.id == queued.id
+    await execute_goal_sync_job(app, claimed)
+    completed = await store.get(owner, goal.goal_id, queued.id)
+    assert completed and completed.status == "completed"
+    assert completed.receipt["status"] == "no_recipes"
+
+
+@pytest.mark.asyncio
+async def test_worker_recovers_queued_job_after_start() -> None:
+    get_goal_sync_job_store.cache_clear()
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal.user_id
+    goal = GoalContract(
+        goal_id=uuid4(),
+        title="Read 20 books",
+        goal_type=GoalType.CONTINUOUS_TARGET,
+        success_definition={"metric": "books_read", "target": 20},
+        deadline=datetime.now(UTC) + timedelta(days=60),
+        state_dimensions=["books_read"],
+    )
+    await app.state.agent_workflow._inner._deps.goals._repository.create(goal, owner)
+    store = get_goal_sync_job_store()
+    queued = await store.enqueue(owner, goal.goal_id)
+    stop = asyncio.Event()
+    worker = asyncio.create_task(goal_sync_worker(app, stop))
+    try:
+        for _ in range(20):
+            if (await store.get(owner, goal.goal_id, queued.id)).status == "completed":
+                break
+            await asyncio.sleep(0.05)
+        assert (await store.get(owner, goal.goal_id, queued.id)).status == "completed"
+    finally:
+        stop.set()
+        await worker

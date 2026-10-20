@@ -23,7 +23,9 @@ def normalize_tool_result(
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             continue
-        external_id = str(row.get("id") or row.get("sha") or row.get("node_id") or f"{tool_name}:{index}")
+        external_id = str(
+            row.get("id") or row.get("sha") or row.get("node_id") or f"{tool_name}:{index}"
+        )
         events = _infer_events(plugin_id, tool_name, row, recipe_step)
         body = {
             **row,
@@ -35,6 +37,9 @@ def normalize_tool_result(
         }
         from personal_markets.integrations.mcp_repository import payload_hash
 
+        fingerprint = payload_hash(body)
+        if plugin_id == "notion":
+            external_id = f"{external_id}:{fingerprint[:16]}"
         records.append(
             RawSourceRecord(
                 id=uuid4(),
@@ -43,30 +48,7 @@ def normalize_tool_result(
                 tool_identity=tool_name,
                 retrieved_at=datetime.now(UTC),
                 payload=body,
-                payload_hash=payload_hash(body),
-                sync_run_id=sync_run_id,
-                cursor_context={"user_id": user_id, "source_type": plugin_id},
-            )
-        )
-    if not records and payload:
-        body = {
-            "summary": f"{plugin_id} sync via {tool_name}",
-            "events": [],
-            "provider": plugin_id,
-            "observed_at": datetime.now(UTC).isoformat(),
-            "raw": payload,
-        }
-        from personal_markets.integrations.mcp_repository import payload_hash
-
-        records.append(
-            RawSourceRecord(
-                id=uuid4(),
-                plugin_connection_id=plugin_connection_id,
-                external_id=f"{tool_name}:aggregate",
-                tool_identity=tool_name,
-                retrieved_at=datetime.now(UTC),
-                payload=body,
-                payload_hash=payload_hash(body),
+                payload_hash=fingerprint,
                 sync_run_id=sync_run_id,
                 cursor_context={"user_id": user_id, "source_type": plugin_id},
             )
@@ -80,10 +62,10 @@ def _extract_rows(payload: dict[str, Any]) -> list[Any]:
         if isinstance(value, list):
             return value
         if isinstance(value, dict):
-            nested = value.get("items") or value.get("repositories") or value.get("results")
-            if isinstance(nested, list):
-                return nested
-    return [payload] if payload else []
+            for nested_key in ("items", "repositories", "results"):
+                if isinstance(value.get(nested_key), list):
+                    return value[nested_key]
+    return [payload] if payload and not payload.get("has_more") else []
 
 
 def _observed_at(row: dict[str, Any]) -> str:
@@ -96,12 +78,16 @@ def _observed_at(row: dict[str, Any]) -> str:
         author = commit.get("author") or {}
         if isinstance(author, dict) and author.get("date"):
             return str(author["date"])
-    return datetime.now(UTC).isoformat()
+    return ""
 
 
 def _summary_for_row(plugin_id: str, tool_name: str, row: dict[str, Any]) -> str:
     if "commit" in row or tool_name.lower().find("commit") >= 0:
-        message = row.get("commit", {}).get("message") if isinstance(row.get("commit"), dict) else row.get("message")
+        message = (
+            row.get("commit", {}).get("message")
+            if isinstance(row.get("commit"), dict)
+            else row.get("message")
+        )
         repo = row.get("repository") or row.get("repo") or ""
         return f"GitHub commit: {str(message or row.get('sha') or 'activity')[:120]} ({repo})"
     if row.get("full_name") or row.get("name"):
@@ -158,7 +144,11 @@ def _infer_events(
             }
         )
     if plugin_id == "github" and ("commit" in tool_name.lower() or "commit" in row):
-        message = row.get("commit", {}).get("message") if isinstance(row.get("commit"), dict) else row.get("message")
+        message = (
+            row.get("commit", {}).get("message")
+            if isinstance(row.get("commit"), dict)
+            else row.get("message")
+        )
         events.append(
             {
                 "event_type": "repository_activity",
@@ -170,27 +160,21 @@ def _infer_events(
                 "summary": f"Commit: {str(message or row.get('sha') or 'activity')[:160]}",
             }
         )
-    elif plugin_id == "github" and row.get("state") and row.get("title"):
+    elif (
+        plugin_id == "github"
+        and row.get("state")
+        and row.get("title")
+        and ("issue" in tool_name.lower() or "pull_request" in tool_name.lower())
+    ):
+        is_pull_request = "pull_request" in tool_name.lower()
         events.append(
             {
-                "event_type": "issue_activity",
+                "event_type": "pull_request_activity" if is_pull_request else "issue_activity",
                 "domain": "software",
-                "metric": "issue_update",
+                "metric": "pull_request_update" if is_pull_request else "issue_update",
                 "categorical_value": str(row.get("state")),
                 "observed_at": observed,
-                "summary": f"Issue: {row.get('title')}",
-            }
-        )
-    repo = (recipe_step.arguments.get("owner"), recipe_step.arguments.get("repo")) if recipe_step else (None, None)
-    if repo[0] and repo[1] and not events:
-        events.append(
-            {
-                "event_type": "repository_activity",
-                "domain": "software",
-                "metric": "external_event",
-                "categorical_value": "synced",
-                "observed_at": observed,
-                "summary": _summary_for_row(plugin_id, tool_name, row),
+                "summary": f"{'Pull request' if is_pull_request else 'Issue'}: {row.get('title')}",
             }
         )
     return events

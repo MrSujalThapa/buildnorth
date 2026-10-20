@@ -36,12 +36,15 @@ function formatMeta(goal: Goal): string {
 }
 
 export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market {
+  const published = publishedHistoryPoints(history);
   const chart = historyToChart(history);
   const odds = chart.at(-1)?.value ?? null;
   const first = chart[0]?.value ?? null;
   const last = chart.at(-1)?.value ?? null;
-  const prev = chart.length > 1 ? chart.at(-2)?.value : null;
-  const todayReturn = last != null && prev != null ? last - prev : first != null && last != null ? last - first : null;
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const beforeToday = published.filter((point) => point.created_at && Date.parse(point.created_at) < startOfDay.getTime()).at(-1);
+  const todayReturn = last != null && beforeToday ? last - beforeToday.probability * 100 : null;
   const totalReturn = first != null && last != null ? last - first : null;
 
   return {
