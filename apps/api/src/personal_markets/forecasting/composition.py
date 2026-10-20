@@ -191,18 +191,28 @@ def _apply_parameter_overrides(
     parameters: dict[str, float],
     sources: dict[str, str],
     overrides: dict[str, Any],
-    metric: str,
     node_id: str,
+    kind: str,
 ) -> None:
+    declared = _editable_parameters(kind)
     for key, value in overrides.items():
         short = key.split(".", 1)[-1]
-        qualified = key == f"{node_id}.{short}" and short in parameters
-        if key in parameters or key == metric or qualified:
+        allowed = short in parameters or short in declared
+        qualified = key == f"{node_id}.{short}" and allowed
+        if (key == short and allowed) or qualified:
             try:
                 parameters[short] = float(value)
                 sources[short] = "user_assumption"
             except (TypeError, ValueError):
                 pass
+
+
+def _editable_parameters(kind: str) -> set[str]:
+    return {
+        "cumulative_count": {"rate"},
+        "growth": {"mu", "sigma"},
+        "continuous_threshold": {"trend", "noise"},
+    }.get(kind, set())
 
 
 def _node_state(
@@ -231,7 +241,24 @@ def _node_state(
             continue
         parameters.setdefault(name.split(".")[-1], float(item["value"]))
         sources[name.split(".")[-1]] = "prior"
-    _apply_parameter_overrides(parameters, sources, overrides, metric, node.id)
+    # Values entered through the missing-state form are stored as evidence, not
+    # request overrides. Consume only declared parameters and their explicit
+    # manual-state events; a generic rate must not bleed into a multi-node model.
+    for parameter in _editable_parameters(node.kind):
+        keys = {f"{node.id}.{parameter}"}
+        if len(spec.primitives) == 1:
+            keys.add(parameter)
+        entered = [
+            item for item in evidence
+            if item.event_type == "manual_state_entry"
+            and item.metric in keys
+            and item.numeric_value is not None
+        ]
+        if entered:
+            latest = max(entered, key=lambda item: item.observed_at or datetime.min.replace(tzinfo=UTC))
+            parameters[parameter] = float(latest.numeric_value)
+            sources[parameter] = "user_assumption"
+    _apply_parameter_overrides(parameters, sources, overrides, node.id, node.kind)
     if node.kind == "deadline_hazard":
         completed = (current is not None and float(current) >= 1) or observed_completion(
             evidence, metric, aliases
@@ -276,7 +303,7 @@ def _node_state(
                 gaps.append("performance history (at least two dated measurements)")
         parameters.setdefault("noise", 1.0)
     # Estimated parameters exist only now; explicit What If edits must replace them too.
-    _apply_parameter_overrides(parameters, sources, overrides, metric, node.id)
+    _apply_parameter_overrides(parameters, sources, overrides, node.id, node.kind)
     if node.kind == "funnel":
         stages = [str(item) for item in node.config.get("stages") or []]
         counts = []

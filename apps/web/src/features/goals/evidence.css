@@ -52,6 +52,28 @@
   color: var(--app-ink);
 }
 
+.evidence-source-tools {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.evidence-source-tools button,
+.evidence-source-tools a {
+  color: var(--app-ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.evidence-source-tools button {
+  padding: 9px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  cursor: pointer;
+}
+
 .evidence-section {
   padding: 28px 0 8px;
 }
@@ -180,6 +202,92 @@
   font-size: 15px;
 }
 
+.evidence-ref-field {
+  display: grid;
+  gap: 7px;
+  max-width: 460px;
+  margin: 14px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evidence-ref-field input,
+.upload-mapping-form input,
+.upload-mapping-form select {
+  min-height: 42px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font: inherit;
+}
+
+.evidence-activity-fieldset {
+  margin: 18px 0;
+  padding: 0;
+  border: 0;
+}
+
+.evidence-activity-fieldset legend {
+  margin-bottom: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evidence-activity-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evidence-activity-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: var(--app-bg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.evidence-activity-options label:has(input:checked) {
+  border-color: var(--app-accent);
+  color: var(--app-accent);
+}
+
+.evidence-activity-options input {
+  accent-color: var(--app-accent);
+}
+
+.evidence-resource-panel > button,
+.upload-actions button,
+.upload-mapping-form button,
+.evidence-composer-actions button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--app-ink);
+  border-radius: 8px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.evidence-resource-panel > button:disabled,
+.upload-actions button:disabled,
+.upload-mapping-form button:disabled,
+.evidence-composer-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
 .evidence-resource-list {
   list-style: none;
   margin: 12px 0 0;
@@ -234,6 +342,153 @@
   gap: 12px;
 }
 
+.evidence-manual-card {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 24px;
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: var(--app-surface);
+}
+
+.evidence-manual-card h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -.02em;
+}
+
+.evidence-manual-card .composer-form {
+  margin: 0;
+}
+
+.evidence-manual-form {
+  max-width: 720px;
+  gap: 10px;
+}
+
+.evidence-manual-form > label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evidence-manual-form textarea {
+  min-height: 108px;
+  padding: 12px 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 9px;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.evidence-composer-actions,
+.upload-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.evidence-composer-actions .field-hint {
+  margin-right: auto;
+}
+
+.file-upload-form {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.file-drop-label {
+  position: relative;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  min-height: 120px;
+  padding: 20px;
+  border: 1px dashed var(--app-border);
+  border-radius: 10px;
+  background: var(--app-bg);
+  text-align: center;
+  cursor: pointer;
+}
+
+.file-drop-label.dragging,
+.file-drop-label:focus-within {
+  border-color: var(--app-accent);
+  outline: 2px solid color-mix(in srgb, var(--app-accent) 35%, transparent);
+}
+
+.file-drop-label strong {
+  font-size: 15px;
+}
+
+.file-drop-label span {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.file-drop-label input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.upload-actions .quiet-button {
+  border-color: var(--app-border);
+  background: transparent;
+  color: var(--app-ink);
+}
+
+.upload-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--app-border);
+}
+
+.upload-progress::after {
+  content: "";
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--app-accent);
+  animation: upload-sweep 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes upload-sweep {
+  to { transform: translateX(190%); }
+}
+
+.upload-mapping-form {
+  display: grid;
+  max-width: 520px;
+  gap: 8px;
+}
+
+.upload-mapping-form label {
+  align-self: end;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.upload-mapping-form button {
+  justify-self: start;
+  margin-top: 8px;
+}
+
+.evidence-page :is(input, textarea, select, button, a):focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-progress::after { animation: none; width: 100%; }
+}
+
 .upload-preview select,
 .upload-preview input[type="file"] {
   width: 100%;
@@ -270,4 +525,7 @@
     grid-column: 1 / -1;
     justify-content: flex-end;
   }
+
+  .evidence-manual-card { padding: 18px; }
+  .upload-mapping-form { grid-template-columns: 1fr; }
 }

@@ -3,16 +3,21 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.completion import complete_validated
+from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
 from personal_markets.core.config import Settings
+from personal_markets.core.errors import SemanticProviderError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.gateway import UnifiedIntegrationGateway
-from personal_markets.integrations.mcp_domain import GoalSyncRecipeRecord, ReadCapabilityRecord, SyncRecipeStep
+from personal_markets.integrations.mcp_domain import (
+    GoalSyncRecipeRecord,
+    ReadCapabilityRecord,
+    SyncRecipeStep,
+)
 from personal_markets.integrations.plugins import PLUGIN_DEFINITIONS, PluginStatus
 from personal_markets.integrations.resource_ranker import rank_resources
 from personal_markets.ports import (
@@ -208,6 +213,8 @@ class SourcePlannerService:
     ) -> list[SyncRecipeStep]:
         capabilities: list[ReadCapabilityRecord] = await self._repository.list_capabilities(connection_id)  # type: ignore[attr-defined]
         selected = _select_capabilities(capabilities, activity_types)
+        if activity_types and not selected:
+            raise SemanticProviderError("No supported read action matches the selected activity.")
         if not selected:
             return [
                 SyncRecipeStep(
@@ -318,6 +325,20 @@ def _select_capabilities(
     if not capabilities:
         return []
     if activity_types:
+        if any((cap.tool_name or "").startswith("GITHUB_") for cap in capabilities):
+            preferred = {
+                "commits": ("GITHUB_LIST_COMMITS",),
+                "pull_requests": ("GITHUB_GET_PULL_REQUESTS", "GITHUB_LIST_PULL_REQUESTS"),
+                "issues": ("GITHUB_LIST_ISSUES_FOR_A_REPOSITORY", "GITHUB_LIST_REPOSITORY_ISSUES"),
+            }
+            selected: list[ReadCapabilityRecord] = []
+            for activity in activity_types:
+                for tool_name in preferred.get(activity, ()):
+                    match = next((cap for cap in capabilities if cap.tool_name == tool_name), None)
+                    if match is not None:
+                        selected.append(match)
+                        break
+            return selected if len(selected) == len(activity_types) else []
         wanted = {item.lower() for item in activity_types}
         matched = [
             cap
@@ -326,6 +347,7 @@ def _select_capabilities(
         ]
         if matched:
             return matched
+        return []
     return [
         min(
             capabilities,

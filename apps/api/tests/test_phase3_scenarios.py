@@ -18,7 +18,9 @@ from personal_markets.ports import (
 )
 from personal_markets.what_if.domain import InterventionChangeInput, WhatIfRequest
 from personal_markets.what_if.intervention_registry import allowed_metrics, composed_metric_units
+from personal_markets.what_if.repository import InMemorySimulationRepository
 from personal_markets.what_if.service import WhatIfService
+from personal_markets.what_if.simulation import SimulationEngine
 
 
 def _proposal(**overrides: object) -> GoalArchitectProposal:
@@ -266,7 +268,8 @@ def test_scenario_f_frozen_applicable_research_can_fill_a_rate() -> None:
     )
 
 
-def test_scenario_b_what_if_unmapped_publication_frequency() -> None:
+@pytest.mark.asyncio
+async def test_scenario_b_what_if_unmapped_publication_frequency() -> None:
     proposal = refine_architect_proposal(
         _proposal(
             title="Reach 10000 subscribers",
@@ -300,7 +303,7 @@ def test_scenario_b_what_if_unmapped_publication_frequency() -> None:
             )
         ],
     )
-    result = service._simulate_composition(goal, request, evidence)
+    result = await service._simulate_composition(goal, request, evidence, persist=False)
     assert result is not None
     assert result.status == "NOT_PRICED"
     assert result.receipt.get("causal_status") == "unmapped_intervention"
@@ -360,27 +363,29 @@ def test_critic_drops_composed_change_with_wrong_unit() -> None:
     assert critic.approved is False
 
 
-def test_composed_what_if_without_mapped_changes_is_not_priced() -> None:
+@pytest.mark.asyncio
+async def test_composed_what_if_without_mapped_changes_is_not_priced() -> None:
     goal, history = _country_goal_and_history()
     service = WhatIfService.__new__(WhatIfService)
     request = WhatIfRequest(
         goal_id=str(goal.goal_id), current_value=6, target_value=15, periods=100,
         assumptions=[], parsed_changes=[],
     )
-    result = service._simulate_composition(goal, request, history)
+    result = await service._simulate_composition(goal, request, history, persist=False)
     assert result is not None
     assert result.status == "NOT_PRICED"
     assert result.expected_uplift_pp is None
 
 
-def test_composed_rate_add_raises_probability_from_estimated_rate() -> None:
+@pytest.mark.asyncio
+async def test_composed_rate_add_raises_probability_from_estimated_rate() -> None:
     goal, history = _country_goal_and_history()
     service = WhatIfService.__new__(WhatIfService)
     request = WhatIfRequest(
         goal_id=str(goal.goal_id), current_value=6, target_value=15, periods=100,
         assumptions=[], parsed_changes=[_rate_change(2 / 52.1775)],
     )
-    result = service._simulate_composition(goal, request, history)
+    result = await service._simulate_composition(goal, request, history, persist=False)
     assert result is not None and result.priced
     assert result.expected_uplift_pp is not None and result.expected_uplift_pp > 0
     estimated = composition_numeric_inputs(goal, history)
@@ -388,6 +393,25 @@ def test_composed_rate_add_raises_probability_from_estimated_rate() -> None:
     assert result.receipt["overrides"]["primary.rate"] == pytest.approx(
         estimated.assumptions["primary.rate"] + 2 / 52.1775
     )
+
+
+@pytest.mark.asyncio
+async def test_composed_scenario_persists_without_publishing_forecast() -> None:
+    goal, history = _country_goal_and_history()
+    service = WhatIfService.__new__(WhatIfService)
+    service._repository = InMemorySimulationRepository()
+    service._engine = SimulationEngine()
+    request = WhatIfRequest(
+        goal_id=str(goal.goal_id), current_value=6, target_value=15, periods=100,
+        assumptions=[], parsed_changes=[_rate_change(2 / 52.1775)],
+    )
+    result = await service._simulate_composition(goal, request, history, persist=True)
+    assert result is not None and result.priced and result.run_id
+    assert result.persisted
+    runs = await service._repository.list_runs(goal.goal_id)
+    assert len(runs) == 1
+    assert runs[0].receipt["scenario"]["causal_status"] == "parameter_intervention"
+    assert await service._repository.history(goal.goal_id) == []
 
 
 def test_scenario_e_running_keeps_domain_adapter() -> None:

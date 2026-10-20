@@ -306,10 +306,6 @@
   cursor: default;
 }
 
-.inference-byok-form {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .choice-row {
   display: flex;
   flex-wrap: wrap;
@@ -390,6 +386,10 @@
   align-items: end;
 }
 
+.inference-settings-form.inference-byok-form {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .inference-settings-form label {
   display: grid;
   gap: 6px;
@@ -420,6 +420,21 @@
   color: var(--app-bg);
   font-weight: 650;
   cursor: pointer;
+}
+
+.inference-settings-form .model-picker button {
+  width: 100%;
+  max-width: none;
+  justify-self: stretch;
+  background: transparent;
+  color: var(--app-ink);
+  text-align: left;
+  font-weight: 500;
+}
+
+.inference-settings-form .model-picker button[aria-selected="true"] {
+  background: var(--app-ink);
+  color: var(--app-bg);
 }
 
 .inference-settings-form button:disabled { opacity: .55; cursor: default; }

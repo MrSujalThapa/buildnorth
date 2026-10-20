@@ -61,10 +61,7 @@ async def test_reconcile_creates_connection_from_active_composio_account(monkeyp
     monkeypatch.setattr(service._composio, "search_toolkits", fake_search_toolkits)
     monkeypatch.setattr(service, "_discover_and_persist", noop_discover)
 
-    views = await service.views()
-    github = next(item for item in views if item.definition.id == "github")
-    assert github.connection.status == PluginStatus.CONNECTED
-    assert github.connection.account_metadata["connected_account_id"] == "ca_OAMrxROoSCb-"
+    await service._reconcile_connections(service._default_user_id)
 
     stored = await repo.get_connection(service._default_user_id, "github")
     assert stored is not None
@@ -77,8 +74,9 @@ async def test_connect_managed_reuses_connected_account_without_reauth(monkeypat
     service = IntegrationGatewayService(repository=repo)
     owner = service._default_user_id
     now = __import__("datetime").datetime.now(__import__("datetime").UTC)
-    from personal_markets.integrations.mcp_domain import ConnectionType, PluginConnectionRecord
     from uuid import uuid4
+
+    from personal_markets.integrations.mcp_domain import ConnectionType, PluginConnectionRecord
 
     existing = PluginConnectionRecord(
         id=uuid4(),
@@ -136,6 +134,34 @@ async def test_reconcile_ignores_non_active_composio_accounts(monkeypatch: pytes
 
 
 @pytest.mark.asyncio
+async def test_reconcile_keeps_pending_oauth_request_until_status_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from personal_markets.integrations.mcp_domain import ConnectionType, PluginConnectionRecord
+
+    repo = InMemoryIntegrationRepository()
+    service = IntegrationGatewayService(repository=repo)
+    owner = service._default_user_id
+    await repo.upsert_connection(PluginConnectionRecord(
+        id=uuid4(), user_id=owner, plugin_id="github",
+        connection_type=ConnectionType.MANAGED_GATEWAY,
+        gateway_provider="composio", transport="http", auth_ref="request-1",
+        status="pending_auth", account_metadata={"connection_request_id": "request-1"},
+        created_at=datetime.now(UTC),
+    ))
+
+    async def no_active(_user_id):  # noqa: ANN001
+        return {}
+
+    monkeypatch.setattr(service._composio, "_client", object())
+    monkeypatch.setattr(service._composio, "list_active_connected_accounts", no_active)
+    await service._reconcile_connections(owner)
+    connection = await repo.get_connection(owner, "github")
+    assert connection is not None and connection.status == "pending_auth"
+
+
+@pytest.mark.asyncio
 async def test_managed_connect_discover_sync_and_dedupe() -> None:
     repo = InMemoryIntegrationRepository()
     service = IntegrationGatewayService(repository=repo)
@@ -144,9 +170,8 @@ async def test_managed_connect_discover_sync_and_dedupe() -> None:
     second = await service.sync("github")
     assert first["records_new"] == 1
     assert second["records_new"] == 0
-    views = await service.views()
-    github = next(item for item in views if item.definition.id == "github")
-    assert github.connection.status == PluginStatus.CONNECTED
+    stored = await repo.get_connection(service._default_user_id, "github")
+    assert stored is not None and stored.status == "connected"
 
 
 @pytest.mark.asyncio

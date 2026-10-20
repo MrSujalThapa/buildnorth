@@ -15,6 +15,20 @@ def _settings(**kwargs: Any) -> Settings:
     return Settings(_env_file=None, **kwargs)
 
 
+def test_profile_patch_cors_preflight() -> None:
+    with TestClient(isolated_app()) as client:
+        response = client.options(
+            "/api/v1/profile",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "PATCH",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+    assert response.status_code == 200
+    assert "PATCH" in response.headers["access-control-allow-methods"]
+
+
 def test_auto_hosted_never_falls_back_to_openai() -> None:
     settings = _settings(
         inference_provider="auto", openai_api_key="sk-openai", anthropic_api_key="sk-ant"

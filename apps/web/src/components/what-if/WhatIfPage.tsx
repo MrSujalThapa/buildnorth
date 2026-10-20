@@ -506,9 +506,7 @@ export default function WhatIfPage({
 
     if (!question.trim()) return;
 
-    simulation.setInterventionText(question.trim());
-
-    simulation.runScenario();
+    simulation.runScenario(question);
 
   }
 

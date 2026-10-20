@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type PluginConnectResponse, type PluginView } from "../api/client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { api, type PluginCatalogResponse, type PluginConnectResponse, type PluginView } from "../api/client";
 import PluginsPage from "../components/plugins/PluginsPage";
 import { isPluginConnected, pluginViewToDisplay } from "../components/plugins/pluginPresentation";
 import {
@@ -62,14 +62,14 @@ export function PluginsRoute() {
     refetchOnWindowFocus: false,
   });
 
-  const clearAuthUi = () => {
+  const clearAuthUi = useCallback(() => {
     setAuthNotice(null);
     setBlockedAuthUrl(null);
     pendingAuthUrlRef.current = null;
     authPopupRef.current?.close();
     authPopupRef.current = null;
     authRequestIdRef.current = null;
-  };
+  }, []);
 
   const presentAuthUrl = (url: string) => {
     const popup = authPopupRef.current;
@@ -152,6 +152,7 @@ export function PluginsRoute() {
     () => pluginViews.filter((plugin) => plugin.connection.status === "pending_auth" && !isPluginConnected(plugin)),
     [pluginViews],
   );
+  const pendingKey = pendingPlugins.map((plugin) => plugin.definition.id).join(",");
 
   useEffect(() => {
     const redeliver = (requestId: string) => {
@@ -188,23 +189,54 @@ export function PluginsRoute() {
   }, [connectingId]);
 
   useEffect(() => {
-    if (!pendingPlugins.length) return undefined;
-    const refreshPending = () => {
-      for (const plugin of pendingPlugins) {
-        void refreshConnection.mutateAsync(plugin.definition.id).then((result) => {
-          if (result.status === "connected") {
-            clearAuthUi();
-          }
-        });
+    if (!pendingKey) return undefined;
+    const ids = pendingKey.split(",");
+    let inFlight = false;
+    let attempts = 0;
+    let stopped = false;
+    const refreshPending = async () => {
+      if (inFlight || stopped) return;
+      if (attempts >= 24) {
+        stopped = true;
+        setAuthNotice("Still waiting for authorization. Refresh the connection from its plugin card.");
+        return;
+      }
+      inFlight = true;
+      attempts += 1;
+      try {
+        const results = await Promise.all(ids.map((id) => api.refreshPluginConnection(id)));
+        for (const result of results) {
+          if (result.status !== "connected") continue;
+          queryClient.setQueryData<PluginCatalogResponse>(["plugins", debouncedQuery], (current) => current && ({
+            ...current,
+            items: current.items.map((item) => item.definition.id === result.plugin_id
+              ? { ...item, connection: { ...item.connection, status: "connected", account_metadata: {
+                ...item.connection.account_metadata,
+                ...(result.connected_account_id ? { connected_account_id: result.connected_account_id } : {}),
+                ...(result.account_label ? { account_label: result.account_label } : {}),
+              } } }
+              : item),
+          }));
+          clearAuthUi();
+          setAuthNotice(`${result.plugin_id} connected.`);
+          void queryClient.invalidateQueries({ queryKey: ["plugins"] });
+        }
+      } catch {
+        // A transient provider failure is retried within the bounded window.
+      } finally {
+        inFlight = false;
       }
     };
-    window.addEventListener("focus", refreshPending);
-    const timer = window.setInterval(refreshPending, 5000);
+    const onFocus = () => { void refreshPending(); };
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(onFocus, 5000);
+    void refreshPending();
     return () => {
-      window.removeEventListener("focus", refreshPending);
+      stopped = true;
+      window.removeEventListener("focus", onFocus);
       window.clearInterval(timer);
     };
-  }, [pendingPlugins]);
+  }, [pendingKey, debouncedQuery, queryClient, clearAuthUi]);
 
   const displays = useMemo(() => pluginViews.map(pluginViewToDisplay), [pluginViews]);
   const viewById = useMemo(

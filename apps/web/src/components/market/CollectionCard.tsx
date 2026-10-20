@@ -30,8 +30,8 @@ export default function CollectionCard({ collection, onOpen }: Props) {
           <CollectionChart series={collection.series} interactive={false} />
         ) : (
           <div className="unpriced-state">
-            <strong>Empty collection</strong>
-            <span>Add goals to see their modeled odds together.</span>
+            <strong>{collection.progress.total ? "No measured progress yet" : "Empty collection"}</strong>
+            <span>{collection.progress.total ? "Add measurable evidence to a goal." : "Add a goal to see its progress here."}</span>
           </div>
         )}
       </div>

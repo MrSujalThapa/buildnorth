@@ -99,3 +99,44 @@ def test_clipped_growth_override_keeps_raw_probabilities() -> None:
     assert price.raw_probability == pytest.approx(edited)
     assert price.raw_probability is not None
     assert 0 < price.raw_probability < 1
+
+
+@pytest.mark.parametrize("key", ["rate", "primary.rate"])
+def test_missing_count_rate_can_be_supplied_as_manual_state(key: str) -> None:
+    proposal = refine_architect_proposal(
+        GoalArchitectProposal.model_validate(
+            {
+                "ready_to_commit": True,
+                "title": "Read 20 books",
+                "goal_type": "threshold",
+                "success_metric": "books_read_count",
+                "success_operator": ">=",
+                "success_target": "20",
+                "deadline": (datetime.now(UTC) + timedelta(days=365)).date().isoformat(),
+                "primitive_kind": "cumulative_count",
+                "state_dimensions": ["books_read_count"],
+                "current_state_known": {"books_read_count": "5"},
+                "model_family_compatibility": "exploratory_general",
+            }
+        )
+    )
+    goal = proposal_to_contract(proposal)
+    evidence = [_evidence()[-1].model_copy(update={"metric": "books_read_count", "numeric_value": 5})]
+    baseline = price_composition(goal, composition_numeric_inputs(goal, evidence))
+    assert baseline is not None and not baseline.priced
+
+    inputs = composition_numeric_inputs(goal, evidence, overrides={key: 0.5})
+    assert inputs is not None
+    priced = price_composition(goal, inputs)
+    assert priced is not None and priced.priced
+    assert priced.raw_probability is not None
+    assert inputs.assumptions["primary.rate"] == pytest.approx(0.5)
+
+    manual_rate = evidence[0].model_copy(
+        update={"event_type": "manual_state_entry", "metric": "rate", "numeric_value": 0.5}
+    )
+    from_evidence = composition_numeric_inputs(goal, [*evidence, manual_rate])
+    assert from_evidence is not None
+    published = price_composition(goal, from_evidence)
+    assert published is not None and published.priced
+    assert from_evidence.assumptions["primary.rate"] == pytest.approx(0.5)

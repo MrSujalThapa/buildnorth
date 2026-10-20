@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   api,
   type PluginView,
@@ -9,7 +10,6 @@ import {
 } from "../../api/client";
 import { PluginBrandIcon } from "../../components/plugins/PluginBrandIcon";
 import { isPluginConnected, pluginViewToDisplay } from "../../components/plugins/pluginPresentation";
-import { ExecutionProfileRadar } from "../../components/behavior/ExecutionProfileRadar";
 import { AgentProgress } from "../agents/AgentProgress";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
 import "./evidence.css";
@@ -108,8 +108,9 @@ export function EvidenceSourceWorkspace({
 }: Props) {
   const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [enabledIds, setEnabledIds] = useState<Record<string, boolean>>({});
+  const [planRequested, setPlanRequested] = useState(false);
   const [selectedResources, setSelectedResources] = useState<Record<string, string[]>>({});
+  const [repositories, setRepositories] = useState<Record<string, string>>({});
   const [resourceRefs, setResourceRefs] = useState<Record<string, string>>({});
   const [activityTypes, setActivityTypes] = useState<Record<string, string[]>>({});
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
@@ -121,19 +122,13 @@ export function EvidenceSourceWorkspace({
   const sourcePlan = useQuery({
     queryKey: ["evidence-source-plan", goalId],
     queryFn: ({ signal }) => api.evidenceSourcePlan(goalId, signal),
-    enabled: Boolean(goalId),
+    enabled: Boolean(goalId) && planRequested,
   });
   const recipes = useQuery({
     queryKey: ["evidence-source-recipes", goalId],
     queryFn: ({ signal }) => api.evidenceSourceRecipes(goalId, signal),
     enabled: Boolean(goalId),
   });
-  const behavior = useQuery({
-    queryKey: ["behavior-profile", goalId],
-    queryFn: ({ signal }) => api.behaviorProfile(goalId, signal),
-    enabled: Boolean(goalId),
-  });
-
   const cards = useMemo(
     () => buildSourceCards(sourcePlan.data, plugins.data ?? []),
     [plugins.data, sourcePlan.data],
@@ -171,10 +166,6 @@ export function EvidenceSourceWorkspace({
     },
   });
 
-  const toggleEnabled = (pluginId: string) => {
-    setEnabledIds((current) => ({ ...current, [pluginId]: !(current[pluginId] ?? true) }));
-  };
-
   const toggleActivity = (pluginId: string, activity: string) => {
     setActivityTypes((current) => {
       const existing = new Set(current[pluginId] ?? []);
@@ -185,6 +176,11 @@ export function EvidenceSourceWorkspace({
   };
 
   const buildResourceIds = (pluginId: string, card: SourceCardModel) => {
+    if (pluginId === "github") {
+      const repository = (repositories.github ?? "").trim();
+      const branch = (resourceRefs.github ?? "").trim();
+      return repository ? [`${repository}${branch ? `@${branch}` : ""}`] : [];
+    }
     const base =
       selectedResources[pluginId]?.length
         ? (selectedResources[pluginId] ?? [])
@@ -207,7 +203,6 @@ export function EvidenceSourceWorkspace({
   const sections: { key: SourceBucket; title: string }[] = [
     { key: "recommended", title: "Recommended sources" },
     { key: "connected", title: "Connected sources" },
-    { key: "other", title: "Other available sources" },
   ];
 
   return (
@@ -233,19 +228,17 @@ export function EvidenceSourceWorkspace({
             ) : null}
             {sourcePlan.data?.goal_type ? <span>Type: {sourcePlan.data.goal_type}</span> : null}
           </div>
-          {sourcePlan.data?.manual_fallback_note ? (
-            <p className="field-hint">{sourcePlan.data.manual_fallback_note}</p>
-          ) : null}
         </header>
 
-        {behavior.data ? <ExecutionProfileRadar compact profile={behavior.data} /> : null}
-
-        {sourcePlan.isLoading || plugins.isLoading ? <p role="status">Planning evidence sources…</p> : null}
+        {plugins.isLoading ? <p role="status">Loading connected sources…</p> : null}
+        <div className="evidence-source-tools">
+          <button type="button" onClick={() => { if (planRequested) void sourcePlan.refetch(); else setPlanRequested(true); }} disabled={sourcePlan.isFetching}>
+            {sourcePlan.isFetching ? "Finding sources…" : "Find relevant sources"}
+          </button>
+          <Link to="/plugins">Browse integrations</Link>
+        </div>
         {sourcePlan.isError ? (
-          <div className="unpriced-state">
-            <strong>Source plan unavailable</strong>
-            <span>Connect plugins first or retry.</span>
-          </div>
+          <p className="field-hint" role="alert">Suggestions are unavailable. Connected sources still work.</p>
         ) : null}
 
         {sections.map((section) => {
@@ -259,7 +252,6 @@ export function EvidenceSourceWorkspace({
               </div>
               <div className="evidence-source-grid">
                 {sectionCards.map((card) => {
-                  const enabled = enabledIds[card.pluginId] ?? card.enabled;
                   const expanded = expandedId === card.pluginId;
                   return (
                     <div key={card.pluginId}>
@@ -309,36 +301,26 @@ export function EvidenceSourceWorkspace({
                             {card.lastSyncLabel ? <span className="evidence-pill">{card.lastSyncLabel}</span> : null}
                           </span>
                         </span>
-                        <span className="evidence-source-actions">
-                          <button
-                            type="button"
-                            className="evidence-toggle"
-                            aria-pressed={enabled}
-                            aria-label={`${enabled ? "Disable" : "Enable"} ${card.name} for this goal`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              toggleEnabled(card.pluginId);
-                            }}
-                          >
-                            {enabled ? "On" : "Off"}
-                          </button>
-                        </span>
                       </button>
                       {expanded ? (
                         <SourceResourcePanel
                           source={card}
                           selectedResources={selectedResources[card.pluginId] ?? []}
                           resourceRef={resourceRefs[card.pluginId] ?? ""}
+                          repository={repositories[card.pluginId] ?? ""}
                           selectedActivities={activityTypes[card.pluginId] ?? []}
                           onResourceRefChange={(value) =>
                             setResourceRefs((current) => ({ ...current, [card.pluginId]: value }))
+                          }
+                          onRepositoryChange={(value) =>
+                            setRepositories((current) => ({ ...current, [card.pluginId]: value }))
                           }
                           onToggleActivity={(activity) => toggleActivity(card.pluginId, activity)}
                           onToggleResource={(resourceId) => toggleResource(card.pluginId, resourceId)}
                           onApprove={() =>
                             saveRecipe.mutate({
                               pluginId: card.pluginId,
-                              label: card.resources[0]?.label ?? card.name,
+                              label: card.pluginId === "github" ? (repositories.github ?? "").trim() : card.resources[0]?.label ?? card.name,
                               resourceIds: buildResourceIds(card.pluginId, card),
                               activityTypes: activityTypes[card.pluginId],
                             })
@@ -362,22 +344,7 @@ export function EvidenceSourceWorkspace({
                 {savedRecipes.map((recipe: SourceRecipeRecord) => (
                   <li key={`${recipe.plugin_id}-${recipe.label}`}>
                     <strong>{recipe.plugin_id}</strong>: {recipe.label}
-                    {recipe.steps?.length ? (
-                      <span className="field-hint">
-                        {" "}
-                        · {recipe.steps.length} step(s)
-                        {recipe.steps.map((step, index) => (
-                          <span key={`${step.capability_id}-${index}`}>
-                            {" "}
-                            [{step.tool_name ?? step.capability_id}:{" "}
-                            {Object.entries(step.arguments ?? {})
-                              .map(([key, value]) => `${key}=${String(value)}`)
-                              .join(", ")}
-                            ]
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
+                    {recipe.steps?.length ? <span className="field-hint"> · {recipe.steps.length} read action(s)</span> : null}
                   </li>
                 ))}
               </ul>
@@ -394,9 +361,6 @@ export function EvidenceSourceWorkspace({
 
         <section className="evidence-manual-card">
           <h2>Manual evidence</h2>
-          <p className="field-hint">
-            Use this for notes the connected sources cannot see. Connected records remain the stronger evidence class.
-          </p>
           <EvidenceWorkflow
             goalId={goalId}
             embedded
@@ -414,6 +378,9 @@ export function EvidenceSourceWorkspace({
 
 function DatasetUpload({ goalId }: { goalId: string }) {
   const queryClient = useQueryClient();
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [valueColumn, setValueColumn] = useState("");
   const [timeColumn, setTimeColumn] = useState("");
   const [metric, setMetric] = useState("");
@@ -424,9 +391,23 @@ function DatasetUpload({ goalId }: { goalId: string }) {
   const send = useMutation({
     mutationFn: (file: File) => api.uploadDataset(goalId, file),
     onSuccess: () => {
+      setFile(null);
       void queryClient.invalidateQueries({ queryKey: ["uploads", goalId] });
     },
   });
+  const chooseFile = (candidate?: File) => {
+    if (!candidate) return;
+    if (!/\.(csv|xlsx|pdf|txt|md)$/i.test(candidate.name)) {
+      setFileError("Choose a CSV, Excel, PDF, or text file.");
+      return;
+    }
+    if (candidate.size > 5_000_000) {
+      setFileError("File must be under 5 MB.");
+      return;
+    }
+    setFile(candidate);
+    setFileError(null);
+  };
   const latest = uploads.data?.at(-1);
   const map = useMutation({
     mutationFn: () => {
@@ -450,22 +431,32 @@ function DatasetUpload({ goalId }: { goalId: string }) {
     <section className="evidence-manual-card">
       <h2>Upload a dataset</h2>
       <form
-        className="composer-form file-drop"
+        className="file-upload-form"
         onSubmit={(event) => {
           event.preventDefault();
-          const input = event.currentTarget.elements.namedItem("dataset") as HTMLInputElement | null;
-          const file = input?.files?.[0];
           if (file) send.mutate(file);
         }}
       >
-        <label className="file-drop-label" htmlFor="dataset">
-          <span>Drop a CSV, Excel, PDF, or text file, or choose one</span>
-          <input id="dataset" name="dataset" type="file" accept=".csv,.xlsx,.pdf,.txt,.md" />
+        <label
+          className={`file-drop-label${dragging ? " dragging" : ""}`}
+          htmlFor="dataset"
+          onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+          onDragLeave={(event) => { event.preventDefault(); setDragging(false); }}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); chooseFile(event.dataTransfer.files[0]); }}
+        >
+          <strong>{file ? file.name : "Drop a file here"}</strong>
+          <span>{file ? `${(file.size / 1024).toFixed(0)} KB · Choose another file` : "or choose a CSV, Excel, PDF, or text file · 5 MB max"}</span>
+          <input id="dataset" name="dataset" type="file" accept=".csv,.xlsx,.pdf,.txt,.md" onChange={(event) => chooseFile(event.target.files?.[0])} />
         </label>
-        <button type="submit" disabled={send.isPending}>
+        <div className="upload-actions">
+          {file ? <button type="button" className="quiet-button" onClick={() => { setFile(null); setFileError(null); }}>Remove</button> : null}
+          <button type="submit" disabled={send.isPending || !file}>
           {send.isPending ? "Uploading…" : "Upload"}
-        </button>
-        {send.error ? <p className="field-hint">{String(send.error)}</p> : null}
+          </button>
+        </div>
+        {send.isPending ? <div className="upload-progress" role="progressbar" aria-label="Upload in progress" /> : null}
+        {fileError || send.error ? <p className="field-hint" role="alert">{fileError ?? String(send.error)}</p> : null}
+        {send.isSuccess ? <p className="field-hint" role="status">Upload complete.</p> : null}
       </form>
       {latest ? (
         <div className="upload-preview">
@@ -475,7 +466,7 @@ function DatasetUpload({ goalId }: { goalId: string }) {
           </p>
           {columns.length ? (
             <form
-              className="composer-form"
+              className="upload-mapping-form"
               onSubmit={(event) => {
                 event.preventDefault();
                 map.mutate();
@@ -504,6 +495,8 @@ function DatasetUpload({ goalId }: { goalId: string }) {
               <button type="submit" disabled={map.isPending || !(valueColumn || columns[1])}>
                 {map.isPending ? "Importing…" : "Import measurements"}
               </button>
+              {map.isSuccess ? <p className="field-hint" role="status">Measurements imported.</p> : null}
+              {map.isError ? <p className="field-hint" role="alert">{String(map.error)}</p> : null}
             </form>
           ) : (
             <p className="field-hint">This file is stored as research text. It is not used as model instructions.</p>
@@ -518,8 +511,10 @@ function SourceResourcePanel({
   source,
   selectedResources,
   resourceRef,
+  repository,
   selectedActivities,
   onResourceRefChange,
+  onRepositoryChange,
   onToggleActivity,
   onToggleResource,
   onApprove,
@@ -528,8 +523,10 @@ function SourceResourcePanel({
   source: SourceCardModel;
   selectedResources: string[];
   resourceRef: string;
+  repository: string;
   selectedActivities: string[];
   onResourceRefChange: (value: string) => void;
+  onRepositoryChange: (value: string) => void;
   onToggleActivity: (activity: string) => void;
   onToggleResource: (resourceId: string) => void;
   onApprove: () => void;
@@ -539,16 +536,22 @@ function SourceResourcePanel({
     queryKey: ["plugin-resources", source.pluginId],
     queryFn: ({ signal }) => api.pluginResources(source.pluginId, signal),
     staleTime: 60_000,
+    enabled: source.pluginId !== "github",
   });
   const capabilities = useQuery({
     queryKey: ["plugin-capabilities", source.pluginId],
     queryFn: ({ signal }) => api.pluginCapabilities(source.pluginId, signal),
     staleTime: 60_000,
   });
-  const activityOptions =
-    source.pluginId === "github"
-      ? ["commits", "prs", "reviews", "issues"]
-      : (capabilities.data ?? []).map((item) => item.label.toLowerCase());
+  const githubActivities = [
+    { value: "commits", label: "Commits", tools: ["GITHUB_LIST_COMMITS"] },
+    { value: "pull_requests", label: "Pull requests", tools: ["GITHUB_GET_PULL_REQUESTS", "GITHUB_LIST_PULL_REQUESTS"] },
+    { value: "issues", label: "Issues", tools: ["GITHUB_LIST_ISSUES_FOR_A_REPOSITORY", "GITHUB_LIST_REPOSITORY_ISSUES"] },
+  ];
+  const activityOptions = source.pluginId === "github"
+    ? githubActivities.filter((activity) => (capabilities.data ?? []).some((item) => activity.tools.includes(item.tool_name ?? "")))
+    : (capabilities.data ?? []).slice(0, 6).map((item) => ({ value: item.label.toLowerCase(), label: item.label }));
+  const validRepository = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository.trim());
   const rankedPlan = [...source.resources].sort((left, right) => {
     const rank = (item: (typeof source.resources)[number]) =>
       item.recommended || item.goal_relevance === "high" ? 0 : item.goal_relevance === "medium" ? 1 : 2;
@@ -579,12 +582,15 @@ function SourceResourcePanel({
 
   return (
     <div className="evidence-resource-panel">
-      <h3>Choose what counts as evidence</h3>
-      <p className="field-hint">
-        {source.contributes.length ? `Can contribute: ${source.contributes.join(", ")}` : source.rationale}
-      </p>
-      {resources.isLoading ? <p className="field-hint">Loading provider resources…</p> : null}
-      {options.length ? (
+      <h3>{source.pluginId === "github" ? "GitHub evidence" : "Choose what counts as evidence"}</h3>
+      {source.pluginId === "github" ? (
+        <label className="evidence-ref-field">
+          <span>Repository</span>
+          <input value={repository} onChange={(event) => onRepositoryChange(event.target.value)} placeholder="owner/repository" autoComplete="off" />
+        </label>
+      ) : null}
+      {resources.isLoading ? <p className="field-hint">Loading resources…</p> : null}
+      {source.pluginId !== "github" && options.length ? (
         <ul className="evidence-resource-list">
           {options.map((resource) => {
             const checked = selectedResources.includes(resource.resource_id);
@@ -609,14 +615,12 @@ function SourceResourcePanel({
             );
           })}
         </ul>
-      ) : (
-        <p className="field-hint">Use the whole connected source for this goal.</p>
-      )}
+      ) : null}
       {source.pluginId === "github" || source.pluginId === "notion" || source.pluginId === "google_sheets" ? (
         <label className="evidence-ref-field">
           <span>
             {source.pluginId === "github"
-              ? "Branch / ref / SHA"
+              ? "Branch (optional)"
               : source.pluginId === "google_sheets"
                 ? "Tab or range (optional)"
                 : "Page scope (optional)"}
@@ -627,7 +631,7 @@ function SourceResourcePanel({
             value={resourceRef}
             onChange={(event) => onResourceRefChange(event.target.value)}
             placeholder={
-              source.pluginId === "github" ? "codex/pass-6-end-to-end-product" : "Leave blank for default scope"
+              source.pluginId === "github" ? "main" : "Leave blank for default scope"
             }
           />
         </label>
@@ -637,26 +641,21 @@ function SourceResourcePanel({
           <legend>Read activity</legend>
           <div className="evidence-activity-options">
             {activityOptions.map((activity) => (
-              <label key={activity}>
+              <label key={activity.value}>
                 <input
                   type="checkbox"
-                  checked={selectedActivities.includes(activity)}
-                  onChange={() => onToggleActivity(activity)}
+                  checked={selectedActivities.includes(activity.value)}
+                  onChange={() => onToggleActivity(activity.value)}
                 />
-                {activity}
+                {activity.label}
               </label>
             ))}
           </div>
         </fieldset>
       ) : null}
-      {capabilities.data?.length ? (
-        <p className="field-hint">
-          Discovered read tools:{" "}
-          {capabilities.data.map((item) => item.tool_name ?? item.label).join(", ")}
-        </p>
-      ) : null}
-      <button type="button" disabled={approvePending || !source.connected} onClick={onApprove}>
-        {approvePending ? "Saving recipe…" : "Approve sync recipe"}
+      {source.pluginId === "github" && repository && !validRepository ? <p className="field-hint" role="alert">Enter a repository as owner/name.</p> : null}
+      <button type="button" disabled={approvePending || !source.connected || (source.pluginId === "github" && (!validRepository || !selectedActivities.length))} onClick={onApprove}>
+        {approvePending ? "Saving…" : "Save source"}
       </button>
     </div>
   );

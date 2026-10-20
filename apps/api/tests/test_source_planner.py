@@ -5,18 +5,38 @@ import pytest
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
-from personal_markets.agents.source_planner_service import SourcePlannerService
+from personal_markets.agents.source_planner_service import (
+    SourcePlannerService,
+    _select_capabilities,
+)
 from personal_markets.core.config import Settings
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
+from personal_markets.integrations.mcp_domain import ReadCapabilityRecord
 from personal_markets.persistence.agent_store import (
     InMemoryAgentRunStore,
     InMemoryEvidenceRepository,
 )
 from personal_markets.wiring import get_integration_repository, integration_gateway_for
+
+
+def test_github_recipe_selects_only_requested_read_actions() -> None:
+    connection_id = uuid4()
+    names = ["GITHUB_LIST_COMMITS", "GITHUB_GET_PULL_REQUESTS", "GITHUB_GET_A_REPOSITORY"]
+    capabilities = [
+        ReadCapabilityRecord(
+            id=uuid4(), plugin_connection_id=connection_id,
+            capability_id=name.lower(), label=name, operation="read",
+            tool_name=name, approved=True,
+        )
+        for name in names
+    ]
+    selected = _select_capabilities(capabilities, ["commits", "pull_requests"])
+    assert [item.tool_name for item in selected] == names[:2]
+    assert _select_capabilities(capabilities, ["reviews"]) == []
 
 
 @pytest.mark.asyncio

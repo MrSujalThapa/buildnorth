@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type Goal,
@@ -52,7 +52,7 @@ export function useWhatIfSimulation(
     enabled: Boolean(goalId),
   });
   const [values, setValues] = useState<TuneValues | null>(null);
-  const [interventionText, setInterventionText] = useState("");
+  const pendingScenario = useRef<string | null>(null);
   const simulation = useMutation({ mutationFn: (body: Record<string, unknown>) => api.fastReprice(body) });
   const persistSimulation = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.simulateWhatIf(body),
@@ -109,7 +109,7 @@ export function useWhatIfSimulation(
       periods: values.periods,
       direction: baseline.data.direction,
       assumptions,
-      parsed_changes: parseIntervention.data?.changes ?? [],
+      parsed_changes: [],
       intervention: {
         id: readText(defaultIntervention.id, "primary-plan"),
         title: readText(defaultIntervention.title, "Scenario plan"),
@@ -125,7 +125,7 @@ export function useWhatIfSimulation(
       },
       config: baseline.data.config,
     };
-  }, [assumptions, baseline.data, goal, parseIntervention.data?.changes, plan, targetDimension, values]);
+  }, [assumptions, baseline.data, goal, plan, targetDimension, values]);
 
   useEffect(() => {
     if (!request) return;
@@ -133,49 +133,48 @@ export function useWhatIfSimulation(
     return () => window.clearTimeout(timer);
   }, [request, mutateScenario]);
 
-  useEffect(() => {
-    const trimmed = interventionText.trim();
-    if (!trimmed || !goalId) {
-      parseIntervention.reset();
-      return;
-    }
-    const timer = window.setTimeout(() => parseIntervention.mutate(trimmed), 450);
-    return () => window.clearTimeout(timer);
-  }, [interventionText, goalId, parseIntervention]);
-
   const preview: WhatIfPreview | null = useMemo(() => {
     if (!market) return null;
     return previewFromResult(market, plan, baseline.data, scenarioResult);
   }, [baseline.data, market, plan, scenarioResult]);
 
-  function runScenario() {
-    if (!request || !interventionText.trim()) return;
-    const trimmed = interventionText.trim();
-    const submit = (parsed: { changes?: unknown[] }) => {
-      const body = {
-        ...request,
-        parsed_changes: parsed.changes ?? [],
-      };
-      persistSimulation.mutate(body, {
-        onSuccess: () => {
-          simulation.mutate(body);
-          options?.onScenarioPersisted?.();
-        },
-      });
-    };
-    if (parseIntervention.data?.changes) {
-      submit(parseIntervention.data);
+  function runScenario(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (!request) {
+      pendingScenario.current = trimmed;
       return;
     }
-    parseIntervention.mutate(trimmed, { onSuccess: submit });
+    pendingScenario.current = null;
+    parseIntervention.mutate(trimmed, {
+      onSuccess: (parsed) => {
+        const body = {
+          ...request,
+          parsed_changes: parsed.changes,
+          intervention: { ...request.intervention, title: trimmed },
+        };
+        persistSimulation.mutate(body, {
+          onSuccess: () => {
+            simulation.mutate(body);
+            options?.onScenarioPersisted?.();
+          },
+        });
+      },
+    });
   }
+
+  useEffect(() => {
+    if (request && pendingScenario.current) {
+      const text = pendingScenario.current;
+      pendingScenario.current = null;
+      runScenario(text);
+    }
+  }, [request]);
 
   return {
     baseline,
     values,
     setValues,
-    interventionText,
-    setInterventionText,
     parseIntervention,
     simulation,
     persistSimulation,

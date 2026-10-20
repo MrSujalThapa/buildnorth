@@ -133,8 +133,8 @@ class WhatIfService:
                 return fixture
         return await self._simulate(request, persist=False)
 
-    def _simulate_composition(
-        self, goal: GoalContract, request: WhatIfRequest, evidence: list
+    async def _simulate_composition(
+        self, goal: GoalContract, request: WhatIfRequest, evidence: list, *, persist: bool
     ) -> WhatIfResult | None:
         from personal_markets.forecasting.compiler import spec_from_mapping
         from personal_markets.forecasting.composition import (
@@ -249,7 +249,7 @@ class WhatIfService:
                 "scenario, not an actionable intervention with identified causal support."
             )
         )
-        return WhatIfResult(
+        result = WhatIfResult(
             priced=True,
             status="EXPLORATORY",
             message=message,
@@ -267,6 +267,9 @@ class WhatIfService:
                 "numerical_bound": bound,
             },
         )
+        if persist:
+            return await self._persist(request, result, spec.family, spec.compiler_version)
+        return result
 
     @staticmethod
     def _unmapped_changes_result(
@@ -301,7 +304,7 @@ class WhatIfService:
 
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
-            composed = self._simulate_composition(goal, request, evidence)
+            composed = await self._simulate_composition(goal, request, evidence, persist=persist)
             if composed is not None:
                 return composed
             request = self._apply_behavior_execution(goal, request, evidence)
@@ -1241,6 +1244,8 @@ class WhatIfService:
             "critic_decision": "DETERMINISTIC_PUBLISH_EXPLORATORY",
             "llm_used": False,
         }
+        if result.receipt:
+            receipt["scenario"] = result.receipt
         run, created, history_created = await self._repository.append(
             goal_id=UUID(request.goal_id),
             run_kind="impact",

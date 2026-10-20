@@ -124,6 +124,11 @@ def startup_requirements() -> tuple[StateRequirement, ...]:
 
 def composition_requirements(spec: dict[str, Any]) -> tuple[StateRequirement, ...]:
     requirements: list[StateRequirement] = []
+    primitives = spec.get("primitives") or []
+    first = primitives[0] if primitives else {}
+    time_unit = str((first.get("config") or {}).get("time_unit") or "week")
+    observable = (spec.get("observable_inputs") or [{}])[0]
+    count_unit = str(observable.get("unit") or first.get("unit") or "items")
     for item in spec.get("observable_inputs") or []:
         metric = str(item.get("metric") or "")
         if not metric:
@@ -139,14 +144,14 @@ def composition_requirements(spec: dict[str, Any]) -> tuple[StateRequirement, ..
             )
         )
     for name in spec.get("required_parameters") or []:
+        count_rate = name == "rate" and first.get("kind") == "cumulative_count"
         requirements.append(
             StateRequirement(
                 key=name,
-                label=name.replace("_", " "),
-                unit="parameter",
-                why=(
-                    "The compiled model needs this parameter from your history "
-                    "or an explicit assumption."
+                label=f"{count_unit.capitalize()} per {time_unit}" if count_rate else name.replace("_", " "),
+                unit=f"{count_unit}/{time_unit}" if count_rate else "parameter",
+                why="Your expected pace, based on history or your own assumption." if count_rate else (
+                    "The model needs this parameter from your history or an explicit assumption."
                 ),
                 required=True,
             )

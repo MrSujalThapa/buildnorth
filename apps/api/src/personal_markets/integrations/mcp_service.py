@@ -150,7 +150,10 @@ class IntegrationGatewayService:
                 continue
             if plugin_id in active_by_toolkit:
                 continue
-            if connection.status in {"connected", "pending_auth"}:
+            # A newly authorized account can take time to appear in Composio's
+            # account listing. Keep the request pending until refresh confirms
+            # its outcome; demoting it here stops the client's pending poll.
+            if connection.status == "connected":
                 await self._repository.update_connection(connection.id, status="not_connected")
 
     async def search_catalog(
