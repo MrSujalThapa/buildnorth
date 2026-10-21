@@ -593,8 +593,11 @@ class IntegrationGatewayService:
         run = await self._repository.start_run(connection.id)
         records_read = 0
         raw_rows: list[RawSourceRecord] = []
+        last_tool: str | None = None
+        argument_keys: list[str] = []
         try:
             for step in steps_to_run:
+                last_tool = step.tool_name
                 cursor = await self._repository.get_cursor(connection.id, step.capability_id)
                 arguments = {
                     key: value
@@ -603,6 +606,7 @@ class IntegrationGatewayService:
                 }
                 if cursor and cursor.cursor_value:
                     arguments["since"] = cursor.cursor_value
+                argument_keys = sorted(arguments)
                 if not step.tool_name:
                     raise ValueError("Saved source has no supported read action. Select a source again.")
                 started = time.perf_counter()
@@ -706,6 +710,15 @@ class IntegrationGatewayService:
                 "new_records": [item.model_dump(mode="json") for item in inserted_rows],
             }
         except Exception as exc:  # noqa: BLE001
+            if plugin_id == "notion":
+                _log.warning(
+                    "source_sync_read_failed",
+                    provider=plugin_id,
+                    tool=last_tool,
+                    argument_keys=argument_keys,
+                    error_type=type(exc).__name__,
+                    reason=str(exc)[:240],
+                )
             await self._repository.finish_run(
                 run.id,
                 status="failed",
