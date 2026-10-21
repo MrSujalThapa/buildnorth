@@ -90,6 +90,14 @@ def test_plugins_catalog_keeps_manual_and_csv_when_composio_is_off() -> None:
         assert body["items"]
 
 
+def test_connected_plugin_view_does_not_require_remote_catalog() -> None:
+    app = isolated_app()
+    with TestClient(app) as client:
+        response = client.get("/api/v1/plugins/connected")
+        assert response.status_code == 200, response.text
+        assert response.json() == []
+
+
 def test_goals_dashboard_returns_histories_in_one_payload() -> None:
     app = isolated_app()
     with TestClient(app) as client:

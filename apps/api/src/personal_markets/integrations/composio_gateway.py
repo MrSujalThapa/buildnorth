@@ -347,47 +347,41 @@ class ComposioIntegrationGateway:
         connected_account_id: str | None,
     ) -> list[MCPResourceDescriptor]:
         """Discover selectable resources via approved read tools where available."""
-        tools = await self.list_tools(user_id, toolkit_slug)
-        resource_tools = [
-            tool
-            for tool in tools
-            if any(
-                token in tool.name.lower()
-                for token in (
-                    "list_repositories",
-                    "list_repos",
-                    "list_pages",
-                    "list_databases",
-                    "list_spreadsheets",
-                    "list_sheets",
-                    "list_calendars",
-                    "list_files",
-                    "list_folders",
-                    "list_labels",
-                    "list_threads",
-                    "search_notion_page",
-                    "list_accessible_repositories",
-                )
-            )
-        ]
-        if not resource_tools:
-            return []
-        tool = resource_tools[0]
+        preferred = {
+            "github": "GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER",
+            "notion": "NOTION_SEARCH_NOTION_PAGE",
+        }.get(toolkit_slug)
+        if preferred:
+            tool_name = preferred
+        else:
+            tools = await self.list_tools(user_id, toolkit_slug)
+            resource_tools = [
+                tool for tool in tools
+                if any(token in tool.name.lower() for token in (
+                    "list_repositories", "list_repos", "list_pages", "list_databases",
+                    "list_spreadsheets", "list_sheets", "list_calendars", "list_files",
+                    "list_folders", "list_labels", "list_threads",
+                ))
+            ]
+            if not resource_tools:
+                return []
+            tool_name = resource_tools[0].name
         payload = await self.execute_tool(
             user_id,
-            tool.name,
+            tool_name,
             {},
             connected_account_id=connected_account_id,
         )
         resources: list[MCPResourceDescriptor] = []
         rows = (
             payload.get("records") or payload.get("items") or payload.get("results")
+            or payload.get("repositories") or payload.get("pages")
             or payload.get("data") or []
         )
         if isinstance(rows, dict):
             rows = (
                 rows.get("items") or rows.get("repositories") or rows.get("results")
-                or rows.get("data") or []
+                or rows.get("pages") or rows.get("data") or []
             )
         if not isinstance(rows, list):
             return resources
@@ -418,7 +412,9 @@ class ComposioIntegrationGateway:
             )
             label = str(row.get("full_name") or row.get("name") or title or resource_id)
             resource_type = str(
-                row.get("object")
+                ("private" if row["private"] else "public")
+                if isinstance(row.get("private"), bool)
+                else row.get("object")
                 or row.get("type")
                 or row.get("kind")
                 or row.get("mimeType")

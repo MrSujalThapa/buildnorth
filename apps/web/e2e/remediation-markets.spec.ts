@@ -24,6 +24,7 @@ test("markets and collection stay clear at desktop and mobile widths", async ({ 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok" } }));
   await page.route("**/api/v1/goals/dashboard", (route) => route.fulfill({ json: { goals: [goal], histories: { [goal.goal_id]: [] }, collections: [collection] } }));
+  await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [goal] }));
   await page.route("**/api/v1/collections/**", (route) => route.fulfill({ json: collection }));
   await page.goto("/markets");
   await expect(page.getByRole("heading", { name: "Your outcomes" })).toBeVisible();
@@ -45,6 +46,12 @@ test("markets and collection stay clear at desktop and mobile widths", async ({ 
   await page.getByRole("button", { name: "Open Personal collection" }).click();
   await expect(page.getByRole("heading", { name: "Personal" })).toBeVisible();
   await expect(page.getByText("62%", { exact: true })).toBeVisible();
+  await page.screenshot({ path: `test-results/remediation-collection-${testInfo.project.name}.png`, fullPage: true });
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "Edit collection" });
+  await expect(editor.getByLabel(goal.title)).toBeVisible();
+  await page.screenshot({ path: `test-results/remediation-collection-editor-${testInfo.project.name}.png` });
+  await editor.getByRole("button", { name: "Cancel" }).click();
   await page.getByText("Goals and calculation").click();
   await expect(page.getByText("1 of 1 goals have published odds.")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

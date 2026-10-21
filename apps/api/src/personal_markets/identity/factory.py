@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 
 def reset_identity_state() -> None:
+    get_identity_service.cache_clear()
     get_credential_store.cache_clear()
     get_identity_repository.cache_clear()
     get_budget_store.cache_clear()
@@ -37,6 +38,7 @@ def get_identity_repository():
     return repo
 
 
+@lru_cache
 def get_identity_service() -> IdentityService:
     return IdentityService(get_identity_repository(), get_settings())
 

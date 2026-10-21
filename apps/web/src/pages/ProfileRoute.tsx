@@ -135,21 +135,20 @@ export function ProfileRoute() {
           save.mutate({ display_name: field("display_name"), username: field("username"), bio: field("bio") });
         }}>
           <h2 id="edit-profile-title">Edit profile</h2>
-          <label htmlFor="display_name">Display name</label><input id="display_name" name="display_name" defaultValue={fields.display_name ?? ""} maxLength={80} autoFocus />
-          <label htmlFor="username">Username</label><input id="username" name="username" defaultValue={fields.username ?? ""} maxLength={24} />
-          <label htmlFor="bio">Bio</label><textarea id="bio" name="bio" rows={3} defaultValue={fields.bio ?? ""} maxLength={280} />
+          <label htmlFor="display_name">Display name</label><input id="display_name" name="display_name" className="ui-field" autoComplete="name" defaultValue={fields.display_name ?? ""} maxLength={80} />
+          <label htmlFor="username">Username</label><input id="username" name="username" className="ui-field" autoComplete="username" spellCheck={false} defaultValue={fields.username ?? ""} maxLength={24} />
+          <label htmlFor="bio">Bio</label><textarea id="bio" name="bio" className="ui-field" rows={3} defaultValue={fields.bio ?? ""} maxLength={280} />
           {save.isError ? <p role="alert">Could not save profile. Check the username and try again.</p> : null}
-          <div className="composer-actions"><button type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</button><button type="button" className="secondary" onClick={() => setEditing(false)}>Cancel</button></div>
+          <div className="composer-actions"><button type="submit" className="ui-button" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</button><button type="button" className="secondary ui-button ui-button-secondary" onClick={() => setEditing(false)}>Cancel</button></div>
         </form>
       </div> : null}
       {editingDimensions ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-dimensions-title">
         <div className="confirm-card profile-editor profile-dimension-editor">
           <h2 id="edit-dimensions-title">Your dimensions</h2>
-          <p>Choose goals for each dimension.</p>
           {dimensions.map((item, index) => <div className="profile-dimension-row" key={index}>
-            <input aria-label={`Dimension ${index + 1} name`} value={item.label} maxLength={32} onChange={(event) => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
+            <input className="ui-field" aria-label={`Dimension ${index + 1} name`} value={item.label} maxLength={32} onChange={(event) => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
             <div className="profile-dimension-controls"><button type="button" disabled={index === 0} onClick={() => setDimensions((current) => moved(current, index, index - 1))}>↑</button><button type="button" disabled={index === dimensions.length - 1} onClick={() => setDimensions((current) => moved(current, index, index + 1))}>↓</button><button type="button" onClick={() => setDimensions((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</button></div>
-            <div className="profile-dimension-goals">{goals.data?.map((goal) => <label key={goal.goal_id}><input type="checkbox" checked={item.goal_ids.includes(goal.goal_id)} onChange={() => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, goal_ids: row.goal_ids.includes(goal.goal_id) ? row.goal_ids.filter((id) => id !== goal.goal_id) : [...row.goal_ids, goal.goal_id] } : row))} />{goal.title}</label>)}</div>
+            <div className="profile-dimension-goals">{goals.data?.map((goal) => <label key={goal.goal_id} className="ui-choice"><input type="checkbox" checked={item.goal_ids.includes(goal.goal_id)} onChange={() => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, goal_ids: row.goal_ids.includes(goal.goal_id) ? row.goal_ids.filter((id) => id !== goal.goal_id) : [...row.goal_ids, goal.goal_id] } : row))} />{goal.title}</label>)}</div>
           </div>)}
           <button type="button" className="markets-select" disabled={dimensions.length >= 12} onClick={() => setDimensions((current) => [...current, { label: "", goal_ids: [] }])}>Add dimension</button>
           {saveDimensions.isError ? <p role="alert">Could not save dimensions.</p> : null}

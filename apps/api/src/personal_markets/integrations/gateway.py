@@ -18,6 +18,9 @@ class UnifiedIntegrationGateway:
     async def views(self) -> list[PluginView]:
         return await self._mcp.views(self._user_id)
 
+    async def connected_views(self) -> list[PluginView]:
+        return await self._mcp.connected_views(self._user_id)
+
     async def search_catalog(
         self,
         *,

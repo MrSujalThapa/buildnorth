@@ -262,6 +262,17 @@ class IntegrationGatewayService:
         catalog = await self.search_catalog(limit=50, user_id=user_id, reconcile=reconcile)
         return [PluginView.model_validate(item) for item in catalog["items"]]
 
+    async def connected_views(self, user_id: UUID | None = None) -> list[PluginView]:
+        """Return stored connections without waiting for the remote toolkit catalog."""
+        owner = self._owner(user_id)
+        connections = {
+            item.plugin_id: item for item in await self._repository.list_connections(owner)
+        }
+        return [
+            view for view in await self._local_plugin_views(connections)
+            if view.definition.id in connections
+        ]
+
     async def _local_plugin_views(
         self, connections: dict[str, PluginConnectionRecord]
     ) -> list[PluginView]:

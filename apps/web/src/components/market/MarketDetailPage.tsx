@@ -153,7 +153,6 @@ export default function MarketDetailPage({
         </header>
 
         <div className="market-heading">
-          <div className="market-eyebrow">{market.category}</div>
           <h1>{market.title}</h1>
           <p className="market-meta">{market.meta}</p>
         </div>
@@ -250,13 +249,6 @@ export default function MarketDetailPage({
                 ) : null}
               </div>
             ) : null}
-          </section>
-        ) : null}
-
-        {market.modelExplanation ? (
-          <section className="market-section model-note">
-            <h2>Model</h2>
-            <p>{market.modelExplanation}</p>
           </section>
         ) : null}
 

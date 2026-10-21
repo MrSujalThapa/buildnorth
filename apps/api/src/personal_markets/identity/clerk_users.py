@@ -1,6 +1,42 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
+
 import httpx
+
+
+class VerifiedEmailCache:
+    """Bounded, short-lived cache for Clerk's verified primary email lookup."""
+
+    def __init__(
+        self,
+        lookup: Callable[[str, str], tuple[str | None, bool]] | None = None,
+        ttl_seconds: float = 60.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._lookup = lookup or lookup_verified_email
+        self._ttl = ttl_seconds
+        self._clock = clock
+        self._entries: dict[str, tuple[float, str]] = {}
+
+    def resolve(self, clerk_user_id: str, secret: str) -> tuple[str | None, bool]:
+        now = self._clock()
+        cached = self._entries.get(clerk_user_id)
+        if cached and cached[0] > now:
+            return cached[1], True
+        email, verified = self._lookup(clerk_user_id, secret)
+        if email and verified:
+            if len(self._entries) >= 256:
+                self._entries = {
+                    key: value for key, value in self._entries.items() if value[0] > now
+                }
+                if len(self._entries) >= 256:
+                    self._entries.pop(next(iter(self._entries)))
+            self._entries[clerk_user_id] = (now + self._ttl, email)
+        else:
+            self._entries.pop(clerk_user_id, None)
+        return email, verified
 
 
 def lookup_verified_email(clerk_user_id: str, secret: str) -> tuple[str | None, bool]:

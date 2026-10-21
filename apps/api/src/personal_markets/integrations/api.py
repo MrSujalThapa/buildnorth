@@ -29,6 +29,14 @@ async def plugins(
     return await gateway.search_catalog(search=search, cursor=cursor, limit=limit)
 
 
+@router.get("/connected")
+async def connected_plugins(
+    gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
+) -> list[dict[str, object]]:
+    views = await gateway.connected_views()
+    return [view.model_dump(mode="json") for view in views]
+
+
 @router.post("/{plugin_id}/connect")
 async def connect_managed(
     plugin_id: str,

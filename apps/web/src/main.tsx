@@ -9,6 +9,7 @@ import { App } from "./App";
 import { queryClient } from "./app/query-client";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./template-index.css";
+import "./components/ui/controls.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

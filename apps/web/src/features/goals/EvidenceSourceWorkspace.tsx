@@ -45,7 +45,7 @@ function formatProbability(value: number | null | undefined): string | undefined
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function buildSourceCards(plan: SourcePlannerProposal | undefined, plugins: PluginView[]): SourceCardModel[] {
+function buildSourceCards(plan: SourcePlannerProposal | undefined, plugins: PluginView[], savedIds: Set<string>): SourceCardModel[] {
   const displayById = new Map(plugins.map((plugin) => [plugin.definition.id, pluginViewToDisplay(plugin)]));
   const pluginById = new Map(plugins.map((plugin) => [plugin.definition.id, plugin]));
   const recommendedIds = new Set((plan?.recommended ?? []).map((item) => item.plugin_id));
@@ -76,13 +76,13 @@ function buildSourceCards(plan: SourcePlannerProposal | undefined, plugins: Plug
     if (id === "manual" || id === "csv" || recommendedIds.has(id)) continue;
     const display = displayById.get(id)!;
     const connected = isPluginConnected(plugin);
-    if (!connected && irrelevantIds.has(id)) continue;
+    if (!connected && irrelevantIds.has(id) && !savedIds.has(id)) continue;
     cards.push({
       pluginId: id,
       name: display.name,
       description: display.description,
       logoUrl: plugin.definition.logo_url ?? undefined,
-      bucket: connected ? "connected" : "other",
+      bucket: connected || savedIds.has(id) ? "connected" : "other",
       relevance: irrelevantIds.has(id) ? "low relevance" : connected ? "available" : "not connected",
       rationale:
         plan?.irrelevant.find((item) => item.plugin_id === id)?.rationale ??
@@ -116,8 +116,9 @@ export function EvidenceSourceWorkspace({
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const plugins = useQuery({
-    queryKey: ["plugins"],
-    queryFn: ({ signal }) => api.plugins(signal),
+    queryKey: ["plugins-connected"],
+    queryFn: ({ signal }) => api.connectedPlugins(signal),
+    staleTime: 30_000,
   });
   const sourcePlan = useQuery({
     queryKey: ["evidence-source-plan", goalId],
@@ -145,8 +146,8 @@ export function EvidenceSourceWorkspace({
     void queryClient.invalidateQueries({ queryKey: ["what-if-baseline", goalId] });
   }, [goalId, queryClient, syncJob.data?.id, syncJob.data?.status]);
   const cards = useMemo(
-    () => buildSourceCards(sourcePlan.data, plugins.data ?? []),
-    [plugins.data, sourcePlan.data],
+    () => buildSourceCards(sourcePlan.data, plugins.data ?? [], new Set((recipes.data ?? []).map((recipe) => recipe.plugin_id))),
+    [plugins.data, sourcePlan.data, recipes.data],
   );
 
   const saveRecipe = useMutation({
@@ -342,7 +343,7 @@ export function EvidenceSourceWorkspace({
               <ul className="evidence-recipe-list" aria-label="Saved sources">
                 {savedRecipes.map((recipe: SourceRecipeRecord) => (
                   <li key={`${recipe.plugin_id}-${recipe.label}`}>
-                    {recipe.label}
+                    {recipe.label}{plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin)) ? " · Reconnect source" : ""}
                   </li>
                 ))}
               </ul>
@@ -552,6 +553,7 @@ function SourceResourcePanel({
     queryKey: ["plugin-capabilities", source.pluginId],
     queryFn: ({ signal }) => api.pluginCapabilities(source.pluginId, signal),
     staleTime: 60_000,
+    enabled: source.connected,
   });
   const githubActivities = [
     { value: "commits", label: "Commits", tools: ["GITHUB_LIST_COMMITS"] },
@@ -585,15 +587,16 @@ function SourceResourcePanel({
   return (
     <div className="evidence-resource-panel">
       <h3>{source.pluginId === "github" ? "GitHub evidence" : "Choose what counts as evidence"}</h3>
+      {!source.connected ? <p className="field-hint">Reconnect {source.name} in <Link to="/plugins">Plugins</Link> to choose sources.</p> : null}
       {resources.isLoading ? <p className="field-hint">Loading resources…</p> : null}
-      {options.length > 6 ? <input className="evidence-resource-search" type="search" aria-label={`Search ${source.name} sources`} placeholder={source.pluginId === "github" ? "Search repositories" : "Search pages"} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
+      {options.length ? <input className="evidence-resource-search ui-field" type="search" aria-label={`Search ${source.name} sources`} name={`search_${source.pluginId}_sources`} autoComplete="off" placeholder={source.pluginId === "github" ? "Search repositories" : "Search pages"} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
       {options.length ? (
         <ul className="evidence-resource-list">
           {visibleOptions.map((resource) => {
             const checked = selectedResources.includes(resource.resource_id);
             return (
               <li key={resource.resource_id}>
-                <label>
+                <label className="ui-choice">
                   <input
                     type={source.pluginId === "github" ? "radio" : "checkbox"}
                     checked={checked}
@@ -619,6 +622,7 @@ function SourceResourcePanel({
                 : "Range (optional)"}
           </span>
           <input
+            className="ui-field"
             name={`resource-ref-${source.pluginId}`}
             autoComplete="off"
             value={resourceRef}
@@ -634,7 +638,7 @@ function SourceResourcePanel({
           <legend>Read activity</legend>
           <div className="evidence-activity-options">
             {activityOptions.map((activity) => (
-              <label key={activity.value}>
+              <label key={activity.value} className="ui-choice">
                 <input
                   type="checkbox"
                   checked={selectedActivities.includes(activity.value)}
@@ -648,7 +652,7 @@ function SourceResourcePanel({
       ) : null}
       {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
       {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
-      <button type="button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={onApprove}>
+      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={onApprove}>
         {approvePending ? "Saving…" : "Save source"}
       </button>
     </div>

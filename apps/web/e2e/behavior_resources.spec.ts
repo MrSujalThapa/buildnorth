@@ -200,6 +200,9 @@ test.describe("Resource-specific evidence", () => {
         },
       }),
     );
+    await page.route("**/api/v1/plugins/connected", (route) =>
+      route.fulfill({ json: [pluginView("notion", "Notion"), pluginView("github", "GitHub")] }),
+    );
     await page.route("**/api/v1/plugins", (route) => {
       if (route.request().url().includes("/resources")) return route.fallback();
       return route.fulfill({

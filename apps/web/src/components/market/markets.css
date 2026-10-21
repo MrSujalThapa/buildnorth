@@ -217,6 +217,38 @@
   margin: 0;
 }
 
+.confirm-card .composer-actions {
+  margin-top: 10px;
+}
+
+.confirm-card .composer-actions button {
+  min-height: 40px;
+  padding: 9px 16px;
+  border: 1px solid var(--app-ink);
+  border-radius: 8px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.confirm-card .composer-actions button.secondary {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-ink);
+}
+
+.confirm-card .composer-actions button.danger {
+  border-color: #9c4232;
+  background: #9c4232;
+}
+
+.confirm-card .composer-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .market-card.is-selected {
   outline: 2px solid var(--app-accent);
   outline-offset: 2px;
@@ -245,15 +277,22 @@
 }
 
 .collection-chart,
-.collection-chart-plot,
-.collection-detail-chart {
+.collection-chart-plot {
   width: 100%;
   height: 100%;
 }
 
 .collection-detail-chart {
-  min-height: 240px;
+  width: 100%;
   margin-bottom: 24px;
+}
+
+.collection-detail-chart .collection-chart {
+  height: 230px;
+}
+
+.collection-detail-chart.is-sparse .collection-chart {
+  height: 118px;
 }
 
 .collection-chart-empty,
@@ -351,6 +390,35 @@
   align-items: center;
   gap: 10px;
   padding: 8px 0;
+}
+
+.collection-editor-goal input[type="checkbox"],
+.profile-dimension-goals input[type="checkbox"] {
+  appearance: none;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  background: var(--app-surface);
+  cursor: pointer;
+}
+
+.collection-editor-goal input[type="checkbox"]:checked,
+.profile-dimension-goals input[type="checkbox"]:checked {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+}
+
+.collection-editor-goal input[type="checkbox"]:checked::after,
+.profile-dimension-goals input[type="checkbox"]:checked::after {
+  display: block;
+  content: "✓";
+  color: white;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
 }
 
 .profile-avatar {

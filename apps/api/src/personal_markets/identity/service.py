@@ -13,7 +13,7 @@ from personal_markets.core.errors import (
     SemanticProviderError,
     UnauthorizedError,
 )
-from personal_markets.identity.clerk_users import lookup_verified_email
+from personal_markets.identity.clerk_users import VerifiedEmailCache
 from personal_markets.identity.domain import (
     AccountView,
     HostedUsage,
@@ -30,9 +30,15 @@ _USERNAME = re.compile(r"^[a-z0-9_]{3,24}$")
 
 
 class IdentityService:
-    def __init__(self, repository: IdentityRepository, settings: Settings) -> None:
+    def __init__(
+        self,
+        repository: IdentityRepository,
+        settings: Settings,
+        email_cache: VerifiedEmailCache | None = None,
+    ) -> None:
         self._repository = repository
         self._settings = settings
+        self._email_cache = email_cache or VerifiedEmailCache()
 
     async def principal_from_claims(self, claims: TokenClaims) -> Principal:
         claims.pop("role", None)
@@ -43,7 +49,7 @@ class IdentityService:
             and self._settings.clerk_secret_key
             and claims.get("iss") != "playitout-test"
         ):
-            looked_up, looked_verified = lookup_verified_email(
+            looked_up, looked_verified = self._email_cache.resolve(
                 claims.clerk_user_id, self._settings.clerk_secret_key
             )
             email = email or looked_up
@@ -71,8 +77,8 @@ class IdentityService:
                 invitation_id=None,
                 now=datetime.now(UTC),
             )
-        fresh = await self._repository.get_user(stored.user_id)
-        return fresh or stored
+            return await self._repository.get_user(stored.user_id) or stored
+        return stored
 
     async def create_invitation(
         self,
@@ -193,7 +199,9 @@ class IdentityService:
         display = patch.display_name if patch.display_name is not None else current.display_name
         bio = patch.bio if patch.bio is not None else current.bio
         avatar = patch.avatar_value if patch.avatar_value is not None else current.avatar_value
-        dimensions = patch.dimensions if "dimensions" in patch.model_fields_set else current.dimensions
+        dimensions = (
+            patch.dimensions if "dimensions" in patch.model_fields_set else current.dimensions
+        )
         updated = UserProfile(
             display_name=(display or "").strip() or None,
             username=username or None,

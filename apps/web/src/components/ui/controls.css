@@ -1,0 +1,82 @@
+/* Shared form controls for the application surfaces. */
+.ui-field {
+  min-height: 44px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+}
+
+textarea.ui-field { padding-block: 11px; }
+
+.ui-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--app-ink);
+  border-radius: 8px;
+  background: var(--app-ink);
+  color: var(--app-bg);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ui-button:hover:not(:disabled) { opacity: .86; }
+.ui-button:disabled { opacity: .45; cursor: not-allowed; }
+.ui-button.ui-button-secondary {
+  border-color: var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-ink);
+}
+
+.ui-choice {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.ui-choice input[type="checkbox"],
+.ui-choice input[type="radio"] {
+  appearance: none;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  background: var(--app-surface);
+  cursor: pointer;
+}
+
+.ui-choice input[type="radio"] { border-radius: 50%; }
+.ui-choice input:checked { border-color: var(--app-accent); background: var(--app-accent); }
+.ui-choice input[type="checkbox"]:checked::after {
+  display: block;
+  content: "✓";
+  color: #fff;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
+}
+.ui-choice input[type="radio"]:checked::after {
+  display: block;
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 5px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.ui-field:focus-visible,
+.ui-button:focus-visible,
+.ui-choice:focus-within {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}

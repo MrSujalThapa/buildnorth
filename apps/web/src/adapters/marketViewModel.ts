@@ -32,7 +32,7 @@ function formatMeta(goal: Goal): string {
     day: "numeric",
     year: "numeric",
   });
-  return `${goal.goal_type.replaceAll("_", " ")} · Deadline ${deadline} · ${goal.forecast_status}`;
+  return `Deadline ${deadline} · ${goal.forecast_status.toLowerCase()}`;
 }
 
 export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market {

@@ -846,6 +846,8 @@ export const api = {
     const body = await api.pluginsCatalog(signal, search, cursor);
     return body.items;
   },
+  connectedPlugins: (signal?: AbortSignal) =>
+    request<PluginView[]>("/api/v1/plugins/connected", undefined, signal),
   searchPlugins: (search: string, cursor?: string, signal?: AbortSignal) => {
     const params = new URLSearchParams({ search });
     if (cursor) params.set("cursor", cursor);

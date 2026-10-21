@@ -246,7 +246,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--app-border);
   border-radius: 999px;
@@ -260,8 +260,46 @@
   color: var(--app-accent);
 }
 
-.evidence-activity-options input {
-  accent-color: var(--app-accent);
+.evidence-activity-options input,
+.evidence-resource-list input {
+  appearance: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  background: var(--app-surface);
+  cursor: pointer;
+}
+
+.evidence-resource-list input[type="radio"] {
+  border-radius: 50%;
+}
+
+.evidence-activity-options input:checked,
+.evidence-resource-list input:checked {
+  border-color: var(--app-accent);
+  background: var(--app-accent);
+}
+
+.evidence-activity-options input:checked::after,
+.evidence-resource-list input[type="checkbox"]:checked::after {
+  display: block;
+  content: "✓";
+  color: white;
+  font-size: 13px;
+  line-height: 15px;
+  text-align: center;
+}
+
+.evidence-resource-list input[type="radio"]:checked::after {
+  display: block;
+  content: "";
+  width: 5px;
+  height: 5px;
+  margin: 5px;
+  border-radius: 50%;
+  background: white;
 }
 
 .evidence-resource-panel > button,

@@ -49,6 +49,8 @@ export function CollectionDetailRoute() {
   if (collection.isError || !collection.data) return <main className="markets-page"><section className="markets-shell"><p role="alert">Collection unavailable.</p></section></main>;
 
   const view = collection.data;
+  const hasHistory = view.series.some((item) => item.points.length > 0);
+  const hasTrajectory = view.series.some((item) => item.points.length > 1);
   const startEditing = () => {
     setName(view.collection.name);
     setMemberIds(view.collection.goal_ids);
@@ -66,10 +68,10 @@ export function CollectionDetailRoute() {
           </div>
         </header>
         {view.collection.name === "Acceptance test collection" ? <div className="collection-rename-offer"><span>Rename this collection to Personal?</span><button type="button" className="markets-select" disabled={renameSuggestion.isPending} onClick={() => renameSuggestion.mutate()}>Rename</button>{renameSuggestion.isError ? <span role="alert">Personal already exists, or the rename could not be saved.</span> : null}</div> : null}
-        <section className="collection-detail-chart" aria-label="Collection odds">
+        <section className={`collection-detail-chart${hasHistory ? hasTrajectory ? "" : " is-sparse" : " is-empty"}`} aria-label="Collection odds">
           <div className="market-price">{view.portfolio_odds == null ? "—" : `${view.portfolio_odds.toFixed(0)}%`}</div>
           <div className="market-price-hint">{view.change_pp == null ? "—" : `${view.change_pp >= 0 ? "+" : ""}${view.change_pp.toFixed(1)} percentage points today`}</div>
-          <CollectionChart series={view.series} interactive={false} />
+          {hasHistory ? <CollectionChart series={view.series} interactive={false} /> : null}
         </section>
         <details className="collection-details">
           <summary>Goals and calculation</summary>
@@ -91,13 +93,13 @@ export function CollectionDetailRoute() {
           <form className="confirm-card collection-editor" onSubmit={(event) => { event.preventDefault(); if (name.trim()) save.mutate(); }}>
             <h2 id="edit-collection-title">Edit collection</h2>
             <label htmlFor="edit-collection-name">Name</label>
-            <input id="edit-collection-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus />
+            <input id="edit-collection-name" name="collection_name" className="ui-field" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
             <fieldset>
               <legend>Goals</legend>
-              {goals.data?.map((goal) => <label key={goal.goal_id} className="collection-editor-goal"><input type="checkbox" checked={memberIds.includes(goal.goal_id)} onChange={() => setMemberIds((current) => current.includes(goal.goal_id) ? current.filter((id) => id !== goal.goal_id) : [...current, goal.goal_id])} />{goal.title}</label>)}
+              {goals.data?.map((goal) => <label key={goal.goal_id} className="collection-editor-goal ui-choice"><input type="checkbox" checked={memberIds.includes(goal.goal_id)} onChange={() => setMemberIds((current) => current.includes(goal.goal_id) ? current.filter((id) => id !== goal.goal_id) : [...current, goal.goal_id])} />{goal.title}</label>)}
             </fieldset>
             {save.isError ? <p role="alert">Could not save collection. Check the name and try again.</p> : null}
-            <div className="composer-actions"><button type="submit" disabled={save.isPending || !name.trim()}>Save</button><button type="button" className="secondary" onClick={() => setEditing(false)}>Cancel</button></div>
+            <div className="composer-actions"><button type="submit" className="ui-button" disabled={save.isPending || !name.trim()}>Save</button><button type="button" className="secondary ui-button ui-button-secondary" onClick={() => setEditing(false)}>Cancel</button></div>
           </form>
         </div>
       ) : null}

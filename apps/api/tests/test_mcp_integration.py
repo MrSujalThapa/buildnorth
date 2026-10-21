@@ -408,6 +408,30 @@ async def test_composio_failed_read_is_not_treated_as_evidence() -> None:
 
 
 @pytest.mark.asyncio
+async def test_resource_discovery_prefers_authenticated_github_repositories() -> None:
+    from uuid import uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+    async def unexpected_tools(*_args, **_kwargs):
+        raise AssertionError("known resource pickers must avoid a full toolkit scan")
+
+    gateway.list_tools = unexpected_tools  # type: ignore[method-assign]
+    chosen: list[str] = []
+
+    async def execute(_user_id, tool_name, _arguments, **_kwargs):
+        chosen.append(tool_name)
+        return {"repositories": [{"full_name": "owner/repo", "private": True}]}
+
+    gateway.execute_tool = execute  # type: ignore[method-assign]
+    resources = await gateway.list_resources(uuid4(), "github", connected_account_id="account-1")
+    assert chosen == ["GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER"]
+    assert [item.name for item in resources] == ["owner/repo"]
+
+
+@pytest.mark.asyncio
 async def test_connected_notion_is_visible_without_catalog_page_containing_it() -> None:
     from datetime import UTC, datetime
     from uuid import uuid4
