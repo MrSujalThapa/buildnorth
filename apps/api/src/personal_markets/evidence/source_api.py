@@ -6,16 +6,18 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.behavior.service import BehaviorService
-from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
 from personal_markets.integrations.goal_sync_jobs import GoalSyncJob, get_goal_sync_job_store
+from personal_markets.integrations.source_watches import SourceWatch, get_source_watch_store
 from personal_markets.ports import SourcePlannerProposal
 from personal_markets.wiring import (
     get_evidence_service,
     get_goal_service,
+    get_integration_repository,
     get_source_planner_service,
 )
 
@@ -29,6 +31,20 @@ class SaveRecipeBody(BaseModel):
     resource_ids: list[str] = Field(default_factory=list)
     approved: bool = True
     activity_types: list[str] = Field(default_factory=list)
+
+
+class SaveWatchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plugin_id: str = Field(min_length=1)
+    resource_id: str = Field(min_length=1)
+    interval_minutes: int = Field(default=60, ge=15, le=10080)
+
+
+class WatchStatusBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
 
 
 @router.get("/{goal_id}/evidence/sources/plan", response_model=SourcePlannerProposal)
@@ -46,6 +62,72 @@ async def list_goal_recipes(
 ) -> list[dict[str, object]]:
     recipes = await planner.list_recipes(str(goal_id))
     return [item.model_dump(mode="json") for item in recipes]
+
+
+@router.get("/{goal_id}/evidence/sources/watches", response_model=list[SourceWatch])
+async def list_source_watches(
+    goal_id: UUID,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> list[SourceWatch]:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    return await get_source_watch_store().list_for_goal(principal.user_id, goal_id)
+
+
+@router.post("/{goal_id}/evidence/sources/watches", response_model=SourceWatch)
+async def save_source_watch(
+    goal_id: UUID,
+    body: SaveWatchBody,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> SourceWatch:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    repo = get_integration_repository()
+    recipe = await repo.get_goal_recipe(goal_id, body.plugin_id)
+    connection = await repo.get_connection(principal.user_id, body.plugin_id)
+    if (
+        not recipe
+        or not recipe.approved
+        or not connection
+        or connection.status != "connected"
+        or recipe.plugin_connection_id != connection.id
+    ):
+        raise SemanticProviderError("Approve this connected source before enabling monitoring.")
+    expected_uri = f"composio://{body.plugin_id}/{body.resource_id}"
+    if not any(step.resource_uri == expected_uri for step in recipe.steps):
+        raise SemanticProviderError(
+            "Select an approved source resource before enabling monitoring."
+        )
+    return await get_source_watch_store().save(
+        SourceWatch(
+            owner_id=principal.user_id,
+            goal_id=goal_id,
+            plugin_connection_id=connection.id,
+            plugin_id=body.plugin_id,
+            resource_id=body.resource_id,
+            scope="resource",
+            interval_minutes=body.interval_minutes,
+        )
+    )
+
+
+@router.patch("/{goal_id}/evidence/sources/watches/{watch_id}", response_model=SourceWatch)
+async def update_source_watch(
+    goal_id: UUID,
+    watch_id: UUID,
+    body: WatchStatusBody,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> SourceWatch:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    if body.status not in {"active", "paused", "revoked"}:
+        raise SemanticProviderError("Choose active, paused, or revoked.")
+    watch = await get_source_watch_store().set_status(
+        principal.user_id, goal_id, watch_id, body.status
+    )
+    if watch is None:
+        raise ResourceNotFoundError("Source watch not found")
+    return watch
 
 
 @router.post("/{goal_id}/evidence/sources/{plugin_id}/recipe")

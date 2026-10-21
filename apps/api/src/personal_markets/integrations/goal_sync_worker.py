@@ -13,6 +13,7 @@ import structlog
 from personal_markets.core.config import get_settings
 from personal_markets.integrations.goal_sync_jobs import GoalSyncJob, get_goal_sync_job_store
 from personal_markets.integrations.goal_sync_service import GoalSyncService
+from personal_markets.integrations.source_watches import get_source_watch_store
 from personal_markets.wiring import get_integration_repository, integration_gateway_for
 
 _log = structlog.get_logger(__name__)
@@ -26,6 +27,10 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
         "run_id": str(job.id),
         "started_at": job.started_at.isoformat() if job.started_at else None,
     }
+    watch_uris = None
+    if job.receipt.get("origin") == "watch":
+        active_uris = await get_source_watch_store().active_resource_uris(job.owner_id, job.goal_id)
+        watch_uris = sorted(active_uris & set(job.receipt.get("watch_resource_uris", [])))
     service = GoalSyncService(
         settings=get_settings(),
         gateway=integration_gateway_for(job.owner_id),
@@ -36,6 +41,7 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
         owner_id=job.owner_id,
         job_id=job.id,
         replay_job_ids=[UUID(value) for value in job.receipt.get("replay_job_ids", [])],
+        watch_resource_uris=watch_uris,
     )
 
     async def stage(status: str, values: dict[str, Any]) -> None:
@@ -96,8 +102,12 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
 
 async def goal_sync_worker(application: Any, stop: asyncio.Event) -> None:
     store = get_goal_sync_job_store()
+    last_watch_check = 0.0
     while not stop.is_set():
         try:
+            if asyncio.get_running_loop().time() - last_watch_check >= 60:
+                await get_source_watch_store().enqueue_due()
+                last_watch_check = asyncio.get_running_loop().time()
             await store.expire_stranded()
             job = await store.claim()
             if job is None:

@@ -417,4 +417,16 @@ Vercel marked `77d96c1` Ready. In the signed-in deployed app, desktop and 375 px
 
 The `bb47d68` percentage-point wording and readable extracted reading events were also checked in the deployed browser, superseding the earlier pending visual note for outcome 1. The final Markets change leaves outcomes 1–3 and 7 at PASS. Outcomes 4–5 remain PARTIAL because only one member has live priced odds; a two-priced-goal fixture passed desktop/mobile interaction and screenshot review. Outcomes 9, 13, 15–17 and 19 retain the limits in the matrix above.
 
+### Extended remediation status — 2026-10-21
+
+The newer autonomous observability and behavioral-execution brief extends the original 19-item matrix. The prior 11 PASS labels are limited to their stated tests and are not an acceptance of these new requirements.
+
+**PARTIAL — execution-profile correction.** `e738eb6` removes goal-progress fallback and unpaired action trials from the radar; six execution traits now separate behavior from interest-area filters. Targeted behavior tests and desktop/mobile fixture browser paths pass. Durable commitments, chronological validation, calibrated execution probabilities and What If integration remain open.
+
+**PARTIAL — persisted exact-resource monitoring foundation.** Migration `0020` adds owner-scoped watches, pause/revoke state and scheduling checkpoints. Scheduled jobs use the existing evidence/forecast pipeline with an exact approved-resource allowlist and recheck active consent before reading. A standalone scheduled runner is prepared. It has not been run against production, and no paid external cron service has been provisioned. Parent-scoped Notion descendant discovery, provider triggers, automatic new-report E2E, monitoring UI and ongoing worker reliability remain open. Autonomous observability is not PASS.
+
+**PARTIAL — latency visibility.** `f672f76` adds correlated route-duration logs and a bounded client session retry state. No valid authenticated p50/p95 before/after result has been collected for this revision. Free Render cold starts remain a release blocker for responsive navigation and reliable in-process scheduling.
+
+No new live data was seeded and no paid inference was run for this extension. The original 19-item statuses stay as previously recorded until each is rechecked after deployment.
+
 Four targeted Playwright cases passed on desktop and mobile, including the two-series chart fixture; the web production build passed. The last desktop/mobile console sample contained only the Clerk development-key warning. A fresh Render `/health` request after inactivity took 29.7 seconds to return 200, confirming a cold-start risk. No authenticated p50/p95 or sub-two-second claim is made. No additional paid inference was used for this release check.

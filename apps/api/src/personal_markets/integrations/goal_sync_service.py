@@ -24,6 +24,7 @@ class GoalSyncService:
         owner_id=None,
         job_id: UUID | None = None,
         replay_job_ids: list[UUID] | None = None,
+        watch_resource_uris: list[str] | None = None,
     ) -> None:
         self._settings = settings
         self._gateway = gateway
@@ -34,6 +35,9 @@ class GoalSyncService:
         self._owner_id = owner_id
         self._job_id = job_id
         self._replay_job_ids = replay_job_ids or []
+        self._watch_resource_uris = (
+            set(watch_resource_uris) if watch_resource_uris is not None else None
+        )
 
     async def sync_goal_sources(
         self,
@@ -46,6 +50,20 @@ class GoalSyncService:
         goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         recipes = await self._repository.list_goal_recipes(goal.goal_id)
         approved = [item for item in recipes if item.approved]
+        if self._watch_resource_uris is not None:
+            approved = [
+                item.model_copy(
+                    update={
+                        "steps": [
+                            step
+                            for step in item.steps
+                            if step.resource_uri in self._watch_resource_uris
+                        ]
+                    }
+                )
+                for item in approved
+            ]
+            approved = [item for item in approved if item.steps]
         if not approved:
             return {"status": "no_recipes", "message": "No approved goal-specific sync recipes."}
 
@@ -64,9 +82,7 @@ class GoalSyncService:
         )
 
         new_records: list[RawSourceRecord] = list(replay)
-        replayed_providers = {
-            str(record.cursor_context.get("source_type")) for record in replay
-        }
+        replayed_providers = {str(record.cursor_context.get("source_type")) for record in replay}
         scanned = 0
         run_ids: list[str] = []
         for recipe in approved:

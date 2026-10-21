@@ -169,7 +169,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     from personal_markets.integrations.goal_sync_worker import goal_sync_worker
 
     sync_stop = asyncio.Event()
-    sync_worker = asyncio.create_task(goal_sync_worker(application, sync_stop))
+    import os
+
+    sync_worker = (
+        None
+        if os.getenv("PLAYITOUT_WATCH_RUNNER") == "1"
+        else asyncio.create_task(goal_sync_worker(application, sync_stop))
+    )
     async with AsyncExitStack() as stack:
         remote = getattr(application.state, "remote_mcp", None)
         if remote is not None:
@@ -178,9 +184,10 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             yield
         finally:
             sync_stop.set()
-            sync_worker.cancel()
-            with suppress(asyncio.CancelledError):
-                await sync_worker
+            if sync_worker is not None:
+                sync_worker.cancel()
+                with suppress(asyncio.CancelledError):
+                    await sync_worker
     if checkpointer_cm is not None:
         await checkpointer_cm.__aexit__(None, None, None)
 
