@@ -1,4 +1,4 @@
-﻿.utility-page {
+.utility-page {
   min-height: 100vh;
   background: var(--app-bg);
   color: var(--app-text);
@@ -336,7 +336,7 @@
 }
 
 .choice-row button[aria-pressed="true"],
-.model-picker button[aria-selected="true"] {
+.model-picker button[aria-pressed="true"] {
   background: var(--app-ink);
   color: var(--app-bg);
   border-color: var(--app-ink);
@@ -433,7 +433,7 @@
   font-weight: 500;
 }
 
-.inference-settings-form .model-picker button[aria-selected="true"] {
+.inference-settings-form .model-picker button[aria-pressed="true"] {
   background: var(--app-ink);
   color: var(--app-bg);
 }

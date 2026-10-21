@@ -66,7 +66,7 @@ test("manage provider credentials and explicit billing without exposing saved ke
   await expect(page.getByText(/Validated connection · ••••1234/)).toBeVisible();
   await expect(page.getByLabel("Replacement API key")).toBeEmpty();
   await expect(page.getByText("Current mode: BYOK")).toBeVisible();
-  await page.getByRole("option", { name: /GPT-5.4 mini/ }).click();
+  await page.getByRole("button", { name: /GPT-5.4 mini/ }).click();
   await page.getByRole("button", { name: "Save BYOK preference" }).click();
   await expect(page.getByText("BYOK preference saved.")).toBeVisible();
   await expect(page.getByText(/Your OpenAI or Anthropic account pays/)).toBeVisible();
@@ -82,12 +82,12 @@ test("manage provider credentials and explicit billing without exposing saved ke
   await page.getByLabel("API key", { exact: true }).fill("sk-ant-test-private-9012");
   await page.getByRole("button", { name: "Connect and use my key" }).click();
   await expect(page.getByText(/Validated connection · ••••9012/)).toBeVisible();
-  await page.getByRole("option", { name: /Claude Sonnet 5.5/ }).click();
+  await page.getByRole("button", { name: /Claude Sonnet 5.5/ }).click();
   await page.getByRole("button", { name: "Save BYOK preference" }).click();
   await expect(page.getByText("BYOK preference saved.")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "Anthropic" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("option", { name: /Claude Sonnet 5.5/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("button", { name: /Claude Sonnet 5.5/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("body")).not.toContainText("sk-ant-test-private");
   const saved = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
   expect(saved).not.toContain("sk-ant-test-private");

@@ -181,11 +181,10 @@ export function InferenceSettings({
                     onChange={(event) => setModelQuery(event.target.value)}
                   />
                 </label>
-                <div className="model-picker" role="listbox" aria-label="Compatible model">
+                <div className="model-picker" role="group" aria-label="Compatible model">
                   <button
                     type="button"
-                    role="option"
-                    aria-selected={!model}
+                    aria-pressed={!model}
                     disabled={busy}
                     onClick={() => setModel("")}
                   >
@@ -195,8 +194,7 @@ export function InferenceSettings({
                     <button
                       key={item.model}
                       type="button"
-                      role="option"
-                      aria-selected={model === item.model}
+                      aria-pressed={model === item.model}
                       disabled={busy || !item.structured}
                       onClick={() => setModel(item.model)}
                     >

@@ -1,4 +1,4 @@
-﻿import { Copy, Link2, Moon, ShieldCheck, Sun } from "lucide-react";
+﻿import { Copy, Link2, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type InvitationRecord } from "../../api/client";
 import { useAccount } from "../../auth/AuthGate";
@@ -35,14 +35,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
       <section className="utility-shell">
         <header className="utility-header">
           <h1>Settings</h1>
-          <p>
-            {account?.role === "admin"
-              ? "Generate a shared invitation, then check hosted allowance and appearance."
-              : "Control how Play It Out looks, connects data, and uses evidence."}
-          </p>
         </header>
-
-        {account?.role === "admin" ? <InviteAdmin /> : null}
 
         <section className="settings-group">
           <h2>Account</h2>
@@ -76,7 +69,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
 
         <InferenceSettings hosted={hosted} isAdmin={account?.role === "admin"} />
 
-        <PersonalAgents />
+        {account?.role === "admin" ? <InviteAdmin /> : null}
 
         <section className="settings-group">
           <h2>Appearance</h2>
@@ -100,40 +93,7 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
           </div>
         </section>
 
-        <section className="settings-group">
-          <h2>Evidence & data</h2>
-          <div className="settings-list">
-            <div className="setting-row">
-              <div>
-                <strong>Automatic evidence suggestions</strong>
-                <span>Surface useful observations from connected plugins before they affect a goal.</span>
-              </div>
-              <label className="setting-switch"><input type="checkbox" defaultChecked /><span /></label>
-            </div>
-            <div className="setting-row">
-              <div>
-                <strong>Require review for sensitive evidence</strong>
-                <span>Health, financial, and ambiguous observations stay pending until approved.</span>
-              </div>
-              <label className="setting-switch"><input type="checkbox" defaultChecked /><span /></label>
-            </div>
-            <div className="setting-row">
-              <div>
-                <strong>Show provenance on evidence</strong>
-                <span>Keep the source plugin, timestamp, and original record attached to every observation.</span>
-              </div>
-              <label className="setting-switch"><input type="checkbox" defaultChecked /><span /></label>
-            </div>
-          </div>
-        </section>
-
-        <section className="privacy-note">
-          <ShieldCheck size={20} />
-          <div>
-            <strong>Connected data should never change odds by itself.</strong>
-            <p>Plugins produce source observations. Play It Out decides whether those observations are relevant evidence for a goal, preserves provenance, and only then reprices the market.</p>
-          </div>
-        </section>
+        <PersonalAgents />
       </section>
     </main>
   );

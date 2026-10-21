@@ -46,7 +46,7 @@ test("hosted Spur model is never submitted as an Anthropic BYOK model", async ()
   const save = vi.spyOn(api, "saveInferencePreference").mockResolvedValue(settings);
   render(<InferenceSettings />);
   expect(await screen.findByRole("button", { name: "Save BYOK preference" })).toBeInTheDocument();
-  expect(screen.getByRole("option", { name: "Provider default" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Provider default" })).toHaveAttribute("aria-pressed", "true");
   fireEvent.click(screen.getByRole("button", { name: "Save BYOK preference" }));
   await waitFor(() => expect(save).toHaveBeenCalledWith({ mode: "byok", provider: "anthropic", model: null }));
 });
