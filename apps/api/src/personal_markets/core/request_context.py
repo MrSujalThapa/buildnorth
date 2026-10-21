@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
+from time import perf_counter
 from uuid import uuid4
 
 import structlog
@@ -54,9 +55,24 @@ async def request_context_middleware(
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(request_id=request_id)
     token = client_ip_var.set(client_ip)
+    started = perf_counter()
     try:
         response = await call_next(request)
+    except Exception:
+        if request.url.path.startswith("/api/v1/"):
+            structlog.get_logger(__name__).error(
+                "api_request_timing", method=request.method,
+                path=request.url.path, status=500,
+                duration_ms=round((perf_counter() - started) * 1000),
+            )
+        raise
     finally:
         client_ip_var.reset(token)
+    if request.url.path.startswith("/api/v1/"):
+        structlog.get_logger(__name__).info(
+            "api_request_timing", method=request.method,
+            path=request.url.path, status=response.status_code,
+            duration_ms=round((perf_counter() - started) * 1000),
+        )
     response.headers["x-request-id"] = request_id
     return response

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter, MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 import { api } from "../api/client";
@@ -14,10 +14,21 @@ vi.mock("@clerk/react", () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   window.sessionStorage.clear();
   window.history.replaceState({}, "", "/");
   session.setAccessTokenProvider(null);
+});
+
+test("stalled account lookup presents a retry instead of spinning forever", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(session, "clerkEnabled").mockReturnValue(true);
+  vi.spyOn(api, "me").mockImplementation(() => new Promise(() => {}));
+  render(<MemoryRouter><ThemeProvider><AuthGate><Location /></AuthGate></ThemeProvider></MemoryRouter>);
+  expect(screen.getByText("Checking your session.")).toBeInTheDocument();
+  await act(async () => { vi.advanceTimersByTime(12_000); });
+  expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
 function Location() {

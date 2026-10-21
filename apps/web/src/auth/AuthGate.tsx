@@ -167,6 +167,15 @@ function ClerkGate({ children }: Props) {
   const returnUrl = typeof window === "undefined" ? "/" : googleReturnUrl();
 
   useEffect(() => {
+    if (ready) return;
+    const timer = window.setTimeout(() => {
+      setSessionError("Session check is taking too long. Try again.");
+      setReady(true);
+    }, 12_000);
+    return () => window.clearTimeout(timer);
+  }, [ready, reload]);
+
+  useEffect(() => {
     setAccessTokenProvider(async () => (await getToken()) ?? null);
     return () => setAccessTokenProvider(null);
   }, [getToken]);
@@ -209,6 +218,9 @@ function ClerkGate({ children }: Props) {
     }
   }, [account, navigate]);
 
+  if (sessionError && (!isLoaded || !isSignedIn)) {
+    return <SessionErrorScreen message={sessionError} onRetry={() => window.location.reload()} />;
+  }
   if (!isLoaded || !ready) return <LoadingScreen />;
   if (!isSignedIn) {
     return (
