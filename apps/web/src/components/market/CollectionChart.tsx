@@ -36,6 +36,11 @@ export default function CollectionChart({ series, interactive = true }: Props) {
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const { rows, mapped } = useMemo(() => merge(series), [series]);
   const visible = mapped.filter((item) => !hidden[item.goal_id]);
+  const values = visible.flatMap((item) => item.values.map((point) => point.value));
+  const low = values.length ? Math.min(...values) : 0;
+  const high = values.length ? Math.max(...values) : 100;
+  const padding = Math.max(3, (high - low) * 0.18);
+  const domain: [number, number] = [Math.max(0, low - padding), Math.min(100, high + padding)];
 
   if (!rows.length) {
     return <div className="collection-chart-empty">No published odds to chart yet.</div>;
@@ -47,7 +52,7 @@ export default function CollectionChart({ series, interactive = true }: Props) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 4 }}>
             <XAxis dataKey="timestamp" hide />
-            <YAxis hide domain={[0, 100]} />
+            <YAxis hide domain={domain} />
             <Tooltip
               cursor={{ stroke: "var(--app-border)" }}
               content={({ payload, label }) => {

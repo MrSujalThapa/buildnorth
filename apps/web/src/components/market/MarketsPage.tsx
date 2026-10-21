@@ -141,8 +141,14 @@ export default function MarketsPage({
           </form>
         ) : null}
 
-        {collections.length ? (
-          <div className="markets-grid collections-grid">
+        <div className="markets-grid">
+          {markets.length === 0 && collections.length === 0 ? (
+            <div className="unpriced-state markets-empty" role="status">
+              <strong>No goals yet</strong>
+              <span>Create a goal to start tracking outcome odds.</span>
+            </div>
+          ) : (
+            <>
             {collections.map((collection) => (
               <CollectionCard
                 key={collection.collection.collection_id}
@@ -152,17 +158,7 @@ export default function MarketsPage({
                 onOpen={() => selectMode ? setSelectedCollections((current) => current.includes(collection.collection.collection_id) ? current.filter((id) => id !== collection.collection.collection_id) : [...current, collection.collection.collection_id]) : onOpenCollection(collection.collection.collection_id)}
               />
             ))}
-          </div>
-        ) : null}
-
-        <div className="markets-grid">
-          {markets.length === 0 && collections.length === 0 ? (
-            <div className="unpriced-state markets-empty" role="status">
-              <strong>No goals yet</strong>
-              <span>Create a goal to start tracking outcome odds.</span>
-            </div>
-          ) : (
-            markets.map((market) => (
+            {markets.map((market) => (
               <MarketCard
                 key={market.id}
                 market={market}
@@ -170,7 +166,8 @@ export default function MarketsPage({
                 selected={selected.includes(market.id)}
                 onClick={() => (selectMode ? toggleSelected(market.id) : onSelectMarket(market.id))}
               />
-            ))
+            ))}
+            </>
           )}
         </div>
       </section>

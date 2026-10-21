@@ -58,3 +58,31 @@ test("markets and collection stay clear at desktop and mobile widths", async ({ 
   expect(overflow).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+
+test("two priced members render separate portfolio trajectories without overflow", async ({ page }, testInfo) => {
+  const second = { ...goal, goal_id: "20000000-0000-0000-0000-000000000002", title: "Practice guitar weekly" };
+  const portfolio = {
+    ...collection,
+    collection: { ...collection.collection, goal_ids: [goal.goal_id, second.goal_id] },
+    portfolio_odds: 72,
+    priced_goals: 2,
+    total_goals: 2,
+    series: [
+      collection.series[0],
+      { goal_id: second.goal_id, title: second.title, color: "#b47456", withheld: false, points: [
+        { timestamp: "2026-10-19T12:00:00Z", value: 75 },
+        { timestamp: "2026-10-20T12:00:00Z", value: 82 },
+      ] },
+    ],
+  };
+  await page.route("**/health", (route) => route.fulfill({ json: { status: "ok" } }));
+  await page.route("**/api/v1/goals/dashboard", (route) => route.fulfill({ json: {
+    goals: [goal, second], histories: { [goal.goal_id]: [], [second.goal_id]: [] }, collections: [portfolio],
+  } }));
+  await page.goto("/markets");
+  await expect(page.locator(".collection-card .recharts-line")).toHaveCount(2);
+  await expect(page.locator(".collection-card .market-card-odds")).toHaveText("72%");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: `test-results/remediation-portfolio-two-lines-${testInfo.project.name}.png`, fullPage: true });
+});
