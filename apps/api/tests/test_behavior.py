@@ -115,6 +115,13 @@ def test_trials_require_commitment_pairs() -> None:
     assert trials[0].outcome == 1
 
 
+def test_unobserved_plan_and_unpaired_activity_do_not_become_execution_trials() -> None:
+    planned = _event("commitment_created", "planned", 8)
+    completed = _event("commitment_completed", "completed", 2)
+    assert trials_from_evidence([planned]) == []
+    assert trials_from_evidence([completed]) == []
+
+
 def test_resource_ranker_uses_metadata_not_provider_map() -> None:
     goal = {"title": "Receive a software engineering offer", "state_dimensions": ["interview_practice"]}
     ranked = rank_resources(

@@ -10,7 +10,11 @@ from personal_markets.behavior.domain import (
     DimensionProvenance,
     ExecutionEstimate,
 )
-from personal_markets.behavior.model import ESTIMATOR_VERSION, hierarchical_posteriors
+from personal_markets.behavior.model import (
+    ESTIMATOR_VERSION,
+    credible_interval,
+    hierarchical_posteriors,
+)
 
 LABELS = {
     "follow_through": "Follow-through",
@@ -55,26 +59,30 @@ def build_profile(
     if trials:
         window = max(1.0, (as_of - min(item.observed_at for item in trials)).total_seconds() / 86400)
 
-    follow_limited, follow_conf = _confidence(posts["action"].n_eff, 4)
+    follow_post = posts["global"] if context.action_type == "overall" else posts["action"]
+    follow_mean = (
+        execution.global_mean if context.action_type == "overall" else execution.action_mean
+    )
+    follow_limited, follow_conf = _confidence(follow_post.n_eff, 4)
     follow = BehaviorDimension(
         key="follow_through",
         label=LABELS["follow_through"],
-        value=None if follow_limited else execution.action_mean,
-        display_percent=_percent(execution.action_mean, follow_limited),
+        value=None if follow_limited else follow_mean,
+        display_percent=_percent(follow_mean, follow_limited),
         limited_evidence=follow_limited,
         confidence=follow_conf,  # type: ignore[arg-type]
         provenance=DimensionProvenance(
             comparable_commitments=len(trials),
             completed=completed,
-            recency_weighted_completion=execution.action_mean,
+            recency_weighted_completion=follow_mean,
             evidence_window_days=window,
             sources=sources,
-            n_eff=posts["action"].n_eff,
+            n_eff=follow_post.n_eff,
             formula="recency-weighted Beta-Bernoulli with hierarchical shrinkage",
             details=[
                 f"{len(trials)} comparable commitments",
                 f"{completed:.0f} completed",
-                f"recency-weighted completion = {execution.action_mean:.3f}",
+                f"recency-weighted completion = {follow_mean:.3f}",
                 f"half-life = {execution.half_life_days:.0f} days",
                 f"sources: {', '.join(sources) or 'none'}",
                 f"confidence = {follow_conf}",
@@ -84,7 +92,7 @@ def build_profile(
 
     consist_limited, consist_conf = _confidence(features.get("n_raw", 0.0), 6)
     burst = features.get("burstiness", 0.0)
-    consistency_value = max(0.0, min(1.0, 0.5 - 0.5 * burst))
+    consistency_value = max(0.0, min(1.0, follow_mean * (0.5 - 0.5 * burst)))
     consistency = BehaviorDimension(
         key="consistency",
         label=LABELS["consistency"],
@@ -97,7 +105,7 @@ def build_profile(
             completed=completed,
             sources=sources,
             n_eff=features.get("n_raw", 0.0),
-            formula="1 - burstiness of inter-session gaps, burstiness=(σ-μ)/(σ+μ)",
+            formula="Observed follow-through × regularity of commitment windows",
             details=[f"burstiness = {burst:.3f}"],
         ),
     )
@@ -145,7 +153,7 @@ def build_profile(
     )
 
     rel_limited, rel_conf = _confidence(features.get("n_raw", 0.0), 8)
-    reliability_value = 1.0 / (1.0 + 4.0 * features.get("variance", 0.25))
+    reliability_value = credible_interval(posts["global"].alpha, posts["global"].beta)[0]
     reliability = BehaviorDimension(
         key="reliability",
         label=LABELS["reliability"],
@@ -158,8 +166,8 @@ def build_profile(
             completed=completed,
             sources=sources,
             n_eff=features.get("n_raw", 0.0),
-            formula="1 / (1 + 4 Var[outcome])",
-            details=[f"outcome variance = {features.get('variance', 0):.3f}"],
+            formula="Conservative lower bound of observed follow-through",
+            details=[f"observed outcomes = {len(trials)}"],
         ),
     )
 

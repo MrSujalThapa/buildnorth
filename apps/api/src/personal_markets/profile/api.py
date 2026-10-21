@@ -59,11 +59,20 @@ async def get_profile(
     event_rows = await asyncio.gather(*(goal_evidence(goal.goal_id) for goal in owned))
     grouped = {str(goal.goal_id): rows for goal, rows in zip(owned, event_rows, strict=True)}
     radar = portfolio_profile(owned, grouped, dimensions=account.profile.dimensions)
+    radar_areas = []
+    for area in account.profile.dimensions:
+        members = [goal for goal in owned if goal.goal_id in area.goal_ids]
+        if members:
+            radar_areas.append({
+                "label": area.label,
+                "radar": portfolio_profile(members, grouped).model_dump(mode="json"),
+            })
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),
         "collection_count": len(collection_rows),
         "radar": radar.model_dump(mode="json"),
+        "radar_areas": radar_areas,
         "privacy": "private",
     }
 

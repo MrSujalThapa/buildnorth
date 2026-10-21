@@ -62,12 +62,13 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
   if (!profile || !dimensions.length) {
     return (
       <section className={`execution-profile${compact ? " compact" : ""}`}>
-        <p className="execution-empty">Add dimensions to see your progress here.</p>
+        <p className="execution-empty">No verified commitments yet.</p>
       </section>
     );
   }
 
   const complete = dimensions.length >= 3 && dimensions.every((item) => !item.limited_evidence && item.value != null);
+  const hasMeasurements = dimensions.some((item) => item.value != null && !item.limited_evidence);
   const values = dimensions.map((item) => item.value ?? 0);
   const outline = values
     .map((value, index) => {
@@ -79,7 +80,8 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
   return (
     <section className={`execution-profile${compact ? " compact" : ""}`}>
       <header>
-        {!complete ? <p className="execution-empty">More measured goals are needed for a complete chart.</p> : null}
+        {!hasMeasurements ? <p className="execution-empty">Your execution profile appears as planned actions are verified.</p> : null}
+        {hasMeasurements && !complete ? <p className="execution-empty">Some traits need more observations.</p> : null}
       </header>
       <div className="execution-layout">
         {dimensions.length >= 3 ? <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Follow-through profile radar">
@@ -103,6 +105,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
           ))}
           {complete ? <polygon className="radar-fill" points={outline} fill={`url(#${gradientId})`} /> : null}
           {complete ? <polygon className="radar-outline" points={outline} /> : null}
+          {!hasMeasurements ? <circle className="radar-empty-core" cx={CX} cy={CY} r="38" /> : null}
           {dimensions.map((item, index) => {
             const labelPt = point(index, dimensions.length, 1.28);
             const valuePt = point(index, dimensions.length, item.value ?? 0);
@@ -110,13 +113,13 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
               <g key={item.key}>
                 {complete ? <circle className="radar-node" cx={valuePt.x} cy={valuePt.y} r="3.2" /> : null}
                 <text className="radar-label" x={labelPt.x} y={labelPt.y} textAnchor="middle">
-                  {item.label}
+                  {item.label === "Commitment realism" ? "Planning" : item.label}
                 </text>
               </g>
             );
           })}
         </svg> : null}
-        <aside>
+        {hasMeasurements ? <aside>
           <ul>
             {dimensions.map((item) => (
               <li key={item.key}>
@@ -137,7 +140,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
               </li>
             ))}
           </ul>
-        </aside>
+        </aside> : null}
       </div>
     </section>
   );

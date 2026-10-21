@@ -324,6 +324,7 @@ export interface ProfilePayload {
   goal_count: number;
   collection_count: number;
   radar: BehaviorProfile;
+  radar_areas?: { label: string; radar: BehaviorProfile }[];
   privacy: string;
 }
 

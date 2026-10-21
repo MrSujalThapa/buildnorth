@@ -48,6 +48,7 @@ export function ProfileRoute() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editingDimensions, setEditingDimensions] = useState(false);
+  const [selectedArea, setSelectedArea] = useState("Overall");
   const [dimensions, setDimensions] = useState<{ label: string; goal_ids: string[] }[]>([]);
   const goals = useQuery({ queryKey: ["goals", "list"], queryFn: ({ signal }) => api.goals(signal), enabled: editingDimensions });
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function ProfileRoute() {
         <header className="markets-header"><h1>Profile</h1></header>
         <section className="profile-card">
           <div className="profile-avatar" aria-label={previewUrl || photoUrl ? "Profile photo preview" : "Initials avatar"}>
-            {previewUrl || photoUrl ? <img src={previewUrl || photoUrl || ""} alt="" style={previewUrl ? { objectPosition: `${photoPosition.x}% ${photoPosition.y}%` } : undefined} /> : display.slice(0, 1).toUpperCase()}
+            {previewUrl || photoUrl ? <img src={previewUrl || photoUrl || ""} alt="" width={96} height={96} style={previewUrl ? { objectPosition: `${photoPosition.x}% ${photoPosition.y}%` } : undefined} /> : display.slice(0, 1).toUpperCase()}
           </div>
           <div className="profile-identity"><strong>{display}</strong><span>@{handle}</span>{fields.bio ? <p>{fields.bio}</p> : null}</div>
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
@@ -121,8 +122,12 @@ export function ProfileRoute() {
           {upload.isPending ? <span role="status">Uploading…</span> : null}
           {photoError || upload.isError || remove.isError ? <span role="alert">{photoError || "Photo could not be saved. Choose a JPEG, PNG or WebP image."}</span> : null}
         </div>
-        <div className="profile-radar-heading"><h2>Execution profile</h2><button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Customize</button></div>
-        <ExecutionProfileRadar profile={profile.data.radar} />
+        <div className="profile-radar-heading"><h2>Execution profile</h2><button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button></div>
+        <div className="profile-area-filter" role="group" aria-label="Execution area">
+          <button type="button" aria-pressed={selectedArea === "Overall"} onClick={() => setSelectedArea("Overall")}>Overall</button>
+          {profile.data.radar_areas?.map((area) => <button type="button" key={area.label} aria-pressed={selectedArea === area.label} onClick={() => setSelectedArea(area.label)}>{area.label}</button>)}
+        </div>
+        <ExecutionProfileRadar profile={profile.data.radar_areas?.find((area) => area.label === selectedArea)?.radar ?? profile.data.radar} />
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <form className="confirm-card profile-editor" onSubmit={(event) => {
@@ -144,14 +149,14 @@ export function ProfileRoute() {
       </div> : null}
       {editingDimensions ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-dimensions-title">
         <div className="confirm-card profile-editor profile-dimension-editor">
-          <h2 id="edit-dimensions-title">Your dimensions</h2>
+          <h2 id="edit-dimensions-title">Your areas</h2>
           {dimensions.map((item, index) => <div className="profile-dimension-row" key={index}>
-            <input className="ui-field" aria-label={`Dimension ${index + 1} name`} value={item.label} maxLength={32} onChange={(event) => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
+            <input className="ui-field" aria-label={`Area ${index + 1} name`} value={item.label} maxLength={32} onChange={(event) => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value } : row))} />
             <div className="profile-dimension-controls"><button type="button" disabled={index === 0} onClick={() => setDimensions((current) => moved(current, index, index - 1))}>↑</button><button type="button" disabled={index === dimensions.length - 1} onClick={() => setDimensions((current) => moved(current, index, index + 1))}>↓</button><button type="button" onClick={() => setDimensions((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</button></div>
             <div className="profile-dimension-goals">{goals.data?.map((goal) => <label key={goal.goal_id} className="ui-choice"><input type="checkbox" checked={item.goal_ids.includes(goal.goal_id)} onChange={() => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, goal_ids: row.goal_ids.includes(goal.goal_id) ? row.goal_ids.filter((id) => id !== goal.goal_id) : [...row.goal_ids, goal.goal_id] } : row))} />{goal.title}</label>)}</div>
           </div>)}
-          <button type="button" className="markets-select" disabled={dimensions.length >= 12} onClick={() => setDimensions((current) => [...current, { label: "", goal_ids: [] }])}>Add dimension</button>
-          {saveDimensions.isError ? <p role="alert">Could not save dimensions.</p> : null}
+          <button type="button" className="markets-select" disabled={dimensions.length >= 12} onClick={() => setDimensions((current) => [...current, { label: "", goal_ids: [] }])}>Add area</button>
+          {saveDimensions.isError ? <p role="alert">Could not save areas.</p> : null}
           <div className="composer-actions"><button type="button" disabled={saveDimensions.isPending || dimensions.some((item) => !item.label.trim())} onClick={() => saveDimensions.mutate()}>Save</button><button type="button" className="secondary" onClick={() => setEditingDimensions(false)}>Cancel</button></div>
         </div>
       </div> : null}

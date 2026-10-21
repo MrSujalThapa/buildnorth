@@ -18,6 +18,9 @@ def test_profile_dimensions_follow_user_order_and_keep_unknown_scores_null() -> 
         ProfileDimension(label="Reading", goal_ids=[goal.goal_id]),
     ]
     profile = portfolio_profile([goal], {}, dimensions=dimensions)
-    assert [item.label for item in profile.dimensions] == ["Music", "Reading"]
-    assert profile.dimensions[0].value is None
-    assert profile.dimensions[1].value == 0.3
+    assert [item.key for item in profile.dimensions] == [
+        "follow_through", "consistency", "commitment_realism",
+        "momentum", "reliability", "recovery",
+    ]
+    assert all(item.value is None for item in profile.dimensions)
+    assert profile.execution.usable is False

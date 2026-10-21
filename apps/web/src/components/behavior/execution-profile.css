@@ -24,14 +24,51 @@
 
 .execution-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 460px) minmax(0, 1fr);
   gap: 28px;
   align-items: start;
 }
 
 .execution-profile svg {
-  width: min(100%, 360px);
+  width: min(100%, 460px);
   height: auto;
+}
+
+.radar-empty-core {
+  fill: var(--what-if-accent, #5ec8bd);
+  opacity: 0.08;
+}
+
+.profile-area-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.profile-area-filter button {
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-ink);
+  padding: 8px 14px;
+  min-height: 38px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-area-filter button[aria-pressed="true"] {
+  border-color: var(--what-if-accent, #5ec8bd);
+  background: color-mix(in srgb, var(--what-if-accent, #5ec8bd) 12%, transparent);
+}
+
+.profile-area-filter button:hover {
+  border-color: var(--what-if-accent, #5ec8bd);
+}
+
+.profile-area-filter button:focus-visible {
+  outline: 2px solid var(--what-if-accent, #5ec8bd);
+  outline-offset: 2px;
 }
 
 .radar-ring {

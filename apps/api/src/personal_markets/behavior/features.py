@@ -106,29 +106,35 @@ def trials_from_evidence(events: Iterable[NormalizedEvidence]) -> list[Commitmen
         if stamp is None:
             continue
         match = _best_match(plan, observed, stamp, used)
+        # A missing provider observation does not establish that a plan failed.
+        # Only an explicit completion, partial result, or miss can score a trial.
+        if match is None:
+            continue
         outcome = 0.0
         realized = None
         delay = None
         source = plan.provenance.source_type
         quality = plan.source_quality
-        if match is not None:
-            match_index, completion = match
-            used.add(match_index)
-            realized = completion.numeric_value
-            completed_at = _parse_observed_at(completion.observed_at)
-            category = (completion.categorical_value or "").lower()
-            if completion.event_type.lower() == "commitment_missed" or category in MISS_MARKERS:
-                outcome = 0.0
-            elif category in COMPLETION_MARKERS or completion.event_type.lower() == "commitment_completed":
-                outcome = 1.0
-            elif plan.numeric_value and realized is not None and plan.numeric_value > 0:
-                outcome = min(1.0, max(0.0, realized / plan.numeric_value))
-            else:
-                outcome = 1.0
-            if completed_at is not None:
-                delay = max(0.0, (completed_at - stamp).total_seconds() / 86400)
-            source = completion.provenance.source_type
-            quality = completion.source_quality
+        match_index, completion = match
+        used.add(match_index)
+        realized = completion.numeric_value
+        completed_at = _parse_observed_at(completion.observed_at)
+        category = (completion.categorical_value or "").lower()
+        if completion.event_type.lower() == "commitment_missed" or category in MISS_MARKERS:
+            outcome = 0.0
+        elif (
+            category in COMPLETION_MARKERS
+            or completion.event_type.lower() == "commitment_completed"
+        ):
+            outcome = 1.0
+        elif plan.numeric_value and realized is not None and plan.numeric_value > 0:
+            outcome = min(1.0, max(0.0, realized / plan.numeric_value))
+        else:
+            outcome = 1.0
+        if completed_at is not None:
+            delay = max(0.0, (completed_at - stamp).total_seconds() / 86400)
+        source = completion.provenance.source_type
+        quality = completion.source_quality
         action = _action_type(plan)
         trials.append(
             CommitmentTrial(
@@ -149,35 +155,7 @@ def trials_from_evidence(events: Iterable[NormalizedEvidence]) -> list[Commitmen
             )
         )
 
-    for index, event in enumerate(observed):
-        if index in used:
-            continue
-        # Completions without a plan are activity, not follow-through trials.
-        if event.event_type.lower() not in {"commitment_completed", "commitment_missed"}:
-            continue
-        stamp = _parse_observed_at(event.observed_at)
-        if stamp is None:
-            continue
-        category = (event.categorical_value or "").lower()
-        outcome = 0.0 if event.event_type.lower() == "commitment_missed" or category in MISS_MARKERS else 1.0
-        action = _action_type(event)
-        trials.append(
-            CommitmentTrial(
-                trial_id=f"obs:{index}:{event.fingerprint[:12]}",
-                domain=event.domain or "general",
-                action_type=action,
-                plan_class=action,
-                planned_amount=event.numeric_value,
-                realized_amount=event.numeric_value if outcome else 0.0,
-                unit=event.unit,
-                outcome=outcome,
-                observed_at=stamp,
-                session_key=session_key(stamp, action, event.provenance.source_type),
-                source=event.provenance.source_type,
-                source_quality=event.source_quality,
-                tokens=tokenize(event.domain, event.metric, event.summary, event.event_type),
-            )
-        )
+    # Unpaired completion is activity; an unpaired miss has no known plan window.
     return collapse_correlated_events(trials)
 
 
