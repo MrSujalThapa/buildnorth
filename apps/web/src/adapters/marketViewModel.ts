@@ -79,12 +79,25 @@ function evidenceIcon(summary: string): MarketEvent["icon"] {
 export function evidenceToEvents(items: EvidenceEvent[]): MarketEvent[] {
   return items.slice(-6).reverse().map((item, index) => ({
     id: `${item.metric}-${index}`,
-    label: item.summary || item.metric,
+    label: evidenceLabel(item),
     impact: null,
     occurredAt: new Date(item.observed_at).toLocaleDateString("en-CA", { month: "short", day: "numeric" }),
     timestamp: Date.parse(item.observed_at),
     icon: evidenceIcon(item.summary || item.metric),
   }));
+}
+
+function evidenceLabel(item: EvidenceEvent): string {
+  const summary = item.summary.trim();
+  if (summary && summary !== item.metric && !/^[a-z]+(?:_[a-z]+)+$/.test(summary)) return summary;
+  if (item.numeric_value != null && item.metric === "reading_minutes") {
+    return `Read for ${item.numeric_value} minutes`;
+  }
+  if (item.numeric_value != null && item.metric === "books_read_count") {
+    return `${item.numeric_value} books read`;
+  }
+  if (item.metric === "rate") return "Reading pace";
+  return item.metric.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function stringField(value: object, key: string): string | undefined {

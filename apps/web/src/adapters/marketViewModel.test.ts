@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Goal, MarketHistoryPoint } from "../api/client";
-import { toMarketCard } from "./marketViewModel";
+import type { EvidenceEvent, Goal, MarketHistoryPoint } from "../api/client";
+import { evidenceToEvents, toMarketCard } from "./marketViewModel";
 
 const goal = {
   goal_id: "goal-1",
@@ -31,4 +31,15 @@ describe("market card daily change", () => {
     ] as MarketHistoryPoint[];
     expect(toMarketCard(goal, points).todayReturn).toBeCloseTo(5);
   });
+});
+
+it("shows extracted reading values without assigning unsupported event-level odds", () => {
+  const event = (metric: string, numeric_value: number | null): EvidenceEvent => ({
+    event_type: "observation", domain: "reading", metric, numeric_value,
+    categorical_value: null, unit: null, observed_at: "2026-10-20T12:00:00Z",
+    source_type: "mcp_sync", summary: metric,
+  });
+  const events = evidenceToEvents([event("books_read_count", 6), event("reading_minutes", 50)]);
+  expect(events.map((item) => item.label)).toEqual(["Read for 50 minutes", "6 books read"]);
+  expect(events.every((item) => item.impact === null)).toBe(true);
 });

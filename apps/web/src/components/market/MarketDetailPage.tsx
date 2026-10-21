@@ -65,7 +65,7 @@ function signedPercent(value: number) {
 }
 
 function signedPoints(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)} pts`;
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)} pp`;
 }
 
 function formatPointDate(timestamp: number) {
@@ -269,7 +269,7 @@ export default function MarketDetailPage({
                     <div className="event-time">{event.occurredAt}</div>
                   </div>
                   <div className={`event-impact ${unknown ? "" : positive ? "positive" : "negative"}`.trim()}>
-                    {event.impact == null ? "—" : `${signedPercent(event.impact)} odds`}
+                    {event.impact == null ? null : `${signedPoints(event.impact)} odds`}
                   </div>
                 </div>
               );
@@ -279,18 +279,18 @@ export default function MarketDetailPage({
 
         <section className="return-panel">
           <div className="return-stat">
-            <div className="return-label">Today's return</div>
+            <div className="return-label">Today's odds change</div>
             <div className={`return-value ${(market.todayReturn ?? 0) >= 0 ? "positive" : "negative"}`}>
-              {market.todayReturn == null ? "—" : signedPercent(market.todayReturn)}
+              {market.todayReturn == null ? "—" : signedPoints(market.todayReturn)}
             </div>
           </div>
 
           <div className="return-divider" />
 
           <div className="return-stat">
-            <div className="return-label">Total return</div>
+            <div className="return-label">Total odds change</div>
             <div className={`return-value ${(market.totalReturn ?? 0) >= 0 ? "positive" : "negative"}`}>
-              {market.totalReturn == null ? "—" : signedPercent(market.totalReturn)}
+              {market.totalReturn == null ? "—" : signedPoints(market.totalReturn)}
             </div>
           </div>
         </section>

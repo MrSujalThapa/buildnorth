@@ -9,12 +9,8 @@ type Props = {
   selected?: boolean;
 };
 
-function signedPercent(
-  value: number,
-) {
-  return `${
-    value >= 0 ? "+" : ""
-  }${value.toFixed(1)}%`;
+function signedPointChange(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)} pp`;
 }
 
 export default function MarketCard({
@@ -56,7 +52,7 @@ export default function MarketCard({
       >
         {market.todayReturn == null
           ? "—"
-          : `${signedPercent(market.todayReturn)} today`}
+          : `${signedPointChange(market.todayReturn)} today`}
       </div>
 
       <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : market.history.length === 1 ? " is-sparse" : ""}`}>
