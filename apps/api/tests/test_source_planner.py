@@ -35,7 +35,7 @@ def test_github_recipe_selects_only_requested_read_actions() -> None:
             plugin_connection_id=connection_id,
             capability_id=name.lower(),
             label=name,
-            operation="read",
+            operation="github.dynamic.github_list_commits.read",
             tool_name=name,
             approved=True,
         )
@@ -54,7 +54,7 @@ def test_notion_recipe_reads_the_selected_page() -> None:
             plugin_connection_id=connection_id,
             capability_id=name.lower(),
             label=name,
-            operation="read",
+            operation="notion.dynamic.notion_fetch_all_block_contents.read",
             tool_name=name,
             approved=True,
             input_schema={"properties": {"block_id": {"type": "string"}}},
@@ -66,6 +66,19 @@ def test_notion_recipe_reads_the_selected_page() -> None:
     assert (
         _arguments_for_resource("page-123", "Book Reports", selected[0])["block_id"] == "page-123"
     )
+
+
+def test_notion_search_alone_cannot_be_saved_as_a_content_source() -> None:
+    capability = ReadCapabilityRecord(
+        id=uuid4(),
+        plugin_connection_id=uuid4(),
+        capability_id="notion-search",
+        label="Search Notion",
+        operation="notion.dynamic.notion_search_notion_page.read",
+        tool_name="NOTION_SEARCH_NOTION_PAGE",
+        approved=True,
+    )
+    assert _select_capabilities([capability], None) == []
 
 
 def test_legacy_search_recipe_cannot_be_mistaken_for_notion_content() -> None:

@@ -402,6 +402,15 @@ class ComposioIntegrationGateway:
                             for part in prop.get("title", []) if isinstance(part, dict)
                         )
                         break
+            candidate_title = str(title or row.get("name") or "").strip()
+            try:
+                opaque_title = UUID(candidate_title)
+            except ValueError:
+                opaque_title = None
+            if toolkit_slug == "notion" and (not candidate_title or opaque_title is not None):
+                # Notion search can return untitled blocks. An opaque page ID is
+                # not a usable selection label for a consumer evidence source.
+                continue
             resource_id = str(
                 row.get("full_name")
                 or row.get("id")
@@ -410,7 +419,7 @@ class ComposioIntegrationGateway:
                 or row.get("url")
                 or title
             )
-            label = str(row.get("full_name") or row.get("name") or title or resource_id)
+            label = str(title or row.get("full_name") or row.get("name") or resource_id)
             resource_type = str(
                 ("private" if row["private"] else "public")
                 if isinstance(row.get("private"), bool)

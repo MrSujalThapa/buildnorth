@@ -467,6 +467,26 @@ async def test_resource_discovery_prefers_authenticated_github_repositories() ->
 
 
 @pytest.mark.asyncio
+async def test_notion_picker_omits_untitled_id_only_results() -> None:
+    from uuid import uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+
+    async def execute(_user_id, _tool_name, _arguments, **_kwargs):
+        return {"results": [
+            {"id": "3ffaf8d1-37de-8050-bea2-e9a62716f138", "title": [{"plain_text": "Oct 20th book report"}]},
+            {"id": "8c8af8d1-37de-8200-b371-017da61970ef", "title": []},
+        ]}
+
+    gateway.execute_tool = execute  # type: ignore[method-assign]
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == ["Oct 20th book report"]
+
+
+@pytest.mark.asyncio
 async def test_connected_notion_is_visible_without_catalog_page_containing_it() -> None:
     from datetime import UTC, datetime
     from uuid import uuid4

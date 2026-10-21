@@ -325,7 +325,10 @@ def _select_capabilities(
     capabilities: list[ReadCapabilityRecord],
     activity_types: list[str] | None,
 ) -> list[ReadCapabilityRecord]:
-    capabilities = [cap for cap in capabilities if cap.approved and cap.operation == "read"]
+    capabilities = [
+        cap for cap in capabilities
+        if cap.approved and (cap.operation == "read" or cap.operation.endswith(".read"))
+    ]
     if not capabilities:
         return []
     if activity_types:
@@ -357,6 +360,7 @@ def _select_capabilities(
             match = next((cap for cap in capabilities if cap.tool_name == name), None)
             if match is not None:
                 return [match]
+        return []
     return [
         min(
             capabilities,
