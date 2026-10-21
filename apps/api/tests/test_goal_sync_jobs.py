@@ -71,6 +71,56 @@ async def test_manual_retry_carries_failed_job_records_with_owner_scope() -> Non
     assert next_retry.receipt["replay_job_ids"] == [str(first.id), str(retry.id)]
 
 
+@pytest.mark.asyncio
+async def test_retry_fetches_providers_missing_from_saved_rows() -> None:
+    owner, goal_id, previous_id = uuid4(), uuid4(), uuid4()
+    github_row = RawSourceRecord(
+        id=uuid4(), plugin_connection_id=uuid4(), external_id="commit-1",
+        tool_identity="GITHUB_LIST_COMMITS", retrieved_at=datetime.now(UTC),
+        payload={"summary": "Unrelated commit"}, payload_hash="hash-1",
+        sync_run_id=uuid4(), cursor_context={"user_id": str(owner), "source_type": "github"},
+    )
+    calls: list[str] = []
+
+    class Repository:
+        async def list_goal_recipes(self, _goal_id):
+            return [
+                SimpleNamespace(approved=True, plugin_id=provider, steps=[
+                    SimpleNamespace(tool_name=tool)
+                ])
+                for provider, tool in (
+                    ("github", "GITHUB_LIST_COMMITS"),
+                    ("notion", "NOTION_GET_PAGE_MARKDOWN"),
+                )
+            ]
+
+        async def list_job_raw_records(self, _owner, _job_ids):
+            return [github_row]
+
+    class Gateway:
+        async def sync(self, provider, **_kwargs):
+            calls.append(provider)
+            return {"records_read": 0, "records_new": 0, "new_records": []}
+
+    class Goals:
+        async def get_goal_by_string(self, _goal_id, *, owner_id):
+            assert owner_id == owner
+            return SimpleNamespace(goal_id=goal_id)
+
+    class Workflow:
+        async def start(self, request):
+            assert len(request.mcp_records) == 1
+            return SimpleNamespace(status="unchanged")
+
+    service = GoalSyncService(
+        settings=None, gateway=Gateway(), repository=Repository(), goals=Goals(),
+        workflow=Workflow(), evidence=None, owner_id=owner,
+        replay_job_ids=[previous_id],
+    )
+    await service.sync_goal_sources(str(goal_id))
+    assert calls == ["notion"]
+
+
 def test_goal_sync_api_acknowledges_job_and_recovers_status() -> None:
     get_goal_sync_job_store.cache_clear()
     app = isolated_app()

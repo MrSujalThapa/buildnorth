@@ -244,6 +244,7 @@
   padding: 18px 18px 16px;
   background: var(--app-surface);
   display: grid;
+  align-content: start;
   gap: 12px;
   min-width: 0;
 }

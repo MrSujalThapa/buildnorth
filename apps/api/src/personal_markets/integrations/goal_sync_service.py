@@ -64,9 +64,14 @@ class GoalSyncService:
         )
 
         new_records: list[RawSourceRecord] = list(replay)
+        replayed_providers = {
+            str(record.cursor_context.get("source_type")) for record in replay
+        }
         scanned = 0
         run_ids: list[str] = []
-        for recipe in [] if replay else approved:
+        for recipe in approved:
+            if recipe.plugin_id in replayed_providers:
+                continue
             source_started = time.perf_counter()
             sync_kwargs: dict[str, Any] = {"steps": recipe.steps}
             if self._job_id is not None:
