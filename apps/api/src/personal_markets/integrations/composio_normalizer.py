@@ -24,7 +24,8 @@ def normalize_tool_result(
         if not isinstance(row, dict):
             continue
         external_id = str(
-            row.get("id") or row.get("sha") or row.get("node_id") or f"{tool_name}:{index}"
+            (row.get("sha") if plugin_id == "github" else None)
+            or row.get("id") or row.get("node_id") or f"{tool_name}:{index}"
         )
         events = _infer_events(plugin_id, tool_name, row, recipe_step)
         body = {
@@ -37,7 +38,19 @@ def normalize_tool_result(
         }
         from personal_markets.integrations.mcp_repository import payload_hash
 
-        fingerprint = payload_hash(body)
+        if plugin_id == "notion" and isinstance(row.get("markdown"), str):
+            fingerprint = payload_hash({
+                "id": row.get("id") or (recipe_step.arguments.get("page_id") if recipe_step else None),
+                "markdown": row["markdown"],
+            })
+        elif plugin_id == "github" and row.get("sha"):
+            # A commit SHA identifies immutable content; provider request IDs do not.
+            fingerprint = payload_hash({"sha": row["sha"]})
+        else:
+            fingerprint = payload_hash({
+                key: value for key, value in body.items()
+                if key not in {"request_id", "response_id", "trace_id", "retrieved_at"}
+            })
         if plugin_id == "notion":
             external_id = f"{external_id}:{fingerprint[:16]}"
         records.append(
@@ -67,7 +80,7 @@ def _extract_rows(payload: dict[str, Any]) -> list[Any]:
         if isinstance(value, list):
             return value
         if isinstance(value, dict):
-            for nested_key in ("items", "repositories", "results"):
+            for nested_key in ("items", "repositories", "results", "commits", "data"):
                 if isinstance(value.get(nested_key), list):
                     return value[nested_key]
     return [payload] if payload and not payload.get("has_more") else []

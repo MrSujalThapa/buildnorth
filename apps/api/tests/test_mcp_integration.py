@@ -418,12 +418,19 @@ async def test_notion_page_sync_keeps_document_and_dedupes() -> None:
     ))
 
     class PageTransport:
+        calls = 0
+
         async def call_tool(self, name, arguments):
+            self.calls += 1
             assert name == "NOTION_GET_PAGE_MARKDOWN"
             assert arguments == {"page_id": "page-1"}
-            return {"data": [], "id": "page-1", "markdown": "I finished my sixth book."}
+            return {
+                "data": [], "id": "page-1", "markdown": "I finished my sixth book.",
+                "request_id": f"provider-call-{self.calls}",
+            }
 
-    service._transport_for = lambda connection: PageTransport()  # type: ignore[method-assign]
+    transport = PageTransport()
+    service._transport_for = lambda connection: transport  # type: ignore[method-assign]
     step = SyncRecipeStep(
         capability_id="notion.read", tool_name="NOTION_GET_PAGE_MARKDOWN",
         arguments={"page_id": "page-1"},
@@ -432,6 +439,26 @@ async def test_notion_page_sync_keeps_document_and_dedupes() -> None:
     second = await service.sync("notion", steps=[step])
     assert first["records_new"] == 1
     assert second["records_new"] == 0
+
+
+def test_github_nested_commits_ignore_provider_request_id() -> None:
+    from uuid import uuid4
+
+    kwargs = {
+        "plugin_id": "github", "plugin_connection_id": uuid4(),
+        "sync_run_id": uuid4(), "tool_name": "GITHUB_LIST_COMMITS", "user_id": "test-user",
+    }
+    first = normalize_tool_result(**kwargs, payload={
+        "request_id": "call-1",
+        "data": {"commits": [{"sha": "abc123", "commit": {"message": "Ship"}}]},
+    })
+    second = normalize_tool_result(**kwargs, payload={
+        "request_id": "call-2",
+        "data": {"commits": [{"sha": "abc123", "commit": {"message": "Ship"}}]},
+    })
+    assert len(first) == len(second) == 1
+    assert first[0].external_id == second[0].external_id == "abc123"
+    assert first[0].payload_hash == second[0].payload_hash
 
 
 def test_github_normalization_keeps_activity_types_and_does_not_invent_events() -> None:
