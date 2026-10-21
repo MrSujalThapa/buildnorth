@@ -317,10 +317,10 @@ export function EvidenceSourceWorkspace({
                           }
                           onToggleActivity={(activity) => toggleActivity(card.pluginId, activity)}
                           onToggleResource={(resourceId) => toggleResource(card.pluginId, resourceId)}
-                          onApprove={() =>
+                          onApprove={(label) =>
                             saveRecipe.mutate({
                               pluginId: card.pluginId,
-                              label: card.resources.find((item) => selectedResources[card.pluginId]?.includes(item.resource_id))?.label ?? card.name,
+                              label: label || card.name,
                               resourceIds: buildResourceIds(card.pluginId),
                               activityTypes: activityTypes[card.pluginId],
                             })
@@ -539,7 +539,7 @@ function SourceResourcePanel({
   onResourceRefChange: (value: string) => void;
   onToggleActivity: (activity: string) => void;
   onToggleResource: (resourceId: string) => void;
-  onApprove: () => void;
+  onApprove: (label: string) => void;
   approvePending: boolean;
 }) {
   const [resourceQuery, setResourceQuery] = useState("");
@@ -652,7 +652,7 @@ function SourceResourcePanel({
       ) : null}
       {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
       {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
-      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={onApprove}>
+      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={() => onApprove(options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", "))}>
         {approvePending ? "Saving…" : "Save source"}
       </button>
     </div>
