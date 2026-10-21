@@ -166,26 +166,36 @@ class PostgresIdentityRepository:
 
     async def upsert_user(self, principal: Principal) -> Principal:
         async with transaction(self._engine) as connection:
-            await connection.execute(
-                text("""
-                insert into app_users (id, clerk_user_id, email, email_verified, role)
-                values (:id, :clerk_user_id, :email, :email_verified, :role)
-                on conflict (clerk_user_id) do update set
-                  email = coalesce(excluded.email, app_users.email),
-                  email_verified = app_users.email_verified or excluded.email_verified,
-                  role = excluded.role
-                """),
-                {
-                    "id": principal.user_id,
-                    "clerk_user_id": principal.clerk_user_id,
-                    "email": principal.email,
-                    "email_verified": principal.email_verified,
-                    "role": principal.role,
-                },
+            row = (
+                (
+                    await connection.execute(
+                        text("""
+                        with upserted as (
+                          insert into app_users (id, clerk_user_id, email, email_verified, role)
+                          values (:id, :clerk_user_id, :email, :email_verified, :role)
+                          on conflict (clerk_user_id) do update set
+                            email = coalesce(excluded.email, app_users.email),
+                            email_verified = app_users.email_verified or excluded.email_verified,
+                            role = excluded.role
+                          returning *
+                        )
+                        select u.*, e.enabled as hosted_enabled, e.quota_usd, e.quota_tokens
+                        from upserted u
+                        left join hosted_entitlements e on e.user_id = u.id
+                        """),
+                        {
+                            "id": principal.user_id,
+                            "clerk_user_id": principal.clerk_user_id,
+                            "email": principal.email,
+                            "email_verified": principal.email_verified,
+                            "role": principal.role,
+                        },
+                    )
+                )
+                .mappings()
+                .one()
             )
-        stored = await self.get_user_by_clerk_id(principal.clerk_user_id)
-        assert stored is not None
-        return stored
+        return self._to_principal(dict(row))
 
     async def get_user(self, user_id: UUID) -> Principal | None:
         async with self._engine.connect() as connection:
