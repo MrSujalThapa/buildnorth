@@ -195,6 +195,14 @@ class IntegrationGatewayService:
                 "provider_status": provider_status,
                 "provider_message": provider_message,
             }
+        if not search and not cursor:
+            return {
+                "items": [item.model_dump(mode="json") for item in local_views[:limit]],
+                "next_cursor": None,
+                "total_items": len(local_views),
+                "provider_status": provider_status,
+                "provider_message": provider_message,
+            }
         try:
             page = await self._composio.search_toolkits(search=search, cursor=cursor, limit=limit)
         except Exception:
@@ -278,8 +286,6 @@ class IntegrationGatewayService:
     ) -> list[PluginView]:
         views: list[PluginView] = []
         for definition in PLUGIN_DEFINITIONS:
-            if definition.id not in {"manual", "csv"} and definition.id not in connections:
-                continue
             stored = connections.get(definition.id)
             if stored is None:
                 connection = PluginConnection(
@@ -382,7 +388,14 @@ class IntegrationGatewayService:
             }
         if existing is not None and existing.status == "pending_auth":
             auth_url = existing.account_metadata.get("auth_url")
-            if auth_url:
+            created_at = existing.account_metadata.get("auth_url_created_at")
+            try:
+                issued = datetime.fromisoformat(created_at) if created_at else None
+                age = (now - issued).total_seconds() if issued and issued.tzinfo else None
+                fresh = age is not None and 0 <= age < 300
+            except ValueError:
+                fresh = False
+            if auth_url and fresh:
                 return {
                     "plugin_id": plugin_id,
                     "connection_id": str(existing.id),
@@ -405,6 +418,7 @@ class IntegrationGatewayService:
                 "auth_config_id": init.auth_config_id,
                 "connection_request_id": init.connection_request_id,
                 "auth_url": init.redirect_url,
+                "auth_url_created_at": now.isoformat(),
             },
             created_at=existing.created_at if existing is not None else now,
             last_verified_at=now,

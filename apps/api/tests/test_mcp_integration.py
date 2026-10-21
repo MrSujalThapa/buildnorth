@@ -121,6 +121,41 @@ async def test_connect_managed_reuses_connected_account_without_reauth(
 
 
 @pytest.mark.asyncio
+async def test_pending_oauth_link_without_fresh_timestamp_is_reissued(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from personal_markets.integrations.composio_gateway import ConnectInitResult
+    from personal_markets.integrations.mcp_domain import ConnectionType, PluginConnectionRecord
+
+    repo = InMemoryIntegrationRepository()
+    service = IntegrationGatewayService(repository=repo)
+    owner = service._default_user_id
+    await repo.upsert_connection(PluginConnectionRecord(
+        id=uuid4(), user_id=owner, plugin_id="notion",
+        connection_type=ConnectionType.MANAGED_GATEWAY, gateway_provider="composio",
+        transport="http", auth_ref="old-request", status="pending_auth",
+        account_metadata={"auth_url": "https://old.example/link"}, created_at=datetime.now(UTC),
+    ))
+
+    async def no_reconcile(_owner):
+        return None
+
+    async def fresh_link(_owner, _plugin):
+        return ConnectInitResult("config", "new-request", "https://new.example/link")
+
+    monkeypatch.setattr(service._composio, "_client", object())
+    monkeypatch.setattr(service, "_reconcile_connections", no_reconcile)
+    monkeypatch.setattr(service._composio, "initiate_connection", fresh_link)
+    result = await service.connect_managed("notion")
+    assert result["auth_url"] == "https://new.example/link"
+    stored = await repo.get_connection(owner, "notion")
+    assert stored is not None and stored.account_metadata["auth_url_created_at"]
+
+
+@pytest.mark.asyncio
 async def test_reconcile_ignores_non_active_composio_accounts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -457,3 +492,23 @@ async def test_connected_notion_is_visible_without_catalog_page_containing_it() 
     )
     ids = {item.definition.id for item in await service.views(user_id=owner)}
     assert "notion" in ids
+
+
+@pytest.mark.asyncio
+async def test_default_plugin_directory_skips_remote_catalog() -> None:
+    from uuid import uuid4
+
+    from personal_markets.core.config import Settings
+
+    service = IntegrationGatewayService(settings=Settings(environment="test"))
+
+    class RemoteCatalog:
+        available = True
+
+        async def search_toolkits(self, **_kwargs):
+            raise AssertionError("default directory must not scan remote toolkits")
+
+    service._composio = RemoteCatalog()  # type: ignore[assignment]
+    catalog = await service.search_catalog(user_id=uuid4())
+    ids = {item["definition"]["id"] for item in catalog["items"]}
+    assert {"manual", "csv", "github", "notion"} <= ids

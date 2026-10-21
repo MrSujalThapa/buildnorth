@@ -125,14 +125,6 @@ export function PluginsRoute() {
     },
   });
 
-  const refreshConnection = useMutation({
-    mutationFn: (pluginId: string) => api.refreshPluginConnection(pluginId),
-    onSettled: () => {
-      setConnectingId(null);
-      void queryClient.invalidateQueries({ queryKey: ["plugins"] });
-    },
-  });
-
   const disconnectPlugin = useMutation({
     mutationFn: (pluginId: string) => api.disconnectPlugin(pluginId),
     onMutate: (pluginId) => {
@@ -256,11 +248,10 @@ export function PluginsRoute() {
     setBlockedAuthUrl(null);
     setAuthNotice(null);
 
-    const existingAuthUrl = plugin.connection.account_metadata?.auth_url;
     const needsOAuth =
       plugin.connection.status === "not_connected" ||
       plugin.connection.status === "error" ||
-      (plugin.connection.status === "pending_auth" && Boolean(existingAuthUrl));
+      plugin.connection.status === "pending_auth";
 
     const requestId = needsOAuth ? createComposioAuthRequestId() : null;
     authRequestIdRef.current = requestId;
@@ -272,25 +263,6 @@ export function PluginsRoute() {
     }
 
     try {
-      if (plugin.connection.status === "pending_auth" || plugin.connection.status === "error") {
-        if (existingAuthUrl && requestId) {
-          pendingAuthUrlRef.current = existingAuthUrl;
-          deliverComposioAuthUrl(requestId, existingAuthUrl, popup);
-          setBlockedAuthUrl(existingAuthUrl);
-          if (!popup) {
-            setAuthNotice("Popup blocked. Open the authorization link below to continue.");
-          } else {
-            setAuthNotice("Authorization opened in a new tab. Complete sign-in, then return here.");
-          }
-        } else if (existingAuthUrl) {
-          setBlockedAuthUrl(existingAuthUrl);
-          setAuthNotice("Popup blocked. Open the authorization link below to continue.");
-        }
-        const result = await refreshConnection.mutateAsync(pluginId);
-        handleConnectResult(result, popup);
-        return;
-      }
-
       const result = await connectPlugin.mutateAsync(pluginId);
       handleConnectResult(result, popup);
     } catch (error) {

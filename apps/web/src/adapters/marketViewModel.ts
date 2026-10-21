@@ -44,7 +44,11 @@ export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market 
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
   const beforeToday = published.filter((point) => point.created_at && Date.parse(point.created_at) < startOfDay.getTime()).at(-1);
-  const todayReturn = last != null && beforeToday ? last - beforeToday.probability * 100 : null;
+  const latestAt = published.at(-1)?.created_at;
+  const hasTodaySnapshot = Boolean(latestAt && Date.parse(latestAt) >= startOfDay.getTime());
+  const todayReturn = hasTodaySnapshot && last != null && beforeToday
+    ? last - beforeToday.probability * 100
+    : null;
   const totalReturn = first != null && last != null ? last - first : null;
 
   return {

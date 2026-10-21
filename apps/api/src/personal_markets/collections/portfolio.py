@@ -20,6 +20,7 @@ def portfolio_summary(
     day_start = datetime.combine(as_of.date(), time.min, UTC)
     current: list[float] = []
     previous: list[float] = []
+    updated_today = False
     for item in series:
         if item.withheld:
             continue
@@ -38,11 +39,16 @@ def portfolio_summary(
             continue
         points.sort(key=lambda point: point[0])
         current.append(points[-1][1])
+        updated_today = updated_today or points[-1][0] >= day_start
         earlier = [value for timestamp, value in points if timestamp < day_start]
         if earlier:
             previous.append(earlier[-1])
     if not current:
         return None, None, 0
     odds = sum(current) / len(current)
-    change = odds - sum(previous) / len(previous) if len(previous) == len(current) else None
+    change = (
+        odds - sum(previous) / len(previous)
+        if updated_today and len(previous) == len(current)
+        else None
+    )
     return odds, change, len(current)

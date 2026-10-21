@@ -32,3 +32,8 @@ def test_portfolio_partial_coverage_has_no_invented_change():
     ]
     assert portfolio_summary(goals, now=NOW) == (60, None, 2)
     assert portfolio_summary([series([])], now=NOW) == (None, None, 0)
+
+
+def test_stale_portfolio_has_no_today_change():
+    goals = [series([("2026-10-18T20:00:00Z", 30), ("2026-10-19T12:00:00Z", 40)])]
+    assert portfolio_summary(goals, now=NOW) == (40, None, 1)
