@@ -644,12 +644,12 @@ class IntegrationGatewayService:
                     tool_rows = payload.get("data")
                 if plugin_id == "notion":
                     _log.info(
-                        "source_sync_payload_shape",
-                        provider=plugin_id,
-                        tool=step.tool_name,
-                        payload_keys=sorted(raw_payload) if isinstance(raw_payload, dict) else [],
-                        rows_type=type(tool_rows).__name__,
-                        rows_count=len(tool_rows) if isinstance(tool_rows, list) else None,
+                        "source_sync_payload_shape provider=%s tool=%s payload_keys=%s rows_type=%s rows_count=%s",
+                        plugin_id,
+                        step.tool_name,
+                        sorted(raw_payload) if isinstance(raw_payload, dict) else [],
+                        type(tool_rows).__name__,
+                        len(tool_rows) if isinstance(tool_rows, list) else None,
                     )
                 has_document_body = isinstance(raw_payload, dict) and any(
                     isinstance(raw_payload.get(key), str) and raw_payload[key].strip()
@@ -712,12 +712,12 @@ class IntegrationGatewayService:
         except Exception as exc:  # noqa: BLE001
             if plugin_id == "notion":
                 _log.warning(
-                    "source_sync_read_failed",
-                    provider=plugin_id,
-                    tool=last_tool,
-                    argument_keys=argument_keys,
-                    error_type=type(exc).__name__,
-                    reason=str(exc)[:240],
+                    "source_sync_read_failed provider=%s tool=%s argument_keys=%s error_type=%s reason=%s",
+                    plugin_id,
+                    last_tool,
+                    argument_keys,
+                    type(exc).__name__,
+                    str(exc)[:240],
                 )
             await self._repository.finish_run(
                 run.id,

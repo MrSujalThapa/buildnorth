@@ -398,6 +398,42 @@ def test_notion_document_with_empty_child_data_is_still_a_record() -> None:
     assert records[0].payload["markdown"] == "I finished my sixth book."
 
 
+@pytest.mark.asyncio
+async def test_notion_page_sync_keeps_document_and_dedupes() -> None:
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from personal_markets.integrations.mcp_domain import (
+        ConnectionType, PluginConnectionRecord, SyncRecipeStep,
+    )
+
+    repo = InMemoryIntegrationRepository()
+    service = IntegrationGatewayService(repository=repo)
+    owner = service._default_user_id
+    await repo.upsert_connection(PluginConnectionRecord(
+        id=uuid4(), user_id=owner, plugin_id="notion",
+        connection_type=ConnectionType.MANAGED_GATEWAY,
+        gateway_provider="composio", transport="http", auth_ref="test",
+        status="connected", created_at=datetime.now(UTC),
+    ))
+
+    class PageTransport:
+        async def call_tool(self, name, arguments):
+            assert name == "NOTION_GET_PAGE_MARKDOWN"
+            assert arguments == {"page_id": "page-1"}
+            return {"data": [], "id": "page-1", "markdown": "I finished my sixth book."}
+
+    service._transport_for = lambda connection: PageTransport()  # type: ignore[method-assign]
+    step = SyncRecipeStep(
+        capability_id="notion.read", tool_name="NOTION_GET_PAGE_MARKDOWN",
+        arguments={"page_id": "page-1"},
+    )
+    first = await service.sync("notion", steps=[step])
+    second = await service.sync("notion", steps=[step])
+    assert first["records_new"] == 1
+    assert second["records_new"] == 0
+
+
 def test_github_normalization_keeps_activity_types_and_does_not_invent_events() -> None:
     from uuid import uuid4
 
