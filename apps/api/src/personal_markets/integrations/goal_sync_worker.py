@@ -55,7 +55,9 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             receipt["forecast_result"] = (
                 outcome.pricing.model_dump(mode="json") if outcome.pricing else None
             )
-            failed = outcome.status != "completed"
+            # An irrelevant source observation is a successful read with no
+            # forecast change, not a failed provider sync.
+            failed = outcome.status not in {"completed", "unchanged"}
         receipt["completed_at"] = datetime.now(UTC).isoformat()
         await store.update(
             job.id,

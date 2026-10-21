@@ -57,6 +57,11 @@ def normalize_tool_result(
 
 
 def _extract_rows(payload: dict[str, Any]) -> list[Any]:
+    # Some read tools return one document alongside an empty ``data`` list.
+    # A page body is still a source record even when it has no child rows.
+    if any(isinstance(payload.get(key), str) and payload[key].strip()
+           for key in ("markdown", "content", "text", "plain_text")):
+        return [payload]
     for key in ("records", "items", "data", "commits", "repositories", "results"):
         value = payload.get(key)
         if isinstance(value, list):

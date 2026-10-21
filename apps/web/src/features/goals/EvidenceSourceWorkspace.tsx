@@ -361,7 +361,9 @@ export function EvidenceSourceWorkspace({
           syncJob.data.status === "processing_evidence" ? "Processing evidence…" :
           syncJob.data.status === "updating_forecast" ? "Updating forecast…" :
           syncJob.data.status === "completed" ?
-            Number(syncJob.data.receipt.records_added ?? 0) > 0
+            syncJob.data.receipt.workflow_status === "unchanged"
+              ? "Sources checked · no relevant goal change"
+              : Number(syncJob.data.receipt.records_added ?? 0) > 0
               ? `Synced · ${Number(syncJob.data.receipt.records_added)} new record${Number(syncJob.data.receipt.records_added) === 1 ? "" : "s"}`
               : "No new updates"
             : syncJob.data.error ?? "Sync failed. Try again."

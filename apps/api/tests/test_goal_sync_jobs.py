@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -11,6 +12,7 @@ from personal_markets.integrations.goal_sync_jobs import (
     InMemoryGoalSyncJobStore,
     get_goal_sync_job_store,
 )
+from personal_markets.integrations.goal_sync_service import GoalSyncService
 from personal_markets.integrations.goal_sync_worker import execute_goal_sync_job, goal_sync_worker
 from personal_markets.integrations.mcp_domain import RawSourceRecord
 from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
@@ -115,6 +117,32 @@ async def test_worker_completes_queued_job_without_recipes() -> None:
     completed = await store.get(owner, goal.goal_id, queued.id)
     assert completed and completed.status == "completed"
     assert completed.receipt["status"] == "no_recipes"
+
+
+@pytest.mark.asyncio
+async def test_worker_completes_when_source_has_no_goal_impact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    get_goal_sync_job_store.cache_clear()
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal.user_id
+    goal_id = uuid4()
+    store = get_goal_sync_job_store()
+    queued = await store.enqueue(owner, goal_id)
+    claimed = await store.claim()
+    assert claimed is not None
+
+    async def unchanged(self, goal_id, *, on_stage=None):  # noqa: ANN001
+        return SimpleNamespace(
+            thread_id=uuid4(), status="unchanged", evidence=[], pricing=None,
+        )
+
+    monkeypatch.setattr(GoalSyncService, "sync_goal_sources", unchanged)
+    await execute_goal_sync_job(app, claimed)
+    completed = await store.get(owner, goal_id, queued.id)
+    assert completed is not None
+    assert completed.status == "completed"
+    assert completed.receipt["workflow_status"] == "unchanged"
 
 
 @pytest.mark.asyncio

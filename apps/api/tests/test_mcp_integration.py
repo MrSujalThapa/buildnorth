@@ -383,6 +383,21 @@ def test_notion_content_revision_dedupes_without_losing_updates() -> None:
     assert normalize_tool_result(**kwargs, payload={"results": []}) == []
 
 
+def test_notion_document_with_empty_child_data_is_still_a_record() -> None:
+    from uuid import uuid4
+
+    records = normalize_tool_result(
+        plugin_id="notion",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name="NOTION_GET_PAGE_MARKDOWN",
+        user_id="test-user",
+        payload={"id": "report-1", "data": [], "markdown": "I finished my sixth book."},
+    )
+    assert len(records) == 1
+    assert records[0].payload["markdown"] == "I finished my sixth book."
+
+
 def test_github_normalization_keeps_activity_types_and_does_not_invent_events() -> None:
     from uuid import uuid4
 

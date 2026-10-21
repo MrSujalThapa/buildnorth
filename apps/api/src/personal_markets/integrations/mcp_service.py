@@ -638,7 +638,20 @@ class IntegrationGatewayService:
                     tool_rows = payload.get("items")
                 if tool_rows is None:
                     tool_rows = payload.get("data")
-                if isinstance(tool_rows, list) and len(tool_rows) == 0:
+                if plugin_id == "notion":
+                    _log.info(
+                        "source_sync_payload_shape",
+                        provider=plugin_id,
+                        tool=step.tool_name,
+                        payload_keys=sorted(raw_payload) if isinstance(raw_payload, dict) else [],
+                        rows_type=type(tool_rows).__name__,
+                        rows_count=len(tool_rows) if isinstance(tool_rows, list) else None,
+                    )
+                has_document_body = isinstance(raw_payload, dict) and any(
+                    isinstance(raw_payload.get(key), str) and raw_payload[key].strip()
+                    for key in ("markdown", "content", "text", "plain_text")
+                )
+                if isinstance(tool_rows, list) and len(tool_rows) == 0 and not has_document_body:
                     continue
                 normalized = normalize_tool_result(
                     plugin_id=plugin_id,
