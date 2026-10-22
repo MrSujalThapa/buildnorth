@@ -22,7 +22,8 @@ test("partial evidence plots only observed traits without completing a polygon",
   const { container } = render(<ExecutionProfileRadar profile={profile} />);
   expect(screen.getByText("Some traits need more observations.")).toBeVisible();
   expect(container.querySelectorAll(".radar-node")).toHaveLength(1);
-  expect(container.querySelector(".radar-wedge")).toBeNull();
+  expect(container.querySelector(".radar-fill")).toBeNull();
+  expect(container.querySelectorAll(".radar-bar")).toHaveLength(1);
   expect(screen.queryByText("Observed")).toBeNull();
   expect(screen.getByText("You completed 2 of 3 comparable commitments.")).toBeVisible();
 });

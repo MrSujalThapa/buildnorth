@@ -1,17 +1,17 @@
 import type { BehaviorDimension } from "./ExecutionProfileRadar";
 
 export const TRAIT_COLORS: Record<string, string> = {
-  follow_through: "#1f8a70",
-  consistency: "#c9842a",
-  commitment_realism: "#c45c4a",
-  momentum: "#3b6fd6",
-  reliability: "#2f6b4f",
-  recovery: "#b4536a",
-  evidence_quality: "#6d645c",
-  goal_relevance: "#8a6232",
+  follow_through: "#2ec4b6",
+  consistency: "#ff9f1c",
+  commitment_realism: "#e71d36",
+  momentum: "#2e86de",
+  reliability: "#6a994e",
+  recovery: "#c9184a",
+  evidence_quality: "#7a746c",
+  goal_relevance: "#b08968",
 };
 
-const FALLBACK = ["#1f8a70", "#c9842a", "#3b6fd6", "#c45c4a", "#2f6b4f", "#b4536a"];
+const FALLBACK = ["#2ec4b6", "#ff9f1c", "#2e86de", "#e71d36", "#6a994e", "#c9184a"];
 
 export function traitColor(key: string, index: number): string {
   return TRAIT_COLORS[key] ?? FALLBACK[index % FALLBACK.length] ?? "#1f8a70";
