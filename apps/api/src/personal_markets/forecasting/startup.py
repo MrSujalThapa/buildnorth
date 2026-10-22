@@ -320,11 +320,14 @@ def futures_outcome_weights(
     evidence: list[NormalizedEvidence],
     *,
     scenario_labels: list[str] | None = None,
+    state_overrides: dict[str, Any] | None = None,
 ) -> tuple[dict[str, float] | None, str | None]:
     """Map Possible Futures labels to numerical weights when startup evidence exists."""
     if not is_startup_goal(goal):
         return None, "not a startup goal"
-    state = aggregate_startup_from_evidence(evidence)
+    state = apply_startup_overrides(
+        aggregate_startup_from_evidence(evidence), state_overrides
+    )
     if not _has_startup_signal(state):
         return None, "insufficient startup evidence for defensible weights"
     ref = load_startup_reference()

@@ -31,6 +31,15 @@ describe("market card daily change", () => {
     ] as MarketHistoryPoint[];
     expect(toMarketCard(goal, points).todayReturn).toBeCloseTo(5);
   });
+
+  it("keeps synthetic demo history off live cards unless opted in", () => {
+    const points = [
+      { probability: 0.4, created_at: "2026-10-01T12:00:00Z", source_kind: "synthetic_demo" },
+      { probability: 0.5, created_at: "2026-10-20T12:00:00Z", source_kind: "synthetic_demo" },
+    ] as MarketHistoryPoint[];
+    expect(toMarketCard(goal, points).history).toEqual([]);
+    expect(toMarketCard(goal, points, { includeSyntheticDemo: true }).history).toHaveLength(2);
+  });
 });
 
 it("shows extracted reading values without assigning unsupported event-level odds", () => {

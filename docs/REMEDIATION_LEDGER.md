@@ -41,23 +41,23 @@ PASS / PARTIAL / FAIL / BLOCKED / NOT TESTED
 
 | ID | Deliverable | Status | Notes |
 |---|---|---|---|
-| W1 | Shared intervention/baseline/parsed_changes used across four modes | PARTIAL | Contracts wired; live preview against production API not yet |
-| W2 | Change: NL → parsed_changes → numerical delta | PARTIAL | Submit path exists; auto-reprice dead |
-| W3 | Futures: decision conditions MC/funnel, not labels only | PARTIAL | Unit test: higher contribution raises target mass |
+| W1 | Shared intervention/baseline/parsed_changes used across four modes | PARTIAL | Contracts wired; live preview against production API still lacks new fields |
+| W2 | Change: NL → parsed_changes → numerical delta | PARTIAL | Submit path exists; auto-reprice still unused for `action` |
+| W3 | Futures: decision conditions MC/funnel, not labels only | PARTIAL | Goal-family labels; startup/hiring/finance parsed_changes shift mass in unit tests. Live preview not accepted |
 | W4 | Compare: two user-specified paths, no 0% for unpriced | PARTIAL | Path A/B composers + null unpriced |
-| W5 | Reverse: non-empty candidates + ranked feasible paths | PARTIAL | Adapter + `_ensure_search_levers` |
-| W6 | Simple vs Deeper: different computation | PARTIAL | Draw counts differ; deeper sensitivity not yet |
+| W5 | Reverse: non-empty candidates + ranked feasible paths | PARTIAL | Assumption-lever generation + binary search + re-simulation. Live Reverse not accepted |
+| W6 | Simple vs Deeper: different computation | PARTIAL | Draws 2000 vs 8000; sensitivity only in Deeper; opportunity costs in deep UI |
 | G1 | Goal create / forecast-readiness distinction | NOT TESTED | |
-| R1 | Parameter radar (not six traits) | PARTIAL | Parameter estimator + UI reject six-trait skeleton |
-| R2 | Isolated demo parameter/fixture dataset | PARTIAL | `GET /api/v1/profile/demo-radar`; does not write user rows |
-| P1 | Profile editor polish + photo persist | PARTIAL | Photo flow exists; area modal crude |
-| L1 | Plugin full catalog + icons | PARTIAL | |
+| R1 | Parameter radar (not six traits) | PARTIAL | Selectable presets persisted as `__param__:` markers; live chart not accepted |
+| R2 | Isolated demo parameter/fixture dataset | PARTIAL | `GET /api/v1/profile/demo-radar` unchanged; does not write user rows |
+| P1 | Profile editor polish + photo persist | PARTIAL | Save waits for photo upload/removal; failures keep the editor open. Browser not accepted |
+| L1 | Plugin full catalog + icons | PARTIAL | Auto-paginates `browse=true` after popular list. Live catalog not counted |
 | N1 | Notion resource identity trace | PARTIAL | Gateway title/URL work; live account not re-traced |
-| M1 | Isolated demo markets/collections/histories | FAIL | |
+| M1 | Isolated demo markets/collections/histories | PARTIAL | `GET /api/v1/profile/demo-portfolio` + Markets `?demo=1`. Nonlinear synthetic_demo histories; no user writes |
 | O1 | Observability scheduled loop | BLOCKED | Cron owned by Codex |
-| X1 | Consumer UX, composer attachments, speech | PARTIAL | |
+| X1 | Consumer UX, composer attachments, speech | PARTIAL | Mic uses browser Speech Recognition; attach control is disabled with an honest reason |
 | K1 | Performance measurements | NOT TESTED | |
-| D1 | Preview + authenticated browser matrix | PARTIAL | CORS repaired; product flows not accepted |
+| D1 | Preview + authenticated browser matrix | PARTIAL | Git-alias still SSO-protected; production Render lacks new contracts |
 
 ---
 
@@ -76,6 +76,25 @@ Tests: `test_what_if_contracts.py`, futures, pass4 remaining, parameter profile,
 
 ---
 
+### 2026-10-22 — Goal-family Futures, Reverse levers, Deeper sensitivity, demo markets
+
+- `parse-decision` loads the goal and uses family outcome labels. Regex no longer gates pricing.
+- Startup Futures apply `parsed_changes` onto `StartupState` before `derive_outcome_weights`. Hiring/finance already shifted; tests assert raise-seed and offer mass move.
+- Reverse generates flow / weekly_application_rate setpoints, re-simulates them, and always enables bounded binary search when those assumptions exist.
+- Simple analysis skips sensitivity; Deeper requests it and shows opportunity costs / fragility.
+- Profile Save waits for photo upload or removal and keeps the editor open on failure. Parameter axes are user-selected presets, not life areas.
+- Isolated `GET /api/v1/profile/demo-portfolio` backs Markets `?demo=1` with `synthetic_demo` histories. Plugins auto-browse up to 8 catalog pages.
+
+Tests: contracts, futures (startup+hiring conditioning), demo portfolio, parameter selection, vitest adapters/radar.
+
+### Deployment blocker (do not treat as end of pass)
+
+- Vercel git-alias remains behind Deployment Protection SSO. Shareable Links / Protection Bypass for Automation were not created from this session (Hobby one-link limit; requires dashboard/token).
+- Production Render `playitout-api` is still `main` and ignores new request fields. Compatible backend for this commit is the branch API, not production.
+- Do not disable SSO. Do not seed `sujalthapa242`. Cron/watch-runner untouched.
+
+---
+
 ## Next unfinished task
 
-If interrupted: commit/push this branch, then isolated markets/collections demo (M1) without seeding production `sujalthapa242`, plugin catalog live check, authenticated preview acceptance. Cron still owned by Codex.
+If interrupted: push this branch, obtain a Vercel Shareable Link or bypass token without disabling SSO, run the branch API (not production Render), then signed-in A–L acceptance. Cron still owned by Codex.

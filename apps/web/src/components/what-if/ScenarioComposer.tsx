@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowUp, Mic, Square } from "lucide-react";
+import { ArrowUp, Mic, Paperclip, Square } from "lucide-react";
 
 type SpeechResult = { results: ArrayLike<ArrayLike<{ transcript: string }>> };
 
@@ -112,6 +112,15 @@ export function ScenarioComposer({
           }}
         />
         <div className="scenario-composer-actions">
+          <button
+            type="button"
+            className="composer-icon"
+            aria-label="Attach a file"
+            disabled
+            title="File attachments are not ingested as evidence yet, so this control stays unavailable."
+          >
+            <Paperclip size={16} />
+          </button>
           <button
             type="button"
             className={recording ? "composer-icon recording" : "composer-icon"}

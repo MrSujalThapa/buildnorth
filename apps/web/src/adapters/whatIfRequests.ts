@@ -6,13 +6,20 @@ type AnalysisDepth = "simple" | "deep";
 export function simulationConfigForView(
   view: AnalysisDepth,
   seed: number,
-): Record<string, number> {
+): {
+  seed: number;
+  minimum_draws: number;
+  batch_draws: number;
+  maximum_draws: number;
+  include_sensitivity: boolean;
+} {
   if (view === "deep") {
     return {
       seed,
       minimum_draws: 8000,
       batch_draws: 4000,
       maximum_draws: 20000,
+      include_sensitivity: true,
     };
   }
   return {
@@ -20,6 +27,7 @@ export function simulationConfigForView(
     minimum_draws: 2000,
     batch_draws: 2000,
     maximum_draws: 4000,
+    include_sensitivity: false,
   };
 }
 

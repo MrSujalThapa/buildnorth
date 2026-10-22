@@ -9,7 +9,14 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.identity.domain import Invitation, Principal, RedeemResult, UserProfile
+from personal_markets.identity.domain import (
+    Invitation,
+    Principal,
+    RedeemResult,
+    UserProfile,
+    merge_stored_dimensions,
+    split_stored_dimensions,
+)
 from personal_markets.persistence.database import transaction
 
 
@@ -450,12 +457,14 @@ class PostgresIdentityRepository:
             )
         if row is None:
             return UserProfile()
+        areas, parameter_ids = split_stored_dimensions(row.get("profile_dimensions_json") or [])
         return UserProfile(
             display_name=row.get("display_name"),
             username=row.get("username"),
             bio=row.get("bio"),
             avatar_value=row.get("avatar_value"),
-            dimensions=row.get("profile_dimensions_json") or [],
+            dimensions=areas,
+            parameter_ids=parameter_ids,
         )
 
     async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile:
@@ -478,7 +487,9 @@ class PostgresIdentityRepository:
                     "username": profile.username,
                     "bio": profile.bio,
                     "avatar_value": profile.avatar_value,
-                    "dimensions": json.dumps([item.model_dump(mode="json") for item in profile.dimensions]),
+                    "dimensions": json.dumps(
+                        merge_stored_dimensions(profile.dimensions, profile.parameter_ids)
+                    ),
                 },
             )
         return await self.get_profile(user_id)

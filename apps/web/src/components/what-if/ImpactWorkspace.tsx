@@ -308,10 +308,21 @@ export default function ImpactWorkspace({
                     </button>
                   ))
                 ) : (
-                  <div className="empty-state compact"><span>Sensitivity unavailable until a priced simulation returns.</span></div>
+                  <div className="empty-state compact"><span>Sensitivity is computed only in Deeper analysis after a priced run.</span></div>
                 )}
               </div>
-              <p className="quiet-copy">{preview.tradeoff}</p>
+              {impact.fragilityPp != null ? (
+                <p className="quiet-copy">Fragility {impact.fragilityPp.toFixed(1)} pts if key assumptions move.</p>
+              ) : null}
+              {impact.opportunityCosts.length ? (
+                <ul className="stack-list compact">
+                  {impact.opportunityCosts.map((item) => (
+                    <li key={item}><span>Opportunity</span><strong>{item}</strong></li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="quiet-copy">{preview.tradeoff}</p>
+              )}
             </aside>
           </div>
 

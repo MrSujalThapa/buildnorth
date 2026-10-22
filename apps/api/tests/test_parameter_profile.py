@@ -28,3 +28,17 @@ def test_real_profile_omits_parameters_without_observations() -> None:
     profile = build_parameter_profile([], demo=False)
     assert profile.dimensions == []
     assert profile.execution.usable is False
+
+
+def test_selected_parameter_ids_limit_axes() -> None:
+    as_of = datetime(2026, 10, 21, tzinfo=UTC)
+    profile = build_parameter_profile(
+        demo_parameter_evidence(as_of=as_of),
+        selected_ids=["weekly_applications", "monthly_savings"],
+        as_of=as_of,
+        demo=True,
+    )
+    assert {item.key for item in profile.dimensions} == {
+        "weekly_applications",
+        "monthly_savings",
+    }

@@ -71,4 +71,9 @@ describe("whatIfRequests", () => {
     const simple = simulationConfigForView("simple", 1).minimum_draws ?? 0;
     expect(deep).toBeGreaterThan(simple);
   });
+
+  it("runs sensitivity only on deeper analysis", () => {
+    expect(simulationConfigForView("deep", 1).include_sensitivity).toBe(true);
+    expect(simulationConfigForView("simple", 1).include_sensitivity).toBe(false);
+  });
 });

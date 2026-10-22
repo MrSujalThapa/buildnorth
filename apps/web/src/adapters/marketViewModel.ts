@@ -15,12 +15,19 @@ export function marketCategory(goal: Goal): string {
   return CATEGORY_PATTERNS.find(([pattern]) => pattern.test(searchable))?.[1] ?? "Personal";
 }
 
-export function publishedHistoryPoints(points: MarketHistoryPoint[]): MarketHistoryPoint[] {
+export function publishedHistoryPoints(
+  points: MarketHistoryPoint[],
+  options?: { includeSyntheticDemo?: boolean },
+): MarketHistoryPoint[] {
+  if (options?.includeSyntheticDemo) return points;
   return points.filter((point) => point.source_kind !== "synthetic_demo");
 }
 
-function historyToChart(points: MarketHistoryPoint[]): ChartPoint[] {
-  return publishedHistoryPoints(points).map((point, index) => ({
+function historyToChart(
+  points: MarketHistoryPoint[],
+  options?: { includeSyntheticDemo?: boolean },
+): ChartPoint[] {
+  return publishedHistoryPoints(points, options).map((point, index) => ({
     timestamp: point.created_at ? Date.parse(point.created_at) : index,
     value: point.probability * 100,
   }));
@@ -35,9 +42,13 @@ function formatMeta(goal: Goal): string {
   return `Deadline ${deadline} · ${goal.forecast_status.toLowerCase()}`;
 }
 
-export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market {
-  const published = publishedHistoryPoints(history);
-  const chart = historyToChart(history);
+export function toMarketCard(
+  goal: Goal,
+  history: MarketHistoryPoint[],
+  options?: { includeSyntheticDemo?: boolean },
+): Market {
+  const published = publishedHistoryPoints(history, options);
+  const chart = historyToChart(history, options);
   const odds = chart.at(-1)?.value ?? null;
   const first = chart[0]?.value ?? null;
   const last = chart.at(-1)?.value ?? null;

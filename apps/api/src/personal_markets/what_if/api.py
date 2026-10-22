@@ -3,6 +3,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from personal_markets.agents.intervention_service import InterventionAgentService
+from personal_markets.goals.service import GoalService
+from personal_markets.identity.deps import get_invited_principal
+from personal_markets.identity.domain import Principal
 from personal_markets.what_if.domain import (
     ActionFrontierResult,
     MarketHistoryPointResponse,
@@ -25,9 +29,8 @@ from personal_markets.what_if.intervention_models import (
     ParseInterventionResponse,
     TypedDecisionResponse,
 )
-from personal_markets.agents.intervention_service import InterventionAgentService
 from personal_markets.what_if.service import WhatIfService
-from personal_markets.wiring import get_intervention_service, get_what_if_service
+from personal_markets.wiring import get_goal_service, get_intervention_service, get_what_if_service
 
 router = APIRouter(prefix="/api/v1/what-if", tags=["what-if"])
 
@@ -113,8 +116,13 @@ async def compare_paths(
 
 
 @router.post("/parse-decision", response_model=ParseDecisionResponse)
-async def parse_decision(payload: ParseDecisionRequest) -> ParseDecisionResponse:
-    parsed = parse_futures_decision(payload.text)
+async def parse_decision(
+    payload: ParseDecisionRequest,
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+) -> ParseDecisionResponse:
+    goal = await goals.get_goal_by_string(payload.goal_id, owner_id=principal.user_id)
+    parsed = parse_futures_decision(payload.text, goal=goal)
     decision = None
     if parsed.decision is not None:
         decision = TypedDecisionResponse(

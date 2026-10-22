@@ -16,6 +16,9 @@ type Props = {
   onArchiveGoals: (goalIds: string[]) => Promise<void>;
   onDeleteCollections: (collectionIds: string[]) => Promise<void>;
   onMoveToCollection: (collectionId: string, goalIds: string[]) => Promise<void>;
+  demoMode?: boolean;
+  demoMessage?: string;
+  onToggleDemo?: () => void;
 };
 
 export default function MarketsPage({
@@ -27,6 +30,9 @@ export default function MarketsPage({
   onArchiveGoals,
   onDeleteCollections,
   onMoveToCollection,
+  demoMode = false,
+  demoMessage,
+  onToggleDemo,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -64,13 +70,20 @@ export default function MarketsPage({
         <header className="markets-header">
           <div>
             <div className="markets-eyebrow">MARKETS</div>
-            <h1>Your outcomes</h1>
+            <h1>{demoMode ? "Demonstration outcomes" : "Your outcomes"}</h1>
+            {demoMode && demoMessage ? <p className="profile-demo-note">{demoMessage}</p> : null}
           </div>
           <div className="markets-toolbar">
+            {onToggleDemo ? (
+              <button type="button" className={`markets-select${demoMode ? " is-active" : ""}`} onClick={onToggleDemo}>
+                {demoMode ? "Back to my markets" : "View demonstration"}
+              </button>
+            ) : null}
             <button
               type="button"
               className={`markets-select${selectMode ? " is-active" : ""}`}
               onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              disabled={demoMode}
             >
               {selectMode ? "Cancel" : "Select"}
             </button>

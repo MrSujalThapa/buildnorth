@@ -319,6 +319,13 @@ export interface GoalsDashboard {
   collections?: CollectionView[];
 }
 
+export interface ProfileParameterOption {
+  id: string;
+  name: string;
+  meaning: string;
+  unit: string;
+}
+
 export interface ProfilePayload {
   account: AccountView;
   goal_count: number;
@@ -326,6 +333,7 @@ export interface ProfilePayload {
   radar: BehaviorProfile;
   radar_areas?: { label: string; radar: BehaviorProfile }[];
   radar_kind?: "parameters" | "traits";
+  available_parameters?: ProfileParameterOption[];
   privacy: string;
 }
 
@@ -727,6 +735,8 @@ export const api = {
   profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
   demoProfileRadar: (signal?: AbortSignal) =>
     request<{ demo: boolean; radar: BehaviorProfile; message: string }>("/api/v1/profile/demo-radar", undefined, signal),
+  demoPortfolio: (signal?: AbortSignal) =>
+    request<GoalsDashboard & { demo: boolean; message: string }>("/api/v1/profile/demo-portfolio", undefined, signal),
   profilePhoto,
   uploadProfilePhoto: (file: File) => {
     const body = new FormData();
@@ -734,7 +744,7 @@ export const api = {
     return request<{ status: string }>("/api/v1/profile/photo", { method: "PUT", body });
   },
   removeProfilePhoto: () => request<{ status: string }>("/api/v1/profile/photo", { method: "DELETE" }),
-  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string; dimensions?: { label: string; goal_ids: string[] }[] }) =>
+  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string; dimensions?: { label: string; goal_ids: string[] }[]; parameter_ids?: string[] }) =>
     request<AccountView>("/api/v1/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

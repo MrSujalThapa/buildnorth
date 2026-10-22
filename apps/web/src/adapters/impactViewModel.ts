@@ -11,6 +11,8 @@ export type ImpactViewModel = {
   followThroughPercent: number | null;
   downsideTail: number | null;
   sensitivity: { label: string; swingPp: number }[];
+  opportunityCosts: string[];
+  fragilityPp: number | null;
   drawCount: number | null;
   seed: number | null;
   modelLabel: string | null;
@@ -135,6 +137,8 @@ export function toImpactViewModel(
       result?.execution_probability != null ? result.execution_probability * 100 : null,
     downsideTail: stats.p10,
     sensitivity,
+    opportunityCosts: result?.opportunity_costs ?? [],
+    fragilityPp: result?.fragility_pp ?? null,
     drawCount: result?.diagnostics?.n_draws ?? null,
     seed,
     modelLabel: baseline ? `${baseline.model_family}@${baseline.model_version}` : null,

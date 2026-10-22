@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-22 — Goal-family Futures, Reverse levers, Deeper sensitivity
+
+**Hypothesis:** Parsing a decision is not the same as conditioning the model. Reverse filling from compare-catalog chips is not discovery. Simple/Deeper need different analysis, not only more draws. Radar axes must be user-selected parameters. Demo market histories must stay isolated.
+
+**Changes:** Goal-family scenario labels; startup `parsed_changes` applied to `StartupState`; Reverse assumption-lever generation + re-simulation; `include_sensitivity` only on Deeper; Profile Save/Cancel waits for photo; selectable parameter ids; isolated demo portfolio; plugin auto-browse. Cron/watch-runner untouched. Production user not seeded.
+
+**Measured result:** Targeted pytest for contracts/futures/parameters/demo portfolio passed in this session. Vitest adapters + radar passed. Authenticated browser A–L: **NOT TESTED** (git-alias SSO; production API lacks new contracts). No paid inference. No production `main` deploy.
+
 ## 2026-10-22 — What If contracts and parameter radar
 
 **Hypothesis:** Futures/Compare/Reverse were failing at the intervention handoff (labels without `parsed_changes`, empty reverse candidates, unpriced 0%), and Profile still rendered the rejected six-trait skeleton.

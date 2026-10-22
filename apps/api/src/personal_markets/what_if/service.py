@@ -35,6 +35,7 @@ from personal_markets.what_if.domain import (
     ContinuousSearchVariable,
     DistributionBin,
     FrontierPoint,
+    InterventionChangeInput,
     MarketHistoryPointResponse,
     PathComparisonItem,
     PathComparisonRequest,
@@ -676,15 +677,19 @@ class WhatIfService:
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
-        sensitivity = compute_sensitivity(
-            goal=goal,
-            evidence=evidence,
-            request=request,
-            assumptions=assumptions,
-            baseline_probability=baseline,
-            intervention_effect=intervention_effect,
-            mode=mode,
-            engine=self._engine,
+        sensitivity = (
+            compute_sensitivity(
+                goal=goal,
+                evidence=evidence,
+                request=request,
+                assumptions=assumptions,
+                baseline_probability=baseline,
+                intervention_effect=intervention_effect,
+                mode=mode,
+                engine=self._engine,
+            )
+            if request.config.include_sensitivity
+            else []
         )
         opportunity_costs = (
             []
@@ -883,11 +888,12 @@ class WhatIfService:
                 search_method="already_satisfied",
             )
         paths = await self._discrete_target_paths(request, current)
+        paths.extend(await self._assumption_setpoint_paths(request, current))
         if request.continuous_variable is not None:
             continuous = await self._continuous_target_path(request)
             if continuous is not None:
                 paths.append(continuous)
-        paths.sort(key=lambda item: self._cost_score(item.resource_cost))
+        paths.sort(key=lambda item: (self._cost_score(item.resource_cost), len(item.action_ids)))
         result = TargetSearchResult(
             target_probability=request.target_probability,
             current_probability=current,
@@ -1108,8 +1114,7 @@ class WhatIfService:
                     for item in state.compare_candidates
                     if item.intervention is not None
                 ]
-        candidates = updates.get("candidates", request.candidates)
-        if request.continuous_variable is None and not candidates:
+        if request.continuous_variable is None:
             names = {item.name for item in request.base.assumptions}
             if "flow" in names:
                 updates["continuous_variable"] = ContinuousSearchVariable(assumption="flow")
@@ -1120,6 +1125,74 @@ class WhatIfService:
         if not updates:
             return request
         return request.model_copy(update=updates)
+
+    async def _assumption_setpoint_paths(
+        self, request: TargetSearchRequest, current: float
+    ) -> list[TargetPath]:
+        paths: list[TargetPath] = []
+        for name in ("flow", "weekly_application_rate"):
+            assumption = next(
+                (item for item in request.base.assumptions if item.name == name),
+                None,
+            )
+            if assumption is None:
+                continue
+            span = assumption.maximum - assumption.value
+            if span <= 0:
+                continue
+            for fraction, adjective in ((0.4, "Moderate"), (0.85, "Aggressive")):
+                value = assumption.value + span * fraction
+                change = InterventionChangeInput(
+                    metric=name,
+                    operation="set",
+                    value=value,
+                    unit=assumption.unit,
+                    provenance="EXPLORATION_ASSUMPTION",
+                )
+                changed = apply_parsed_changes_to_assumptions(
+                    request.base.assumptions,
+                    [InterventionChangeResponse.model_validate(change.model_dump())],
+                )
+                priced = await self._simulate(
+                    request.base.model_copy(
+                        update={
+                            "assumptions": changed,
+                            "parsed_changes": [change],
+                            "intervention": None,
+                        }
+                    ),
+                    persist=False,
+                )
+                if priced.scenario_probability is None:
+                    continue
+                if priced.scenario_probability <= current + 1e-9:
+                    continue
+                if (
+                    priced.scenario_probability + request.probability_tolerance
+                    < request.target_probability
+                ):
+                    continue
+                paths.append(
+                    TargetPath(
+                        label=(
+                            f"{adjective} {assumption.name.replace('_', ' ')} "
+                            f"({value:.4g} {assumption.unit})"
+                        ),
+                        action_ids=[f"lever:{name}:{fraction}"],
+                        resulting_probability=priced.scenario_probability,
+                        resource_cost=ResourceCost(),
+                        assumptions=changed,
+                        fragility_pp=priced.fragility_pp,
+                        valid_because=(
+                            "Assumption lever was re-simulated and clears the target."
+                        ),
+                        model_provenance={
+                            "family": "assumption_lever",
+                            "version": "1.0.0",
+                        },
+                    )
+                )
+        return paths
 
     async def _discrete_target_paths(
         self, request: TargetSearchRequest, current: float

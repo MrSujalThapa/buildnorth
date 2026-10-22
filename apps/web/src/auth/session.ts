@@ -22,6 +22,7 @@ export type UserProfile = {
   bio: string | null;
   avatar_value: string | null;
   dimensions: { label: string; goal_ids: string[] }[];
+  parameter_ids?: string[];
 };
 
 export type AccountView = {

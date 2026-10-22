@@ -18,7 +18,9 @@ from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import AccountView, Principal, ProfileDimension, UserProfile
 from personal_markets.identity.factory import get_identity_service, get_inference_budget_service
 from personal_markets.identity.service import IdentityService
+from personal_markets.profile.demo_portfolio import demo_portfolio
 from personal_markets.profile.parameters import (
+    PARAMETER_PRESETS,
     build_parameter_profile,
     demo_parameter_profile,
     flatten_goal_evidence,
@@ -37,6 +39,10 @@ class ProfilePatch(BaseModel):
     bio: str | None = Field(default=None, max_length=280)
     avatar_value: str | None = Field(default=None, max_length=32)
     dimensions: list[ProfileDimension] | None = Field(default=None, max_length=12)
+    parameter_ids: list[str] | None = Field(default=None, max_length=8)
+
+
+_ALLOWED_PARAMETERS = {item.id for item in PARAMETER_PRESETS}
 
 
 @router.get("")
@@ -62,7 +68,10 @@ async def get_profile(
 
     event_rows = await asyncio.gather(*(goal_evidence(goal.goal_id) for goal in owned))
     grouped = {str(goal.goal_id): rows for goal, rows in zip(owned, event_rows, strict=True)}
-    radar = build_parameter_profile(flatten_goal_evidence(grouped))
+    selected = account.profile.parameter_ids or None
+    radar = build_parameter_profile(
+        flatten_goal_evidence(grouped), selected_ids=selected
+    )
     radar_areas = []
     for area in account.profile.dimensions:
         members = [goal for goal in owned if goal.goal_id in area.goal_ids]
@@ -75,7 +84,7 @@ async def get_profile(
             {
                 "label": area.label,
                 "radar": build_parameter_profile(
-                    flatten_goal_evidence(subset)
+                    flatten_goal_evidence(subset), selected_ids=selected
                 ).model_dump(mode="json"),
             }
         )
@@ -86,6 +95,15 @@ async def get_profile(
         "radar": radar.model_dump(mode="json"),
         "radar_areas": radar_areas,
         "radar_kind": "parameters",
+        "available_parameters": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "meaning": item.meaning,
+                "unit": item.unit,
+            }
+            for item in PARAMETER_PRESETS
+        ],
         "privacy": "private",
     }
 
@@ -107,6 +125,14 @@ async def get_demo_radar(
     }
 
 
+@router.get("/demo-portfolio")
+async def get_demo_portfolio(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> dict[str, Any]:
+    del principal
+    return demo_portfolio()
+
+
 @router.patch("", response_model=AccountView)
 async def patch_profile(
     body: ProfilePatch,
@@ -119,6 +145,13 @@ async def patch_profile(
         owned = {goal.goal_id for goal in await goals.list_goals(owner_id=principal.user_id)}
         if any(goal_id not in owned for item in body.dimensions for goal_id in item.goal_ids):
             raise ForbiddenError("Profile dimensions may include only your goals")
+    if body.parameter_ids is not None:
+        unknown = [item for item in body.parameter_ids if item not in _ALLOWED_PARAMETERS]
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown parameter ids: {', '.join(unknown)}",
+            )
     await identity.update_profile(
         principal, UserProfile.model_validate(body.model_dump(exclude_unset=True))
     )

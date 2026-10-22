@@ -283,22 +283,44 @@ export function PluginsRoute() {
     }
   };
 
-  const browseCatalog = async () => {
+  const browseCatalog = useCallback(async () => {
     setBrowsing(true);
     try {
-      const page = await api.pluginsCatalog(undefined, undefined, browseStarted ? browseCursor ?? undefined : undefined, true);
+      const extras: PluginView[] = [];
+      let cursor: string | undefined;
+      let pages = 0;
+      while (pages < 8) {
+        const page = await api.pluginsCatalog(
+          undefined,
+          undefined,
+          browseStarted || pages > 0 ? cursor ?? browseCursor ?? undefined : undefined,
+          true,
+        );
+        extras.push(...page.items);
+        pages += 1;
+        if (!page.next_cursor) {
+          cursor = undefined;
+          break;
+        }
+        cursor = page.next_cursor;
+      }
       setCatalogExtras((current) => {
         const seen = new Set(current.map((item) => item.definition.id));
-        return [...current, ...page.items.filter((item) => !seen.has(item.definition.id))];
+        return [...current, ...extras.filter((item) => !seen.has(item.definition.id))];
       });
-      setBrowseCursor(page.next_cursor);
+      setBrowseCursor(cursor ?? null);
       setBrowseStarted(true);
     } catch {
       setAuthNotice("The full catalog could not be loaded. Popular integrations are still available.");
     } finally {
       setBrowsing(false);
     }
-  };
+  }, [browseCursor, browseStarted]);
+
+  useEffect(() => {
+    if (debouncedQuery || !plugins.isSuccess || browseStarted || browsing) return;
+    void browseCatalog();
+  }, [browseCatalog, browseStarted, browsing, debouncedQuery, plugins.isSuccess]);
 
   const handleToggleConnection = (pluginId: string) => {
     const plugin = viewById.get(pluginId);

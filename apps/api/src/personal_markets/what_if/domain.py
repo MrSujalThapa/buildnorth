@@ -86,6 +86,7 @@ class SimulationConfig(BaseModel):
     batch_draws: int = Field(default=2000, ge=100)
     maximum_draws: int = Field(default=20000, ge=100)
     probability_se_tolerance: float = Field(default=0.0075, gt=0)
+    include_sensitivity: bool = True
 
     @model_validator(mode="after")
     def valid_draw_bounds(self) -> SimulationConfig:

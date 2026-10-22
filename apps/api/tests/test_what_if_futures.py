@@ -9,7 +9,11 @@ from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.persistence.agent_store import InMemoryEvidenceRepository
 from personal_markets.ports import EvidenceEventProposal
-from personal_markets.what_if.domain import PossibleFuturesRequest, ScenarioDefinition
+from personal_markets.what_if.domain import (
+    InterventionChangeInput,
+    PossibleFuturesRequest,
+    ScenarioDefinition,
+)
 from personal_markets.what_if.service import WhatIfService
 
 
@@ -246,3 +250,140 @@ async def test_possible_futures_prices_career_from_funnel_model() -> None:
     assert result.priced is True
     total = sum(item.probability or 0 for item in result.outcomes) + result.other_probability
     assert total == pytest.approx(1.0)
+
+
+def _prob(result, needle: str) -> float:
+    for item in result.outcomes:
+        if needle.lower() in item.label.lower():
+            return float(item.probability or 0)
+    raise AssertionError(f"missing outcome containing {needle!r}")
+
+
+@pytest.mark.asyncio
+async def test_startup_parsed_changes_shift_raise_seed_mass() -> None:
+    goal_id = uuid4()
+    goal = GoalContract.model_validate(
+        {
+            "goal_id": goal_id,
+            "title": "Quit and work on my startup",
+            "goal_type": GoalType.MULTI_OUTCOME,
+            "success_definition": {"metric": "startup_outcome", "target": "raise_external_funding"},
+            "deadline": datetime.now(UTC) + timedelta(days=400),
+            "state_dimensions": ["mrr", "runway"],
+        }
+    )
+    goal_repo = InMemoryGoalRepository()
+    await goal_repo.create(goal, uuid4())
+    evidence_repo = InMemoryEvidenceRepository({goal_id: True})
+    await evidence_repo.insert(
+        uuid4(),
+        goal_id,
+        EvidenceEventProposal.model_validate(
+            {
+                "source_type": "manual",
+                "event_type": "observation",
+                "domain": "startup",
+                "metric": "mrr",
+                "numeric_value": 9000.0,
+                "unit": "USD",
+                "observed_at": datetime.now(UTC).isoformat(),
+                "summary": "mrr snapshot",
+            }
+        ),
+        fingerprint="mrr",
+        agent_run_id=None,
+        conflict="none",
+    )
+    service = WhatIfService(GoalService(goal_repo), evidence=EvidenceService(evidence_repo))
+    labels = [
+        ScenarioDefinition(label="Raise seed"),
+        ScenarioDefinition(label="Bootstrap sustainably"),
+        ScenarioDefinition(label="Downside / return to job", downside=True),
+    ]
+    baseline = await service.possible_futures(
+        PossibleFuturesRequest(goal_id=str(goal_id), name="Baseline", outcomes=labels)
+    )
+    boosted = await service.possible_futures(
+        PossibleFuturesRequest(
+            goal_id=str(goal_id),
+            name="More conversations",
+            outcomes=labels,
+            parsed_changes=[
+                InterventionChangeInput(
+                    metric="user_conversations_per_week",
+                    operation="set",
+                    value=8,
+                    unit="per week",
+                    provenance="USER_ASSUMPTION",
+                )
+            ],
+        )
+    )
+    assert baseline.priced and boosted.priced
+    assert _prob(boosted, "Raise") > _prob(baseline, "Raise")
+
+
+@pytest.mark.asyncio
+async def test_hiring_parsed_changes_shift_offer_mass() -> None:
+    goal_id = uuid4()
+    goal = GoalContract.model_validate(
+        {
+            "goal_id": goal_id,
+            "title": "Receive a Big Tech SWE offer",
+            "goal_type": GoalType.DEADLINE_EVENT,
+            "success_definition": {"metric": "offer_received", "target": "swe_offer"},
+            "deadline": datetime.now(UTC) + timedelta(days=180),
+            "state_dimensions": ["application_pipeline", "interview_outcomes"],
+        }
+    )
+    goal_repo = InMemoryGoalRepository()
+    await goal_repo.create(goal, uuid4())
+    evidence_repo = InMemoryEvidenceRepository({goal_id: True})
+    user_id = uuid4()
+    for metric, value in (("applications_submitted", 4.0), ("responses_received", 1.0)):
+        await evidence_repo.insert(
+            user_id,
+            goal_id,
+            EvidenceEventProposal.model_validate(
+                {
+                    "source_type": "manual",
+                    "event_type": "observation",
+                    "domain": "career",
+                    "metric": metric,
+                    "numeric_value": value,
+                    "unit": "count",
+                    "observed_at": datetime.now(UTC).isoformat(),
+                    "summary": f"{metric}={value}",
+                }
+            ),
+            fingerprint=f"{metric}-{value}",
+            agent_run_id=None,
+            conflict="none",
+        )
+    service = WhatIfService(GoalService(goal_repo), evidence=EvidenceService(evidence_repo))
+    labels = [
+        ScenarioDefinition(label="Offer received"),
+        ScenarioDefinition(label="Final-stage pipeline"),
+        ScenarioDefinition(label="No meaningful progress", downside=True),
+    ]
+    baseline = await service.possible_futures(
+        PossibleFuturesRequest(goal_id=str(goal_id), name="Baseline", outcomes=labels)
+    )
+    boosted = await service.possible_futures(
+        PossibleFuturesRequest(
+            goal_id=str(goal_id),
+            name="More applications",
+            outcomes=labels,
+            parsed_changes=[
+                InterventionChangeInput(
+                    metric="applications_per_week",
+                    operation="set",
+                    value=12,
+                    unit="per week",
+                    provenance="USER_ASSUMPTION",
+                )
+            ],
+        )
+    )
+    assert baseline.priced and boosted.priced
+    assert _prob(boosted, "Offer") > _prob(baseline, "Offer")

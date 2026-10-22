@@ -21,6 +21,7 @@ from personal_markets.what_if.domain import (
     WhatIfBaselineState,
     WhatIfResult,
 )
+from personal_markets.what_if.futures_decision import parse_futures_decision
 from personal_markets.what_if.repository import InMemorySimulationRepository
 from personal_markets.what_if.service import WhatIfService
 from test_pass4_remaining import (
@@ -213,4 +214,35 @@ async def test_reverse_fills_empty_candidates_from_baseline() -> None:
     )
     assert result.feasible
     assert result.paths
-    assert result.paths[0].action_ids == ["reach"]
+    assert any(path.resulting_probability + 0.01 >= 0.7 for path in result.paths)
+
+
+@pytest.mark.asyncio
+async def test_reverse_discovers_assumption_levers_without_catalog() -> None:
+    goal = make_goal()
+    service = LinearWhatIfService(
+        GoalService(InMemoryGoalRepository()), InMemorySimulationRepository()
+    )
+    result = await service.target_search(
+        TargetSearchRequest(
+            base=make_base(str(goal.goal_id), flow=3),
+            target_probability=0.7,
+            candidates=[],
+            limits=ResourceLimitsInput(hours_per_week=5, money=1000, energy=5),
+        )
+    )
+    assert result.feasible
+    assert result.paths
+    assert any(
+        "flow" in path.label.lower() or path.action_ids[:1] == ["lever:flow:0.85"]
+        for path in result.paths
+    )
+    assert all(path.resulting_probability > result.current_probability for path in result.paths)
+
+
+def test_parse_decision_uses_goal_family_not_regex_taxonomy() -> None:
+    parsed = parse_futures_decision("What if I skip half my classes?", goal=_finance_goal())
+    assert parsed.unsupported == ()
+    assert "Target reached" in parsed.scenario_labels
+    assert parsed.decision is not None
+    assert parsed.decision.action == "adjust_plan"

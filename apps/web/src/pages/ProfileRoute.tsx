@@ -55,6 +55,10 @@ export function ProfileRoute() {
   const goals = useQuery({ queryKey: ["goals", "list"], queryFn: ({ signal }) => api.goals(signal), enabled: editingDimensions });
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [demoRadar, setDemoRadar] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [editingParameters, setEditingParameters] = useState(false);
+  const [selectedParameters, setSelectedParameters] = useState<string[]>([]);
   const demo = useQuery({
     queryKey: ["profile-demo-radar"],
     queryFn: ({ signal }) => api.demoProfileRadar(signal),
@@ -74,7 +78,14 @@ export function ProfileRoute() {
   }, [selectedPhoto]);
   const save = useMutation({
     mutationFn: (body: { display_name: string; username: string; bio: string }) => api.patchProfile(body),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["profile"] }); setEditing(false); setSelectedPhoto(null); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["profile"] }); },
+  });
+  const saveParameters = useMutation({
+    mutationFn: (parameter_ids: string[]) => api.patchProfile({ parameter_ids }),
+    onSuccess: () => {
+      setEditingParameters(false);
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
   const saveDimensions = useMutation({
     mutationFn: () => api.patchProfile({ dimensions: resolveAreas(dimensions, goals.data ?? []) }),
@@ -96,7 +107,7 @@ export function ProfileRoute() {
   const fields = account.profile ?? { display_name: null, username: null, bio: null, avatar_value: null, dimensions: [] };
   const handle = fields.username || account.email?.split("@")[0] || "you";
   const display = fields.display_name || handle;
-  const shownPhoto = previewUrl || photoUrl;
+  const shownPhoto = pendingRemove ? null : previewUrl || photoUrl;
   const suggestions = suggestAreas(goals.data ?? [], dimensions.map((item) => item.label));
 
   function choosePhoto(file: File | undefined) {
@@ -140,6 +151,16 @@ export function ProfileRoute() {
             >
               {demoRadar ? "Hide demonstration" : "View demonstration"}
             </button>
+            <button
+              type="button"
+              className="markets-select"
+              onClick={() => {
+                setSelectedParameters(fields.parameter_ids ?? profile.data.available_parameters?.map((item) => item.id) ?? []);
+                setEditingParameters(true);
+              }}
+            >
+              Edit parameters
+            </button>
             <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
           </div>
         </div>
@@ -170,9 +191,23 @@ export function ProfileRoute() {
             return typeof value === "string" ? value : "";
           };
           const pending = selectedPhoto;
-          save.mutate({ display_name: field("display_name"), username: field("username"), bio: field("bio") }, {
-            onSuccess: () => { if (pending) upload.mutate(pending); },
-          });
+          const shouldRemove = pendingRemove;
+          setSaveError(null);
+          void (async () => {
+            try {
+              await save.mutateAsync({ display_name: field("display_name"), username: field("username"), bio: field("bio") });
+              if (shouldRemove) {
+                await remove.mutateAsync();
+              } else if (pending) {
+                await upload.mutateAsync(pending);
+              }
+              setPendingRemove(false);
+              setSelectedPhoto(null);
+              setEditing(false);
+            } catch (error) {
+              setSaveError(error instanceof Error ? error.message : "Could not save profile.");
+            }
+          })();
         }}>
           <h2 id="edit-profile-title">Edit profile</h2>
           <div className="profile-edit-photo">
@@ -182,7 +217,19 @@ export function ProfileRoute() {
             <div className="profile-edit-photo-actions">
               <label className="markets-select" htmlFor="profile-photo-input">{photoUrl || selectedPhoto ? "Change photo" : "Add photo"}</label>
               <input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { choosePhoto(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-              {photoUrl || selectedPhoto ? <button type="button" className="markets-select" disabled={remove.isPending} onClick={() => { if (selectedPhoto) setSelectedPhoto(null); else remove.mutate(); }}>Remove photo</button> : null}
+              {shownPhoto || photoUrl || selectedPhoto ? (
+                <button
+                  type="button"
+                  className="markets-select"
+                  onClick={() => {
+                    setSelectedPhoto(null);
+                    setPendingRemove(true);
+                    setPhotoError(null);
+                  }}
+                >
+                  Remove photo
+                </button>
+              ) : null}
             </div>
           </div>
           {selectedPhoto ? (
@@ -199,12 +246,62 @@ export function ProfileRoute() {
           <input id="username" name="username" className="ui-field" autoComplete="username" spellCheck={false} defaultValue={fields.username ?? ""} maxLength={24} />
           <label htmlFor="bio">Bio</label>
           <textarea id="bio" name="bio" className="ui-field" rows={3} defaultValue={fields.bio ?? ""} maxLength={280} />
-          {save.isError ? <p role="alert">Could not save profile. Check the username and try again.</p> : null}
+          {save.isError || saveError ? <p role="alert">{saveError || "Could not save profile. Check the username and try again."}</p> : null}
           <div className="composer-actions">
-            <button type="submit" className="ui-button" disabled={save.isPending || upload.isPending}>{save.isPending || upload.isPending ? "Saving…" : "Save"}</button>
-            <button type="button" className="secondary ui-button ui-button-secondary" onClick={() => { setEditing(false); setSelectedPhoto(null); }}>Cancel</button>
+            <button type="submit" className="ui-button" disabled={save.isPending || upload.isPending || remove.isPending}>
+              {save.isPending || upload.isPending || remove.isPending ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              className="secondary ui-button ui-button-secondary"
+              onClick={() => {
+                setEditing(false);
+                setSelectedPhoto(null);
+                setPendingRemove(false);
+                setSaveError(null);
+                setPhotoError(null);
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </form>
+      </div> : null}
+      {editingParameters ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-parameters-title">
+        <div className="confirm-card profile-editor">
+          <h2 id="edit-parameters-title">Measurable parameters</h2>
+          <p className="quiet-copy">Choose axes from recorded quantities. These are not personality traits or goal names.</p>
+          {(profile.data.available_parameters ?? []).map((item) => (
+            <label key={item.id} className="ui-choice">
+              <input
+                type="checkbox"
+                checked={selectedParameters.includes(item.id)}
+                onChange={() => {
+                  setSelectedParameters((current) => (
+                    current.includes(item.id)
+                      ? current.filter((id) => id !== item.id)
+                      : [...current, item.id]
+                  ));
+                }}
+              />
+              <span>
+                <strong>{item.name}</strong>
+                <span> {item.meaning}</span>
+              </span>
+            </label>
+          ))}
+          {saveParameters.isError ? <p role="alert">Could not save parameters.</p> : null}
+          <div className="composer-actions">
+            <button
+              type="button"
+              disabled={saveParameters.isPending || selectedParameters.length === 0}
+              onClick={() => saveParameters.mutate(selectedParameters)}
+            >
+              {saveParameters.isPending ? "Saving…" : "Save"}
+            </button>
+            <button type="button" className="secondary" onClick={() => setEditingParameters(false)}>Cancel</button>
+          </div>
+        </div>
       </div> : null}
       {editingDimensions ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-dimensions-title">
         <div className="confirm-card profile-editor profile-dimension-editor">

@@ -1,28 +1,38 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { toMarketCard } from "../adapters/marketViewModel";
 import MarketsPage from "../components/market/MarketsPage";
 
 export function MarketsRoute() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const demoMode = searchParams.get("demo") === "1";
   const queryClient = useQueryClient();
   const dashboard = useQuery({
     queryKey: ["goals", "dashboard"],
     queryFn: ({ signal }) => api.goalsDashboard(signal),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
+    enabled: !demoMode,
+  });
+  const demo = useQuery({
+    queryKey: ["demo-portfolio"],
+    queryFn: ({ signal }) => api.demoPortfolio(signal),
+    enabled: demoMode,
+    staleTime: 5 * 60_000,
   });
 
+  const source = demoMode ? demo.data : dashboard.data;
   const markets = useMemo(() => {
-    const goals = dashboard.data?.goals ?? [];
-    const histories = dashboard.data?.histories ?? {};
+    const goals = source?.goals ?? [];
+    const histories = source?.histories ?? {};
     return goals.map((goal) => ({
-      ...toMarketCard(goal, histories[goal.goal_id] ?? []),
+      ...toMarketCard(goal, histories[goal.goal_id] ?? [], { includeSyntheticDemo: demoMode }),
       historyUnavailable: false,
     }));
-  }, [dashboard.data]);
+  }, [demoMode, source]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["goals"] });
 
@@ -44,23 +54,30 @@ export function MarketsRoute() {
     onSuccess: invalidate,
   });
 
-  if (dashboard.isLoading && !dashboard.data) {
+  const loading = demoMode ? demo.isLoading && !demo.data : dashboard.isLoading && !dashboard.data;
+  const errored = demoMode ? demo.isError && !demo.data : dashboard.isError && !dashboard.data;
+
+  if (loading) {
     return (
       <main className="markets-page">
         <section className="markets-shell">
-          <p role="status">Loading markets from backend…</p>
+          <p role="status">{demoMode ? "Loading demonstration markets…" : "Loading markets from backend…"}</p>
         </section>
       </main>
     );
   }
 
-  if (dashboard.isError && !dashboard.data) {
+  if (errored) {
     return (
       <main className="markets-page">
         <section className="markets-shell">
           <div className="unpriced-state">
             <strong>Markets unavailable</strong>
-            <span>Could not reach GET /api/v1/goals/dashboard.</span>
+            <span>
+              {demoMode
+                ? "Could not reach GET /api/v1/profile/demo-portfolio."
+                : "Could not reach GET /api/v1/goals/dashboard."}
+            </span>
           </div>
         </section>
       </main>
@@ -70,9 +87,23 @@ export function MarketsRoute() {
   return (
     <MarketsPage
       markets={markets}
-      collections={dashboard.data?.collections ?? []}
-      onSelectMarket={(marketId) => { void navigate(`/goals/${marketId}`); }}
-      onOpenCollection={(collectionId) => { void navigate(`/collections/${collectionId}`); }}
+      collections={source?.collections ?? []}
+      demoMode={demoMode}
+      demoMessage={demoMode ? demo.data?.message : undefined}
+      onToggleDemo={() => {
+        const next = new URLSearchParams(searchParams);
+        if (demoMode) next.delete("demo");
+        else next.set("demo", "1");
+        setSearchParams(next);
+      }}
+      onSelectMarket={(marketId) => {
+        if (demoMode) return;
+        void navigate(`/goals/${marketId}`);
+      }}
+      onOpenCollection={(collectionId) => {
+        if (demoMode) return;
+        void navigate(`/collections/${collectionId}`);
+      }}
       onCreateCollection={(name) => createCollection.mutateAsync(name).then(() => undefined)}
       onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds).then(() => undefined)}
       onDeleteCollections={(ids) => deleteCollections.mutateAsync(ids).then(() => undefined)}

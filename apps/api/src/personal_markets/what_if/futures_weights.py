@@ -59,7 +59,9 @@ def resolve_futures_weights(
     config: SimulationConfig | None = None,
 ) -> ResolvedFuturesWeights | None:
     if is_startup_goal(goal):
-        return _startup_weights(goal, evidence, scenario_labels)
+        return _startup_weights(
+            goal, evidence, scenario_labels, parsed_changes=parsed_changes
+        )
     if is_finance_goal(goal) or is_running_goal(goal):
         return _continuous_target_mc_weights(
             goal,
@@ -76,12 +78,44 @@ def resolve_futures_weights(
     return None
 
 
+def _startup_overrides_from_changes(
+    parsed_changes: list[InterventionChangeInput] | None,
+) -> dict[str, object]:
+    overrides: dict[str, object] = {}
+    for change in parsed_changes or []:
+        metric = change.metric
+        value = float(change.value)
+        if metric in {"fundraising_conversations", "user_conversations_per_week"}:
+            if change.operation == "subtract":
+                value = -value
+            overrides["fundraising_conversations"] = max(0, int(round(value)))
+        elif metric in {
+            "mrr",
+            "revenue",
+            "revenue_growth_rate",
+            "users",
+            "runway_months",
+            "burn_monthly",
+        }:
+            overrides[metric] = value
+        elif metric == "term_sheet":
+            overrides["term_sheet"] = value >= 1
+    return overrides
+
+
 def _startup_weights(
     goal: GoalContract,
     evidence: list[NormalizedEvidence],
     scenario_labels: list[str],
+    *,
+    parsed_changes: list[InterventionChangeInput] | None = None,
 ) -> ResolvedFuturesWeights | None:
-    weights, _message = futures_outcome_weights(goal, evidence, scenario_labels=scenario_labels)
+    weights, _message = futures_outcome_weights(
+        goal,
+        evidence,
+        scenario_labels=scenario_labels,
+        state_overrides=_startup_overrides_from_changes(parsed_changes),
+    )
     if not weights:
         return None
     outcomes = _definitions_from_map(scenario_labels, weights, AssumptionSource.REFERENCE)
