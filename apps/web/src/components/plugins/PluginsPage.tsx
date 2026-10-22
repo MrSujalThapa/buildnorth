@@ -31,6 +31,9 @@ export type PluginsPageProps = {
   canBrowse?: boolean;
   browsing?: boolean;
   onBrowse?: () => void;
+  directoryExpanded?: boolean;
+  isLoadingAll?: boolean;
+  directoryError?: boolean;
 };
 
 export default function PluginsPage({
@@ -47,6 +50,9 @@ export default function PluginsPage({
   canBrowse = false,
   browsing = false,
   onBrowse,
+  directoryExpanded = false,
+  isLoadingAll = false,
+  directoryError = false,
 }: PluginsPageProps) {
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -122,9 +128,11 @@ export default function PluginsPage({
 
         <section className="plugin-directory" aria-labelledby="popular-title">
           <div className="section-heading">
-            <h2 id="popular-title">{query.trim() ? "Results" : "Popular"}</h2>
+            <h2 id="popular-title">{query.trim() ? "Results" : directoryExpanded ? "All integrations" : "Popular"}</h2>
             <span>{filtered.length} plugins</span>
           </div>
+          {isLoadingAll && !query.trim() ? <p className="field-hint" role="status">Loading more integrations…</p> : null}
+          {directoryError && !query.trim() ? <p className="field-hint">More integrations are unavailable right now. Popular plugins remain accessible.</p> : null}
           {filtered.length ? (
             <div className="plugin-list">
               {filtered.map((plugin) => {
@@ -178,7 +186,7 @@ export default function PluginsPage({
           )}
           {canBrowse && !query.trim() ? (
             <button type="button" className="plugin-browse" onClick={onBrowse} disabled={browsing}>
-              {browsing ? "Loading integrations…" : "Browse all integrations"}
+              {browsing ? "Loading more…" : "Load more integrations"}
             </button>
           ) : null}
         </section>
