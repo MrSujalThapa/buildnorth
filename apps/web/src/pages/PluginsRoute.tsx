@@ -66,6 +66,17 @@ export function PluginsRoute() {
     refetchOnWindowFocus: false,
   });
 
+  // The full directory loads independently; the local popular catalog stays immediately usable.
+  // React Query shares the remote page across navigations instead of refetching on every render.
+  const fullCatalog = useQuery({
+    queryKey: ["plugins", "directory", "first-page"],
+    queryFn: ({ signal }) => api.pluginsCatalog(signal, undefined, undefined, true),
+    enabled: Boolean(plugins.data) && !debouncedQuery,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
   const clearAuthUi = useCallback(() => {
     setAuthNotice(null);
     setBlockedAuthUrl(null);
@@ -144,9 +155,14 @@ export function PluginsRoute() {
   const pluginViews = useMemo(() => {
     const base = plugins.data?.items ?? [];
     if (debouncedQuery) return base;
-    const seen = new Set(base.map((item) => item.definition.id));
-    return [...base, ...catalogExtras.filter((item) => !seen.has(item.definition.id))];
-  }, [catalogExtras, debouncedQuery, plugins.data?.items]);
+    const seen = new Set<string>();
+    return [...base, ...(fullCatalog.data?.items ?? []), ...catalogExtras].filter((item) => {
+      const id = item.definition.id;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [catalogExtras, debouncedQuery, plugins.data?.items, fullCatalog.data?.items]);
   const providerMessage = plugins.data?.provider_message ?? (plugins.isError ? "Plugins could not be loaded. Retry in a moment." : null);
 
   const pendingPlugins = useMemo(
@@ -284,9 +300,11 @@ export function PluginsRoute() {
   };
 
   const browseCatalog = async () => {
+    const cursor = browseStarted ? browseCursor : fullCatalog.data?.next_cursor;
+    if (!cursor) return;
     setBrowsing(true);
     try {
-      const page = await api.pluginsCatalog(undefined, undefined, browseStarted ? browseCursor ?? undefined : undefined, true);
+      const page = await api.pluginsCatalog(undefined, undefined, cursor, true);
       setCatalogExtras((current) => {
         const seen = new Set(current.map((item) => item.definition.id));
         return [...current, ...page.items.filter((item) => !seen.has(item.definition.id))];
@@ -350,7 +368,10 @@ export function PluginsRoute() {
         }}
         isLoading={plugins.isLoading && !plugins.data}
         isRefreshing={plugins.isFetching && Boolean(plugins.data)}
-        canBrowse={!debouncedQuery && (!browseStarted || Boolean(browseCursor))}
+        canBrowse={!debouncedQuery && Boolean(browseStarted ? browseCursor : fullCatalog.data?.next_cursor)}
+        directoryExpanded={Boolean(fullCatalog.data) || browseStarted}
+        isLoadingAll={fullCatalog.isFetching && !fullCatalog.data}
+        directoryError={fullCatalog.isError}
         browsing={browsing}
         onBrowse={() => { void browseCatalog(); }}
       />
