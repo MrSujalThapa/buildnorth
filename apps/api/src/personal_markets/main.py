@@ -211,7 +211,12 @@ def create_app() -> FastAPI:
         allow_origin_regex=settings.cors_origin_regex,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
-        expose_headers=["mcp-session-id", "mcp-protocol-version", "www-authenticate"],
+        expose_headers=[
+            "mcp-session-id",
+            "mcp-protocol-version",
+            "www-authenticate",
+            "server-timing",
+        ],
     )
 
     @application.exception_handler(DomainError)

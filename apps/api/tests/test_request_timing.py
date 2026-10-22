@@ -29,6 +29,10 @@ def test_api_request_timing_keeps_correlation_id(monkeypatch) -> None:
             "method": "GET", "path": "/api/v1/me",
             "status": response.status_code,
             "duration_ms": events[0]["duration_ms"],
+            "db_queries": 0,
+            "db_checkouts": 0,
+            "db_ms": 0,
         }
     ]
     assert events[0]["duration_ms"] >= 0
+    assert response.headers["server-timing"] == 'db;dur=0.0;desc="0 queries, 0 checkouts"'

@@ -4,6 +4,8 @@ from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
+from personal_markets.persistence.query_stats import instrument
+
 
 def async_database_url(url: str) -> str:
     if url.startswith("postgresql+asyncpg://"):
@@ -13,13 +15,15 @@ def async_database_url(url: str) -> str:
 
 @lru_cache(maxsize=8)
 def create_engine(url: str) -> AsyncEngine:
-    return create_async_engine(
+    engine = create_async_engine(
         async_database_url(url),
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=10,
         pool_recycle=1800,
     )
+    instrument(engine.sync_engine)
+    return engine
 
 
 @asynccontextmanager
