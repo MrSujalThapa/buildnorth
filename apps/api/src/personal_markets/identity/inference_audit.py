@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from personal_markets.identity.budget import InMemoryBudgetStore, PostgresBudgetStore
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 
 class InferenceAudit:
@@ -63,7 +63,7 @@ class InferenceAudit:
                 "output_tokens": sum(int(str(r["output_tokens"])) for r in rows),
                 "estimated_cost_usd": sum(float(str(r["estimated_cost_usd"])) for r in rows),
             }
-        async with self._store._engine.connect() as conn:
+        async with autocommit_connection(self._store._engine) as conn:
             row = (
                 (
                     await conn.execute(

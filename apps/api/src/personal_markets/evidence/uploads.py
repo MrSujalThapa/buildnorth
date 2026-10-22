@@ -25,7 +25,7 @@ from personal_markets.evidence.parsers import (
     parse_upload,
     rows_from_table,
 )
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.ports import EvidenceEventProposal
 
 MAX_UPLOAD_BYTES = 5_000_000
@@ -166,7 +166,7 @@ class PostgresUploadStore:
         return stored
 
     async def get(self, owner: UUID, upload_id: UUID) -> UploadRecord:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -185,7 +185,7 @@ class PostgresUploadStore:
         return self._to_record(dict(row))
 
     async def list_for_goal(self, owner: UUID, goal_id: UUID) -> list[UploadRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("""
@@ -199,7 +199,7 @@ class PostgresUploadStore:
         return [self._to_record(dict(row)) for row in rows]
 
     async def find_hash(self, owner: UUID, goal_id: UUID, digest: str) -> UploadRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             return await self._find_hash(connection, owner, goal_id, digest)
 
     async def _find_hash(
@@ -247,7 +247,7 @@ class PostgresUploadStore:
     async def load_blob(self, owner: UUID, record: UploadRecord) -> bytes:
         if record.owner_id != owner:
             raise ForbiddenError("Upload does not belong to this user")
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             value = await connection.scalar(
                 text("""
                 select content from goal_uploads
@@ -260,7 +260,7 @@ class PostgresUploadStore:
         return bytes(value)
 
     async def owner_bytes(self, owner: UUID) -> int:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             value = await connection.scalar(
                 text("""
                 select coalesce(sum(byte_size), 0) from goal_uploads

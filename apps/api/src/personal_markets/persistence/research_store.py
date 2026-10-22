@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.ports import ResearchArtifact
 
 
@@ -39,7 +39,7 @@ class ResearchStore:
                 for (user_id, goal_id, _), row in self._rows.items()
                 if user_id == owner and goal_id == goal
             ]
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             rows = (
                 (
                     await conn.execute(

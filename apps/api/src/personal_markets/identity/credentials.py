@@ -15,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.core.errors import ProviderNotConfiguredError
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 UserProvider = Literal["openai", "anthropic"]
 
@@ -161,7 +161,7 @@ class PostgresCredentialStore:
         self._engine = engine
 
     async def get(self, owner: UUID, provider: UserProvider) -> StoredCredential | None:
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             row = (
                 (
                     await conn.execute(
@@ -244,7 +244,7 @@ class PostgresCredentialStore:
             )
 
     async def preference(self, owner: UUID) -> InferencePreference:
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             row = (
                 (
                     await conn.execute(

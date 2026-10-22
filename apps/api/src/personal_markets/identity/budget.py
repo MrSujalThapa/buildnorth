@@ -19,7 +19,7 @@ from personal_markets.core.errors import (
     ProviderNotConfiguredError,
 )
 from personal_markets.identity.domain import HostedUsage, Principal
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,9 +38,12 @@ class InferenceBudgetService:
         self._settings = settings
 
     async def usage_for(self, principal: Principal) -> HostedUsage:
-        kill = not await self._store.hosted_enabled(self._settings.hosted_inference_enabled)
-        counters = await self._store.counters(str(principal.user_id))
-        global_counters = await self._store.counters("global")
+        enabled, counters, global_counters = await asyncio.gather(
+            self._store.hosted_enabled(self._settings.hosted_inference_enabled),
+            self._store.counters(str(principal.user_id)),
+            self._store.counters("global"),
+        )
+        kill = not enabled
         remaining_usd = max(
             0.0, principal.hosted_quota_usd - counters.reserved_usd - counters.spent_usd
         )
@@ -199,12 +202,17 @@ class InferenceBudgetService:
     async def _enforce_rate_limits(self, user_id: UUID, client_ip: str | None) -> None:
         try:
             await self._store.consume_rate(
-                user_id, _ip_hash(client_ip), self._settings.hosted_user_rpm,
-                self._settings.hosted_ip_rpm)
+                user_id,
+                _ip_hash(client_ip),
+                self._settings.hosted_user_rpm,
+                self._settings.hosted_ip_rpm,
+            )
         except DomainError:
             raise
         except Exception:
-            raise ProviderNotConfiguredError("Application inference limits are unavailable") from None
+            raise ProviderNotConfiguredError(
+                "Application inference limits are unavailable"
+            ) from None
 
     async def enforce_application_limits(self, user_id: UUID, client_ip: str | None) -> None:
         """BYOK and key validation consume request limits, never hosted entitlements."""
@@ -429,7 +437,7 @@ class PostgresBudgetStore(BudgetStore):
         self._engine = engine
 
     async def hosted_enabled(self, default: bool) -> bool:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -460,25 +468,36 @@ class PostgresBudgetStore(BudgetStore):
             )
 
     async def counters(self, scope: str) -> _Counters:
-        async with transaction(self._engine) as connection:
-            await connection.execute(
-                text("""
-                insert into hosted_budget_counters (scope)
-                values (:scope)
-                on conflict (scope) do nothing
-                """),
-                {"scope": scope},
-            )
-            row = (
-                (
-                    await connection.execute(
-                        text("select * from hosted_budget_counters where scope = :scope"),
-                        {"scope": scope},
+        # A concurrent first insert can commit after this statement's snapshot, leaving neither
+        # branch visible; a second statement sees that committed row.
+        row = None
+        async with autocommit_connection(self._engine) as connection:
+            for _ in range(2):
+                row = (
+                    (
+                        await connection.execute(
+                            text("""
+                            with created as (
+                              insert into hosted_budget_counters (scope)
+                              values (:scope)
+                              on conflict (scope) do nothing
+                              returning *
+                            )
+                            select * from created
+                            union all
+                            select * from hosted_budget_counters
+                            where scope = :scope and not exists (select 1 from created)
+                            """),
+                            {"scope": scope},
+                        )
                     )
+                    .mappings()
+                    .one_or_none()
                 )
-                .mappings()
-                .one()
-            )
+                if row is not None:
+                    break
+        if row is None:
+            raise DomainError(f"budget counters for {scope} could not be read")
         return _Counters(
             reserved_usd=float(row["reserved_usd"]),
             spent_usd=float(row["spent_usd"]),
@@ -749,7 +768,7 @@ class PostgresBudgetStore(BudgetStore):
             )
 
     async def rate_count(self, user_id: UUID | None, ip_hash: str | None, since: datetime) -> int:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             if user_id is not None:
                 value = await connection.scalar(
                     text(

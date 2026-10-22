@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 from uuid import UUID
 
@@ -41,8 +42,10 @@ async def me(
     identity: Annotated[IdentityService, Depends(get_identity_service)],
     budget: Annotated[InferenceBudgetService, Depends(get_inference_budget_service)],
 ) -> AccountView:
-    usage = await budget.usage_for(principal)
-    return await identity.account_view(principal, usage)
+    usage, profile = await asyncio.gather(
+        budget.usage_for(principal), identity.profile_for(principal)
+    )
+    return await identity.account_view(principal, usage, profile)
 
 
 @router.post("/invites/redeem", response_model=AccountView)

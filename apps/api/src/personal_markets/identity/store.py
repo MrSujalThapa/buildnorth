@@ -19,7 +19,7 @@ from personal_markets.identity.domain import (
     split_stored_dimensions,
     split_stored_parameters,
 )
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 
 def _kind_for(email: str | None) -> str:
@@ -174,7 +174,7 @@ class PostgresIdentityRepository:
         self._engine = engine
 
     async def upsert_user(self, principal: Principal) -> Principal:
-        async with transaction(self._engine) as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -207,7 +207,7 @@ class PostgresIdentityRepository:
         return self._to_principal(dict(row))
 
     async def get_user(self, user_id: UUID) -> Principal | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -228,7 +228,7 @@ class PostgresIdentityRepository:
         return self._to_principal(dict(row)) if row else None
 
     async def get_user_by_clerk_id(self, clerk_user_id: str) -> Principal | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -289,7 +289,7 @@ class PostgresIdentityRepository:
         return stored
 
     async def get_invitation_by_hash(self, token_hash: str) -> Invitation | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -403,7 +403,7 @@ class PostgresIdentityRepository:
         return self._to_invitation(dict(row)) if row else None
 
     async def list_invitations(self) -> list[Invitation]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(text("select * from invitations order by created_at desc"))
             ).mappings()
@@ -441,7 +441,7 @@ class PostgresIdentityRepository:
         return bool(result.rowcount)
 
     async def get_profile(self, user_id: UUID) -> UserProfile:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -510,7 +510,7 @@ class PostgresIdentityRepository:
         return await self.get_profile(user_id)
 
     async def username_taken(self, username: str, user_id: UUID) -> bool:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 await connection.execute(
                     text(

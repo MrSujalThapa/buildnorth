@@ -16,7 +16,7 @@ from personal_markets.behavior.domain import CommitmentTrial
 from personal_markets.behavior.tokenize import tokenize
 from personal_markets.core.config import get_settings
 from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
-from personal_markets.persistence.database import create_engine, transaction
+from personal_markets.persistence.database import autocommit_connection, create_engine, transaction
 
 OutcomeStatus = Literal["completed", "partial", "missed", "cancelled", "unknown"]
 
@@ -203,7 +203,7 @@ class PostgresCommitmentStore:
     ) -> tuple[list[Commitment], list[CommitmentObservation]]:
         if not goal_ids:
             return [], []
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             plan_rows = (
                 (
                     await conn.execute(

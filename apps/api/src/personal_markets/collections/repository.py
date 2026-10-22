@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.collections.domain import CollectionRecord
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 PALETTE = ("#1f8f86", "#c85f3e", "#5b6ee1", "#c9a227", "#7a5c8e", "#3d7ea6")
 
@@ -49,7 +49,7 @@ class PostgresCollectionRepository:
         self._engine = engine
 
     async def list_for_user(self, user_id: UUID) -> list[CollectionRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -74,7 +74,7 @@ class PostgresCollectionRepository:
             return [self._to_domain(dict(row)) for row in rows]
 
     async def get_for_user(self, collection_id: UUID, user_id: UUID) -> CollectionRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(

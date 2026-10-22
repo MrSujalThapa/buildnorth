@@ -171,8 +171,14 @@ class IdentityService:
             raise ForbiddenError("admin invitation access is required")
         return await self._repository.list_invitations()
 
-    async def account_view(self, principal: Principal, usage: HostedUsage) -> AccountView:
-        profile = await self._repository.get_profile(principal.user_id)
+    async def profile_for(self, principal: Principal) -> UserProfile:
+        return await self._repository.get_profile(principal.user_id)
+
+    async def account_view(
+        self, principal: Principal, usage: HostedUsage, profile: UserProfile | None = None
+    ) -> AccountView:
+        if profile is None:
+            profile = await self.profile_for(principal)
         return AccountView(
             user_id=principal.user_id,
             clerk_user_id=principal.clerk_user_id,
