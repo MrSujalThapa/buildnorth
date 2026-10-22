@@ -847,10 +847,11 @@ export const api = {
   marketHistory: (goalId: string, signal?: AbortSignal) => request<MarketHistoryPoint[]>(`/api/v1/what-if/history/${goalId}`, undefined, signal),
   whatIfExplorations: (goalId: string, signal?: AbortSignal) =>
     request<WhatIfExploration[]>(`/api/v1/what-if/explorations/${goalId}`, undefined, signal),
-  pluginsCatalog: (signal?: AbortSignal, search?: string, cursor?: string) => {
+  pluginsCatalog: (signal?: AbortSignal, search?: string, cursor?: string, browse = false) => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (cursor) params.set("cursor", cursor);
+    if (browse) params.set("browse", "true");
     const suffix = params.toString() ? `?${params.toString()}` : "";
     return request<PluginCatalogResponse>(`/api/v1/plugins${suffix}`, undefined, signal);
   },
@@ -880,7 +881,7 @@ export const api = {
       signal,
     ),
   pluginResources: (pluginId: string, signal?: AbortSignal) =>
-    request<{ uri: string; name: string; description?: string; resource_type?: string }[]>(
+    request<{ uri: string; name: string; description?: string; resource_type?: string; metadata?: { url?: string; provider_id?: string; connected_account_id?: string } }[]>(
       `/api/v1/plugins/${pluginId}/resources`,
       undefined,
       signal,

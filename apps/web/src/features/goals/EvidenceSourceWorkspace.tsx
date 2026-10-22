@@ -622,6 +622,7 @@ function SourceResourcePanel({
               goal_relevance: planned?.goal_relevance,
               state_variables: planned?.state_variables ?? [],
               recommended: planned?.recommended ?? false,
+              url: item.metadata?.url,
             };
           })
           .sort((left, right) => Number(right.recommended) - Number(left.recommended));
@@ -646,6 +647,7 @@ function SourceResourcePanel({
                     onChange={() => onToggleResource(resource.resource_id)}
                   />
                   <strong>{resource.label}</strong>
+                  {resource.url ? <a href={resource.url} target="_blank" rel="noreferrer">Open</a> : null}
                   <span>
                     {resource.resource_type === "private" ? "Private" : resource.resource_type === "public" ? "Public" : ""}
                   </span>

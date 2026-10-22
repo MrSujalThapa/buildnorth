@@ -28,6 +28,9 @@ export type PluginsPageProps = {
   isConnectionDisabled?: (pluginId: string) => boolean;
   isLoading?: boolean;
   isRefreshing?: boolean;
+  canBrowse?: boolean;
+  browsing?: boolean;
+  onBrowse?: () => void;
 };
 
 export default function PluginsPage({
@@ -41,6 +44,9 @@ export default function PluginsPage({
   isConnectionDisabled,
   isLoading = false,
   isRefreshing = false,
+  canBrowse = false,
+  browsing = false,
+  onBrowse,
 }: PluginsPageProps) {
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -170,6 +176,11 @@ export default function PluginsPage({
           ) : (
             <p className="plugins-empty">No plugins match “{query}”.</p>
           )}
+          {canBrowse && !query.trim() ? (
+            <button type="button" className="plugin-browse" onClick={onBrowse} disabled={browsing}>
+              {browsing ? "Loading integrations…" : "Browse all integrations"}
+            </button>
+          ) : null}
         </section>
       </div>
       {selected ? (

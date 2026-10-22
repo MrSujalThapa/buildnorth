@@ -45,6 +45,10 @@ export function PluginsRoute() {
   const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [blockedAuthUrl, setBlockedAuthUrl] = useState<string | null>(null);
+  const [catalogExtras, setCatalogExtras] = useState<PluginView[]>([]);
+  const [browseCursor, setBrowseCursor] = useState<string | null>(null);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseStarted, setBrowseStarted] = useState(false);
   const authPopupRef = useRef<Window | null>(null);
   const authRequestIdRef = useRef<string | null>(null);
   const pendingAuthUrlRef = useRef<string | null>(null);
@@ -137,7 +141,12 @@ export function PluginsRoute() {
     },
   });
 
-  const pluginViews = plugins.data?.items ?? [];
+  const pluginViews = useMemo(() => {
+    const base = plugins.data?.items ?? [];
+    if (debouncedQuery) return base;
+    const seen = new Set(base.map((item) => item.definition.id));
+    return [...base, ...catalogExtras.filter((item) => !seen.has(item.definition.id))];
+  }, [catalogExtras, debouncedQuery, plugins.data?.items]);
   const providerMessage = plugins.data?.provider_message ?? (plugins.isError ? "Plugins could not be loaded. Retry in a moment." : null);
 
   const pendingPlugins = useMemo(
@@ -274,6 +283,23 @@ export function PluginsRoute() {
     }
   };
 
+  const browseCatalog = async () => {
+    setBrowsing(true);
+    try {
+      const page = await api.pluginsCatalog(undefined, undefined, browseStarted ? browseCursor ?? undefined : undefined, true);
+      setCatalogExtras((current) => {
+        const seen = new Set(current.map((item) => item.definition.id));
+        return [...current, ...page.items.filter((item) => !seen.has(item.definition.id))];
+      });
+      setBrowseCursor(page.next_cursor);
+      setBrowseStarted(true);
+    } catch {
+      setAuthNotice("The full catalog could not be loaded. Popular integrations are still available.");
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
   const handleToggleConnection = (pluginId: string) => {
     const plugin = viewById.get(pluginId);
     if (!plugin) return;
@@ -324,6 +350,9 @@ export function PluginsRoute() {
         }}
         isLoading={plugins.isLoading && !plugins.data}
         isRefreshing={plugins.isFetching && Boolean(plugins.data)}
+        canBrowse={!debouncedQuery && (!browseStarted || Boolean(browseCursor))}
+        browsing={browsing}
+        onBrowse={() => { void browseCatalog(); }}
       />
     </>
   );

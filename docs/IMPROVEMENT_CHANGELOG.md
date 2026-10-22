@@ -2,6 +2,16 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-21 — Consumer profile, radar, and What If presentation
+
+**Hypothesis:** The forecasting and behavior models can stay in place while the default UI stops showing estimator diagnostics, fake-complete radar polygons, and unexplained follow-through defaults.
+
+**Changes:** Profile photo controls moved into Edit. Radar draws one color per measured trait and withholds a closed polygon until every axis is measured. Area editing suggests life areas and links a goal only on a unique title match. Desktop navigation is an icon rail that expands on hover, focus, or an explicit touch control, with the uploaded photo in the profile slot. What If keeps the four existing mode ids, labels Reverse instead of Paths, and does not send an unsupported decision string into Futures as a 0% outcome. The plugin directory still loads the local popular list first; Browse all requests the remote catalog. Notion resource rows keep the provider title and now store the provider page URL plus connected-account id. Cron, watch-runner, and Render scheduler files were not modified.
+
+**Measured result:** `uv run python -m pytest apps/api/tests/test_mcp_integration.py -q` — 25 passed. Web `tsc -b` passed. Vitest radar and area tests — 3 passed. Playwright `e2e/remediation-profile.spec.ts` desktop and mobile-chromium — passed, mocked API, auth bypass. Production signed-in browser: **NOT TESTED** (Playwright MCP to the existing Chrome session timed out). No paid inference.
+
+**Not done:** File attachments on What If (no ingestion path was added, so the control was not faked). Speech-to-text uses the browser Speech Recognition API when present and disables the mic otherwise. Synthetic demo forecast histories were not seeded. Full four-mode live simulations were not re-run against production.
+
 ## 2026-10-19 — Pass 06: private staging packaging; live agents blocked on hosting
 
 **Hypothesis:** Existing FastAPI `/mcp`, Clerk, and migrations `0001–0015` can be packaged as one single-worker HTTPS staging stack without copying the local database or weakening OAuth, and real ChatGPT Plus / Grok Bot can then be connected.

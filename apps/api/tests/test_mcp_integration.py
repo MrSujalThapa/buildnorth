@@ -562,6 +562,8 @@ async def test_notion_picker_omits_untitled_id_only_results() -> None:
     gateway.execute_tool = execute  # type: ignore[method-assign]
     resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
     assert [item.name for item in resources] == ["Oct 20th book report"]
+    assert resources[0].metadata["url"] == "https://www.notion.so/3ffaf8d137de8050bea2e9a62716f138"
+    assert resources[0].metadata["connected_account_id"] == "account-1"
 
 
 @pytest.mark.asyncio
@@ -610,3 +612,24 @@ async def test_default_plugin_directory_skips_remote_catalog() -> None:
     catalog = await service.search_catalog(user_id=uuid4())
     ids = {item["definition"]["id"] for item in catalog["items"]}
     assert {"manual", "csv", "github", "notion"} <= ids
+
+
+@pytest.mark.asyncio
+async def test_browse_requests_remote_catalog_without_blocking_the_default_list() -> None:
+    from uuid import uuid4
+
+    from personal_markets.core.config import Settings
+
+    service = IntegrationGatewayService(settings=Settings(environment="test"))
+    calls: list[dict] = []
+
+    class RemoteCatalog:
+        available = True
+
+        async def search_toolkits(self, **kwargs):
+            calls.append(kwargs)
+            return type("Page", (), {"items": [], "next_cursor": None, "total_items": 0})()
+
+    service._composio = RemoteCatalog()  # type: ignore[assignment]
+    await service.search_catalog(user_id=uuid4(), browse=True)
+    assert calls and calls[0]["search"] in {None, ""}

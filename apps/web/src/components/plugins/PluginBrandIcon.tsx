@@ -1,4 +1,5 @@
-import { Code2, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { Blocks, Code2, type LucideIcon } from "lucide-react";
 
 type Props = {
   id: string;
@@ -9,7 +10,8 @@ type Props = {
 };
 
 export function PluginBrandIcon({ id, logoUrl, Icon, size = 22, className }: Props) {
-  if (logoUrl) {
+  const [broken, setBroken] = useState(false);
+  if (logoUrl && !broken) {
     return (
       <img
         className={className ?? "plugin-brand-icon"}
@@ -20,10 +22,12 @@ export function PluginBrandIcon({ id, logoUrl, Icon, size = 22, className }: Pro
         loading="lazy"
         decoding="async"
         data-provider={id}
+        onError={() => setBroken(true)}
       />
     );
   }
-  return <Icon size={size} aria-hidden className={className} />;
+  const Fallback = Icon === Code2 && id !== "github" ? Blocks : Icon;
+  return <Fallback size={size} aria-hidden className={className} />;
 }
 
-export const fallbackPluginIcon = Code2;
+export const fallbackPluginIcon = Blocks;

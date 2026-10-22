@@ -24,9 +24,10 @@ async def plugins(
     gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
     search: str | None = Query(default=None),
     cursor: str | None = Query(default=None),
+    browse: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=100),
 ) -> dict[str, object]:
-    return await gateway.search_catalog(search=search, cursor=cursor, limit=limit)
+    return await gateway.search_catalog(search=search, cursor=cursor, limit=limit, browse=browse)
 
 
 @router.get("/connected")
