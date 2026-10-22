@@ -119,7 +119,7 @@ def _production_cors_settings(**overrides: object) -> Settings:
     )
 
 
-def _preflight(client: TestClient, origin: str) -> Response:
+def _preflight(client: TestClient, origin: str) -> Any:
     return client.options(
         "/api/v1/me",
         headers={

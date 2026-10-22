@@ -79,7 +79,7 @@ async def _finance_service(goal: GoalContract) -> WhatIfService:
     return WhatIfService(GoalService(goal_repo), evidence=evidence_service)
 
 
-def _prob(result: WhatIfResult, needle: str) -> float:
+def _prob(result: ScenarioDistribution, needle: str) -> float:
     for item in result.outcomes:
         if needle.lower() in item.label.lower():
             return float(item.probability or 0)
