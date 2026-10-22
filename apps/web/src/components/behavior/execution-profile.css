@@ -193,8 +193,11 @@
 }
 
 @media (max-width: 720px) {
+  .radar-stage {
+    width: calc(100% - 72px);
+  }
   .radar-label {
-    font-size: 13px;
+    font-size: 15px;
   }
   .radar-tooltip {
     width: min(200px, 72%);
