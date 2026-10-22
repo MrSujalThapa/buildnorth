@@ -1,16 +1,16 @@
-﻿import { useMemo, useState, type CSSProperties } from "react";
+﻿import { useState, type CSSProperties } from "react";
 import { RotateCcw } from "lucide-react";
 
 import type { ImpactViewModel } from "../../adapters/impactViewModel";
 import { formatProbabilityPercent } from "../../adapters/formatProbability";
-import { DEFAULT_IMPACT_AXES, type SimulationPoint } from "../../adapters/simulationTypes";
+import { formatOutcome } from "../../adapters/outcomeFormat";
+import type { SimulationPoint } from "../../adapters/simulationTypes";
 import type { Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
 import type { Priceability } from "../../api/client";
 import MissingStatePanel from "./MissingStatePanel";
 import { ScenarioComposer } from "./ScenarioComposer";
+import OutcomeDistribution from "./OutcomeDistribution";
 import OutcomeRangeChart from "./OutcomeRangeChart";
-import ProbabilityDistribution from "./ProbabilityDistribution";
-import SimulationCloud from "./SimulationCloud";
 
 type TuneCopy = {
   effortLabel: string;
@@ -122,8 +122,6 @@ export default function ImpactWorkspace({
   onPlanChange,
   onReset,
   onOpenDetails,
-  selectedSimulation,
-  onSelectSimulation,
   running,
   runError,
   priceability,
@@ -134,8 +132,8 @@ export default function ImpactWorkspace({
   stateError,
 }: Props) {
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const axes = DEFAULT_IMPACT_AXES;
-  const points = impact.distributionPoints;
+  const bins = impact.outcomeBins;
+  const formatValue = (value: number) => formatOutcome(value, impact.outcomeScale.unit);
   const resultPositive = (preview.improvementPoints ?? 0) >= 0;
   const deltaTone =
     preview.improvementPoints === null ? "neutral" : resultPositive ? "positive" : "negative";
@@ -146,12 +144,18 @@ export default function ImpactWorkspace({
       ? "—"
       : `${impact.followThroughPercent.toFixed(0)}%`;
 
-  const distributionSeries = useMemo(
-    () => [{ id: "change", label: "With this change", points, selected: true }],
-    [points],
+  const outcomeChart = (label: string) => (
+    <OutcomeDistribution
+      ariaLabel={label}
+      bins={bins}
+      scale={impact.outcomeScale}
+      median={impact.stats.p50}
+      low={impact.stats.p10}
+      high={impact.stats.p90}
+    />
   );
 
-  const unpriced = preview.currentOdds === null || !points.length;
+  const unpriced = preview.currentOdds === null || !bins.length;
   let unpricedPanel;
   if (priceability && priceability.status !== "PRICED" && onSubmitMissingState) {
     unpricedPanel = (
@@ -242,21 +246,13 @@ export default function ImpactWorkspace({
 
             <div className="panel-head tight">
               <div>
-                <p className="section-label">Where your odds could land</p>
-                <h2>Resulting odds across {impact.drawCount?.toLocaleString() ?? "simulated"} futures</h2>
+                <p className="section-label">Where you could finish</p>
+                <h2>Simulated results across {impact.drawCount?.toLocaleString() ?? "simulated"} futures</h2>
               </div>
             </div>
 
             <div className="result-chart">
-              {unpriced ? (
-                unpricedPanel
-              ) : (
-                <ProbabilityDistribution
-                  ariaLabel="Likelihood of resulting odds after this change"
-                  currentOdds={preview.currentOdds}
-                  series={distributionSeries}
-                />
-              )}
+              {unpriced ? unpricedPanel : outcomeChart("Distribution of simulated results after this change")}
             </div>
 
             <div className="metric-row four">
@@ -284,19 +280,11 @@ export default function ImpactWorkspace({
               <div className="panel-head tight">
                 <div>
                   <p className="section-label">Final outcome</p>
-                  <h2>Where your odds could land</h2>
+                  <h2>Where you could finish</h2>
                 </div>
                 <span className="meta">{impact.metaLabel}</span>
               </div>
-              {points.length ? (
-                <ProbabilityDistribution
-                  ariaLabel="Likelihood distribution of resulting odds"
-                  currentOdds={preview.currentOdds}
-                  series={[{ id: "plan", label: "This plan", points, selected: true }]}
-                />
-              ) : (
-                unpricedPanel
-              )}
+              {bins.length ? outcomeChart("Distribution of simulated results for this plan") : unpricedPanel}
             </div>
 
             <aside className="quiet-panel">
@@ -335,28 +323,15 @@ export default function ImpactWorkspace({
                 <div><p className="section-label">Simulated futures</p><h3>Select a representative future</h3></div>
                 <span className="meta">{impact.drawCount ? `Sampled from ${impact.drawCount.toLocaleString()} draws` : "Unavailable"}</span>
               </div>
-              {impact.simulationCloudAvailable && points.length ? (
-                <SimulationCloud
-                  ariaLabel="Sampled simulated futures"
-                  layout="beeswarm"
-                  xAxis={axes.x}
-                  yAxis={axes.y}
-                  selectedId={selectedSimulation?.id ?? null}
-                  onSelect={onSelectSimulation}
-                  representatives={impact.representatives}
-                  series={[{ id: "plan", label: "This plan", points, tone: "aqua", visible: true }]}
-                />
-              ) : (
-                <div className="empty-state compact">
-                  <strong>Representative futures unavailable</strong>
-                  <span>The backend has not exposed retained draw trajectories yet. Distribution and fan charts still reflect aggregate bins.</span>
-                </div>
-              )}
+              <div className="empty-state compact">
+                <strong>Representative futures unavailable</strong>
+                <span>Individual draw trajectories are not retained. The distribution and fan charts reflect aggregate bins.</span>
+              </div>
             </article>
             <article className="viz-block fan-support">
               <div className="panel-head tight"><div><p className="section-label">Over time</p><h3>How the range could evolve</h3></div></div>
               {preview.outcome.length ? (
-                <OutcomeRangeChart data={preview.outcome} currentOdds={preview.currentOdds ?? 0} />
+                <OutcomeRangeChart data={preview.outcome} format={formatValue} target={impact.outcomeScale.target} />
               ) : (
                 <div className="empty-state compact"><span>Fan chart unavailable until the backend returns a time fan.</span></div>
               )}

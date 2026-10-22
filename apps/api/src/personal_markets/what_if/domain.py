@@ -248,6 +248,7 @@ class WhatIfBaselineState(BaseModel):
     priceability: PriceabilityView | None = None
     current_value: float | None = None
     target_value: float | None = None
+    target_unit: str | None = None
     periods: int | None = None
     direction: Literal["at_least", "at_most"] = "at_least"
     current_probability: float | None = None

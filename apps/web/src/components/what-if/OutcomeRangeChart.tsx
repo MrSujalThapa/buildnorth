@@ -9,7 +9,9 @@ import type { OutcomePoint } from "../../adapters/templateTypes";
 
 type Props = {
   data: OutcomePoint[];
-  currentOdds: number;
+  format: (value: number) => string;
+  /** Goal target in the same unit as `data`, drawn as a reference line. */
+  target?: number | null;
 };
 
 type SvgPoint = {
@@ -72,7 +74,7 @@ function bandPath(upper: SvgPoint[], lower: SvgPoint[]) {
   return `${top} ${bottom} Z`;
 }
 
-export default function OutcomeRangeChart({ data, currentOdds }: Props) {
+export default function OutcomeRangeChart({ data, format, target = null }: Props) {
   const gradientId = `outcome-band-${useId().replace(/:/g, "")}`;
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -81,9 +83,13 @@ export default function OutcomeRangeChart({ data, currentOdds }: Props) {
       return null;
     }
 
-    const min = Math.max(0, Math.min(...data.map((point) => point.low)) - 2.5);
-    const max = Math.min(100, Math.max(...data.map((point) => point.high)) + 2.5);
-    const span = Math.max(max - min, 1);
+    const values = [...data.flatMap((point) => [point.low, point.high]), ...(target == null ? [] : [target])];
+    const lowest = Math.min(...values);
+    const highest = Math.max(...values);
+    const pad = Math.max((highest - lowest) * 0.06, Math.abs(highest) * 1e-6, 1e-9);
+    const min = lowest - pad;
+    const max = highest + pad;
+    const span = max - min;
 
     const xFor = (index: number) =>
       PAD_X + (index / Math.max(data.length - 1, 1)) * (WIDTH - PAD_X * 2);
@@ -100,9 +106,9 @@ export default function OutcomeRangeChart({ data, currentOdds }: Props) {
       lower,
       likelyPath: smoothLine(likely),
       bandPath: bandPath(upper, lower),
-      baselineY: yFor(currentOdds),
+      targetY: target == null ? null : yFor(target),
     };
-  }, [data, currentOdds]);
+  }, [data, target]);
 
   if (!chart) {
     return (
@@ -127,14 +133,14 @@ export default function OutcomeRangeChart({ data, currentOdds }: Props) {
       <div className="outcome-chart-readout">
         {active ? (
           <>
-            <span>Week {Math.max(1, Math.round(((active.step + 1) / data.length) * 12))}</span>
-            <strong>{active.likely.toFixed(1)}% likely</strong>
-            <span>{active.low.toFixed(1)}ΓÇô{active.high.toFixed(1)}% range</span>
+            <span>Period {active.step + 1}</span>
+            <strong>{format(active.likely)} median</strong>
+            <span>{format(active.low)}–{format(active.high)} range</span>
           </>
         ) : (
           <>
             <span>Possible outcomes</span>
-            <strong>{data[data.length - 1]?.likely.toFixed(1) ?? "—"}% most likely</strong>
+            <strong>{data.length ? `${format(data[data.length - 1]!.likely)} median at the deadline` : "—"}</strong>
             <span>Move across the chart to explore</span>
           </>
         )}
@@ -159,13 +165,15 @@ export default function OutcomeRangeChart({ data, currentOdds }: Props) {
           </linearGradient>
         </defs>
 
-        <line
-          x1={PAD_X}
-          x2={WIDTH - PAD_X}
-          y1={chart.baselineY}
-          y2={chart.baselineY}
-          className="outcome-current-line"
-        />
+        {chart.targetY != null ? (
+          <line
+            x1={PAD_X}
+            x2={WIDTH - PAD_X}
+            y1={chart.targetY}
+            y2={chart.targetY}
+            className="outcome-current-line"
+          />
+        ) : null}
 
         <path d={chart.bandPath} fill={`url(#${gradientId})`} className="outcome-band" />
 

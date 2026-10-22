@@ -21,13 +21,14 @@ export function defaultQuestionForMarket(market: Market): string {
   return `What if I put more consistent time into ${market.title.toLowerCase()}?`;
 }
 
+/** Fan quantiles are trajectory values in the goal's unit, not odds. */
 function fanToOutcome(fan: WhatIfResult["fan"]): OutcomePoint[] {
   if (!fan.length) return [];
   return fan.map((point, index) => ({
     step: index,
-    low: point.p10 * 100,
-    likely: point.p50 * 100,
-    high: point.p90 * 100,
+    low: point.p10,
+    likely: point.p50,
+    high: point.p90,
   }));
 }
 

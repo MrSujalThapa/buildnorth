@@ -1669,6 +1669,28 @@
 .distribution-median { stroke: currentColor; stroke-width: 1; stroke-dasharray: 3 4; opacity: .62; }
 .distribution-current { stroke: var(--what-if-ink); stroke-width: 1.4; stroke-dasharray: 5 5; }
 .distribution-y { writing-mode: vertical-rl; transform: rotate(180deg); transform-origin: center; }
+.outcome-bar { fill: color-mix(in srgb, var(--what-if-muted) 30%, transparent); }
+.outcome-bar.meets { fill: color-mix(in srgb, var(--what-if-accent) 62%, transparent); }
+.probability-distribution text.outcome-target-label { fill: var(--what-if-ink); font-weight: 600; }
+.outcome-intervals { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.outcome-intervals.is-empty { color: var(--what-if-muted); font-size: .86rem; }
+.outcome-intervals ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.outcome-intervals li { display: grid; grid-template-columns: minmax(96px, .9fr) minmax(0, 2.4fr) minmax(92px, auto); align-items: center; gap: 14px; }
+.outcome-interval-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; color: var(--what-if-muted); }
+.outcome-intervals li.selected .outcome-interval-label { color: var(--what-if-ink); font-weight: 600; }
+.outcome-interval-track { position: relative; height: 22px; border-radius: 999px; background: color-mix(in srgb, var(--what-if-border) 55%, transparent); }
+.outcome-interval-bar { position: absolute; top: 5px; bottom: 5px; border-radius: 999px; background: color-mix(in srgb, var(--what-if-muted) 55%, transparent); }
+.outcome-intervals li.selected .outcome-interval-bar { background: var(--what-if-accent); }
+.outcome-interval-median { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--what-if-ink); }
+.outcome-interval-target { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 1.5px dashed var(--what-if-ink); opacity: .7; }
+.outcome-interval-value { font: 12px var(--font-mono); color: var(--what-if-ink); text-align: right; white-space: nowrap; }
+.outcome-intervals figcaption { display: flex; justify-content: space-between; gap: 12px; color: var(--what-if-muted); font: 11px var(--font-mono); }
+.outcome-intervals figcaption span:nth-child(2) { text-align: center; }
+@media (max-width: 640px) {
+  .outcome-intervals li { grid-template-columns: 1fr auto; gap: 6px 10px; }
+  .outcome-interval-track { grid-column: 1 / -1; grid-row: 2; }
+  .outcome-intervals figcaption span:nth-child(2) { display: none; }
+}
 .probability-distribution.compact svg { height: 74px; }
 .probability-distribution.compact .distribution-line { stroke-width: 1.7; }
 

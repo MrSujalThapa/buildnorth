@@ -449,6 +449,7 @@ export interface WhatIfBaselineState {
   message?: string | null;
   current_value?: number | null;
   target_value?: number | null;
+  target_unit?: string | null;
   periods?: number | null;
   direction: "at_least" | "at_most";
   current_probability?: number | null;
