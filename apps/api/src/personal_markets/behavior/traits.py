@@ -553,27 +553,29 @@ def estimate_traits(
         previous = _score_for(trait_id, prior_trials, prior_evidence, earlier, custom_by_id)
         if trait_id in custom_by_id:
             definition = custom_by_id[trait_id]
-            meta = {
-                "name": definition.name,
-                "description": definition.description,
-                "measurement": f"Recency-weighted score from '{definition.metric}' observations.",
-                "evidence": [f"Observations recorded as {definition.metric}"],
-                "custom": True,
-                "forecast_use": "exploratory",
-            }
+            name = definition.name
+            description = definition.description
+            measurement = f"Recency-weighted score from '{definition.metric}' observations."
+            sources_text = [f"Observations recorded as {definition.metric}"]
+            is_custom = True
+            forecast_use: ForecastUse = "exploratory"
         else:
             spec = BUILT_IN_BY_ID[trait_id]
-            meta = {
-                "name": spec.name,
-                "description": spec.description,
-                "measurement": spec.measurement,
-                "evidence": list(spec.evidence),
-                "custom": False,
-                "forecast_use": spec.forecast_use,
-            }
+            name = spec.name
+            description = spec.description
+            measurement = spec.measurement
+            sources_text = list(spec.evidence)
+            is_custom = False
+            forecast_use = spec.forecast_use
         traits.append(
             TraitEstimate(
                 id=trait_id,
+                name=name,
+                description=description,
+                measurement=measurement,
+                evidence=sources_text,
+                custom=is_custom,
+                forecast_use=forecast_use,
                 value=score.value,
                 interval=score.interval,
                 n_eff=score.n_eff,
@@ -582,7 +584,6 @@ def estimate_traits(
                 previous_value=previous.value if score.value is not None else None,
                 sources=_sources(trait_id, trial_rows, evidence_rows, custom_by_id),
                 window_days=round(window, 1) if window is not None else None,
-                **meta,
             )
         )
 
@@ -594,15 +595,15 @@ def estimate_traits(
         )
     ]
     by_context: dict[str, list[CommitmentTrial]] = defaultdict(list)
-    for item in trial_rows:
-        context = context_for_domain(item.domain)
-        if context is not None:
-            by_context[context].append(item)
+    for trial in trial_rows:
+        trial_context = context_for_domain(trial.domain)
+        if trial_context is not None:
+            by_context[trial_context].append(trial)
     evidence_by_context: dict[str, list[NormalizedEvidence]] = defaultdict(list)
-    for item in evidence_rows:
-        context = context_for_domain(item.domain)
-        if context is not None:
-            evidence_by_context[context].append(item)
+    for observation in evidence_rows:
+        evidence_context = context_for_domain(observation.domain)
+        if evidence_context is not None:
+            evidence_by_context[evidence_context].append(observation)
     contextual: list[TraitSeries] = []
     for context in ("career", "personal", "relationships"):
         rows = by_context.get(context, [])

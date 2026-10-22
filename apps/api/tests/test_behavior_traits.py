@@ -4,6 +4,8 @@ from uuid import uuid4
 from personal_markets.behavior.domain import CommitmentTrial
 from personal_markets.behavior.traits import (
     DEFAULT_TRAIT_IDS,
+    TraitEstimate,
+    TraitProfile,
     context_for_domain,
     custom_trait_from_name,
     estimate_traits,
@@ -61,7 +63,7 @@ def _evidence(
     )
 
 
-def _trait(profile, trait_id):  # type: ignore[no-untyped-def]
+def _trait(profile: TraitProfile, trait_id: str) -> TraitEstimate:
     return next(item for item in profile.traits if item.id == trait_id)
 
 

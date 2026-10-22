@@ -166,14 +166,14 @@ def test_failed_goal_is_retired_and_rebuilt_on_retry(monkeypatch: pytest.MonkeyP
 def test_seed_endpoint_requires_admin_and_scopes_to_caller() -> None:
     app = isolated_app()
     with TestClient(app) as client:
-        client.app.state.auth_bypass_principal = invited_principal()
+        app.state.auth_bypass_principal = invited_principal()
         assert client.post("/api/v1/admin/workspace-seed").status_code == 403
-        client.app.state.auth_bypass_principal = admin_principal()
+        app.state.auth_bypass_principal = admin_principal()
         seeded = client.post("/api/v1/admin/workspace-seed")
         assert seeded.status_code == 200, seeded.text
         status = client.get("/api/v1/admin/workspace-seed").json()
         assert status["records"]["goal"] == len(SEED_GOALS)
         dashboard = client.get("/api/v1/goals/dashboard")
         assert dashboard.status_code == 200
-        client.app.state.auth_bypass_principal = invited_principal("someone-else")
+        app.state.auth_bypass_principal = invited_principal("someone-else")
         assert client.get("/api/v1/goals").json() == []
