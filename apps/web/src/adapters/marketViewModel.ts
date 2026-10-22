@@ -15,19 +15,12 @@ export function marketCategory(goal: Goal): string {
   return CATEGORY_PATTERNS.find(([pattern]) => pattern.test(searchable))?.[1] ?? "Personal";
 }
 
-export function publishedHistoryPoints(
-  points: MarketHistoryPoint[],
-  options?: { includeSyntheticDemo?: boolean },
-): MarketHistoryPoint[] {
-  if (options?.includeSyntheticDemo) return points;
+export function publishedHistoryPoints(points: MarketHistoryPoint[]): MarketHistoryPoint[] {
   return points.filter((point) => point.source_kind !== "synthetic_demo");
 }
 
-function historyToChart(
-  points: MarketHistoryPoint[],
-  options?: { includeSyntheticDemo?: boolean },
-): ChartPoint[] {
-  return publishedHistoryPoints(points, options).map((point, index) => ({
+function historyToChart(points: MarketHistoryPoint[]): ChartPoint[] {
+  return publishedHistoryPoints(points).map((point, index) => ({
     timestamp: point.created_at ? Date.parse(point.created_at) : index,
     value: point.probability * 100,
   }));
@@ -42,13 +35,9 @@ function formatMeta(goal: Goal): string {
   return `Deadline ${deadline} · ${goal.forecast_status.toLowerCase()}`;
 }
 
-export function toMarketCard(
-  goal: Goal,
-  history: MarketHistoryPoint[],
-  options?: { includeSyntheticDemo?: boolean },
-): Market {
-  const published = publishedHistoryPoints(history, options);
-  const chart = historyToChart(history, options);
+export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market {
+  const published = publishedHistoryPoints(history);
+  const chart = historyToChart(history);
   const odds = chart.at(-1)?.value ?? null;
   const first = chart[0]?.value ?? null;
   const last = chart.at(-1)?.value ?? null;
@@ -59,6 +48,10 @@ export function toMarketCard(
   const hasTodaySnapshot = Boolean(latestAt && Date.parse(latestAt) >= startOfDay.getTime());
   const todayReturn = hasTodaySnapshot && last != null && beforeToday
     ? last - beforeToday.probability * 100
+    : null;
+  const previous = published.at(-2);
+  const lastRevision = previous && latestAt && last != null
+    ? { change: last - previous.probability * 100, at: Date.parse(latestAt) }
     : null;
   const totalReturn = first != null && last != null ? last - first : null;
 
@@ -71,6 +64,7 @@ export function toMarketCard(
     deadlineAt: Date.parse(goal.deadline),
     odds,
     todayReturn,
+    lastRevision,
     totalReturn,
     events: [],
     history: chart,

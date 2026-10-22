@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowLeft, X } from "lucide-react";
 
@@ -174,56 +174,6 @@ function tuneCopyForMarket(category: string) {
 
 
 
-function demoPreviewFallback(
-
-  market: Market,
-
-  plan: WhatIfPlan,
-
-  baseline: WhatIfBaselineState | undefined,
-
-): WhatIfPreview | null {
-
-  if (baseline?.status !== "DEMO_SEED" || baseline.current_probability == null) {
-
-    return null;
-
-  }
-
-  const current = baseline.current_probability * 100;
-
-  const scenario = Math.min(95, current + (market.category === "Career" ? 12 : 8));
-
-  return {
-
-    currentOdds: current,
-
-    scenarioOdds: scenario,
-
-    improvementPoints: scenario - current,
-
-    possibleLow: current - 5,
-
-    possibleHigh: scenario + 6,
-
-    chanceHelps: 78,
-
-    weeklyHours: plan.effortHours * 7 + plan.cadence * 0.25,
-
-    outcome: [],
-
-    tradeoff:
-
-      baseline.limitations?.find((item) => item.includes("time")) ??
-
-      "Time spent here cannot be spent on other goals at the same intensity.",
-
-  };
-
-}
-
-
-
 export default function WhatIfPage({
 
   market,
@@ -349,21 +299,11 @@ export default function WhatIfPage({
   const baselinePriced = baseline?.priced ?? false;
   const priceabilityMessage = baseline?.priceability?.reason ?? baseline?.priceability?.headline;
 
-  const demoPreview = useMemo(
-
-    () => demoPreviewFallback(market, plan, baseline),
-
-    [baseline, market, plan],
-
-  );
-
   const preview =
 
     simulation.preview ??
 
     previewFromApi(simulation.scenarioResult) ??
-
-    demoPreview ??
 
     previewFromResult(market, plan, baseline, simulation.scenarioResult);
 
@@ -1022,18 +962,6 @@ export default function WhatIfPage({
             ) : null}
 
 
-
-            {baseline?.status === "DEMO_SEED" ? (
-
-              <section>
-
-                <h3>Model</h3>
-
-                <p>{baseline.model_family}@{baseline.model_version} · DEMO_SEED</p>
-
-              </section>
-
-            ) : null}
 
           </aside>
 

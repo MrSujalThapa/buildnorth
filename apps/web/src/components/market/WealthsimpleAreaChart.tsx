@@ -445,7 +445,7 @@ export default function WealthsimpleAreaChart({
           />
 
           <Area
-            type={data.length === 1 ? "linear" : "monotone"}
+            type={data.length === 1 ? "linear" : "stepAfter"}
             dataKey="value"
             stroke="var(--market-chart-accent, #299f96)"
             strokeWidth={1.7}

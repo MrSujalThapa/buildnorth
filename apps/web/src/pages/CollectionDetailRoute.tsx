@@ -1,14 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import CollectionChart from "../components/market/CollectionChart";
 import { api } from "../api/client";
 import "../components/market/markets.css";
 
 export function CollectionDetailRoute() {
   const { collectionId = "" } = useParams();
-  const [searchParams] = useSearchParams();
-  const demoMode = searchParams.get("demo") === "1";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -18,17 +16,12 @@ export function CollectionDetailRoute() {
   const collection = useQuery({
     queryKey: ["collection", collectionId],
     queryFn: ({ signal }) => api.collection(collectionId, signal),
-    enabled: Boolean(collectionId) && !demoMode,
-  });
-  const demo = useQuery({
-    queryKey: ["demo-portfolio"],
-    queryFn: ({ signal }) => api.demoPortfolio(signal),
-    enabled: demoMode,
+    enabled: Boolean(collectionId),
   });
   const goals = useQuery({
     queryKey: ["goals", "list"],
     queryFn: ({ signal }) => api.goals(signal),
-    enabled: editing && !demoMode,
+    enabled: editing,
   });
   const save = useMutation({
     mutationFn: () => api.patchCollection(collectionId, { name: name.trim(), goal_ids: memberIds }),
@@ -53,11 +46,9 @@ export function CollectionDetailRoute() {
     },
   });
 
-  if (demoMode ? demo.isLoading : collection.isLoading) return <main className="markets-page"><section className="markets-shell"><p role="status">Loading collection…</p></section></main>;
+  if (collection.isLoading) return <main className="markets-page"><section className="markets-shell"><p role="status">Loading collection…</p></section></main>;
 
-  const view = demoMode
-    ? demo.data?.collections?.find((item) => item.collection.collection_id === collectionId)
-    : collection.data;
+  const view = collection.data;
   if (!view) return <main className="markets-page"><section className="markets-shell"><p role="alert">Collection unavailable.</p></section></main>;
   const hasHistory = view.series.some((item) => item.points.length > 0);
   const hasTrajectory = view.series.some((item) => item.points.length > 1);
@@ -69,16 +60,15 @@ export function CollectionDetailRoute() {
   return (
     <main className="markets-page collection-detail-page">
       <section className="markets-shell">
-        <button type="button" className="evidence-back" onClick={() => { void navigate(demoMode ? "/markets?demo=1" : "/markets"); }}>← {demoMode ? "Demonstration outcomes" : "Your outcomes"}</button>
+        <button type="button" className="evidence-back" onClick={() => { void navigate("/markets"); }}>← Your outcomes</button>
         <header className="markets-header">
           <h1>{view.collection.name}</h1>
-          {!demoMode ? <div className="markets-toolbar">
+          <div className="markets-toolbar">
             <button type="button" className="markets-select" onClick={startEditing}>Edit</button>
             <button type="button" className="markets-select" onClick={() => setConfirmDelete(true)}>Delete</button>
-          </div> : null}
+          </div>
         </header>
-        {demoMode ? <p className="profile-demo-note">Synthetic demonstration · no account records</p> : null}
-        {!demoMode && view.collection.name === "Acceptance test collection" ? <div className="collection-rename-offer"><span>Rename this collection to Personal?</span><button type="button" className="markets-select" disabled={renameSuggestion.isPending} onClick={() => renameSuggestion.mutate()}>Rename</button>{renameSuggestion.isError ? <span role="alert">Personal already exists, or the rename could not be saved.</span> : null}</div> : null}
+        {view.collection.name === "Acceptance test collection" ? <div className="collection-rename-offer"><span>Rename this collection to Personal?</span><button type="button" className="markets-select" disabled={renameSuggestion.isPending} onClick={() => renameSuggestion.mutate()}>Rename</button>{renameSuggestion.isError ? <span role="alert">Personal already exists, or the rename could not be saved.</span> : null}</div> : null}
         <section className={`collection-detail-chart${hasHistory ? hasTrajectory ? "" : " is-sparse" : " is-empty"}`} aria-label="Collection odds">
           <div className="market-price">{view.portfolio_odds == null ? "—" : `${view.portfolio_odds.toFixed(0)}%`}</div>
           <div className="market-price-hint">{view.change_pp == null ? "—" : `${view.change_pp >= 0 ? "+" : ""}${view.change_pp.toFixed(1)} percentage points today`}</div>
@@ -86,11 +76,11 @@ export function CollectionDetailRoute() {
         </section>
         <details className="collection-details">
           <summary>Goals and calculation</summary>
-          <p>{view.portfolio_methodology} {view.priced_goals} of {view.total_goals} goals have {demoMode ? "illustrative" : "published"} odds.</p>
+          <p>{view.portfolio_methodology} {view.priced_goals} of {view.total_goals} goals have published odds.</p>
           <ul className="collection-goal-list">
             {view.series.map((item) => (
               <li key={item.goal_id}>
-                <button type="button" onClick={() => { void navigate(`/goals/${item.goal_id}${demoMode ? "?demo=1" : ""}`); }}>
+                <button type="button" onClick={() => { void navigate(`/goals/${item.goal_id}`); }}>
                   <i style={{ background: item.color }} />{item.title}
                   {item.points.at(-1) ? ` · ${item.points.at(-1)!.value.toFixed(1)}%` : " · —"}
                 </button>

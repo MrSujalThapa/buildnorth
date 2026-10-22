@@ -1,18 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ExecutionProfileRadar } from "../components/behavior/ExecutionProfileRadar";
+import { ParameterEditor } from "../components/behavior/ParameterEditor";
+import { TraitRadar } from "../components/behavior/TraitRadar";
 import { api } from "../api/client";
 import { useRefreshAccount } from "../auth/AuthGate";
-import { linkedGoals, resolveAreas, suggestAreas, type ProfileArea } from "./profileAreas";
 import { saveProfileWithPhoto } from "./profileSave";
-
-function moved<T>(items: T[], from: number, to: number): T[] {
-  const next = [...items];
-  if (to < 0 || to >= next.length) return next;
-  const [item] = next.splice(from, 1);
-  if (item !== undefined) next.splice(to, 0, item);
-  return next;
-}
 
 async function cropPhoto(file: File, x: number, y: number): Promise<File> {
   const image = await createImageBitmap(file);
@@ -51,22 +43,10 @@ export function ProfileRoute() {
   const [photoPosition, setPhotoPosition] = useState({ x: 50, y: 50 });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [editingDimensions, setEditingDimensions] = useState(false);
-  const [selectedArea, setSelectedArea] = useState("Overall");
-  const [dimensions, setDimensions] = useState<ProfileArea[]>([]);
-  const [customArea, setCustomArea] = useState("");
-  const goals = useQuery({ queryKey: ["goals", "list"], queryFn: ({ signal }) => api.goals(signal), enabled: editingDimensions });
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [demoRadar, setDemoRadar] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingParameters, setEditingParameters] = useState(false);
-  const [selectedParameters, setSelectedParameters] = useState<string[]>([]);
-  const demo = useQuery({
-    queryKey: ["profile-demo-radar"],
-    queryFn: ({ signal }) => api.demoProfileRadar(signal),
-    enabled: demoRadar,
-  });
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -86,15 +66,11 @@ export function ProfileRoute() {
     },
   });
   const saveParameters = useMutation({
-    mutationFn: (parameter_ids: string[]) => api.patchProfile({ parameter_ids }),
-    onSuccess: () => {
+    mutationFn: (body: { parameter_ids: string[]; custom_parameters: { name: string; description: string }[] }) => api.patchProfile(body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["profile"] });
       setEditingParameters(false);
-      void queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
-  });
-  const saveDimensions = useMutation({
-    mutationFn: () => api.patchProfile({ dimensions: resolveAreas(dimensions, goals.data ?? []) }),
-    onSuccess: () => { setEditingDimensions(false); void queryClient.invalidateQueries({ queryKey: ["profile"] }); },
   });
   const upload = useMutation({
     mutationFn: async (file: File) => api.uploadProfilePhoto(await cropPhoto(file, photoPosition.x, photoPosition.y)),
@@ -113,7 +89,6 @@ export function ProfileRoute() {
   const handle = fields.username || account.email?.split("@")[0] || "you";
   const display = fields.display_name || handle;
   const shownPhoto = pendingRemove ? null : previewUrl || photoUrl;
-  const suggestions = suggestAreas(goals.data ?? [], dimensions.map((item) => item.label));
 
   function choosePhoto(file: File | undefined) {
     if (!file) return;
@@ -121,14 +96,6 @@ export function ProfileRoute() {
     setPhotoError(null);
     setPhotoPosition({ x: 50, y: 50 });
     setSelectedPhoto(file);
-  }
-
-  function addArea(label: string) {
-    const trimmed = label.trim();
-    if (!trimmed || dimensions.some((item) => item.label.toLowerCase() === trimmed.toLowerCase())) return;
-    const linked = linkedGoals(trimmed, goals.data ?? []);
-    setDimensions((current) => [...current, { label: trimmed, goal_ids: linked.ambiguous ? [] : linked.ids }]);
-    setCustomArea("");
   }
 
   return (
@@ -147,48 +114,12 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="profile-radar-heading">
-          <h2>Parameter profile</h2>
-          <div className="profile-radar-actions">
-            <button
-              type="button"
-              className="markets-select"
-              aria-pressed={demoRadar}
-              onClick={() => setDemoRadar((current) => !current)}
-            >
-              {demoRadar ? "Hide demonstration" : "View demonstration"}
-            </button>
-            <button
-              type="button"
-              className="markets-select"
-              onClick={() => {
-                setSelectedParameters(fields.parameter_ids?.length
-                  ? fields.parameter_ids
-                  : profile.data.available_parameters?.map((item) => item.id) ?? []);
-                setEditingParameters(true);
-              }}
-            >
-              Edit parameters
-            </button>
-            <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
-          </div>
+          <h2>Behavior profile</h2>
+          <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
+            Edit parameters
+          </button>
         </div>
-        {demoRadar ? (
-          <p className="profile-demo-note" role="status">
-            {demo.data?.message ?? "Loading isolated demonstration data. This is not your profile."}
-          </p>
-        ) : (
-          <div className="profile-area-filter" role="group" aria-label="Evidence filter">
-            <button type="button" aria-pressed={selectedArea === "Overall"} onClick={() => setSelectedArea("Overall")}>All measurements</button>
-            {profile.data.radar_areas?.map((area) => <button type="button" key={area.label} aria-pressed={selectedArea === area.label} onClick={() => setSelectedArea(area.label)}>{area.label}</button>)}
-          </div>
-        )}
-        <ExecutionProfileRadar
-          profile={
-            demoRadar
-              ? demo.data?.radar
-              : profile.data.radar_areas?.find((area) => area.label === selectedArea)?.radar ?? profile.data.radar
-          }
-        />
+        <TraitRadar traits={profile.data.traits.traits} series={profile.data.traits.series} />
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <form className="confirm-card profile-editor" onSubmit={(event) => {
@@ -282,85 +213,16 @@ export function ProfileRoute() {
           </div>
         </form>
       </div> : null}
-      {editingParameters ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-parameters-title">
-        <div className="confirm-card profile-editor">
-          <h2 id="edit-parameters-title">Measurable parameters</h2>
-          <p className="quiet-copy">Choose at least three measured quantities.</p>
-          {(profile.data.available_parameters ?? []).map((item) => (
-            <label key={item.id} className="ui-choice">
-              <input
-                type="checkbox"
-                checked={selectedParameters.includes(item.id)}
-                onChange={() => {
-                  setSelectedParameters((current) => (
-                    current.includes(item.id)
-                      ? current.filter((id) => id !== item.id)
-                      : [...current, item.id]
-                  ));
-                }}
-              />
-              <span>
-                <strong>{item.name}</strong>
-                <span> {item.meaning}</span>
-              </span>
-            </label>
-          ))}
-          {saveParameters.isError ? <p role="alert">Could not save parameters.</p> : null}
-          <div className="composer-actions">
-            <button
-              type="button"
-              disabled={saveParameters.isPending || selectedParameters.length < 3}
-              onClick={() => saveParameters.mutate(selectedParameters)}
-            >
-              {saveParameters.isPending ? "Saving…" : "Save"}
-            </button>
-            <button type="button" className="secondary" onClick={() => setEditingParameters(false)}>Cancel</button>
-          </div>
-        </div>
-      </div> : null}
-      {editingDimensions ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-dimensions-title">
-        <div className="confirm-card profile-editor profile-dimension-editor">
-          <h2 id="edit-dimensions-title">Your areas</h2>
-          <div className="profile-area-suggestions">
-            {suggestions.map((label) => <button key={label} type="button" onClick={() => addArea(label)}>Add {label}</button>)}
-          </div>
-          <form className="profile-custom-area" onSubmit={(event) => { event.preventDefault(); addArea(customArea); }}>
-            <label htmlFor="custom-area">Custom area</label>
-            <input id="custom-area" className="ui-field" value={customArea} maxLength={32} onChange={(event) => setCustomArea(event.target.value)} />
-            <button type="submit" className="markets-select" disabled={!customArea.trim() || dimensions.length >= 12}>Add area</button>
-          </form>
-          {dimensions.map((item, index) => {
-            const linked = linkedGoals(item.label, goals.data ?? []);
-            const titles = (goals.data ?? []).filter((goal) => item.goal_ids.includes(goal.goal_id)).map((goal) => goal.title);
-            return (
-              <div className="profile-dimension-row" key={`${item.label}-${index}`}>
-                <input className="ui-field" aria-label={`Area ${index + 1} name`} value={item.label} maxLength={32} onChange={(event) => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, label: event.target.value, goal_ids: [] } : row))} />
-                <div className="profile-dimension-controls">
-                  <button type="button" aria-label={`Move ${item.label || "area"} up`} disabled={index === 0} onClick={() => setDimensions((current) => moved(current, index, index - 1))}>Up</button>
-                  <button type="button" aria-label={`Move ${item.label || "area"} down`} disabled={index === dimensions.length - 1} onClick={() => setDimensions((current) => moved(current, index, index + 1))}>Down</button>
-                  <button type="button" onClick={() => setDimensions((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</button>
-                </div>
-                {titles.length ? <p className="profile-area-link">Includes {titles.join(", ")}</p> : null}
-                {linked.ambiguous ? (
-                  <div className="profile-dimension-goals">
-                    {(goals.data ?? []).filter((goal) => linked.titles.includes(goal.title)).map((goal) => (
-                      <label key={goal.goal_id} className="ui-choice">
-                        <input type="checkbox" checked={item.goal_ids.includes(goal.goal_id)} onChange={() => setDimensions((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, goal_ids: row.goal_ids.includes(goal.goal_id) ? row.goal_ids.filter((id) => id !== goal.goal_id) : [...row.goal_ids, goal.goal_id] } : row))} />
-                        {goal.title}
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-          {saveDimensions.isError ? <p role="alert">Could not save areas.</p> : null}
-          <div className="composer-actions">
-            <button type="button" disabled={saveDimensions.isPending || goals.isLoading || dimensions.some((item) => !item.label.trim())} onClick={() => saveDimensions.mutate()}>Save</button>
-            <button type="button" className="secondary" onClick={() => setEditingDimensions(false)}>Cancel</button>
-          </div>
-        </div>
-      </div> : null}
+      {editingParameters ? (
+        <ParameterEditor
+          selected={profile.data.selected_parameters}
+          options={profile.data.available_parameters}
+          saving={saveParameters.isPending}
+          error={saveParameters.isError ? "Could not save parameters." : null}
+          onSave={(payload) => saveParameters.mutate(payload)}
+          onCancel={() => { saveParameters.reset(); setEditingParameters(false); }}
+        />
+      ) : null}
     </main>
   );
 }

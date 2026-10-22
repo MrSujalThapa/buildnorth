@@ -319,21 +319,59 @@ export interface GoalsDashboard {
   collections?: CollectionView[];
 }
 
-export interface ProfileParameterOption {
+export type TraitForecastUse = "execution_probability" | "exploratory";
+
+export interface TraitOption {
   id: string;
   name: string;
-  meaning: string;
-  unit: string;
+  description: string;
+  measurement: string;
+  evidence: string[];
+  custom: boolean;
+  forecast_use: TraitForecastUse;
+  metric?: string;
+}
+
+export interface TraitEstimate {
+  id: string;
+  name: string;
+  description: string;
+  measurement: string;
+  evidence: string[];
+  custom: boolean;
+  forecast_use: TraitForecastUse;
+  value: number | null;
+  interval: [number, number] | null;
+  n_eff: number;
+  observations: number;
+  confidence: "insufficient" | "low" | "moderate" | "high";
+  previous_value: number | null;
+  sources: string[];
+  window_days: number | null;
+}
+
+export interface TraitSeries {
+  id: string;
+  label: string;
+  values: Record<string, number | null>;
+}
+
+export interface TraitProfile {
+  estimator_version: string;
+  as_of: string;
+  traits: TraitEstimate[];
+  series: TraitSeries[];
+  trial_count: number;
+  evidence_count: number;
 }
 
 export interface ProfilePayload {
   account: AccountView;
   goal_count: number;
   collection_count: number;
-  radar: BehaviorProfile;
-  radar_areas?: { label: string; radar: BehaviorProfile }[];
-  radar_kind?: "parameters" | "traits";
-  available_parameters?: ProfileParameterOption[];
+  traits: TraitProfile;
+  selected_parameters: string[];
+  available_parameters: TraitOption[];
   privacy: string;
 }
 
@@ -733,10 +771,6 @@ export const api = {
       body: JSON.stringify({ goal_ids: goalIds }),
     }),
   profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
-  demoProfileRadar: (signal?: AbortSignal) =>
-    request<{ demo: boolean; radar: BehaviorProfile; message: string }>("/api/v1/profile/demo-radar", undefined, signal),
-  demoPortfolio: (signal?: AbortSignal) =>
-    request<GoalsDashboard & { demo: boolean; message: string }>("/api/v1/profile/demo-portfolio", undefined, signal),
   profilePhoto,
   uploadProfilePhoto: (file: File) => {
     const body = new FormData();
@@ -744,7 +778,14 @@ export const api = {
     return request<{ status: string }>("/api/v1/profile/photo", { method: "PUT", body });
   },
   removeProfilePhoto: () => request<{ status: string }>("/api/v1/profile/photo", { method: "DELETE" }),
-  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string; dimensions?: { label: string; goal_ids: string[] }[]; parameter_ids?: string[] }) =>
+  patchProfile: (body: {
+    display_name?: string;
+    username?: string;
+    bio?: string;
+    avatar_value?: string;
+    parameter_ids?: string[];
+    custom_parameters?: { name: string; description: string }[];
+  }) =>
     request<AccountView>("/api/v1/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

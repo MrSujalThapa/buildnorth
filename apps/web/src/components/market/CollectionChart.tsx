@@ -80,7 +80,7 @@ export default function CollectionChart({ series, interactive = true }: Props) {
             {visible.map((item) => (
               <Line
                 key={item.goal_id}
-                type="monotone"
+                type="stepAfter"
                 dataKey={item.goal_id}
                 stroke={item.color}
                 strokeWidth={2}

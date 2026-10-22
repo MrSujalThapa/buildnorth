@@ -1,0 +1,325 @@
+.trait-radar {
+  --trait-overall: var(--app-accent, #1f8f86);
+  --trait-career: #2f6fd6;
+  --trait-personal: #1f8f86;
+  --trait-relationships: #d0643f;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 4px 0 8px;
+}
+
+.theme-dark .trait-radar {
+  --trait-career: #6f9ef0;
+  --trait-personal: #5ec8bd;
+  --trait-relationships: #ec8a63;
+}
+
+.trait-radar-stage {
+  width: min(100%, 560px);
+}
+
+.trait-radar svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.trait-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--app-ink) 9%, transparent);
+  stroke-width: 1;
+}
+
+.trait-ring:last-of-type {
+  stroke: color-mix(in srgb, var(--app-ink) 16%, transparent);
+}
+
+.trait-spoke {
+  stroke: color-mix(in srgb, var(--app-ink) 11%, transparent);
+  stroke-width: 1;
+}
+
+.trait-spoke.is-empty {
+  stroke-dasharray: 3 5;
+}
+
+.trait-band {
+  stroke: color-mix(in srgb, var(--trait-overall) 28%, transparent);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.trait-shape {
+  fill: color-mix(in srgb, currentColor 16%, transparent);
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+}
+
+.trait-shape.is-overlay {
+  fill: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.trait-edge {
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+}
+
+.trait-node {
+  fill: currentColor;
+  stroke: var(--app-bg, #f4f2ee);
+  stroke-width: 2;
+  transition: r 160ms ease;
+}
+
+.trait-axis {
+  cursor: pointer;
+  outline: none;
+}
+
+.trait-axis text {
+  fill: var(--app-muted, #706d68);
+  transition: fill 160ms ease;
+}
+
+.trait-axis-name {
+  font: 600 14px/1 "Instrument Sans", "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.trait-axis-value {
+  font: 500 13px/1 "Instrument Sans", "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.trait-axis.is-active text,
+.trait-axis:hover text {
+  fill: var(--app-ink, #161513);
+}
+
+.trait-axis:focus-visible text {
+  fill: var(--app-ink, #161513);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.trait-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  margin: -6px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.trait-legend li,
+.trait-readout-contexts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.trait-legend i,
+.trait-readout-contexts i {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.trait-readout {
+  width: min(100%, 460px);
+  padding-top: 14px;
+  border-top: 1px solid var(--app-border);
+}
+
+.trait-readout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trait-readout-head strong {
+  font-size: 16px;
+  letter-spacing: -0.02em;
+}
+
+.trait-readout-value {
+  font-size: 26px;
+  font-weight: 680;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.trait-readout-meta,
+.trait-readout-contexts {
+  margin: 2px 0 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trait-readout-contexts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 8px;
+}
+
+.trait-readout-copy {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trait-series {
+    animation: trait-in 480ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform-origin: 260px 260px;
+  }
+}
+
+@keyframes trait-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .trait-radar-stage {
+    width: calc(100% - 56px);
+  }
+  .trait-axis-name {
+    font-size: 17px;
+  }
+  .trait-axis-value {
+    font-size: 16px;
+  }
+}
+
+.parameter-editor {
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(86vh, 760px);
+  overflow: auto;
+  gap: 14px;
+}
+
+.parameter-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--app-border);
+}
+
+.parameter-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.parameter-row-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.parameter-row-text strong {
+  font-size: 15px;
+}
+
+.parameter-row-text span {
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.parameter-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.parameter-row-actions button,
+.parameter-add button {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--app-ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.parameter-row-actions button:hover:not(:disabled),
+.parameter-add button:hover:not(:disabled) {
+  border-color: var(--app-border);
+}
+
+.parameter-row-actions button:disabled,
+.parameter-add button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.parameter-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.parameter-add > span,
+.parameter-custom label {
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.parameter-add > span {
+  margin-right: 4px;
+}
+
+.parameter-add button {
+  border-color: var(--app-border);
+  border-radius: 999px;
+}
+
+.parameter-custom {
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--app-border);
+}
+
+.parameter-custom button {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.parameter-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.parameter-hint code {
+  font-size: 12px;
+}

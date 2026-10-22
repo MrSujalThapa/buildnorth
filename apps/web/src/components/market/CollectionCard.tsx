@@ -22,8 +22,10 @@ export default function CollectionCard({ collection, onOpen, selectMode = false,
         </div>
         <div className="market-card-odds">{odds == null ? "—" : `${odds.toFixed(0)}%`}</div>
       </div>
-      <div className={`market-card-return${change == null ? "" : change >= 0 ? " positive" : " negative"}`}>
-        {change == null ? "—" : `${change >= 0 ? "+" : ""}${change.toFixed(1)} pp today`}
+      <div className={`market-card-return${change == null ? " is-caption" : change >= 0 ? " positive" : " negative"}`}>
+        {change == null
+          ? `Average of ${collection.priced_goals} of ${collection.total_goals} priced markets`
+          : `${change >= 0 ? "+" : ""}${change.toFixed(1)} pp today`}
       </div>
       <div className={`market-card-chart${hasHistory ? hasTrajectory ? "" : " is-sparse" : " is-empty"}`}>
         {hasHistory ? (

@@ -13,12 +13,29 @@ function signedPointChange(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)} pp`;
 }
 
+function age(at: number) {
+  const days = Math.floor((Date.now() - at) / 86_400_000);
+  return days < 1 ? "today" : `${days}d ago`;
+}
+
+function changeLabel(market: Market): { text: string; change: number | null } {
+  if (market.todayReturn != null) {
+    return { text: `${signedPointChange(market.todayReturn)} today`, change: market.todayReturn };
+  }
+  if (market.lastRevision) {
+    const { change, at } = market.lastRevision;
+    return { text: `${signedPointChange(change)} · ${age(at)}`, change };
+  }
+  return { text: "—", change: null };
+}
+
 export default function MarketCard({
   market,
   onClick,
   selectMode = false,
   selected = false,
 }: Props) {
+  const movement = changeLabel(market);
   return (
     <button
       type="button"
@@ -45,14 +62,11 @@ export default function MarketCard({
 
       <div
         className={`market-card-return ${
-          (market.todayReturn ?? 0) >= 0
-            ? "positive"
-            : "negative"
+          movement.change == null ? "" : movement.change >= 0 ? "positive" : "negative"
         }`}
+        title={movement.change == null ? undefined : "Change at the most recent model revision"}
       >
-        {market.todayReturn == null
-          ? "—"
-          : `${signedPointChange(market.todayReturn)} today`}
+        {movement.text}
       </div>
 
       <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : market.history.length === 1 ? " is-sparse" : ""}`}>
