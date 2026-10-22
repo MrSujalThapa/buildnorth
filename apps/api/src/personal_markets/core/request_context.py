@@ -7,6 +7,7 @@ import structlog
 from fastapi import Request, Response
 
 from personal_markets.core.config import Settings
+from personal_markets.persistence.query_stats import track_queries
 
 client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "testclient", "localhost"})
@@ -56,23 +57,35 @@ async def request_context_middleware(
     structlog.contextvars.bind_contextvars(request_id=request_id)
     token = client_ip_var.set(client_ip)
     started = perf_counter()
-    try:
-        response = await call_next(request)
-    except Exception:
-        if request.url.path.startswith("/api/v1/"):
-            structlog.get_logger(__name__).error(
-                "api_request_timing", method=request.method,
-                path=request.url.path, status=500,
-                duration_ms=round((perf_counter() - started) * 1000),
-            )
-        raise
-    finally:
-        client_ip_var.reset(token)
+    with track_queries() as db:
+        try:
+            response = await call_next(request)
+        except Exception:
+            if request.url.path.startswith("/api/v1/"):
+                structlog.get_logger(__name__).error(
+                    "api_request_timing",
+                    method=request.method,
+                    path=request.url.path,
+                    status=500,
+                    duration_ms=round((perf_counter() - started) * 1000),
+                    db_queries=db.queries,
+                    db_checkouts=db.checkouts,
+                    db_ms=round(db.query_ms),
+                )
+            raise
+        finally:
+            client_ip_var.reset(token)
     if request.url.path.startswith("/api/v1/"):
         structlog.get_logger(__name__).info(
-            "api_request_timing", method=request.method,
-            path=request.url.path, status=response.status_code,
+            "api_request_timing",
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
             duration_ms=round((perf_counter() - started) * 1000),
+            db_queries=db.queries,
+            db_checkouts=db.checkouts,
+            db_ms=round(db.query_ms),
         )
+        response.headers["server-timing"] = db.server_timing()
     response.headers["x-request-id"] = request_id
     return response
