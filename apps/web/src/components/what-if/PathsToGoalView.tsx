@@ -2,15 +2,11 @@
 
 import type { Market, WhatIfView } from "../../adapters/templateTypes";
 import {
-  distributionStats,
   pathAxes,
-  representativesFor,
   type PathStrategy,
   type SimulationPoint,
 } from "../../adapters/simulations";
 import SimulationCloud from "./SimulationCloud";
-import ProbabilityDistribution from "./ProbabilityDistribution";
-
 type Props = {
   market: Market;
   view: WhatIfView;
@@ -44,8 +40,6 @@ export default function PathsToGoalView({
   onSelectVariant,
   onTargetOddsChange,
   onSeeFutures,
-  selectedSimulation,
-  onSelectSimulation,
   onFind,
 }: Props) {
   const paths = pathsProp ?? [];
@@ -54,24 +48,6 @@ export default function PathsToGoalView({
   const selected = paths.find((path) => path.id === selectedPathId) ?? paths[0];
   const [finding, setFinding] = useState(false);
   const selectedVariant = selected?.variants.find((item) => item.id === selectedVariantId);
-  const pathDistributionFromStrategy = (path: PathStrategy): SimulationPoint[] => {
-    const center = path.odds ?? 0;
-    return [0, 1, 2, 3, 4].map((index) => ({
-      id: index + 1,
-      x: path.cost,
-      y: center + (index - 2) * 0.6,
-      clusterId: path.id,
-      pathId: path.id,
-      goalHit: center >= targetOdds,
-      seed: index,
-    }));
-  };
-  const pathSims = view === "deep" && selected ? pathDistributionFromStrategy(selected) : [];
-  const reps = representativesFor(pathSims);
-  const pathDistributions = Object.fromEntries(
-    paths.map((path) => [path.id, pathDistributionFromStrategy(path)]),
-  );
-
   const pathPoints: SimulationPoint[] = paths.map((path, index) => ({
     id: index + 1,
     x: path.cost,
@@ -133,20 +109,16 @@ export default function PathsToGoalView({
               <em>{paths[0]?.odds == null ? "—" : `${paths[0].odds.toFixed(0)}%`}</em>
             </div>
             <ol className="ranked-paths">
-              {paths.map((path) => {
-                const stats = distributionStats(pathDistributions[path.id] ?? []);
-                return (
-                  <li key={path.id}>
-                    <button type="button" onClick={() => onSelectPath(path.id)} className={selected?.id === path.id ? "selected" : ""}>
-                      <span className="path-rank">{paths.indexOf(path) + 1}</span>
-                      <div><h3>{path.label}</h3><p>{path.requirement}</p></div>
-                      <strong>{path.odds?.toFixed(0)}%</strong>
-                      <ProbabilityDistribution compact ariaLabel={`${path.label} odds distribution`} series={[{ id: path.id, label: path.label, points: pathDistributions[path.id] ?? [], selected: selected?.id === path.id }]} />
-                      <small>Likely range {stats.p10.toFixed(0)}–{stats.p90.toFixed(0)}% · {path.cost} relative effort</small>
-                    </button>
-                  </li>
-                );
-              })}
+              {paths.map((path, index) => (
+                <li key={path.id}>
+                  <button type="button" onClick={() => onSelectPath(path.id)} className={selected?.id === path.id ? "selected" : ""}>
+                    <span className="path-rank">{index + 1}</span>
+                    <div><h3>{path.label}</h3><p>{path.requirement}</p></div>
+                    <strong>{path.odds == null ? "—" : `${path.odds.toFixed(0)}%`}</strong>
+                    <small>Relative effort {path.cost}</small>
+                  </button>
+                </li>
+              ))}
             </ol>
           </div>
         ) : (
@@ -295,37 +267,6 @@ export default function PathsToGoalView({
 
         {selected ? (
           <div className="deep-secondary paths-deep-extra">
-            <article className="viz-block">
-              <p className="section-label">Futures if this path is taken</p>
-              <SimulationCloud
-                ariaLabel="Selected path simulation distribution"
-                layout="beeswarm"
-                xAxis={{
-                  label: "Goal progress",
-                  format: (value) => `${Math.round(value)}%`,
-                  min: 4,
-                  max: 100,
-                }}
-                yAxis={{
-                  label: "Likelihood",
-                  format: () => "",
-                  min: 0,
-                  max: 1,
-                }}
-                selectedId={selectedSimulation?.id ?? null}
-                onSelect={onSelectSimulation}
-                representatives={reps}
-                series={[
-                  {
-                    id: selected.id,
-                    label: selected.label,
-                    points: pathSims,
-                    tone: "aqua",
-                    visible: true,
-                  },
-                ]}
-              />
-            </article>
             <article>
               <p className="section-label">Constraints</p>
               <p>Resource budget is relative. Paths to the right demand more time, reputation, or runway than paths to the left.</p>

@@ -35,7 +35,9 @@ function linePath(points: Array<{ x: number; y: number }>) {
 
 export default function ProbabilityDistribution({ ariaLabel, series, currentOdds, compact = false }: Props) {
   const fillId = `distribution-${useId().replace(/:/g, "")}`;
+  const measured = useMemo(() => series.filter((item) => item.points.length > 0), [series]);
   const chart = useMemo(() => {
+    const series = measured;
     const values = series.flatMap((item) => item.points.map((point) => point.x));
     const min = Math.max(0, Math.floor((Math.min(...values, currentOdds ?? 100) - 5) / 5) * 5);
     const max = Math.min(100, Math.ceil((Math.max(...values, currentOdds ?? 0) + 5) / 5) * 5);
@@ -66,7 +68,15 @@ export default function ProbabilityDistribution({ ariaLabel, series, currentOdds
       high: percentile(item.values, 0.9),
     }));
     return { min, max, xFor, curves };
-  }, [compact, currentOdds, series]);
+  }, [compact, currentOdds, measured]);
+
+  if (!measured.length) {
+    return (
+      <div className={compact ? "probability-distribution compact is-empty" : "probability-distribution is-empty"} role="note">
+        No simulated outcomes yet.
+      </div>
+    );
+  }
 
   return (
     <div className={compact ? "probability-distribution compact" : "probability-distribution"}>
@@ -80,7 +90,7 @@ export default function ProbabilityDistribution({ ariaLabel, series, currentOdds
         <line x1={LEFT} x2={WIDTH - RIGHT} y1={HEIGHT - BOTTOM} y2={HEIGHT - BOTTOM} className="distribution-axis" />
         {chart.curves.map((curve, index) => (
           <g key={curve.id} className={curve.selected ? "distribution-series selected" : "distribution-series"}>
-            {series.length === 1 ? <path d={`${curve.path} L${WIDTH - RIGHT},${HEIGHT - BOTTOM} L${LEFT},${HEIGHT - BOTTOM} Z`} fill={`url(#${fillId})`} /> : null}
+            {measured.length === 1 ? <path d={`${curve.path} L${WIDTH - RIGHT},${HEIGHT - BOTTOM} L${LEFT},${HEIGHT - BOTTOM} Z`} fill={`url(#${fillId})`} /> : null}
             <path d={curve.path} className={`distribution-line tone-${index}`} />
             <line x1={chart.xFor(curve.median)} x2={chart.xFor(curve.median)} y1={TOP + 8} y2={HEIGHT - BOTTOM} className="distribution-median" />
           </g>
