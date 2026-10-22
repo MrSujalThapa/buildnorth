@@ -1,26 +1,28 @@
+import { lazy, Suspense } from "react";
 import { ClerkProvider } from "@clerk/react";
 import { Route, Routes } from "react-router-dom";
 import { AuthGate } from "./auth/AuthGate";
 import { clerkProviderLoadOptions, normalizePublishableKey } from "./auth/clerkScript";
 import { clerkEnabled } from "./auth/session";
 import AppShell from "./components/shell/AppShell";
-import SocialPage from "./components/utility/SocialPage";
-import { NewGoalPage } from "./features/goals/NewGoalPage";
-import { ComposioAuthLauncherPage } from "./pages/ComposioAuthLauncherPage";
-import { ConnectAuthorizePage } from "./pages/ConnectAuthorizePage";
-import { CollectionDetailRoute } from "./pages/CollectionDetailRoute";
-import { EvidenceRoute } from "./pages/EvidenceRoute";
-import { GoalDetailRoute } from "./pages/GoalDetailRoute";
 import { MarketsRoute } from "./pages/MarketsRoute";
-import { PluginsRoute } from "./pages/PluginsRoute";
-import { ProfileRoute } from "./pages/ProfileRoute";
-import { SettingsRoute } from "./pages/SettingsRoute";
-import { WhatIfRoute } from "./pages/WhatIfRoute";
 import { ThemeProvider } from "./theme/ThemeProvider";
+
+const SocialPage = lazy(() => import("./components/utility/SocialPage"));
+const NewGoalPage = lazy(() => import("./features/goals/NewGoalPage").then((module) => ({ default: module.NewGoalPage })));
+const ComposioAuthLauncherPage = lazy(() => import("./pages/ComposioAuthLauncherPage").then((module) => ({ default: module.ComposioAuthLauncherPage })));
+const ConnectAuthorizePage = lazy(() => import("./pages/ConnectAuthorizePage").then((module) => ({ default: module.ConnectAuthorizePage })));
+const CollectionDetailRoute = lazy(() => import("./pages/CollectionDetailRoute").then((module) => ({ default: module.CollectionDetailRoute })));
+const EvidenceRoute = lazy(() => import("./pages/EvidenceRoute").then((module) => ({ default: module.EvidenceRoute })));
+const GoalDetailRoute = lazy(() => import("./pages/GoalDetailRoute").then((module) => ({ default: module.GoalDetailRoute })));
+const PluginsRoute = lazy(() => import("./pages/PluginsRoute").then((module) => ({ default: module.PluginsRoute })));
+const ProfileRoute = lazy(() => import("./pages/ProfileRoute").then((module) => ({ default: module.ProfileRoute })));
+const SettingsRoute = lazy(() => import("./pages/SettingsRoute").then((module) => ({ default: module.SettingsRoute })));
+const WhatIfRoute = lazy(() => import("./pages/WhatIfRoute").then((module) => ({ default: module.WhatIfRoute })));
 
 function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={<main className="route-loading" role="status">Loading…</main>}><Routes>
       <Route path="/" element={<MarketsRoute />} />
       <Route path="/markets" element={<MarketsRoute />} />
       <Route path="/new" element={<NewGoalPage />} />
@@ -35,14 +37,14 @@ function AppRoutes() {
       <Route path="/invite" element={<MarketsRoute />} />
       <Route path="/invite/:token" element={<MarketsRoute />} />
       <Route path="*" element={<MarketsRoute />} />
-    </Routes>
+    </Routes></Suspense>
   );
 }
 
 function AppTree() {
   return (
     <ThemeProvider>
-      <Routes>
+      <Suspense fallback={<main className="route-loading" role="status">Loading…</main>}><Routes>
         <Route path="/auth/composio/launch" element={<ComposioAuthLauncherPage />} />
         <Route path="/connect/authorize" element={<AuthGate><ConnectAuthorizePage /></AuthGate>} />
         <Route
@@ -55,7 +57,7 @@ function AppTree() {
             </AuthGate>
           }
         />
-      </Routes>
+      </Routes></Suspense>
     </ThemeProvider>
   );
 }
