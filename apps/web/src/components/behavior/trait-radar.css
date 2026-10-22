@@ -323,3 +323,9 @@
 .parameter-hint code {
   font-size: 12px;
 }
+
+.profile-radar-pending {
+  margin: 24px 0;
+  color: var(--app-muted);
+  font-size: 14px;
+}

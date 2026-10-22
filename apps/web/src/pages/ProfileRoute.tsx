@@ -115,11 +115,17 @@ export function ProfileRoute() {
         </section>
         <div className="profile-radar-heading">
           <h2>Behavior profile</h2>
-          <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
-            Edit parameters
-          </button>
+          {profile.data.traits ? (
+            <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
+              Edit parameters
+            </button>
+          ) : null}
         </div>
-        <TraitRadar traits={profile.data.traits.traits} series={profile.data.traits.series} />
+        {profile.data.traits ? (
+          <TraitRadar traits={profile.data.traits.traits} series={profile.data.traits.series} />
+        ) : (
+          <p className="profile-radar-pending" role="status">The behavior profile is updating. Reload in a few minutes.</p>
+        )}
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <form className="confirm-card profile-editor" onSubmit={(event) => {
