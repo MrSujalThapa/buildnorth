@@ -129,12 +129,13 @@ export function ProfileRoute() {
   return (
     <main className="markets-page profile-page">
       <section className="markets-shell">
+        <h1 className="profile-page-title">Profile</h1>
         <section className="profile-card">
           <div className="profile-avatar" aria-label={shownPhoto && !editing ? "Profile photo" : "Initials avatar"}>
             {shownPhoto && !editing ? <img src={shownPhoto} alt="" width={96} height={96} /> : display.slice(0, 1).toUpperCase()}
           </div>
           <div className="profile-identity">
-            <h1>{display}</h1>
+            <h2>{display}</h2>
             <span>@{handle}</span>
             {fields.bio ? <p>{fields.bio}</p> : null}
           </div>

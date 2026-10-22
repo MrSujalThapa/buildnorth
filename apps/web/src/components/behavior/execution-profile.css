@@ -122,16 +122,12 @@
 }
 
 .radar-tooltip {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: min(240px, 70%);
+  width: min(360px, 100%);
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--app-ink) 10%, transparent);
   border-radius: 14px;
   background: color-mix(in srgb, var(--app-bg) 88%, transparent);
-  box-shadow: 0 18px 40px color-mix(in srgb, var(--app-ink) 12%, transparent);
-  pointer-events: none;
-  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--app-ink) 6%, transparent);
 }
 
 .radar-tooltip strong {

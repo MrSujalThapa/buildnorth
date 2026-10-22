@@ -47,3 +47,22 @@ test("partial parameter evidence plots measured axes without inventing a full po
   expect(container.querySelector(".radar-fill")).toBeNull();
   expect(screen.getByText("Current average 14.00 per week")).toBeVisible();
 });
+
+test("adjacent measured parameters form an open line when one axis is unknown", () => {
+  const measured = (key: string, value: number) => ({
+    key, label: key, value, display_percent: value * 100, limited_evidence: false,
+    confidence: "medium", provenance: { comparable_commitments: 4, completed: 4,
+      sources: ["manual"], n_eff: 4, formula: "Measured average", details: [] },
+  });
+  const missing = { ...measured("unknown", 0), value: null, display_percent: null, limited_evidence: true };
+  const profile: BehaviorProfile = {
+    estimator_version: "parameter_profile@1.0.0",
+    execution: { probability: 0, n_eff: 12, confidence: "low", source: "FITTED", usable: true, notes: [] },
+    dimensions: [measured("applications", 0.7), measured("focus", 0.5), measured("savings", 0.3), missing],
+    disclaimer: "", evidence_sufficiency: "low", n_raw: 12, n_eff: 12,
+  };
+  const { container } = render(<ExecutionProfileRadar profile={profile} />);
+  expect(container.querySelectorAll(".radar-edge")).toHaveLength(2);
+  expect(container.querySelector(".radar-fill")).toBeNull();
+  expect(container.querySelectorAll(".radar-ring")).toHaveLength(4);
+});

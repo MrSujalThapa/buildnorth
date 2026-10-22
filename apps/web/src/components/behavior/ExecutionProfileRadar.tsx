@@ -46,7 +46,7 @@ type Props = {
 const SIZE = 560;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const RADIUS = 168;
+const RADIUS = 190;
 
 function angleFor(index: number, total: number) {
   return -Math.PI / 2 + (index / total) * Math.PI * 2;
@@ -97,8 +97,6 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
   const [methodOpen, setMethodOpen] = useState(false);
   const activeKey = hover ?? locked ?? firstMeasured;
   const active = dimensions.find((item) => item.key === activeKey) ?? null;
-  const activeIndex = dimensions.findIndex((item) => item.key === activeKey);
-  const tooltipPt = activeIndex >= 0 ? point(activeIndex, dimensions.length, 0.55) : { x: CX, y: CY };
 
   if (!profile || !dimensions.length || !dimensions.some(measured)) {
     return (
@@ -129,7 +127,6 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   return (
     <section className={`execution-profile${compact ? " compact" : ""}`}>
-      {profile.execution.notes?.[0] ? <p className="execution-empty">{profile.execution.notes[0]}</p> : null}
       {hasMeasurements && !complete ? <p className="execution-empty">Some parameters need more observations.</p> : null}
       <div className="radar-stage">
         {dimensions.length >= 3 ? (
@@ -163,7 +160,14 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
               })}
             </defs>
             {[0.25, 0.5, 0.75, 1].map((ring) => (
-              <circle key={ring} className="radar-ring" cx={CX} cy={CY} r={RADIUS * ring} />
+              <polygon
+                key={ring}
+                className="radar-ring"
+                points={dimensions.map((_, index) => {
+                  const pt = point(index, dimensions.length, ring);
+                  return `${pt.x},${pt.y}`;
+                }).join(" ")}
+              />
             ))}
             {dimensions.map((item, index) => {
               const edge = point(index, dimensions.length, 1);
@@ -181,11 +185,12 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
             {complete ? (
               <polygon className="radar-fill" points={outline} filter={`url(#${uid}-glow)`} />
             ) : null}
-            {complete
-              ? dimensions.map((item, index) => {
+            {dimensions.map((item, index) => {
                   const next = (index + 1) % dimensions.length;
+                  const nextItem = dimensions[next];
+                  if (!nextItem || !measured(item) || !measured(nextItem) || (!complete && next === 0)) return null;
                   const start = point(index, dimensions.length, item.value ?? 0);
-                  const end = point(next, dimensions.length, dimensions[next]?.value ?? 0);
+                  const end = point(next, dimensions.length, nextItem.value ?? 0);
                   return (
                     <line
                       key={`edge-${item.key}`}
@@ -197,25 +202,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
                       stroke={`url(#${uid}-edge-${index})`}
                     />
                   );
-                })
-              : null}
-            {dimensions.map((item, index) => {
-              if (!measured(item)) return null;
-              const valuePt = point(index, dimensions.length, item.value ?? 0);
-              const inner = point(index, dimensions.length, 0.08);
-              if (complete) return null;
-              return (
-                <line
-                  key={`bar-${item.key}`}
-                  className="radar-bar"
-                  x1={inner.x}
-                  y1={inner.y}
-                  x2={valuePt.x}
-                  y2={valuePt.y}
-                  stroke={traitColor(item.key, index)}
-                />
-              );
-            })}
+                })}
             {dimensions.map((item, index) => {
               const labelPt = point(index, dimensions.length, 1.28);
               const anchor = labelAnchor(index, dimensions.length);
@@ -261,18 +248,12 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
             })}
           </svg>
         ) : null}
-        {active ? (
-          <div
-            className="radar-tooltip"
-            style={{ left: `${(tooltipPt.x / SIZE) * 100}%`, top: `${(tooltipPt.y / SIZE) * 100}%` }}
-            role="status"
-          >
-            <strong>{active.label}</strong>
-            <em>{measured(active) && active.display_percent != null ? `${active.display_percent}%` : "—"}</em>
-            <p>{traitSummary(active)}</p>
-          </div>
-        ) : null}
       </div>
+      {active ? <div className="radar-tooltip" role="status">
+        <strong>{active.label}</strong>
+        <em>{measured(active) && active.display_percent != null ? `${active.display_percent}%` : "—"}</em>
+        <p>{traitSummary(active)}</p>
+      </div> : null}
       {active?.provenance.formula ? (
         <button type="button" className="radar-method" aria-expanded={methodOpen} onClick={() => setMethodOpen((open) => !open)}>
           {methodOpen ? "Hide method" : "How this is measured"}
