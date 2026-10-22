@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     openai_baseline_model: str = "gpt-5.4"
     intervention_agent_enabled: bool = True
     intervention_regex_fallback: bool = True
+    intervention_max_output_tokens: int = 4096
     openai_timeout_seconds: float = 45
     openai_max_retries: int = 3
     openai_max_concurrency: int = 4
