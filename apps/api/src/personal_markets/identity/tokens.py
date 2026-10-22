@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from typing import Any
 from uuid import UUID
 
@@ -9,6 +10,8 @@ import jwt
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import UnauthorizedError
 from personal_markets.identity.domain import user_id_for_clerk
+
+JWKS_CACHE_SECONDS = 300
 
 _EMAIL_CLAIM_KEYS = (
     "email",
@@ -108,6 +111,13 @@ def authorized_origins(settings: Settings) -> list[str]:
     return list(dict.fromkeys(expanded))
 
 
+@lru_cache(maxsize=4)
+def _jwk_client(jwks_url: str) -> jwt.PyJWKClient:
+    # PyJWKClient caches the key set and refetches on an unknown `kid`, so key rotation
+    # still works; a fresh client per request would fetch JWKS synchronously every time.
+    return jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=JWKS_CACHE_SECONDS)
+
+
 def _verify_clerk_token(token: str, settings: Settings) -> TokenClaims:
     jwks_url = settings.resolved_clerk_jwks_url()
     if not jwks_url:
@@ -120,7 +130,7 @@ def _verify_clerk_token(token: str, settings: Settings) -> TokenClaims:
             or not header["kid"]
         ):
             raise jwt.InvalidTokenError("unsupported token signing header")
-        client = jwt.PyJWKClient(jwks_url)
+        client = _jwk_client(jwks_url)
         signing_key = client.get_signing_key_from_jwt(token)
         decode_kwargs: dict[str, Any] = {
             "algorithms": ["RS256"],

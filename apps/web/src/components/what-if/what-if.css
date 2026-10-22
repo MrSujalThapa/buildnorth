@@ -1739,3 +1739,10 @@
   .distribution-y { display: none; }
   .probability-distribution svg { overflow: hidden; }
 }
+
+.scenario-error {
+  margin: 10px 0 0;
+  color: #c85f3e;
+  font-size: 13px;
+  line-height: 1.4;
+}

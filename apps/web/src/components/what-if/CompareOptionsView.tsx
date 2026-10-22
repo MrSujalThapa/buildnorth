@@ -266,7 +266,7 @@ export default function CompareOptionsView({
                     series={[{ id: option.id, label: option.label, points: optionPoints, selected: isLeader }]}
                   />
                   <dl>
-                    <div><dt>Likely range</dt><dd>{stats.p10.toFixed(0)}–{stats.p90.toFixed(0)}%</dd></div>
+                    <div><dt>Likely range</dt><dd>{optionPoints.length ? `${stats.p10.toFixed(0)}–${stats.p90.toFixed(0)}%` : "—"}</dd></div>
                     <div><dt>Downside</dt><dd>{option.downside}</dd></div>
                     <div><dt>Time</dt><dd>{option.time}</dd></div>
                   </dl>

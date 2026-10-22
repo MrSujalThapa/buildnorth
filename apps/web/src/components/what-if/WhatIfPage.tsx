@@ -112,6 +112,13 @@ type Props = {
 
 
 
+export function scenarioErrorMessage(error: unknown): string | null {
+  if (!error) return null;
+  const raw = error instanceof Error ? error.message : "unknown error";
+  const detail = raw.replace(/^API request failed \((.*)\)$/s, "$1");
+  return `Couldn't run this scenario: ${detail}`;
+}
+
 function tuneCopyForMarket(category: string) {
 
   if (category === "Career") {
@@ -552,7 +559,15 @@ export default function WhatIfPage({
 
               copy={copy}
 
-              running={simulation.simulation.isPending}
+              running={
+                simulation.simulation.isPending ||
+                simulation.parseIntervention.isPending ||
+                simulation.persistSimulation.isPending
+              }
+
+              runError={scenarioErrorMessage(
+                simulation.parseIntervention.error ?? simulation.persistSimulation.error,
+              )}
 
               onQuestionChange={setQuestion}
 

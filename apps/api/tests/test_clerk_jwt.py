@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -76,7 +77,34 @@ def install_trusted_jwks(monkeypatch, trusted_jwks) -> list[dict[str, Any]]:
 
     monkeypatch.setattr(token_mod.jwt.PyJWKClient, "fetch_data", fetch_data)
     monkeypatch.setattr(token_mod.jwt, "decode", spy_decode)
+    token_mod._jwk_client.cache_clear()
     return decode_kwargs
+
+
+@pytest.fixture(autouse=True)
+def fresh_jwk_client() -> Iterator[None]:
+    token_mod._jwk_client.cache_clear()
+    yield
+    token_mod._jwk_client.cache_clear()
+
+
+def test_jwks_client_is_reused_across_requests(
+    monkeypatch: pytest.MonkeyPatch,
+    install_trusted_jwks: list[dict[str, Any]],
+    rsa_key: rsa.RSAPrivateKey,
+    clerk_settings: Settings,
+) -> None:
+    fetches: list[int] = []
+    real_fetch = jwt.PyJWKClient.fetch_data
+
+    def counting_fetch(self: jwt.PyJWKClient) -> Any:
+        fetches.append(1)
+        return real_fetch(self)
+
+    monkeypatch.setattr(jwt.PyJWKClient, "fetch_data", counting_fetch)
+    for _ in range(3):
+        token_mod._verify_clerk_token(_sign(rsa_key, azp=ALLOWED_AZP), clerk_settings)
+    assert len(fetches) == 1
 
 
 def _sign(

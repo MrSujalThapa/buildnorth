@@ -37,6 +37,7 @@ type Props = {
   selectedSimulation: SimulationPoint | null;
   onSelectSimulation: (point: SimulationPoint | null) => void;
   running?: boolean;
+  runError?: string | null;
   priceability?: Priceability | null;
   onSubmitMissingState?: (
     entries: { key: string; label: string; value: number; unit: string }[],
@@ -124,6 +125,7 @@ export default function ImpactWorkspace({
   selectedSimulation,
   onSelectSimulation,
   running,
+  runError,
   priceability,
   onSubmitMissingState,
   onAddEvidence,
@@ -191,6 +193,7 @@ export default function ImpactWorkspace({
         submitLabel="Run scenario"
         placeholder="What if I change this?"
       />
+      {runError ? <p className="scenario-error" role="alert">{runError}</p> : null}
 
       {view === "simple" ? (
         <section className="impact-workspace">

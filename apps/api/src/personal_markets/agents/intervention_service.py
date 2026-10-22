@@ -150,6 +150,7 @@ class InterventionAgentService:
             pool=ladder.pool,  # type: ignore[arg-type]
             agent_name="intervention",
             user_id=self._owner_id,
+            max_output_tokens=self._settings.intervention_max_output_tokens,
         )
         proposal, response = await complete_validated(
             self._inference, request, InterventionAgentProposal,
