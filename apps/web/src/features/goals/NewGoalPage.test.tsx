@@ -47,3 +47,17 @@ test("reload recovers a running goal thread", async () => {
   expect(await screen.findByRole("status")).toHaveTextContent("Working on your goal");
   expect(api.getThread).toHaveBeenCalledWith("persisted-thread");
 });
+
+test("expired goal thread reports a timeout after reload", async () => {
+  sessionStorage.setItem("playitout:pending-goal-thread", "expired-thread");
+  const failed = { thread_id: "expired-thread", status: "failed", progress: [],
+    debug: { failure_code: "workflow_timeout" } } as unknown as WorkflowSnapshot;
+  vi.spyOn(api, "getThread").mockResolvedValue(failed);
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><NewGoalPage /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent("This attempt timed out");
+  expect(sessionStorage.getItem("playitout:pending-goal-thread")).toBeNull();
+});

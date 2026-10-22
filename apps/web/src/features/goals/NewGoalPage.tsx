@@ -7,6 +7,12 @@ import "./new-goal.css";
 
 const PENDING_GOAL_THREAD = "playitout:pending-goal-thread";
 
+function failureMessage(snapshot: WorkflowSnapshot): string {
+  return snapshot.debug?.failure_code === "workflow_timeout"
+    ? "This attempt timed out. Check your inference settings, then try again."
+    : "The agent workflow failed. Check inference settings and try again.";
+}
+
 export function NewGoalPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -26,7 +32,7 @@ export function NewGoalPage() {
     const data = thread.data;
     if (!data || data.thread_id !== threadId) return;
     setSnapshot(data);
-    if (data.status === "failed") setError("The agent workflow failed. Check inference settings and try again.");
+    if (data.status === "failed") setError(failureMessage(data));
     if (["completed", "limited", "withheld", "failed", "cancelled"].includes(data.status)) {
       sessionStorage.removeItem(PENDING_GOAL_THREAD);
       setThreadId(null);
@@ -46,7 +52,7 @@ export function NewGoalPage() {
       setThreadId(data.thread_id);
       setError(null);
       if (data.status === "failed") {
-        setError("The agent workflow failed. Check inference settings and try again.");
+        setError(failureMessage(data));
         return;
       }
       if (data.status === "completed" || data.status === "limited" || data.status === "withheld") {
@@ -70,7 +76,7 @@ export function NewGoalPage() {
       setError(null);
       setAnswers({});
       if (data.status === "failed") {
-        setError("The agent workflow failed. Check inference settings and try again.");
+        setError(failureMessage(data));
         return;
       }
       if (data.goal && (data.status === "completed" || data.status === "limited" || data.status === "withheld")) {

@@ -381,8 +381,12 @@ class PostgresThreadStore:
                                 text("""
                                 update workflow_threads set status = 'failed',
                                   current_step = 'failed',
-                                  result_json = result_json ||
-                                    '{"status":"failed","current_step":"failed"}'::jsonb,
+                                  result_json = jsonb_set(
+                                    result_json || '{"status":"failed","current_step":"failed"}'::jsonb,
+                                    '{debug}',
+                                    coalesce(result_json->'debug', '{}'::jsonb) ||
+                                      '{"failure_code":"workflow_timeout"}'::jsonb
+                                  ),
                                   updated_at = now()
                                 where id = :id and status = 'running'
                                   and updated_at = :previous_update
