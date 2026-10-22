@@ -13,6 +13,12 @@ from personal_markets.persistence.database import transaction
 from personal_markets.ports import EvidenceEventProposal, WorkflowSnapshot
 
 
+def running_thread_expired(
+    updated_at: datetime, *, timeout_seconds: int, now: datetime
+) -> bool:
+    return now - updated_at > timedelta(seconds=timeout_seconds + 60)
+
+
 class InMemoryEvidenceRepository:
     def __init__(self, goals: dict[UUID, object] | None = None) -> None:
         self._events: dict[UUID, NormalizedEvidence] = {}
@@ -363,9 +369,11 @@ class PostgresThreadStore:
             )
         if row is None:
             return None
-        if row["status"] == "running":
-            stale_after = timedelta(seconds=get_settings().inference_run_timeout_seconds + 60)
-            if datetime.now(UTC) - row["updated_at"] > stale_after:
+        if row["status"] == "running" and running_thread_expired(
+            row["updated_at"],
+            timeout_seconds=get_settings().inference_run_timeout_seconds,
+            now=datetime.now(UTC),
+        ):
                 async with transaction(self._engine) as connection:
                     expired = (
                         (

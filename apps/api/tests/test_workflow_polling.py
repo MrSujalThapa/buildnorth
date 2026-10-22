@@ -1,10 +1,17 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 
-from personal_markets.persistence.agent_store import InMemoryThreadStore
+from personal_markets.persistence.agent_store import InMemoryThreadStore, running_thread_expired
 from personal_markets.ports import WorkflowSnapshot
 from personal_markets.wiring import PersistingWorkflow
+
+
+def test_running_thread_expires_only_after_inference_timeout_and_grace() -> None:
+    now = datetime(2026, 10, 22, tzinfo=UTC)
+    assert not running_thread_expired(now - timedelta(seconds=180), timeout_seconds=120, now=now)
+    assert running_thread_expired(now - timedelta(seconds=181), timeout_seconds=120, now=now)
 
 
 class StaleInnerWorkflow:
