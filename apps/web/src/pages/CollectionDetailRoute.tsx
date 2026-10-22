@@ -71,7 +71,7 @@ export function CollectionDetailRoute() {
         {view.collection.name === "Acceptance test collection" ? <div className="collection-rename-offer"><span>Rename this collection to Personal?</span><button type="button" className="markets-select" disabled={renameSuggestion.isPending} onClick={() => renameSuggestion.mutate()}>Rename</button>{renameSuggestion.isError ? <span role="alert">Personal already exists, or the rename could not be saved.</span> : null}</div> : null}
         <section className={`collection-detail-chart${hasHistory ? hasTrajectory ? "" : " is-sparse" : " is-empty"}`} aria-label="Collection odds">
           <div className="market-price">{view.portfolio_odds == null ? "—" : `${view.portfolio_odds.toFixed(0)}%`}</div>
-          <div className="market-price-hint">{view.change_pp == null ? "—" : `${view.change_pp >= 0 ? "+" : ""}${view.change_pp.toFixed(1)} percentage points today`}</div>
+          <div className="market-price-hint">{view.change_pp == null ? `Average of ${view.priced_goals} of ${view.total_goals} priced markets` : `${view.change_pp >= 0 ? "+" : ""}${view.change_pp.toFixed(1)} percentage points today`}</div>
           {hasHistory ? <CollectionChart series={view.series} interactive /> : null}
         </section>
         <details className="collection-details">
