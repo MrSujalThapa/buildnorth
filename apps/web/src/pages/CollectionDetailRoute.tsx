@@ -86,7 +86,7 @@ export function CollectionDetailRoute() {
         </section>
         <details className="collection-details">
           <summary>Goals and calculation</summary>
-          <p>{view.portfolio_methodology} {view.priced_goals} of {view.total_goals} goals have published odds.</p>
+          <p>{view.portfolio_methodology} {view.priced_goals} of {view.total_goals} goals have {demoMode ? "illustrative" : "published"} odds.</p>
           <ul className="collection-goal-list">
             {view.series.map((item) => (
               <li key={item.goal_id}>
