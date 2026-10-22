@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import numpy as np
 import pytest
 
 from personal_markets.evidence.service import EvidenceService
@@ -14,6 +15,11 @@ from personal_markets.what_if.domain import (
     PossibleFuturesRequest,
     ScenarioDefinition,
     ScenarioDistribution,
+)
+from personal_markets.what_if.futures_weights import (
+    _band_masses,
+    _band_stats,
+    _terminal_band_masks,
 )
 from personal_markets.what_if.service import WhatIfService
 
@@ -134,6 +140,31 @@ async def test_possible_futures_prices_finance_from_mc_clusters() -> None:
     assert all(item.probability is not None for item in result.outcomes)
     total = sum(item.probability or 0 for item in result.outcomes) + result.other_probability
     assert total == pytest.approx(1.0)
+    by_label = {item.label: item for item in result.outcomes}
+    reached = by_label["Target reached"]
+    if reached.p10 is not None:
+        assert reached.p10 >= 1_000_000
+    medians = {item.median for item in result.outcomes if item.median is not None}
+    assert len(medians) > 1
+
+
+def test_band_quantiles_come_from_each_bands_own_futures() -> None:
+    terminal = np.arange(0.0, 101.0)
+    masks = _terminal_band_masks(terminal, current=50.0, target=80.0, direction="at_least")
+    stats = _band_stats(terminal, masks, ["Target reached", "Downside outcome", "Unrelated label"])
+    assert stats["Target reached"][0] >= 80.0
+    assert stats["Downside outcome"][2] < 50.0
+    assert "Unrelated label" not in stats
+    assert sum(int(mask.sum()) for mask in masks.values()) == len(terminal)
+    assert _band_masses(masks)["target_reached"] == pytest.approx(21 / 101)
+
+
+def test_band_quantiles_omit_bands_without_simulated_futures() -> None:
+    terminal = np.full(50, 2000.0)
+    masks = _terminal_band_masks(terminal, current=2400.0, target=2700.0, direction="at_most")
+    stats = _band_stats(terminal, masks, ["Target reached", "Downside outcome"])
+    assert stats["Target reached"] == (2000.0, 2000.0, 2000.0)
+    assert "Downside outcome" not in stats
 
 
 @pytest.mark.asyncio

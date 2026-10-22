@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -40,6 +41,33 @@ BandKey = Literal[
     "no_progress",
 ]
 
+_BAND_LABEL_TOKENS: dict[BandKey, tuple[str, ...]] = {
+    "target_reached": ("target reached", "reaches target", "hit target", "offer", "success"),
+    "meaningful_progress": (
+        "meaningful progress",
+        "near target",
+        "modest improvement",
+        "technical",
+        "final",
+        "screening",
+    ),
+    "current_trajectory": ("current trajectory", "current path", "maintain", "flat"),
+    "downside": (
+        "downside",
+        "regress",
+        "far below",
+        "fail",
+        "stagnat",
+        "no progress",
+        "shutdown",
+    ),
+    "offer": ("offer", "target reached", "success"),
+    "final_stage": ("final", "late stage"),
+    "technical_stage": ("technical", " onsite"),
+    "screening_stage": ("screen", "response", "pipeline"),
+    "no_progress": ("no progress", "stagnat", "downside"),
+}
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedFuturesWeights:
@@ -59,9 +87,7 @@ def resolve_futures_weights(
     config: SimulationConfig | None = None,
 ) -> ResolvedFuturesWeights | None:
     if is_startup_goal(goal):
-        return _startup_weights(
-            goal, evidence, scenario_labels, parsed_changes=parsed_changes
-        )
+        return _startup_weights(goal, evidence, scenario_labels, parsed_changes=parsed_changes)
     if is_finance_goal(goal) or is_running_goal(goal):
         return _continuous_target_mc_weights(
             goal,
@@ -193,12 +219,13 @@ def _continuous_target_mc_weights(
         ),
     )
     terminal = paired.scenario_outcome if change_models else paired.baseline_outcome
-    bands = _cluster_terminal_outcomes(
+    band_masks = _terminal_band_masks(
         terminal,
         current=resolved.current_value,
         target=resolved.target_value,
         direction=resolved.direction,
     )
+    bands = _band_masses(band_masks)
     mapped = _map_labels_to_bands(scenario_labels, bands, domain="continuous")
     if not mapped:
         return None
@@ -206,7 +233,7 @@ def _continuous_target_mc_weights(
         scenario_labels,
         mapped,
         AssumptionSource.REFERENCE,
-        terminal_stats=_band_stats(terminal, bands, scenario_labels),
+        terminal_stats=_band_stats(terminal, band_masks, scenario_labels),
     )
     if not outcomes:
         return None
@@ -273,7 +300,7 @@ def _career_funnel_weights(
         "screening_stage": max(0.0, p_response - p_technical),
         "no_progress": max(0.0, 1.0 - p_response),
     }
-    continuous_bands = {
+    continuous_bands: dict[BandKey, float] = {
         "target_reached": bands["offer"],
         "meaningful_progress": bands["final_stage"] + bands["technical_stage"],
         "current_trajectory": bands["screening_stage"],
@@ -305,14 +332,25 @@ def _reach_stage_prob(n_apps: float, rates: dict[str, float], stage_index: int) 
     return float(1.0 - (1.0 - p_one) ** n_apps)
 
 
-def _cluster_terminal_outcomes(
+def _band_masses(masks: dict[BandKey, np.ndarray]) -> dict[BandKey, float]:
+    masses: dict[BandKey, float] = {
+        key: float(np.mean(mask)) if len(mask) else 0.0 for key, mask in masks.items()
+    }
+    total = sum(masses.values())
+    if total <= 0:
+        return masses
+    return {key: value / total for key, value in masses.items()}
+
+
+def _terminal_band_masks(
     terminal: np.ndarray,
     *,
     current: float,
     target: float,
     direction: str,
-) -> dict[BandKey, float]:
-    n = max(len(terminal), 1)
+) -> dict[BandKey, np.ndarray]:
+    """Assign each simulated terminal value to one band; unmatched draws count as trajectory."""
+    n = len(terminal)
     gap = abs(target - current)
     progress_mid = current + 0.5 * (target - current)
     near_current = max(gap * 0.15, abs(current) * 0.05, 1.0)
@@ -329,74 +367,41 @@ def _cluster_terminal_outcomes(
         downside_mask = terminal > current + near_current * 0.5
 
     assigned = np.zeros(n, dtype=bool)
-    masses: dict[BandKey, float] = {
-        "target_reached": 0.0,
-        "meaningful_progress": 0.0,
-        "current_trajectory": 0.0,
-        "downside": 0.0,
-    }
-    for key, mask in (
+    masks: dict[BandKey, np.ndarray] = {}
+    ordered: tuple[tuple[BandKey, np.ndarray], ...] = (
         ("target_reached", target_mask),
-        ("meaningful_progress", progress_mask & ~assigned),
-        ("current_trajectory", trajectory_mask & ~assigned),
-        ("downside", downside_mask & ~assigned),
-    ):
+        ("meaningful_progress", progress_mask),
+        ("current_trajectory", trajectory_mask),
+        ("downside", downside_mask),
+    )
+    for key, mask in ordered:
         selected = mask & ~assigned
-        masses[key] = float(np.mean(selected))
+        masks[key] = selected
         assigned |= selected
-    remainder = 1.0 - sum(masses.values())
-    if remainder > 0:
-        masses["current_trajectory"] += remainder
-    total = sum(masses.values())
-    if total <= 0:
-        return masses
-    return {key: value / total for key, value in masses.items()}
+    masks["current_trajectory"] = masks["current_trajectory"] | ~assigned
+    return masks
+
+
+def _band_key_for_label(label: str, band_keys: Iterable[str]) -> BandKey | None:
+    lowered = label.lower()
+    available = set(band_keys)
+    for band_key, tokens in _BAND_LABEL_TOKENS.items():
+        if band_key in available and any(token in lowered for token in tokens):
+            return band_key
+    return None
 
 
 def _map_labels_to_bands(
     labels: list[str],
-    bands: dict[str, float],
+    bands: Mapping[BandKey, float],
     *,
     domain: str,
 ) -> dict[str, float]:
-    token_map: dict[str, tuple[str, ...]] = {
-        "target_reached": ("target reached", "reaches target", "hit target", "offer", "success"),
-        "meaningful_progress": (
-            "meaningful progress",
-            "near target",
-            "modest improvement",
-            "technical",
-            "final",
-            "screening",
-        ),
-        "current_trajectory": ("current trajectory", "current path", "maintain", "flat"),
-        "downside": (
-            "downside",
-            "regress",
-            "far below",
-            "fail",
-            "stagnat",
-            "no progress",
-            "shutdown",
-        ),
-        "offer": ("offer", "target reached", "success"),
-        "final_stage": ("final", "late stage"),
-        "technical_stage": ("technical", " onsite"),
-        "screening_stage": ("screen", "response", "pipeline"),
-        "no_progress": ("no progress", "stagnat", "downside"),
-    }
     mapped: dict[str, float] = {}
     for label in labels:
-        lowered = label.lower()
-        for band_key, tokens in token_map.items():
-            if band_key not in bands:
-                continue
-            if any(token in lowered for token in tokens):
-                mapped[label] = mapped.get(label, 0.0) + bands[band_key]
-                break
-        else:
-            if domain == "continuous" and "other" in lowered:
-                continue
+        band_key = _band_key_for_label(label, bands)
+        if band_key is not None:
+            mapped[label] = mapped.get(label, 0.0) + bands[band_key]
     if not mapped:
         return {}
     total = sum(mapped.values())
@@ -434,10 +439,18 @@ def _definitions_from_map(
 
 def _band_stats(
     terminal: np.ndarray,
-    _bands: dict[BandKey, float],
+    masks: dict[BandKey, np.ndarray],
     labels: list[str],
 ) -> dict[str, tuple[float, float, float]]:
-    p10 = float(np.percentile(terminal, 10))
-    p50 = float(np.percentile(terminal, 50))
-    p90 = float(np.percentile(terminal, 90))
-    return {label: (p10, p50, p90) for label in labels}
+    """Quantiles of the simulated terminal values that fall inside each label's band."""
+    stats: dict[str, tuple[float, float, float]] = {}
+    for label in labels:
+        band_key = _band_key_for_label(label, masks)
+        if band_key is None:
+            continue
+        members = terminal[masks[band_key]]
+        if not len(members):
+            continue
+        p10, p50, p90 = np.percentile(members, [10, 50, 90])
+        stats[label] = (float(p10), float(p50), float(p90))
+    return stats
