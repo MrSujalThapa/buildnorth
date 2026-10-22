@@ -52,3 +52,24 @@ async def test_due_watch_enqueues_once_and_respects_pause(monkeypatch: pytest.Mo
     assert (await jobs.latest(watch.owner_id, watch.goal_id)) is not None
     await store.set_status(watch.owner_id, watch.goal_id, watch.id, "paused")
     assert await store.enqueue_due() == 0
+
+
+@pytest.mark.asyncio
+async def test_due_watch_waits_for_existing_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = InMemorySourceWatchStore()
+    jobs = InMemoryGoalSyncJobStore()
+    monkeypatch.setattr(
+        "personal_markets.integrations.source_watches.get_goal_sync_job_store", lambda: jobs
+    )
+    watch = await store.save(
+        SourceWatch(
+            owner_id=uuid4(), goal_id=uuid4(), plugin_connection_id=uuid4(),
+            plugin_id="notion", resource_id="approved-resource",
+            next_check_at=datetime.now(UTC) - timedelta(minutes=1),
+        )
+    )
+    manual = await jobs.enqueue(watch.owner_id, watch.goal_id)
+    assert await store.enqueue_due() == 0
+    assert (await store.list_for_goal(watch.owner_id, watch.goal_id))[0].next_check_at <= datetime.now(UTC)
+    await jobs.update(manual.id, status="completed")
+    assert await store.enqueue_due() == 1

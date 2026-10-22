@@ -89,6 +89,11 @@ class InMemorySourceWatchStore:
             )[:limit]
             for watch in due:
                 jobs = get_goal_sync_job_store()
+                active = await jobs.latest(watch.owner_id, watch.goal_id)
+                if active is not None and active.status in {
+                    "queued", "fetching_sources", "processing_evidence", "updating_forecast"
+                }:
+                    continue
                 job = await jobs.enqueue(watch.owner_id, watch.goal_id)
                 uri = f"composio://{watch.plugin_id}/{watch.resource_id}"
                 uris = set(job.receipt.get("watch_resource_uris", []))
@@ -199,22 +204,16 @@ class PostgresSourceWatchStore:
             return SourceWatch.model_validate(dict(row)) if row else None
 
     async def enqueue_due(self, limit: int = 25) -> int:
-        # Claim and enqueue in the same transaction, so a crash cannot lose due work.
+        # Advance checkpoints only when a new job is durably queued. An active
+        # manual/watch job can otherwise cause ON CONFLICT DO NOTHING to drop a poll.
         async with transaction(self._engine) as conn:
             rows = (
                 (
                     await conn.execute(
                         text("""
-                with due as (
-                  select id from source_watches
-                  where status = 'active' and next_check_at <= now()
-                  order by next_check_at for update skip locked limit :limit
-                )
-                update source_watches w set last_checked_at = now(),
-                  next_check_at = now() + make_interval(mins => w.interval_minutes),
-                  updated_at = now()
-                where w.id in (select id from due)
-                returning w.owner_id, w.goal_id
+                select id, owner_id, goal_id from source_watches
+                where status = 'active' and next_check_at <= now()
+                order by next_check_at for update skip locked limit :limit
             """),
                         {"limit": limit},
                     )
@@ -222,8 +221,13 @@ class PostgresSourceWatchStore:
                 .mappings()
                 .all()
             )
+            grouped: dict[tuple[UUID, UUID], list[UUID]] = {}
             for row in rows:
-                await conn.execute(
+                grouped.setdefault((row["owner_id"], row["goal_id"]), []).append(row["id"])
+            enqueued = 0
+            for (owner_id, goal_id), watch_ids in grouped.items():
+                inserted = (
+                    await conn.execute(
                     text("""
                     insert into goal_sync_jobs (id, owner_id, goal_id, status, receipt)
                     select :id, :owner_id, :goal_id, 'queued',
@@ -233,11 +237,24 @@ class PostgresSourceWatchStore:
                           from source_watches sw
                           where sw.owner_id = :owner_id and sw.goal_id = :goal_id
                             and sw.status = 'active'), '[]'::jsonb))
-                    on conflict do nothing
+                    on conflict do nothing returning id
                 """),
-                    {"id": uuid4(), "owner_id": row["owner_id"], "goal_id": row["goal_id"]},
-                )
-            return len(rows)
+                    {"id": uuid4(), "owner_id": owner_id, "goal_id": goal_id},
+                    )
+                ).scalar_one_or_none()
+                if inserted is None:
+                    continue
+                for watch_id in watch_ids:
+                    await conn.execute(
+                        text("""
+                        update source_watches set last_checked_at = now(),
+                          next_check_at = now() + make_interval(mins => interval_minutes),
+                          updated_at = now() where id = :id
+                        """),
+                        {"id": watch_id},
+                    )
+                enqueued += len(watch_ids)
+            return enqueued
 
 
 @lru_cache
