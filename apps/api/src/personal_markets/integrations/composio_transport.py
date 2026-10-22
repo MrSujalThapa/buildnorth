@@ -41,6 +41,15 @@ class ComposioTransport:
             connected_account_id=self._connected_account_id,
         )
 
+    async def list_descendants(self, parent_id: str) -> list[str]:
+        if self._plugin_id != "notion" or not self._gateway.available:
+            return []
+        return await self._gateway.list_notion_child_pages(
+            self._user_id,
+            parent_id,
+            connected_account_id=self._connected_account_id,
+        )
+
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if not self._gateway.available:
             return await self._fallback.call_tool(name, arguments)

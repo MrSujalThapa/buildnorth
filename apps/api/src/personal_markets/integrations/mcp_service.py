@@ -449,6 +449,18 @@ class IntegrationGatewayService:
         resources = await transport.list_resources()
         return [item.model_dump(mode="json") for item in resources]
 
+    async def list_descendants(
+        self, plugin_id: str, parent_id: str, *, user_id: UUID | None = None
+    ) -> list[str]:
+        owner = self._owner(user_id)
+        connection = await self._repository.get_connection(owner, plugin_id)
+        if connection is None or connection.status != "connected":
+            raise KeyError(f"no connected {plugin_id} account")
+        transport = self._transport_for(connection)
+        if not isinstance(transport, ComposioTransport):
+            raise ValueError(f"{plugin_id} does not support descendant discovery")
+        return await transport.list_descendants(parent_id)
+
     async def refresh_connection(self, plugin_id: str, *, user_id: UUID | None = None) -> dict[str, object]:
         owner = self._owner(user_id)
         await self._reconcile_connections(owner)

@@ -9,6 +9,7 @@ import structlog
 
 from personal_markets.core.errors import SemanticProviderError
 from personal_markets.integrations.mcp_domain import RawSourceRecord
+from personal_markets.integrations.source_watches import get_source_watch_store
 from personal_markets.ports import WorkflowRequest
 
 
@@ -51,19 +52,60 @@ class GoalSyncService:
         recipes = await self._repository.list_goal_recipes(goal.goal_id)
         approved = [item for item in recipes if item.approved]
         if self._watch_resource_uris is not None:
+            watch_store = get_source_watch_store()
+            active_uris = await watch_store.active_resource_uris(
+                self._owner_id, goal.goal_id
+            )
+            allowed_uris = self._watch_resource_uris & active_uris
             approved = [
                 item.model_copy(
                     update={
                         "steps": [
                             step
                             for step in item.steps
-                            if step.resource_uri in self._watch_resource_uris
+                            if step.resource_uri in allowed_uris
                         ]
                     }
                 )
                 for item in approved
             ]
             approved = [item for item in approved if item.steps]
+            watches = await watch_store.list_for_goal(
+                self._owner_id, goal.goal_id
+            )
+            parent_ids = {
+                watch.resource_id
+                for watch in watches
+                if watch.status == "active"
+                and watch.scope == "parent"
+                and watch.plugin_id == "notion"
+                and f"composio://notion/{watch.resource_id}" in self._watch_resource_uris
+            }
+            if parent_ids:
+                expanded = []
+                for recipe in approved:
+                    steps = list(recipe.steps)
+                    if recipe.plugin_id == "notion":
+                        for step in recipe.steps:
+                            parent_id = step.resource_uri.removeprefix("composio://notion/")
+                            if parent_id not in parent_ids:
+                                continue
+                            argument_key = next(
+                                (key for key in ("block_id", "page_id") if key in step.arguments),
+                                None,
+                            )
+                            if argument_key is None:
+                                raise SemanticProviderError(
+                                    "This Notion read action cannot monitor child pages."
+                                )
+                            children = await self._gateway.list_descendants("notion", parent_id)
+                            for child_id in children:
+                                steps.append(step.model_copy(update={
+                                    "resource_uri": f"composio://notion/{child_id}",
+                                    "arguments": {**step.arguments, argument_key: child_id},
+                                }))
+                    expanded.append(recipe.model_copy(update={"steps": steps}))
+                approved = expanded
         if not approved:
             return {"status": "no_recipes", "message": "No approved goal-specific sync recipes."}
 

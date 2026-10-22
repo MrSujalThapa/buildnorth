@@ -51,6 +51,11 @@ class UnifiedIntegrationGateway:
     async def list_resources(self, plugin_id: str) -> list[dict[str, object]]:
         return await self._mcp.list_resources(plugin_id, user_id=self._user_id)
 
+    async def list_descendants(self, plugin_id: str, parent_id: str) -> list[str]:
+        return await self._mcp.list_descendants(
+            plugin_id, parent_id, user_id=self._user_id
+        )
+
     async def connect_custom_mcp(self, plugin_id: str, endpoint: str, transport: str) -> dict[str, str]:
         record = await self._mcp.connect_custom_mcp(
             plugin_id, endpoint=endpoint, transport=transport, user_id=self._user_id

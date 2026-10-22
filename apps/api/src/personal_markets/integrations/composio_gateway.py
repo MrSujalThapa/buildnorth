@@ -453,6 +453,41 @@ class ComposioIntegrationGateway:
             )
         return resources
 
+    async def list_notion_child_pages(
+        self,
+        user_id: UUID,
+        parent_id: str,
+        *,
+        connected_account_id: str | None,
+    ) -> list[str]:
+        """Traverse only children exposed through a selected, accessible parent."""
+        from personal_markets.integrations.notion_scope import discover_child_page_ids
+
+        tool_name = "NOTION_FETCH_BLOCK_CONTENTS"
+        tools = await self.list_tools(user_id, "notion", limit=500)
+        tool = next((item for item in tools if item.name == tool_name), None)
+        schema = tool.input_schema if tool else {}
+        if isinstance(schema.get("parameters"), dict):
+            schema = schema["parameters"]
+        properties = schema.get("properties") or {}
+        if not isinstance(properties, dict) or "block_id" not in properties:
+            raise RuntimeError("Notion child-page discovery is unavailable for this connection")
+
+        async def fetch(block_id: str, cursor: str | None) -> dict[str, Any]:
+            arguments: dict[str, Any] = {"block_id": block_id}
+            if "page_size" in properties:
+                arguments["page_size"] = 100
+            if cursor:
+                if "start_cursor" not in properties:
+                    raise RuntimeError("Notion child-page pagination is unavailable")
+                arguments["start_cursor"] = cursor
+            return await self.execute_tool(
+                user_id, tool_name, arguments,
+                connected_account_id=connected_account_id,
+            )
+
+        return await discover_child_page_ids(parent_id, fetch)
+
     async def execute_tool(
         self,
         user_id: UUID,

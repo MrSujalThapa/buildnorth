@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -48,6 +48,7 @@ class SaveWatchBody(BaseModel):
 
     plugin_id: str = Field(min_length=1)
     resource_id: str = Field(min_length=1)
+    scope: Literal["resource", "parent"] = "resource"
     interval_minutes: int = Field(default=60, ge=15, le=10080)
 
 
@@ -185,6 +186,21 @@ async def save_source_watch(
         raise SemanticProviderError(
             "Select an approved source resource before enabling monitoring."
         )
+    if body.scope == "parent":
+        if body.plugin_id != "notion":
+            raise SemanticProviderError("Parent monitoring is available for Notion pages.")
+        try:
+            UUID(body.resource_id)
+        except ValueError as error:
+            raise SemanticProviderError("Select a valid Notion parent page.") from error
+        capabilities = await repo.list_capabilities(connection.id)
+        if not any(
+            item.approved and item.tool_name == "NOTION_FETCH_BLOCK_CONTENTS"
+            for item in capabilities
+        ):
+            raise SemanticProviderError(
+                "This Notion connection cannot discover pages inside the selected area."
+            )
     return await get_source_watch_store().save(
         SourceWatch(
             owner_id=principal.user_id,
@@ -192,7 +208,7 @@ async def save_source_watch(
             plugin_connection_id=connection.id,
             plugin_id=body.plugin_id,
             resource_id=body.resource_id,
-            scope="resource",
+            scope=body.scope,
             interval_minutes=body.interval_minutes,
         )
     )
