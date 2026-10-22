@@ -109,9 +109,10 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
           {dimensions.map((item, index) => {
             const labelPt = point(index, dimensions.length, 1.28);
             const valuePt = point(index, dimensions.length, item.value ?? 0);
+            const measured = !item.limited_evidence && item.value != null;
             return (
               <g key={item.key}>
-                {complete ? <circle className="radar-node" cx={valuePt.x} cy={valuePt.y} r="3.2" /> : null}
+                {measured ? <circle className="radar-node" cx={valuePt.x} cy={valuePt.y} r={complete ? "3.2" : "5"} /> : null}
                 <text className="radar-label" x={labelPt.x} y={labelPt.y} textAnchor="middle">
                   {item.label === "Commitment realism" ? "Planning" : item.label}
                 </text>
