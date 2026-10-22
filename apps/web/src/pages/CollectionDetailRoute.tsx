@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import CollectionChart from "../components/market/CollectionChart";
 import { api } from "../api/client";
+import "../components/market/markets.css";
 
 export function CollectionDetailRoute() {
   const { collectionId = "" } = useParams();
@@ -46,9 +47,9 @@ export function CollectionDetailRoute() {
   });
 
   if (collection.isLoading) return <main className="markets-page"><section className="markets-shell"><p role="status">Loading collection…</p></section></main>;
-  if (collection.isError || !collection.data) return <main className="markets-page"><section className="markets-shell"><p role="alert">Collection unavailable.</p></section></main>;
 
   const view = collection.data;
+  if (!view) return <main className="markets-page"><section className="markets-shell"><p role="alert">Collection unavailable.</p></section></main>;
   const hasHistory = view.series.some((item) => item.points.length > 0);
   const hasTrajectory = view.series.some((item) => item.points.length > 1);
   const startEditing = () => {
@@ -57,7 +58,7 @@ export function CollectionDetailRoute() {
     setEditing(true);
   };
   return (
-    <main className="markets-page">
+    <main className="markets-page collection-detail-page">
       <section className="markets-shell">
         <button type="button" className="evidence-back" onClick={() => { void navigate("/markets"); }}>← Your outcomes</button>
         <header className="markets-header">
@@ -71,7 +72,7 @@ export function CollectionDetailRoute() {
         <section className={`collection-detail-chart${hasHistory ? hasTrajectory ? "" : " is-sparse" : " is-empty"}`} aria-label="Collection odds">
           <div className="market-price">{view.portfolio_odds == null ? "—" : `${view.portfolio_odds.toFixed(0)}%`}</div>
           <div className="market-price-hint">{view.change_pp == null ? "—" : `${view.change_pp >= 0 ? "+" : ""}${view.change_pp.toFixed(1)} percentage points today`}</div>
-          {hasHistory ? <CollectionChart series={view.series} interactive={false} /> : null}
+          {hasHistory ? <CollectionChart series={view.series} interactive /> : null}
         </section>
         <details className="collection-details">
           <summary>Goals and calculation</summary>

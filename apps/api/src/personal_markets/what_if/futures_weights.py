@@ -19,7 +19,13 @@ from personal_markets.forecasting.running import is_running_goal
 from personal_markets.forecasting.startup import futures_outcome_weights, is_startup_goal
 from personal_markets.goals.domain import GoalContract
 from personal_markets.what_if.baseline_state import proposal_from_goal, resolve_simulation_context
-from personal_markets.what_if.domain import ScenarioDefinition, SimulationConfig
+from personal_markets.what_if.domain import (
+    InterventionChangeInput,
+    ScenarioDefinition,
+    SimulationConfig,
+)
+from personal_markets.what_if.intervention_models import InterventionChangeResponse
+from personal_markets.what_if.intervention_overrides import apply_parsed_changes_to_assumptions
 from personal_markets.what_if.simulation import SimulationEngine
 
 BandKey = Literal[
@@ -49,22 +55,67 @@ def resolve_futures_weights(
     *,
     scenario_labels: list[str],
     seed: int = 20260829,
+    parsed_changes: list[InterventionChangeInput] | None = None,
+    config: SimulationConfig | None = None,
 ) -> ResolvedFuturesWeights | None:
     if is_startup_goal(goal):
-        return _startup_weights(goal, evidence, scenario_labels)
+        return _startup_weights(
+            goal, evidence, scenario_labels, parsed_changes=parsed_changes
+        )
     if is_finance_goal(goal) or is_running_goal(goal):
-        return _continuous_target_mc_weights(goal, evidence, scenario_labels, seed=seed)
+        return _continuous_target_mc_weights(
+            goal,
+            evidence,
+            scenario_labels,
+            seed=seed,
+            parsed_changes=parsed_changes,
+            config=config,
+        )
     if is_hiring_goal(goal):
-        return _career_funnel_weights(goal, evidence, scenario_labels)
+        return _career_funnel_weights(
+            goal, evidence, scenario_labels, parsed_changes=parsed_changes
+        )
     return None
+
+
+def _startup_overrides_from_changes(
+    parsed_changes: list[InterventionChangeInput] | None,
+) -> dict[str, object]:
+    overrides: dict[str, object] = {}
+    for change in parsed_changes or []:
+        metric = change.metric
+        value = float(change.value)
+        if metric in {"fundraising_conversations", "user_conversations_per_week"}:
+            if change.operation == "subtract":
+                value = -value
+            overrides["fundraising_conversations"] = max(0, int(round(value)))
+        elif metric in {
+            "mrr",
+            "revenue",
+            "revenue_growth_rate",
+            "users",
+            "runway_months",
+            "burn_monthly",
+        }:
+            overrides[metric] = value
+        elif metric == "term_sheet":
+            overrides["term_sheet"] = value >= 1
+    return overrides
 
 
 def _startup_weights(
     goal: GoalContract,
     evidence: list[NormalizedEvidence],
     scenario_labels: list[str],
+    *,
+    parsed_changes: list[InterventionChangeInput] | None = None,
 ) -> ResolvedFuturesWeights | None:
-    weights, _message = futures_outcome_weights(goal, evidence, scenario_labels=scenario_labels)
+    weights, _message = futures_outcome_weights(
+        goal,
+        evidence,
+        scenario_labels=scenario_labels,
+        state_overrides=_startup_overrides_from_changes(parsed_changes),
+    )
     if not weights:
         return None
     outcomes = _definitions_from_map(scenario_labels, weights, AssumptionSource.REFERENCE)
@@ -79,12 +130,22 @@ def _startup_weights(
     )
 
 
+def _as_change_models(
+    parsed_changes: list[InterventionChangeInput] | None,
+) -> list[InterventionChangeResponse]:
+    if not parsed_changes:
+        return []
+    return [InterventionChangeResponse.model_validate(item.model_dump()) for item in parsed_changes]
+
+
 def _continuous_target_mc_weights(
     goal: GoalContract,
     evidence: list[NormalizedEvidence],
     scenario_labels: list[str],
     *,
     seed: int,
+    parsed_changes: list[InterventionChangeInput] | None = None,
+    config: SimulationConfig | None = None,
 ) -> ResolvedFuturesWeights | None:
     resolved = resolve_simulation_context(goal, evidence)
     if not resolved.priced or resolved.mode != "continuous_target":
@@ -92,24 +153,46 @@ def _continuous_target_mc_weights(
     if resolved.current_value is None or resolved.target_value is None or resolved.periods is None:
         return None
 
-    values = {item.name: item.value for item in resolved.assumptions}
+    change_models = _as_change_models(parsed_changes)
+    assumptions = (
+        apply_parsed_changes_to_assumptions(resolved.assumptions, change_models)
+        if change_models
+        else resolved.assumptions
+    )
+    baseline_values = {item.name: item.value for item in resolved.assumptions}
+    values = {item.name: item.value for item in assumptions}
     engine = SimulationEngine()
-    config = SimulationConfig(seed=seed, minimum_draws=4000, batch_draws=2000, maximum_draws=8000)
+    sim_config = config or SimulationConfig(
+        seed=seed, minimum_draws=2000, batch_draws=2000, maximum_draws=4000
+    )
+    if config is None:
+        sim_config = sim_config.model_copy(update={"seed": seed})
     paired = engine.continuous_target(
         current_value=resolved.current_value,
         target_value=resolved.target_value,
         periods=resolved.periods,
         direction=resolved.direction,
-        flow=float(values.get("flow", 0)),
-        growth_mean=float(values.get("growth_mean", 0)),
-        growth_volatility=float(values.get("growth_volatility", 0.03)),
-        shock_probability=float(values.get("shock_probability", 0.02)),
-        shock_fraction=float(values.get("shock_fraction", 0.08)),
-        execution_probability=float(values.get("execution_probability", 0.72)),
+        flow=float(baseline_values.get("flow", 0)),
+        growth_mean=float(baseline_values.get("growth_mean", 0)),
+        growth_volatility=float(baseline_values.get("growth_volatility", 0.03)),
+        shock_probability=float(baseline_values.get("shock_probability", 0.02)),
+        shock_fraction=float(baseline_values.get("shock_fraction", 0.08)),
+        execution_probability=float(baseline_values.get("execution_probability", 0.72)),
         intervention_effect=0.0,
-        config=config,
+        config=sim_config,
+        scenario_flow=float(values.get("flow", 0)) if change_models else None,
+        scenario_growth_mean=float(values.get("growth_mean", 0)) if change_models else None,
+        scenario_growth_volatility=(
+            float(values.get("growth_volatility", 0.03)) if change_models else None
+        ),
+        scenario_shock_probability=(
+            float(values.get("shock_probability", 0.02)) if change_models else None
+        ),
+        scenario_shock_fraction=(
+            float(values.get("shock_fraction", 0.08)) if change_models else None
+        ),
     )
-    terminal = paired.baseline_outcome
+    terminal = paired.scenario_outcome if change_models else paired.baseline_outcome
     bands = _cluster_terminal_outcomes(
         terminal,
         current=resolved.current_value,
@@ -140,6 +223,7 @@ def _career_funnel_weights(
     goal: GoalContract,
     evidence: list[NormalizedEvidence],
     scenario_labels: list[str],
+    parsed_changes: list[InterventionChangeInput] | None = None,
 ) -> ResolvedFuturesWeights | None:
     proposal = proposal_from_goal(goal)
     numeric = build_hiring_numeric_inputs(goal, proposal, evidence)
@@ -151,6 +235,20 @@ def _career_funnel_weights(
     weekly_rate = float(
         numeric.assumptions.get("weekly_application_rate") or reference.weekly_application_rate
     )
+    for change in parsed_changes or []:
+        if change.metric not in {
+            "applications_per_week",
+            "weekly_application_rate",
+            "linkedin_posts_per_week",
+            "sales_calls_per_week",
+        }:
+            continue
+        if change.operation == "set":
+            weekly_rate = change.value
+        elif change.operation == "subtract":
+            weekly_rate = max(0.0, weekly_rate - change.value)
+        else:
+            weekly_rate += change.value
     expected_apps = weekly_rate * periods
 
     transforms = numeric.state.get("pricing_transforms")

@@ -32,8 +32,8 @@ const modes: Array<{
   },
   {
     id: "paths",
-    label: "Paths",
-    description: "Find realistic strategies that could get you there.",
+    label: "Reverse",
+    description: "Find actions that could reach a target.",
     icon: Route,
   },
 ];
@@ -60,7 +60,6 @@ export default function WhatIfModeNav({ mode, onChange }: Props) {
           );
         })}
       </div>
-      <p className="mode-nav-description"><strong>{modes.find((item) => item.id === mode)?.label}</strong> {modes.find((item) => item.id === mode)?.description}</p>
     </nav>
   );
 }

@@ -203,7 +203,7 @@ export interface ScenarioDistribution {
 }
 
 export interface PathComparisonResult {
-  paths: { id: string; label: string; primary_goal_probability: number; expected_outcome: number; median: number; p10: number; p90: number; downside_probability: number; fragility_pp: number | null; resource_cost: { hours_per_week: number; money: number; energy: number }; execution_probability: number; model_status: string }[];
+  paths: { id: string; label: string; primary_goal_probability: number | null; expected_outcome: number | null; median: number | null; p10: number | null; p90: number | null; downside_probability: number | null; fragility_pp: number | null; resource_cost: { hours_per_week: number; money: number; energy: number }; execution_probability: number | null; model_status: string }[];
   model_family: string;
   model_version: string;
   seed: number;
@@ -319,12 +319,59 @@ export interface GoalsDashboard {
   collections?: CollectionView[];
 }
 
+export type TraitForecastUse = "execution_probability" | "exploratory";
+
+export interface TraitOption {
+  id: string;
+  name: string;
+  description: string;
+  measurement: string;
+  evidence: string[];
+  custom: boolean;
+  forecast_use: TraitForecastUse;
+  metric?: string;
+}
+
+export interface TraitEstimate {
+  id: string;
+  name: string;
+  description: string;
+  measurement: string;
+  evidence: string[];
+  custom: boolean;
+  forecast_use: TraitForecastUse;
+  value: number | null;
+  interval: [number, number] | null;
+  n_eff: number;
+  observations: number;
+  confidence: "insufficient" | "low" | "moderate" | "high";
+  previous_value: number | null;
+  sources: string[];
+  window_days: number | null;
+}
+
+export interface TraitSeries {
+  id: string;
+  label: string;
+  values: Record<string, number | null>;
+}
+
+export interface TraitProfile {
+  estimator_version: string;
+  as_of: string;
+  traits: TraitEstimate[];
+  series: TraitSeries[];
+  trial_count: number;
+  evidence_count: number;
+}
+
 export interface ProfilePayload {
   account: AccountView;
   goal_count: number;
   collection_count: number;
-  radar: BehaviorProfile;
-  radar_areas?: { label: string; radar: BehaviorProfile }[];
+  traits: TraitProfile;
+  selected_parameters: string[];
+  available_parameters: TraitOption[];
   privacy: string;
 }
 
@@ -731,7 +778,14 @@ export const api = {
     return request<{ status: string }>("/api/v1/profile/photo", { method: "PUT", body });
   },
   removeProfilePhoto: () => request<{ status: string }>("/api/v1/profile/photo", { method: "DELETE" }),
-  patchProfile: (body: { display_name?: string; username?: string; bio?: string; avatar_value?: string; dimensions?: { label: string; goal_ids: string[] }[] }) =>
+  patchProfile: (body: {
+    display_name?: string;
+    username?: string;
+    bio?: string;
+    avatar_value?: string;
+    parameter_ids?: string[];
+    custom_parameters?: { name: string; description: string }[];
+  }) =>
     request<AccountView>("/api/v1/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -747,6 +801,10 @@ export const api = {
         body: JSON.stringify(body),
       }),
     ),
+  startThreadAsync: (body: { kind: string; intent?: string; goal_id?: string; evidence_text?: string; github_login?: string }) =>
+    request<WorkflowSnapshot>("/api/v1/agent/threads", {
+      method: "POST", headers: ASYNC_JSON_HEADERS, body: JSON.stringify(body),
+    }),
   getThread: (threadId: string, signal?: AbortSignal) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
   resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
@@ -757,6 +815,10 @@ export const api = {
         body: JSON.stringify(body),
       }),
     ),
+  resumeThreadAsync: (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
+    request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/resume`, {
+      method: "POST", headers: ASYNC_JSON_HEADERS, body: JSON.stringify(body),
+    }),
   addManualState: (
     goalId: string,
     entries: { key: string; label: string; value: number; unit: string }[],
@@ -847,10 +909,11 @@ export const api = {
   marketHistory: (goalId: string, signal?: AbortSignal) => request<MarketHistoryPoint[]>(`/api/v1/what-if/history/${goalId}`, undefined, signal),
   whatIfExplorations: (goalId: string, signal?: AbortSignal) =>
     request<WhatIfExploration[]>(`/api/v1/what-if/explorations/${goalId}`, undefined, signal),
-  pluginsCatalog: (signal?: AbortSignal, search?: string, cursor?: string) => {
+  pluginsCatalog: (signal?: AbortSignal, search?: string, cursor?: string, browse = false) => {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (cursor) params.set("cursor", cursor);
+    if (browse) params.set("browse", "true");
     const suffix = params.toString() ? `?${params.toString()}` : "";
     return request<PluginCatalogResponse>(`/api/v1/plugins${suffix}`, undefined, signal);
   },
@@ -880,7 +943,7 @@ export const api = {
       signal,
     ),
   pluginResources: (pluginId: string, signal?: AbortSignal) =>
-    request<{ uri: string; name: string; description?: string; resource_type?: string }[]>(
+    request<{ uri: string; name: string; description?: string; resource_type?: string; metadata?: { url?: string; provider_id?: string; connected_account_id?: string } }[]>(
       `/api/v1/plugins/${pluginId}/resources`,
       undefined,
       signal,

@@ -1,6 +1,8 @@
-﻿import { useLocation, useNavigate } from "react-router-dom";
-import { ChartNoAxesCombined, Moon, Plug, Settings, Sun, UserRound, Users } from "lucide-react";
-import type { ReactNode } from "react";
+﻿import { useQuery } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ChartNoAxesCombined, Menu, Moon, Plug, Settings, Sun, Users } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { api } from "../../api/client";
 import { useAccount } from "../../auth/AuthGate";
 import { useTheme } from "../../theme/useTheme";
 import "./app-shell.css";
@@ -28,15 +30,33 @@ export default function AppShell({ children }: Props) {
   const active = activeFromPath(location.pathname);
   const { theme, toggle } = useTheme();
   const account = useAccount();
+  const [pinned, setPinned] = useState(false);
+  const photo = useQuery({
+    queryKey: ["profile-photo"],
+    queryFn: ({ signal }) => api.profilePhoto(signal),
+    enabled: Boolean(account),
+    staleTime: 5 * 60_000,
+  });
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photo.data) { setPhotoUrl(null); return; }
+    const url = URL.createObjectURL(photo.data);
+    setPhotoUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo.data]);
   const profileLabel =
     account?.profile?.username || account?.profile?.display_name || account?.email?.split("@")[0] || "Profile";
+  const initial = profileLabel.slice(0, 1).toUpperCase();
 
   return (
     <div className={`app-shell theme-${theme}`}>
       <a className="skip-link" href="#app-main">Skip to main content</a>
-      <aside className="app-sidebar">
+      <aside className={pinned ? "app-sidebar pinned" : "app-sidebar"}>
+        <button className="sidebar-expand" type="button" aria-expanded={pinned} aria-label={pinned ? "Collapse navigation" : "Expand navigation"} onClick={() => setPinned((open) => !open)}>
+          <Menu size={18} />
+        </button>
         <button className="brand" type="button" onClick={() => { void navigate("/markets"); }} aria-label="Play It Out, go to Market">
-          <span>Play It Out</span><b>PIO</b>
+          <b>PIO</b><span>Play It Out</span>
         </button>
         <nav aria-label="Primary navigation">
           {items.map(({ id, label, Icon, path }) => (
@@ -47,16 +67,17 @@ export default function AppShell({ children }: Props) {
               aria-current={active === id ? "page" : undefined}
               onClick={() => { void navigate(path); }}
             >
-              <Icon size={19} strokeWidth={1.7} /><span>{label}</span>
+              <Icon size={20} strokeWidth={1.7} /><span className="nav-label">{label}</span>
             </button>
           ))}
         </nav>
         <div className="sidebar-footer">
           <button type="button" onClick={toggle} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>
-            {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}<span>Theme</span>
+            {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}<span className="nav-label">Theme</span>
           </button>
           <button type="button" onClick={() => { void navigate("/profile"); }} aria-label="Open profile" aria-current={active === "profile" ? "page" : undefined}>
-            <UserRound size={19} /><span>{profileLabel}</span>
+            <span className="sidebar-avatar" aria-hidden="true">{photoUrl ? <img src={photoUrl} alt="" /> : initial}</span>
+            <span className="nav-label">{profileLabel}</span>
           </button>
         </div>
       </aside>

@@ -49,6 +49,10 @@ export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market 
   const todayReturn = hasTodaySnapshot && last != null && beforeToday
     ? last - beforeToday.probability * 100
     : null;
+  const previous = published.at(-2);
+  const lastRevision = previous && latestAt && last != null
+    ? { change: last - previous.probability * 100, at: Date.parse(latestAt) }
+    : null;
   const totalReturn = first != null && last != null ? last - first : null;
 
   return {
@@ -60,6 +64,7 @@ export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market 
     deadlineAt: Date.parse(goal.deadline),
     odds,
     todayReturn,
+    lastRevision,
     totalReturn,
     events: [],
     history: chart,

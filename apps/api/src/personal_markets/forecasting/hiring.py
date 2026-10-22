@@ -462,7 +462,9 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
             "offer": "offer",
         }
         return mapping.get(category, "technical")
-    return "practice" if "practice" in blob else "application"
+    # Unrecognized evidence (focus sessions, capacity readings, notes) is not a
+    # funnel stage; counting it as applications inflated the pipeline.
+    return "unrelated"
 
 
 def _rejection_stage(metric: str, event_type: str, category: str, summary: str) -> str:

@@ -16,6 +16,7 @@ import {
 } from "./session";
 
 const AccountContext = createContext<AccountView | null>(null);
+const AccountRefreshContext = createContext<(() => Promise<void>) | null>(null);
 
 function keepsAdminOnPage(pathname: string): boolean {
   // Send new administrators to invitation settings only from the landing route.
@@ -25,6 +26,21 @@ function keepsAdminOnPage(pathname: string): boolean {
 
 export function useAccount(): AccountView | null {
   return useContext(AccountContext);
+}
+
+export function useRefreshAccount(): () => Promise<void> {
+  const refresh = useContext(AccountRefreshContext);
+  return refresh ?? (() => Promise.resolve());
+}
+
+function AccountProviders({ account, refresh, children }: {
+  account: AccountView | null;
+  refresh: () => Promise<void>;
+  children: ReactNode;
+}) {
+  return <AccountContext.Provider value={account}>
+    <AccountRefreshContext.Provider value={refresh}>{children}</AccountRefreshContext.Provider>
+  </AccountContext.Provider>;
 }
 
 type Props = { children: ReactNode };
@@ -165,6 +181,7 @@ function ClerkGate({ children }: Props) {
   const [reload, setReload] = useState(0);
   const landed = useRef(false);
   const returnUrl = typeof window === "undefined" ? "/" : googleReturnUrl();
+  const refreshAccount = async () => { setAccount(await api.me()); };
 
   useEffect(() => {
     if (ready) return;
@@ -262,7 +279,7 @@ function ClerkGate({ children }: Props) {
     return <InviteScreen onRedeemed={setAccount} onSignOut={() => { void signOut(); }} />;
   }
   if (account?.role === "admin") {
-    return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
+    return <AccountProviders account={account} refresh={refreshAccount}>{children}</AccountProviders>;
   }
   if (!account?.invited) {
     return (
@@ -275,7 +292,7 @@ function ClerkGate({ children }: Props) {
     );
   }
   if (pending) clearPendingInvite();
-  return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
+  return <AccountProviders account={account} refresh={refreshAccount}>{children}</AccountProviders>;
 }
 
 function TokenGate({ children }: Props) {
@@ -283,6 +300,7 @@ function TokenGate({ children }: Props) {
   const navigate = useNavigate();
   const [account, setAccount] = useState<AccountView | null>(null);
   const [ready, setReady] = useState(!token);
+  const refreshAccount = async () => { setAccount(await api.me()); };
 
   useEffect(() => {
     if (!token) {
@@ -322,12 +340,12 @@ function TokenGate({ children }: Props) {
     return <InviteScreen onRedeemed={setAccount} />;
   }
   if (account?.role === "admin") {
-    return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
+    return <AccountProviders account={account} refresh={refreshAccount}>{children}</AccountProviders>;
   }
   if (account && !account.invited) {
     return <InviteScreen onRedeemed={setAccount} />;
   }
-  return <AccountContext.Provider value={account}>{children}</AccountContext.Provider>;
+  return <AccountProviders account={account} refresh={refreshAccount}>{children}</AccountProviders>;
 }
 
 export function AuthGate({ children }: Props) {

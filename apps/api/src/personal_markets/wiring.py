@@ -131,13 +131,20 @@ class PersistingWorkflow:
 
     async def snapshot(self, thread_id: Any) -> Any:
         stored = await self._threads.get(thread_id)
+        # The background runner owns terminal state. A concurrent poll must not
+        # revive a failed run from an older LangGraph checkpoint.
+        if stored is not None and stored.status in {"failed", "completed", "limited", "withheld"}:
+            return stored
         try:
             snapshot = await self._inner.snapshot(thread_id)
         except Exception:
             if stored is None:
                 raise
             return stored
-        await self._threads.upsert(snapshot)
+        # Polling is a read. Persisting each running snapshot refreshes the
+        # checkpoint timestamp and can overwrite the runner's failure result.
+        if snapshot.status != "running":
+            await self._threads.upsert(snapshot)
         return snapshot
 
     async def _maybe_review(self, snapshot: Any) -> None:

@@ -80,7 +80,7 @@ export default function CollectionChart({ series, interactive = true }: Props) {
             {visible.map((item) => (
               <Line
                 key={item.goal_id}
-                type="monotone"
+                type="stepAfter"
                 dataKey={item.goal_id}
                 stroke={item.color}
                 strokeWidth={2}
@@ -99,6 +99,7 @@ export default function CollectionChart({ series, interactive = true }: Props) {
               <button
                 type="button"
                 className={hidden[item.goal_id] ? "is-off" : undefined}
+                aria-pressed={!hidden[item.goal_id]}
                 onClick={() => setHidden((current) => ({ ...current, [item.goal_id]: !current[item.goal_id] }))}
               >
                 <i style={{ background: item.color }} />

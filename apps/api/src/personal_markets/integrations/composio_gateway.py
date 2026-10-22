@@ -419,7 +419,9 @@ class ComposioIntegrationGateway:
                 or row.get("url")
                 or title
             )
-            label = str(title or row.get("full_name") or row.get("name") or resource_id)
+            label = str(title or row.get("full_name") or row.get("name") or "").strip()
+            if not label:
+                continue
             resource_type = str(
                 ("private" if row["private"] else "public")
                 if isinstance(row.get("private"), bool)
@@ -436,19 +438,32 @@ class ComposioIntegrationGateway:
                 or row.get("query")
                 or ""
             )
+            metadata = {
+                key: value
+                for key, value in row.items()
+                if key in {"full_name", "default_branch", "parent", "database_id", "spreadsheet_id"}
+                and value is not None
+            }
+            raw_url = row.get("url") or row.get("public_url") or row.get("href")
+            if isinstance(raw_url, str) and raw_url.startswith(("http://", "https://")):
+                metadata["url"] = raw_url
+            provider_id = row.get("id")
+            if provider_id is not None:
+                metadata["provider_id"] = str(provider_id)
+            if connected_account_id:
+                metadata["connected_account_id"] = connected_account_id
+            if toolkit_slug == "notion" and "url" not in metadata and provider_id is not None:
+                compact = str(provider_id).replace("-", "")
+                if len(compact) == 32 and all(char in "0123456789abcdefABCDEF" for char in compact):
+                    metadata["url"] = f"https://www.notion.so/{compact}"
             resources.append(
                 MCPResourceDescriptor(
                     uri=f"composio://{toolkit_slug}/{resource_id}",
                     name=label,
                     description=description,
-                    mime_type=str(row.get("url") or row.get("mimeType") or ""),
+                    mime_type=str(row.get("mimeType") or ""),
                     resource_type=resource_type,
-                    metadata={
-                        key: value
-                        for key, value in row.items()
-                        if key in {"full_name", "default_branch", "parent", "database_id", "spreadsheet_id"}
-                        and value is not None
-                    },
+                    metadata=metadata,
                 )
             )
         return resources

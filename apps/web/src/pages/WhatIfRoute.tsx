@@ -61,6 +61,8 @@ export function WhatIfRoute() {
 
   const baselineRef = useRef(baseline.data);
   baselineRef.current = baseline.data;
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   // Entering a missing state value must reprice on its own: the user should never have
   // to know a baseline forecast exists, let alone trigger one.
@@ -79,10 +81,29 @@ export function WhatIfRoute() {
   });
 
   const compare = useMutation({
-    mutationFn: () => {
+    mutationFn: async (extra?: { id: string; label: string }[]) => {
       const state = baselineRef.current;
-      if (!state?.priced) return Promise.resolve(null);
-      return api.comparePaths(buildCompareRequest(goalId, state));
+      if (!state?.priced) return null;
+      const extraPaths = [];
+      for (const path of extra ?? []) {
+        const parsed = await api.parseIntervention({ goal_id: goalId, text: path.label });
+        extraPaths.push({
+          id: path.id,
+          label: path.label,
+          parsed_changes: parsed.changes,
+        });
+      }
+      const request = buildCompareRequest(goalId, state, extraPaths, viewRef.current);
+      if (!Array.isArray(request.paths) || request.paths.length < 2) {
+        return {
+          paths: [],
+          model_family: state.model_family,
+          model_version: state.model_version,
+          seed: state.config.seed,
+          run_id: null,
+        };
+      }
+      return api.comparePaths(request);
     },
   });
 
@@ -90,9 +111,31 @@ export function WhatIfRoute() {
     mutationFn: async (decision: string) => {
       const state = baselineRef.current;
       if (!state?.priced) return null;
-      const parsed = await api.parseDecision({ goal_id: goalId, text: decision });
-      const labels = parsed.scenario_labels.length ? parsed.scenario_labels : parsed.unsupported;
-      return api.possibleFutures(buildFuturesRequest(goalId, state, decision, labels));
+      const [parsedDecision, parsedIntervention] = await Promise.all([
+        api.parseDecision({ goal_id: goalId, text: decision }),
+        api.parseIntervention({ goal_id: goalId, text: decision }),
+      ]);
+      if (!parsedDecision.scenario_labels.length) {
+        return {
+          priced: false,
+          message: "This question doesn’t map to outcomes this goal can estimate.",
+          outcomes: [],
+          other_probability: 0,
+          evidence_basis: [],
+          model_version: "unsupported",
+          run_id: null,
+        };
+      }
+      return api.possibleFutures(
+        buildFuturesRequest(
+          goalId,
+          state,
+          decision,
+          parsedDecision.scenario_labels,
+          parsedIntervention.changes,
+          viewRef.current,
+        ),
+      );
     },
   });
 
@@ -100,7 +143,9 @@ export function WhatIfRoute() {
     mutationFn: (targetProbability: number) => {
       const state = baselineRef.current;
       if (!state?.priced) return Promise.resolve(null);
-      return api.targetSearch(buildTargetSearchRequest(goalId, state, targetProbability));
+      return api.targetSearch(
+        buildTargetSearchRequest(goalId, state, targetProbability, viewRef.current),
+      );
     },
   });
 
@@ -119,9 +164,12 @@ export function WhatIfRoute() {
     [futures.data],
   );
 
-  const onRunCompare = useCallback(() => {
-    compare.mutate();
-  }, [compare]);
+  const onRunCompare = useCallback(
+    (extra?: { id: string; label: string }[]) => {
+      compare.mutate(extra);
+    },
+    [compare],
+  );
 
   const onRunFutures = useCallback(
     (decision: string) => {

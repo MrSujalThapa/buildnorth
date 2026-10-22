@@ -15,14 +15,15 @@ export function MarketsRoute() {
     staleTime: 60_000,
   });
 
+  const source = dashboard.data;
   const markets = useMemo(() => {
-    const goals = dashboard.data?.goals ?? [];
-    const histories = dashboard.data?.histories ?? {};
+    const goals = source?.goals ?? [];
+    const histories = source?.histories ?? {};
     return goals.map((goal) => ({
       ...toMarketCard(goal, histories[goal.goal_id] ?? []),
       historyUnavailable: false,
     }));
-  }, [dashboard.data]);
+  }, [source]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["goals"] });
 
@@ -48,7 +49,7 @@ export function MarketsRoute() {
     return (
       <main className="markets-page">
         <section className="markets-shell">
-          <p role="status">Loading markets from backend…</p>
+          <p role="status">Loading your outcomes…</p>
         </section>
       </main>
     );
@@ -59,8 +60,8 @@ export function MarketsRoute() {
       <main className="markets-page">
         <section className="markets-shell">
           <div className="unpriced-state">
-            <strong>Markets unavailable</strong>
-            <span>Could not reach GET /api/v1/goals/dashboard.</span>
+            <strong>Outcomes unavailable</strong>
+            <span>Could not load your goals. Check your connection and try again.</span>
           </div>
         </section>
       </main>
@@ -70,9 +71,13 @@ export function MarketsRoute() {
   return (
     <MarketsPage
       markets={markets}
-      collections={dashboard.data?.collections ?? []}
-      onSelectMarket={(marketId) => { void navigate(`/goals/${marketId}`); }}
-      onOpenCollection={(collectionId) => { void navigate(`/collections/${collectionId}`); }}
+      collections={source?.collections ?? []}
+      onSelectMarket={(marketId) => {
+        void navigate(`/goals/${marketId}`);
+      }}
+      onOpenCollection={(collectionId) => {
+        void navigate(`/collections/${collectionId}`);
+      }}
       onCreateCollection={(name) => createCollection.mutateAsync(name).then(() => undefined)}
       onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds).then(() => undefined)}
       onDeleteCollections={(ids) => deleteCollections.mutateAsync(ids).then(() => undefined)}

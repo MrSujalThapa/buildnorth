@@ -167,6 +167,7 @@ class IntegrationGatewayService:
         search: str | None = None,
         cursor: str | None = None,
         limit: int = 20,
+        browse: bool = False,
         user_id: UUID | None = None,
         reconcile: bool = False,
     ) -> dict[str, object]:
@@ -195,7 +196,7 @@ class IntegrationGatewayService:
                 "provider_status": provider_status,
                 "provider_message": provider_message,
             }
-        if not search and not cursor:
+        if not search and not cursor and not browse:
             return {
                 "items": [item.model_dump(mode="json") for item in local_views[:limit]],
                 "next_cursor": None,

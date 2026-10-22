@@ -9,7 +9,16 @@ from PIL import Image, ImageOps, UnidentifiedImageError  # type: ignore[import-n
 from pydantic import BaseModel, Field
 
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
-from personal_markets.behavior.portfolio import portfolio_profile
+from personal_markets.behavior.domain import CommitmentTrial
+from personal_markets.behavior.features import trials_from_evidence
+from personal_markets.behavior.traits import (
+    BUILT_IN_BY_ID,
+    DEFAULT_TRAIT_IDS,
+    CustomTraitDefinition,
+    available_traits,
+    custom_trait_from_name,
+    estimate_traits,
+)
 from personal_markets.collections.service import CollectionService
 from personal_markets.core.errors import ForbiddenError
 from personal_markets.evidence.domain import NormalizedEvidence
@@ -17,7 +26,13 @@ from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.budget import InferenceBudgetService
 from personal_markets.identity.deps import get_invited_principal
-from personal_markets.identity.domain import AccountView, Principal, ProfileDimension, UserProfile
+from personal_markets.identity.domain import (
+    AccountView,
+    CustomParameter,
+    Principal,
+    ProfileDimension,
+    UserProfile,
+)
 from personal_markets.identity.factory import get_identity_service, get_inference_budget_service
 from personal_markets.identity.service import IdentityService
 from personal_markets.profile.photo_store import get_photo_store
@@ -26,6 +41,13 @@ from personal_markets.wiring import get_collection_service, get_evidence_service
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 MAX_PHOTO_BYTES = 2 * 1024 * 1024
 MAX_PHOTO_PIXELS = 8_000_000
+MIN_RADAR_AXES = 3
+MAX_RADAR_AXES = 10
+
+
+class CustomParameterInput(BaseModel):
+    name: str = Field(min_length=2, max_length=32)
+    description: str = Field(min_length=4, max_length=160)
 
 
 class ProfilePatch(BaseModel):
@@ -34,6 +56,46 @@ class ProfilePatch(BaseModel):
     bio: str | None = Field(default=None, max_length=280)
     avatar_value: str | None = Field(default=None, max_length=32)
     dimensions: list[ProfileDimension] | None = Field(default=None, max_length=12)
+    parameter_ids: list[str] | None = Field(default=None, max_length=MAX_RADAR_AXES)
+    custom_parameters: list[CustomParameterInput] | None = Field(default=None, max_length=6)
+
+
+def _custom_definitions(profile: UserProfile) -> list[CustomTraitDefinition]:
+    return [
+        CustomTraitDefinition.model_validate(item.model_dump())
+        for item in profile.custom_parameters
+    ]
+
+
+def selected_trait_ids(profile: UserProfile) -> list[str]:
+    known = set(BUILT_IN_BY_ID) | {item.id for item in profile.custom_parameters}
+    selected = [item for item in profile.parameter_ids if item in known]
+    return selected if len(selected) >= MIN_RADAR_AXES else list(DEFAULT_TRAIT_IDS)
+
+
+async def owner_trials_and_evidence(
+    owner_id: UUID, goal_ids: list[UUID], evidence: EvidenceService
+) -> tuple[list[CommitmentTrial], list[NormalizedEvidence]]:
+    """All of an owner's planned-versus-observed trials plus goal evidence."""
+    evidence_limit = asyncio.Semaphore(8)
+
+    async def goal_evidence(goal_id: UUID) -> list[NormalizedEvidence]:
+        async with evidence_limit:
+            return await evidence.list_for_goal(goal_id)
+
+    event_rows, (plans, observations) = await asyncio.gather(
+        asyncio.gather(*(goal_evidence(goal_id) for goal_id in goal_ids)),
+        get_commitment_store().list_for_goals(owner_id, goal_ids),
+    )
+    trials = trials_from_commitments(plans, observations)
+    rows: list[NormalizedEvidence] = []
+    for goal_id, items in zip(goal_ids, event_rows, strict=True):
+        rows.extend(items)
+        trials.extend(
+            trial.model_copy(update={"trial_id": f"{goal_id}:{trial.trial_id}"})
+            for trial in trials_from_evidence(items)
+        )
+    return trials, rows
 
 
 @router.get("")
@@ -51,51 +113,33 @@ async def get_profile(
         collections.list_for(principal.user_id),
     )
     account = await identity.account_view(principal, usage)
-    evidence_limit = asyncio.Semaphore(8)
-
-    async def goal_evidence(goal_id: UUID) -> list[NormalizedEvidence]:
-        async with evidence_limit:
-            return await evidence.list_for_goal(goal_id)
-
-    event_rows = await asyncio.gather(*(goal_evidence(goal.goal_id) for goal in owned))
-    grouped = {str(goal.goal_id): rows for goal, rows in zip(owned, event_rows, strict=True)}
-    commitments, observations = await get_commitment_store().list_for_goals(
-        principal.user_id, [goal.goal_id for goal in owned]
+    trials, rows = await owner_trials_and_evidence(
+        principal.user_id, [goal.goal_id for goal in owned], evidence
     )
-    explicit_trials = trials_from_commitments(commitments, observations)
-    plan_goals = {str(plan.id): plan.goal_id for plan in commitments}
-    radar = portfolio_profile(
-        owned,
-        grouped,
-        dimensions=account.profile.dimensions,
-        commitment_trials=explicit_trials,
-    )
-    radar_areas = []
-    for area in account.profile.dimensions:
-        members = [goal for goal in owned if goal.goal_id in area.goal_ids]
-        if members:
-            radar_areas.append(
-                {
-                    "label": area.label,
-                    "radar": portfolio_profile(
-                        members,
-                        grouped,
-                        commitment_trials=[
-                            trial
-                            for trial in explicit_trials
-                            if plan_goals.get(trial.trial_id.split(":")[1]) in area.goal_ids
-                        ],
-                    ).model_dump(mode="json"),
-                }
-            )
+    custom = _custom_definitions(account.profile)
+    selected = selected_trait_ids(account.profile)
+    traits = estimate_traits(trials, rows, selected=selected, custom=custom)
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),
         "collection_count": len(collection_rows),
-        "radar": radar.model_dump(mode="json"),
-        "radar_areas": radar_areas,
+        "traits": traits.model_dump(mode="json"),
+        "selected_parameters": selected,
+        "available_parameters": available_traits(custom),
         "privacy": "private",
     }
+
+
+def _normalize_custom(items: list[CustomParameterInput]) -> list[CustomParameter]:
+    normalized: list[CustomParameter] = []
+    seen: set[str] = set()
+    for item in items:
+        definition = custom_trait_from_name(item.name, item.description)
+        if definition.id in seen or definition.id.removeprefix("custom:") in BUILT_IN_BY_ID:
+            raise HTTPException(status_code=422, detail=f"Duplicate parameter: {item.name}")
+        seen.add(definition.id)
+        normalized.append(CustomParameter.model_validate(definition.model_dump()))
+    return normalized
 
 
 @router.patch("", response_model=AccountView)
@@ -110,9 +154,32 @@ async def patch_profile(
         owned = {goal.goal_id for goal in await goals.list_goals(owner_id=principal.user_id)}
         if any(goal_id not in owned for item in body.dimensions for goal_id in item.goal_ids):
             raise ForbiddenError("Profile dimensions may include only your goals")
-    await identity.update_profile(
-        principal, UserProfile.model_validate(body.model_dump(exclude_unset=True))
-    )
+    payload = body.model_dump(exclude_unset=True)
+    if body.custom_parameters is not None:
+        payload["custom_parameters"] = [
+            item.model_dump() for item in _normalize_custom(body.custom_parameters)
+        ]
+    if body.parameter_ids is not None:
+        if body.custom_parameters is not None:
+            custom_ids = {item["id"] for item in payload["custom_parameters"]}
+        else:
+            current = await identity.account_view(principal, await budget.usage_for(principal))
+            custom_ids = {item.id for item in current.profile.custom_parameters}
+        known = set(BUILT_IN_BY_ID) | custom_ids
+        unknown = [item for item in body.parameter_ids if item not in known]
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown parameter ids: {', '.join(unknown)}",
+            )
+        if len(set(body.parameter_ids)) != len(body.parameter_ids):
+            raise HTTPException(status_code=422, detail="Parameters must be unique")
+        if len(body.parameter_ids) < MIN_RADAR_AXES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Choose at least {MIN_RADAR_AXES} parameters for the radar",
+            )
+    await identity.update_profile(principal, UserProfile.model_validate(payload))
     usage = await budget.usage_for(principal)
     return await identity.account_view(principal, usage)
 

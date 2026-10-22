@@ -27,6 +27,7 @@
     "measurement_noise_seconds": 35.0,
     "min_measurement_noise_seconds": 15.0,
     "trend_uncertainty_seconds_per_day": 2.5,
+    "trend_prior_sd_seconds_per_day": 1.0,
     "adherence": 1.0,
     "goal_distance_tolerance_km": 0.75
   },

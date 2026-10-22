@@ -82,12 +82,80 @@ class ProfileDimension(BaseModel):
     goal_ids: list[UUID] = Field(default_factory=list)
 
 
+PARAMETER_MARKER_PREFIX = "__param__:"
+
+
+class CustomParameter(BaseModel):
+    """User-defined radar trait. Scored only from evidence recorded on `metric`."""
+
+    id: str = Field(min_length=8, max_length=48)
+    name: str = Field(min_length=2, max_length=32)
+    description: str = Field(min_length=4, max_length=160)
+    metric: str = Field(min_length=7, max_length=48)
+    scale_min: float = 0.0
+    scale_max: float = 1.0
+
+
 class UserProfile(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     username: str | None = None
     bio: str | None = Field(default=None, max_length=280)
     avatar_value: str | None = Field(default=None, max_length=32)
     dimensions: list[ProfileDimension] = Field(default_factory=list, max_length=12)
+    parameter_ids: list[str] = Field(default_factory=list, max_length=10)
+    custom_parameters: list[CustomParameter] = Field(default_factory=list, max_length=6)
+
+
+def split_stored_parameters(
+    raw: object,
+) -> tuple[list[str], list[CustomParameter]] | None:
+    """Read `profile_parameters_json`. None means the row predates the column."""
+    if not isinstance(raw, dict) or "selected" not in raw:
+        return None
+    selected = [str(item) for item in raw.get("selected") or [] if item]
+    custom: list[CustomParameter] = []
+    for item in raw.get("custom") or []:
+        try:
+            custom.append(CustomParameter.model_validate(item))
+        except ValueError:
+            continue
+    return selected, custom
+
+
+def split_stored_dimensions(
+    raw: object,
+) -> tuple[list[ProfileDimension], list[str]]:
+    items = raw or []
+    areas: list[ProfileDimension] = []
+    parameter_ids: list[str] = []
+    if not isinstance(items, list):
+        return areas, parameter_ids
+    for item in items:
+        data = item if isinstance(item, dict) else None
+        if data is None and hasattr(item, "model_dump"):
+            data = item.model_dump(mode="json")
+        if not isinstance(data, dict):
+            continue
+        label = str(data.get("label") or "")
+        if label.startswith(PARAMETER_MARKER_PREFIX):
+            marker = label[len(PARAMETER_MARKER_PREFIX) :]
+            if marker:
+                parameter_ids.append(marker)
+            continue
+        areas.append(ProfileDimension.model_validate(data))
+    return areas, parameter_ids
+
+
+def merge_stored_dimensions(
+    areas: list[ProfileDimension],
+    parameter_ids: list[str],
+) -> list[dict[str, object]]:
+    markers = [
+        {"label": f"{PARAMETER_MARKER_PREFIX}{item}", "goal_ids": []}
+        for item in parameter_ids
+        if item
+    ]
+    return [item.model_dump(mode="json") for item in areas] + markers
 
 
 class AccountView(BaseModel):

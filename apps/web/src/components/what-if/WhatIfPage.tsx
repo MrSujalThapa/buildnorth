@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowLeft, X } from "lucide-react";
 
@@ -82,7 +82,7 @@ type Props = {
 
   pathsMessage?: string | null;
 
-  onRunCompare?: () => void;
+  onRunCompare?: (paths?: { id: string; label: string }[]) => void;
 
   onRunFutures?: (decision: string) => void;
 
@@ -167,94 +167,6 @@ function tuneCopyForMarket(category: string) {
     cadenceHelper: "Meaningful sessions each week",
 
     cadenceUnit: "/ week",
-
-  };
-
-}
-
-
-
-function suggestionCopy(category: string, title: string) {
-
-  if (category === "Career") {
-
-    return [
-
-      "What if I send 10 more targeted applications every week?",
-
-      "What if I spend 4 more hours a week on interview prep?",
-
-    ];
-
-  }
-
-  if (category === "Startup") {
-
-    return [
-
-      "What if I quit my internship and work on my startup full time?",
-
-      "What if I talk to 5 users every week?",
-
-    ];
-
-  }
-
-  return [
-
-    `What if I spend more focused time on ${title.toLowerCase()}?`,
-
-    "What if I make this a daily habit?",
-
-  ];
-
-}
-
-
-
-function demoPreviewFallback(
-
-  market: Market,
-
-  plan: WhatIfPlan,
-
-  baseline: WhatIfBaselineState | undefined,
-
-): WhatIfPreview | null {
-
-  if (baseline?.status !== "DEMO_SEED" || baseline.current_probability == null) {
-
-    return null;
-
-  }
-
-  const current = baseline.current_probability * 100;
-
-  const scenario = Math.min(95, current + (market.category === "Career" ? 12 : 8));
-
-  return {
-
-    currentOdds: current,
-
-    scenarioOdds: scenario,
-
-    improvementPoints: scenario - current,
-
-    possibleLow: current - 5,
-
-    possibleHigh: scenario + 6,
-
-    chanceHelps: 78,
-
-    weeklyHours: plan.effortHours * 7 + plan.cadence * 0.25,
-
-    outcome: [],
-
-    tradeoff:
-
-      baseline.limitations?.find((item) => item.includes("time")) ??
-
-      "Time spent here cannot be spent on other goals at the same intensity.",
 
   };
 
@@ -371,6 +283,7 @@ export default function WhatIfPage({
 
   const simulation = useWhatIfSimulation(goal, market, plan, {
     onScenarioPersisted: onExplorationsRefresh,
+    analysisDepth: view,
   });
 
   const futuresSimulation = useMemo(
@@ -386,21 +299,11 @@ export default function WhatIfPage({
   const baselinePriced = baseline?.priced ?? false;
   const priceabilityMessage = baseline?.priceability?.reason ?? baseline?.priceability?.headline;
 
-  const demoPreview = useMemo(
-
-    () => demoPreviewFallback(market, plan, baseline),
-
-    [baseline, market, plan],
-
-  );
-
   const preview =
 
     simulation.preview ??
 
     previewFromApi(simulation.scenarioResult) ??
-
-    demoPreview ??
 
     previewFromResult(market, plan, baseline, simulation.scenarioResult);
 
@@ -457,10 +360,18 @@ export default function WhatIfPage({
 
 
   useEffect(() => {
+    const ids = catalog.map((item) => item.id);
+    setCompareIds((current) => {
+      const kept = current.filter((id) => ids.includes(id));
+      if (kept.length >= 2) return kept;
+      return ids.slice(0, 2);
+    });
+  }, [catalog]);
 
-    if (mode === "compare") compareRef.current?.();
-
-  }, [mode]);
+  useEffect(() => {
+    if (mode !== "compare") return;
+    if (catalog.length >= 2) compareRef.current?.();
+  }, [catalog.length, mode]);
 
 
 
@@ -477,9 +388,6 @@ export default function WhatIfPage({
 
 
   const copy = tuneCopyForMarket(market.category);
-
-  const suggestions = suggestionCopy(market.category, market.title);
-
 
 
   function changeMode(next: WhatIfMode) {
@@ -642,8 +550,6 @@ export default function WhatIfPage({
 
               question={question}
 
-              suggestions={suggestions}
-
               copy={copy}
 
               running={simulation.simulation.isPending}
@@ -700,7 +606,7 @@ export default function WhatIfPage({
 
               priced={baselinePriced}
 
-              message={futuresDistribution?.message ?? priceabilityMessage}
+              message={futuresDistribution?.message ?? null}
 
               selectedSimulation={selectedSimulation}
 
@@ -750,6 +656,8 @@ export default function WhatIfPage({
 
               onSelectSimulation={setSelectedSimulation}
 
+              onComparePaths={(paths) => compareRef.current?.(paths)}
+
             />
 
           ) : null}
@@ -790,6 +698,8 @@ export default function WhatIfPage({
 
               onSelectSimulation={setSelectedSimulation}
 
+              onFind={() => pathsRef.current?.(targetOdds / 100)}
+
             />
 
           ) : null}
@@ -826,11 +736,11 @@ export default function WhatIfPage({
                   <div>
                     <strong>{item.intervention_title ?? "Saved exploration"}</strong>
                     <span className="meta">
-                      {item.created_at ? new Date(item.created_at).toLocaleString() : "Saved run"}
+                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : "Saved run"}
+                      {" · saved result"}
                     </span>
-                    <span className="meta">Loads the saved prompt; rerun to refresh results.</span>
                     {item.scenario_probability == null ? (
-                      <span className="meta">Unpriced · add a measurable rate to compare odds.</span>
+                      <span className="meta">Not priced</span>
                     ) : null}
                   </div>
                   <div className="past-metrics">
@@ -912,7 +822,7 @@ export default function WhatIfPage({
 
                 <div><span>Duration</span><strong>{plan.durationWeeks} weeks</strong></div>
 
-                <div><span>Follow-through</span><strong>{plan.followThrough}%</strong></div>
+                <div><span>Assumed follow-through</span><strong>{plan.followThrough}%</strong></div>
 
               </div>
 
@@ -995,7 +905,7 @@ export default function WhatIfPage({
 
                 <label>
 
-                  <span>Follow-through<strong>{plan.followThrough}%</strong></span>
+                  <span>Assumed follow-through<strong>{plan.followThrough}%</strong></span>
 
                   <input
 
@@ -1052,18 +962,6 @@ export default function WhatIfPage({
             ) : null}
 
 
-
-            {baseline?.status === "DEMO_SEED" ? (
-
-              <section>
-
-                <h3>Model</h3>
-
-                <p>{baseline.model_family}@{baseline.model_version} · DEMO_SEED</p>
-
-              </section>
-
-            ) : null}
 
           </aside>
 

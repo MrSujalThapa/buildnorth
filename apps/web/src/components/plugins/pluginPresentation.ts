@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Blocks,
   Code2,
   FileText,
   FolderOpen,
@@ -74,7 +75,7 @@ export function pluginViewToDisplay(plugin: PluginView): PluginDisplay {
       undefined,
     lastSyncLabel: formatLastSync(plugin.connection.last_sync_at),
     logoUrl: plugin.definition.logo_url ?? undefined,
-    Icon: iconById[id] ?? Code2,
+    Icon: iconById[id] ?? Blocks,
     connectionStatus: plugin.connection.status,
   };
 }

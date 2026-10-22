@@ -437,6 +437,16 @@
   cursor: pointer;
 }
 
+.inference-settings-form .choice-row button {
+  background: var(--app-surface);
+  color: var(--app-ink);
+}
+
+.inference-settings-form .choice-row button[aria-pressed="true"] {
+  background: var(--app-ink);
+  color: var(--app-bg);
+}
+
 .inference-settings-form .model-picker button {
   width: 100%;
   max-width: none;

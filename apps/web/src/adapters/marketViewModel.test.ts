@@ -23,6 +23,18 @@ describe("market card daily change", () => {
     expect(toMarketCard(goal, points).todayReturn).toBeNull();
   });
 
+  it("reports the most recent revision separately from today's change", () => {
+    vi.setSystemTime(new Date("2026-10-20T18:00:00Z"));
+    const points = [
+      { probability: 0.1, created_at: "2026-10-12T12:00:00Z" },
+      { probability: 0.18, created_at: "2026-10-14T12:00:00Z" },
+    ] as MarketHistoryPoint[];
+    const card = toMarketCard(goal, points);
+    expect(card.todayReturn).toBeNull();
+    expect(card.lastRevision?.change).toBeCloseTo(8);
+    expect(card.lastRevision?.at).toBe(Date.parse("2026-10-14T12:00:00Z"));
+  });
+
   it("compares a current-day publication to the preceding snapshot", () => {
     vi.setSystemTime(new Date("2026-10-20T18:00:00Z"));
     const points = [
@@ -30,6 +42,14 @@ describe("market card daily change", () => {
       { probability: 0.15, created_at: "2026-10-20T12:00:00Z" },
     ] as MarketHistoryPoint[];
     expect(toMarketCard(goal, points).todayReturn).toBeCloseTo(5);
+  });
+
+  it("never shows synthetic history as published odds", () => {
+    const points = [
+      { probability: 0.4, created_at: "2026-10-01T12:00:00Z", source_kind: "synthetic_demo" },
+      { probability: 0.5, created_at: "2026-10-20T12:00:00Z", source_kind: "synthetic_demo" },
+    ] as MarketHistoryPoint[];
+    expect(toMarketCard(goal, points).history).toEqual([]);
   });
 });
 

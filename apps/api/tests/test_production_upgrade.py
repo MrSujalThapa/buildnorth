@@ -186,7 +186,12 @@ def test_profile_username_is_unique_and_private() -> None:
         assert patched.json()["profile"]["username"] == "judge_one"
         profile = client.get("/api/v1/profile").json()
         assert profile["privacy"] == "private"
-        assert "radar" in profile
+        assert all(
+            value is None
+            for series in profile["traits"]["series"]
+            for value in series["values"].values()
+        )
+        assert len(profile["selected_parameters"]) >= 3
         client.app.state.auth_bypass_principal = make_principal("second-judge", invited=True)
         taken = client.patch("/api/v1/profile", json={"username": "judge_one"})
         assert taken.status_code == 409

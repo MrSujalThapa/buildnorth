@@ -54,6 +54,7 @@ class RunningReference:
     measurement_noise_seconds: float
     min_measurement_noise_seconds: float
     trend_uncertainty_seconds_per_day: float
+    trend_prior_sd_seconds_per_day: float
     adherence: float
     goal_distance_tolerance_km: float
     reference_id: str
@@ -72,6 +73,7 @@ class TrendFit:
     converted_count: int
     slope_seconds_per_day: float
     residual_std_seconds: float
+    projection_uncertainty_seconds: float = 0.0
 
 
 def load_running_reference(root: Path | None = None) -> RunningReference:
@@ -88,6 +90,9 @@ def load_running_reference(root: Path | None = None) -> RunningReference:
         min_measurement_noise_seconds=float(defaults.get("min_measurement_noise_seconds", 15.0)),
         trend_uncertainty_seconds_per_day=float(
             defaults.get("trend_uncertainty_seconds_per_day", 2.5)
+        ),
+        trend_prior_sd_seconds_per_day=float(
+            defaults.get("trend_prior_sd_seconds_per_day", 1.0)
         ),
         adherence=float(defaults.get("adherence", 1.0)),
         goal_distance_tolerance_km=float(defaults.get("goal_distance_tolerance_km", 0.75)),
@@ -307,6 +312,7 @@ def running_state_to_numeric_inputs(
         assumptions={
             "trend": fit.trend_seconds_per_day * 7.0,
             "measurement_noise": fit.measurement_noise_seconds,
+            "trend_projection_uncertainty": fit.projection_uncertainty_seconds,
             "adherence": ref.adherence,
         },
         assumption_sources={
@@ -314,6 +320,7 @@ def running_state_to_numeric_inputs(
             "measurement_noise": "REAL_USER_EVIDENCE"
             if fit.residual_std_seconds > ref.min_measurement_noise_seconds
             else "REFERENCE",
+            "trend_projection_uncertainty": "REAL_USER_EVIDENCE",
             "adherence": "REFERENCE",
         },
     )
@@ -359,7 +366,8 @@ def price_from_numeric_inputs(inputs: NumericInputs) -> tuple[float | None, dict
     trend_daily = trend_weekly / 7.0
     ref = load_running_reference()
     trend_sigma = ref.trend_uncertainty_seconds_per_day * math.sqrt(max(1, periods * 7))
-    sigma = math.sqrt(noise**2 + trend_sigma**2)
+    projection_sigma = float(inputs.assumptions.get("trend_projection_uncertainty") or 0.0)
+    sigma = math.sqrt(noise**2 + trend_sigma**2 + projection_sigma**2)
 
     achieved = _observed_target_met(inputs, target_value, direction)
     if achieved:
@@ -379,6 +387,7 @@ def price_from_numeric_inputs(inputs: NumericInputs) -> tuple[float | None, dict
         "measurement_noise_seconds": noise,
         "trend_seconds_per_week": trend_weekly,
         "trend_seconds_per_day": trend_daily,
+        "trend_projection_uncertainty_seconds": projection_sigma,
         "sigma_deadline_seconds": sigma,
         "direction": direction,
     }
@@ -400,17 +409,28 @@ def fit_performance_trend(
     direct_count = sum(1 for item in observations if not item.conversion_applied)
     converted_count = sum(1 for item in observations if item.conversion_applied)
 
+    days_to_deadline = max(0.0, (deadline - now).total_seconds() / 86400.0)
+    prior_sd = reference.trend_prior_sd_seconds_per_day
     if len(observations) == 1:
         slope = 0.0
         projected = float(times[0])
         residual_std = reference.measurement_noise_seconds
+        projection_sigma = prior_sd * days_to_deadline
     else:
-        slope, intercept = _linear_fit(days_ago, times)
-        days_to_deadline = max(0.0, (deadline - now).total_seconds() / 86400.0)
-        projected = float(intercept - slope * days_to_deadline)
-        residuals = times - (intercept + slope * days_ago)
+        ols_slope, intercept = _linear_fit(days_ago, times)
+        residuals = times - (intercept + ols_slope * days_ago)
         residual_std = float(np.std(residuals, ddof=1)) if len(times) > 1 else 0.0
         residual_std = max(residual_std, reference.min_measurement_noise_seconds)
+        # Conjugate normal prior N(0, prior_sd^2) on the daily improvement rate: a few
+        # noisy trials shrink toward no change, and the slope's posterior spread is
+        # carried to the deadline so long extrapolations widen rather than sharpen.
+        spread = float(np.sum((days_ago - days_ago.mean()) ** 2))
+        data_precision = spread / residual_std**2
+        precision = data_precision + 1.0 / prior_sd**2
+        slope = ols_slope * data_precision / precision
+        centre = float(days_ago.mean())
+        projected = float(times.mean() - slope * (days_to_deadline + centre))
+        projection_sigma = (days_to_deadline + centre) / math.sqrt(precision)
 
     if converted_count and not direct_count:
         residual_std = math.sqrt(residual_std**2 + reference.conversion_uncertainty_seconds**2)
@@ -426,6 +446,7 @@ def fit_performance_trend(
         converted_count=converted_count,
         slope_seconds_per_day=float(slope),
         residual_std_seconds=residual_std,
+        projection_uncertainty_seconds=projection_sigma,
     )
 
 

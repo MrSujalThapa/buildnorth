@@ -28,6 +28,7 @@ export type Market = {
   deadlineAt: number;
   odds: number | null;
   todayReturn: number | null;
+  lastRevision?: { change: number; at: number } | null;
   totalReturn: number | null;
   events: MarketEvent[];
   history: ChartPoint[];

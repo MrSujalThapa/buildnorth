@@ -244,12 +244,16 @@ def build_startup_numeric_inputs(
                 state.mrr / 1000.0
             )
         clock = now or datetime.now(UTC)
-        periods = max(1, math.ceil((goal.deadline - clock).total_seconds() / 604800))
+        period_days = float(ref.seed_round_hazard.get("period_days", 30.4375))
+        periods = max(
+            1, math.ceil((goal.deadline - clock).total_seconds() / (period_days * 86400))
+        )
         transforms = cast(
             dict[str, Any],
             {
                 "startup_state": _state_dict(state),
                 "seed_hazard_logit": logit,
+                "hazard_period_days": period_days,
                 "reference_version": ref.version,
             },
         )
@@ -320,11 +324,14 @@ def futures_outcome_weights(
     evidence: list[NormalizedEvidence],
     *,
     scenario_labels: list[str] | None = None,
+    state_overrides: dict[str, Any] | None = None,
 ) -> tuple[dict[str, float] | None, str | None]:
     """Map Possible Futures labels to numerical weights when startup evidence exists."""
     if not is_startup_goal(goal):
         return None, "not a startup goal"
-    state = aggregate_startup_from_evidence(evidence)
+    state = apply_startup_overrides(
+        aggregate_startup_from_evidence(evidence), state_overrides
+    )
     if not _has_startup_signal(state):
         return None, "insufficient startup evidence for defensible weights"
     ref = load_startup_reference()

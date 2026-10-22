@@ -27,12 +27,14 @@ class UnifiedIntegrationGateway:
         search: str | None = None,
         cursor: str | None = None,
         limit: int = 20,
+        browse: bool = False,
         reconcile: bool = False,
     ) -> dict[str, object]:
         return await self._mcp.search_catalog(
             search=search,
             cursor=cursor,
             limit=limit,
+            browse=browse,
             user_id=self._user_id,
             reconcile=reconcile,
         )

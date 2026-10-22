@@ -9,6 +9,23 @@ This report distinguishes **local mocked tests** from **real deployed browser ve
 
 The earlier sections below record the pre-sign-in state. The dated acceptance addendum at the end supersedes their live-status and blocker statements. No additional paid inference was deliberately initiated in the remediation pass; the preexisting BYOK ledger could not be used to isolate a per-pass charge.
 
+## 2026-10-21 consumer UI pass
+
+Branch `ux/consumer-profile-whatif`. Cron, watch-runner, and Render scheduler were not modified.
+
+| Surface | Status | Evidence |
+| --- | --- | --- |
+| Profile edit owns the photo | PASS mocked | Playwright desktop and mobile profile spec |
+| Radar hides estimator text and closes only when every trait is measured | PASS | Vitest partial-polygon test; Playwright screenshot of a synthetic six-trait fixture |
+| Area editor | PASS mocked | Unique title match links Reading to “Read 20 books” without a goal matrix |
+| Icon rail | PARTIAL | Present in the same Playwright screenshot; hover expansion not separately asserted |
+| What If four modes | PARTIAL | Reverse label, composer, and unsupported Futures short-circuit are in code. Live simulations not re-run |
+| What If attachments | BLOCKED | No ingestion path added; the button was not faked |
+| Speech input | PARTIAL | Browser Speech Recognition when the API exists; otherwise the mic is disabled |
+| Notion titles | PARTIAL | Titles still come from the provider title property. URL and connected-account id are now kept. The unfamiliar pages were not re-fetched from the live account |
+| Plugin catalog | PARTIAL | Popular list stays local; Browse all sets `browse=true` and calls Composio. Not exercised against live Composio |
+| Demo forecast fixtures | NOT DONE | No synthetic history was inserted |
+
 ---
 
 ## 1. Architecture changes

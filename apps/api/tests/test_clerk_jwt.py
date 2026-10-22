@@ -182,6 +182,35 @@ def test_http_allowed_azp_without_aud_reaches_me(
     _assert_crypto_checks(install_trusted_jwks[-1])
 
 
+def test_http_preview_and_production_azp_are_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+    rsa_key: rsa.RSAPrivateKey,
+    clerk_settings: Settings,
+    install_trusted_jwks: list[Any],
+) -> None:
+    preview = (
+        "https://buildnorth-git-ux-consumer-c0fb66-sujalthapa242-3741s-projects.vercel.app"
+    )
+    production = "https://buildnorth-delta.vercel.app"
+    unique = "https://buildnorth-9ajkuwxtx-sujalthapa242-3741s-projects.vercel.app"
+    settings = clerk_settings.model_copy(
+        update={
+            "clerk_authorized_parties": [
+                production,
+                preview,
+                unique,
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ]
+        }
+    )
+    with _http_client(monkeypatch, settings) as client:
+        for origin in (production, preview, unique, "http://localhost:5173"):
+            token = _sign(rsa_key, azp=origin)
+            response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+            assert response.status_code == 200, origin
+
+
 def test_http_unauthorized_azp_without_aud_is_401(
     monkeypatch, rsa_key, clerk_settings, install_trusted_jwks
 ) -> None:

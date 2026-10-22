@@ -202,12 +202,24 @@ class IdentityService:
         dimensions = (
             patch.dimensions if "dimensions" in patch.model_fields_set else current.dimensions
         )
+        parameter_ids = (
+            patch.parameter_ids
+            if "parameter_ids" in patch.model_fields_set
+            else current.parameter_ids
+        )
+        custom_parameters = (
+            patch.custom_parameters
+            if "custom_parameters" in patch.model_fields_set
+            else current.custom_parameters
+        )
         updated = UserProfile(
             display_name=(display or "").strip() or None,
             username=username or None,
             bio=(bio or "").strip() or None,
             avatar_value=(avatar or "").strip() or None,
             dimensions=dimensions,
+            parameter_ids=parameter_ids,
+            custom_parameters=custom_parameters,
         )
         return await self._repository.upsert_profile(principal.user_id, updated)
 

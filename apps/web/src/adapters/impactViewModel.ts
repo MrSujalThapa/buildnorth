@@ -11,6 +11,8 @@ export type ImpactViewModel = {
   followThroughPercent: number | null;
   downsideTail: number | null;
   sensitivity: { label: string; swingPp: number }[];
+  opportunityCosts: string[];
+  fragilityPp: number | null;
   drawCount: number | null;
   seed: number | null;
   modelLabel: string | null;
@@ -19,8 +21,6 @@ export type ImpactViewModel = {
   metaLabel: string;
   representatives: RepresentativePoint[];
 };
-
-const devDemoSimulations = import.meta.env.VITE_DEV_DEMO_SIMULATIONS === "true";
 
 function binsToPoints(bins: WhatIfResult["distribution_bins"], seed: number): SimulationPoint[] {
   const points: SimulationPoint[] = [];
@@ -40,32 +40,6 @@ function binsToPoints(bins: WhatIfResult["distribution_bins"], seed: number): Si
     }
   });
   return points;
-}
-
-function receiptDemoPoints(receipt: WhatIfResult["receipt"] | undefined): SimulationPoint[] {
-  const raw = receipt?.demo_simulation_points;
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item, index) => ({
-    id: Number((item as SimulationPoint).id ?? index),
-    x: Number((item as SimulationPoint).x),
-    y: Number((item as SimulationPoint).y),
-    clusterId: String((item as SimulationPoint).clusterId ?? "demo"),
-    goalHit: Boolean((item as SimulationPoint).goalHit),
-    seed: Number((item as SimulationPoint).seed ?? index),
-  }));
-}
-
-function receiptRepresentatives(receipt: WhatIfResult["receipt"] | undefined): RepresentativePoint[] {
-  const raw = receipt?.demo_representatives;
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item) => {
-    const row = item as RepresentativePoint;
-    return {
-      kind: row.kind,
-      label: row.label,
-      point: row.point,
-    };
-  });
 }
 
 function statsFromResult(result: WhatIfResult | undefined, points: SimulationPoint[]) {
@@ -108,19 +82,13 @@ export function toImpactViewModel(
   baseline: WhatIfBaselineState | undefined,
 ): ImpactViewModel {
   const seed = result?.diagnostics?.seed ?? baseline?.config.seed ?? null;
-  const demoPoints = devDemoSimulations ? receiptDemoPoints(result?.receipt) : [];
   const distributionPoints =
-    demoPoints.length > 0
-      ? demoPoints
-      : result?.distribution_bins?.length && seed != null
-        ? binsToPoints(result.distribution_bins, seed)
-        : [];
+    result?.distribution_bins?.length && seed != null ? binsToPoints(result.distribution_bins, seed) : [];
   const stats = statsFromResult(result, distributionPoints);
   const sensitivity = (result?.sensitivity ?? []).slice(0, 5).map((item) => ({
     label: item.label,
     swingPp: item.swing ?? item.probability_swing_pp ?? 0,
   }));
-  const isDemoSeed = result?.receipt?.provenance === "DEMO_SEED" || result?.status === "DEMO_SEED";
 
   return {
     distributionPoints,
@@ -135,16 +103,14 @@ export function toImpactViewModel(
       result?.execution_probability != null ? result.execution_probability * 100 : null,
     downsideTail: stats.p10,
     sensitivity,
+    opportunityCosts: result?.opportunity_costs ?? [],
+    fragilityPp: result?.fragility_pp ?? null,
     drawCount: result?.diagnostics?.n_draws ?? null,
     seed,
     modelLabel: baseline ? `${baseline.model_family}@${baseline.model_version}` : null,
     llmCalls: result?.llm_calls ?? null,
-    simulationCloudAvailable: devDemoSimulations && demoPoints.length > 0,
-    metaLabel: isDemoSeed
-      ? "DEMO_SEED · UI parity only"
-      : result?.priced
-        ? "Backend Monte Carlo"
-        : "Not priced",
-    representatives: devDemoSimulations ? receiptRepresentatives(result?.receipt) : [],
+    simulationCloudAvailable: false,
+    metaLabel: result?.priced ? "Backend Monte Carlo" : "Not priced",
+    representatives: [],
   };
 }

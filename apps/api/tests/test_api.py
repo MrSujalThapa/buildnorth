@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -5,7 +7,8 @@ from helpers import isolated_app
 from personal_markets.core.config import Settings
 
 
-def test_health_endpoint_and_backend_boot() -> None:
+def test_health_endpoint_and_backend_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123456789abcdef0123")
     with TestClient(isolated_app()) as client:
         response = client.get("/health", headers={"x-request-id": "test-request"})
     assert response.status_code == 200
@@ -13,6 +16,7 @@ def test_health_endpoint_and_backend_boot() -> None:
         "status": "ok",
         "service": "personal-markets-api",
         "version": "0.1.0",
+        "commit": "0123456789ab",
     }
     assert "database" not in response.json()
     assert response.headers["x-request-id"] == "test-request"
@@ -89,6 +93,77 @@ def test_local_loopback_https_is_not_treated_as_deployed() -> None:
     assert not settings.is_publicly_reachable()
     assert not settings.is_deployed()
     settings.assert_safe_startup()
+
+
+PRODUCTION_WEB_ORIGIN = "https://buildnorth-delta.vercel.app"
+PREVIEW_GIT_ORIGIN = (
+    "https://buildnorth-git-ux-consumer-c0fb66-sujalthapa242-3741s-projects.vercel.app"
+)
+PREVIEW_UNIQUE_ORIGIN = (
+    "https://buildnorth-9ajkuwxtx-sujalthapa242-3741s-projects.vercel.app"
+)
+LOCALHOST_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
+ALLOWED_WEB_ORIGINS = (
+    PRODUCTION_WEB_ORIGIN,
+    PREVIEW_GIT_ORIGIN,
+    PREVIEW_UNIQUE_ORIGIN,
+    *LOCALHOST_ORIGINS,
+)
+ARBITRARY_ORIGIN = "https://evil.example"
+
+
+def _production_cors_settings(**overrides: object) -> Settings:
+    return _deployed_settings(
+        environment="production",
+        cors_origins=list(ALLOWED_WEB_ORIGINS),
+        cors_origin_regex=r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):\d+$",
+        clerk_authorized_parties=list(ALLOWED_WEB_ORIGINS),
+        **overrides,
+    )
+
+
+def _preflight(client: TestClient, origin: str) -> Any:
+    return client.options(
+        "/api/v1/me",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+
+
+def test_deployed_cors_allows_production_preview_and_localhost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
+    with TestClient(isolated_app()) as client:
+        for origin in ALLOWED_WEB_ORIGINS:
+            response = _preflight(client, origin)
+            assert response.status_code == 200, origin
+            assert response.headers["access-control-allow-origin"] == origin
+            assert "authorization" in response.headers["access-control-allow-headers"].lower()
+
+
+def test_deployed_cors_rejects_arbitrary_origin(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
+    with TestClient(isolated_app()) as client:
+        response = _preflight(client, ARBITRARY_ORIGIN)
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in {key.lower() for key in response.headers}
+
+
+def test_anonymous_me_is_401_and_still_allows_preview_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
+    app = isolated_app()
+    app.state.auth_bypass_principal = None
+    with TestClient(app) as client:
+        response = client.get("/api/v1/me", headers={"Origin": PREVIEW_GIT_ORIGIN})
+    assert response.status_code == 401
+    assert response.headers["access-control-allow-origin"] == PREVIEW_GIT_ORIGIN
+    assert response.json()["error"]["type"] == "UnauthorizedError"
 
 
 def test_development_cors_accepts_alternate_local_vite_port() -> None:

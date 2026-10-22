@@ -11,6 +11,7 @@ import {
 } from "../../adapters/simulations";
 import SimulationCloud, { type CloudSeries } from "./SimulationCloud";
 import SimulationInspector from "./SimulationInspector";
+import { ScenarioComposer } from "./ScenarioComposer";
 
 type Props = {
   market: Market;
@@ -61,7 +62,7 @@ export default function PossibleFuturesView({
     .filter((cluster) => cluster.tone === "positive")
     .reduce((sum, cluster) => sum + cluster.probability, 0);
   const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId);
-  const hasResults = clusters.length > 0 && points.length > 0;
+  const hasResults = clusters.length > 0;
 
   const series: CloudSeries[] = [
     {
@@ -75,25 +76,16 @@ export default function PossibleFuturesView({
 
   return (
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
-      <section className="composer">
-        <div className="composer-intro">
-          <p className="section-label">Possible futures</p>
-          <h2>{pathLabel ? `If you take ${pathLabel}` : "What are the main ways this could play out?"}</h2>
-        </div>
-        <div className="composer-row">
-          <input
-            name="future-decision"
-            autoComplete="off"
-            value={decision}
-            onChange={(event) => onDecisionChange(event.target.value)}
-            placeholder="What if I quit my internship and work on my startup full time…"
-            aria-label="Decision to explore"
-          />
-          <button type="button" className="primary-action" onClick={onRun} disabled={loading}>
-            {loading ? "Mapping…" : "Map futures"}
-          </button>
-        </div>
-      </section>
+      <ScenarioComposer
+        id="future-decision"
+        label={pathLabel ? `Futures if you take ${pathLabel}` : "Decision to explore"}
+        value={decision}
+        onChange={onDecisionChange}
+        onSubmit={onRun}
+        busy={loading}
+        submitLabel="Map futures"
+        placeholder="What if this happens?"
+      />
 
       {!priced ? (
         <div className="unpriced-state">
@@ -108,7 +100,7 @@ export default function PossibleFuturesView({
 
       {priced && !loading && !hasResults ? (
         <div className="past-empty">
-          Describe a decision and map futures. Unsupported scenarios return NOT_PRICED with an explanation.
+          {message ?? "Ask a question to see the outcomes this goal can estimate."}
         </div>
       ) : null}
 
@@ -162,13 +154,18 @@ export default function PossibleFuturesView({
           <div className="viz-block">
             <div className="panel-head tight">
               <div>
-                <p className="section-label">Simulation cloud</p>
-                <h2>{visiblePoints.length.toLocaleString()} sampled futures</h2>
+                <p className="section-label">Outcome spread</p>
+                <h2>
+                  {points.length
+                    ? "Quantiles from the conditioned model"
+                    : "Outcome probabilities from the conditioned model"}
+                </h2>
               </div>
-              <span className="meta">Backend distribution · each dot is one hypothetical draw</span>
+              <span className="meta">p10 / median / p90 when the model supplies them</span>
             </div>
+            {points.length ? (
             <SimulationCloud
-              ariaLabel="Possible futures simulation cloud"
+              ariaLabel="Possible futures quantile markers"
               layout={axes.layout}
               xAxis={axes.x}
               yAxis={axes.y}
@@ -178,6 +175,9 @@ export default function PossibleFuturesView({
               clusters={centroids}
               series={series}
             />
+            ) : (
+              <p className="quiet-copy">Quantile markers are shown when the model returns p10, median, and p90.</p>
+            )}
           </div>
 
           {selectedSimulation ? (

@@ -9,16 +9,7 @@ import numpy as np
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
-from personal_markets.demo_fixtures import (
-    demo_fixtures_enabled,
-    fixture_action_frontier,
-    fixture_compare,
-    fixture_futures,
-    fixture_simulate,
-    fixture_target_search,
-    is_demo_goal,
-    patch_baseline_state,
-)
+from personal_markets.core.errors import ResourceNotFoundError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.primitives import at_numerical_bound
@@ -31,8 +22,10 @@ from personal_markets.what_if.baseline_state import (
 )
 from personal_markets.what_if.domain import (
     ActionFrontierResult,
+    ContinuousSearchVariable,
     DistributionBin,
     FrontierPoint,
+    InterventionChangeInput,
     MarketHistoryPointResponse,
     PathComparisonItem,
     PathComparisonRequest,
@@ -100,8 +93,6 @@ class WhatIfService:
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
         state = build_baseline_state(goal, evidence)
-        if demo_fixtures_enabled() and is_demo_goal(goal_id):
-            return patch_baseline_state(state)
         return await self._overlay_published_baseline(UUID(goal_id), state)
 
     async def _overlay_published_baseline(
@@ -121,17 +112,9 @@ class WhatIfService:
         return state
 
     async def simulate(self, request: WhatIfRequest) -> WhatIfResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_simulate(request.goal_id)
-            if fixture is not None:
-                return fixture
         return await self._simulate(request, persist=True)
 
     async def fast_reprice(self, request: WhatIfRequest) -> WhatIfResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_simulate(request.goal_id)
-            if fixture is not None:
-                return fixture
         return await self._simulate(request, persist=False)
 
     async def _simulate_composition(
@@ -313,8 +296,11 @@ class WhatIfService:
                 return composed
             explicit_trials = []
             if self._owner_id is not None:
+                # Every owned goal's commitments form the person-level (global) level of
+                # the hierarchical execution model; this goal's actions refine it.
+                owned = await self._goals.list_goals(owner_id=self._owner_id)
                 plans, observations = await get_commitment_store().list_for_goals(
-                    self._owner_id, [goal.goal_id]
+                    self._owner_id, [item.goal_id for item in owned] or [goal.goal_id]
                 )
                 explicit_trials = trials_from_commitments(plans, observations)
             request = self._apply_behavior_execution(
@@ -674,15 +660,19 @@ class WhatIfService:
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
-        sensitivity = compute_sensitivity(
-            goal=goal,
-            evidence=evidence,
-            request=request,
-            assumptions=assumptions,
-            baseline_probability=baseline,
-            intervention_effect=intervention_effect,
-            mode=mode,
-            engine=self._engine,
+        sensitivity = (
+            compute_sensitivity(
+                goal=goal,
+                evidence=evidence,
+                request=request,
+                assumptions=assumptions,
+                baseline_probability=baseline,
+                intervention_effect=intervention_effect,
+                mode=mode,
+                engine=self._engine,
+            )
+            if request.config.include_sensitivity
+            else []
         )
         opportunity_costs = (
             []
@@ -844,15 +834,12 @@ class WhatIfService:
         return items
 
     async def target_search(self, request: TargetSearchRequest) -> TargetSearchResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_target_search(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         baseline = await self._simulate(
             request.base.model_copy(update={"intervention": None}), persist=False
         )
         current = baseline.baseline_probability or 0
         gap = max(0, (request.target_probability - current) * 100)
+        request = await self._ensure_search_levers(request)
         if current + request.probability_tolerance >= request.target_probability:
             return TargetSearchResult(
                 target_probability=request.target_probability,
@@ -880,11 +867,19 @@ class WhatIfService:
                 search_method="already_satisfied",
             )
         paths = await self._discrete_target_paths(request, current)
+        paths.extend(await self._assumption_setpoint_paths(request, current))
         if request.continuous_variable is not None:
             continuous = await self._continuous_target_path(request)
             if continuous is not None:
                 paths.append(continuous)
-        paths.sort(key=lambda item: self._cost_score(item.resource_cost))
+        candidate_ids = {candidate.id for candidate in request.candidates}
+        paths.sort(
+            key=lambda item: (
+                not any(action_id in candidate_ids for action_id in item.action_ids),
+                self._cost_score(item.resource_cost),
+                len(item.action_ids),
+            )
+        )
         result = TargetSearchResult(
             target_probability=request.target_probability,
             current_probability=current,
@@ -901,10 +896,6 @@ class WhatIfService:
         return await self._persist_target_search(request, result)
 
     async def action_frontier(self, request: TargetSearchRequest) -> ActionFrontierResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_action_frontier(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         baseline = await self._simulate(
             request.base.model_copy(update={"intervention": None}), persist=False
         )
@@ -984,10 +975,6 @@ class WhatIfService:
         )
 
     async def possible_futures(self, request: PossibleFuturesRequest) -> ScenarioDistribution:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_futures(request.goal_id)
-            if fixture is not None:
-                return fixture
         if any(item.weight is None for item in request.outcomes):
             resolved = await self._resolve_futures_weights(request)
             if resolved is not None:
@@ -1042,36 +1029,38 @@ class WhatIfService:
         return await self._persist_distribution(request, distribution)
 
     async def compare_paths(self, request: PathComparisonRequest) -> PathComparisonResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_compare(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         goal = await self._require_goal(request.base.goal_id)
         budget = budget_from_goal(goal)
         items: list[PathComparisonItem] = []
         for path in request.paths:
             usage = evaluate_resource_usage(path.intervention, budget)
             priced = await self._simulate(
-                request.base.model_copy(update={"intervention": path.intervention}),
+                request.base.model_copy(
+                    update={
+                        "intervention": path.intervention,
+                        "parsed_changes": path.parsed_changes or list(request.base.parsed_changes),
+                    }
+                ),
                 persist=False,
             )
             quantiles = priced.outcome_quantiles
             model_status = priced.status
             if not usage.within_budget:
                 model_status = "EXPLORATORY_OVER_BUDGET"
+            priced_ok = bool(priced.priced)
             items.append(
                 PathComparisonItem(
                     id=path.id,
                     label=path.label,
-                    primary_goal_probability=priced.scenario_probability or 0,
-                    expected_outcome=priced.expected_outcome or 0,
-                    median=quantiles.get("p50", 0),
-                    p10=quantiles.get("p10", 0),
-                    p90=quantiles.get("p90", 0),
-                    downside_probability=priced.downside_probability or 0,
+                    primary_goal_probability=priced.scenario_probability if priced_ok else None,
+                    expected_outcome=priced.expected_outcome if priced_ok else None,
+                    median=quantiles.get("p50") if priced_ok else None,
+                    p10=quantiles.get("p10") if priced_ok else None,
+                    p90=quantiles.get("p90") if priced_ok else None,
+                    downside_probability=priced.downside_probability if priced_ok else None,
                     fragility_pp=priced.fragility_pp,
                     resource_cost=path.intervention.cost,
-                    execution_probability=priced.execution_probability or 0,
+                    execution_probability=priced.execution_probability if priced_ok else None,
                     assumptions=request.base.assumptions,
                     model_status=model_status,
                     secondary_outcomes=path.secondary_outcomes,
@@ -1085,6 +1074,100 @@ class WhatIfService:
         )
         return await self._persist_path_comparison(request, result)
 
+    async def _ensure_search_levers(self, request: TargetSearchRequest) -> TargetSearchRequest:
+        """Fill Reverse search when the client sends an empty candidate list."""
+        updates: dict[str, object] = {}
+        if not request.candidates:
+            try:
+                state = await self.baseline_state(request.base.goal_id)
+            except ResourceNotFoundError:
+                state = None
+            if state is not None:
+                updates["candidates"] = [
+                    item.intervention
+                    for item in state.compare_candidates
+                    if item.intervention is not None
+                ]
+        if request.continuous_variable is None:
+            names = {item.name for item in request.base.assumptions}
+            if "flow" in names:
+                updates["continuous_variable"] = ContinuousSearchVariable(assumption="flow")
+            elif "weekly_application_rate" in names:
+                updates["continuous_variable"] = ContinuousSearchVariable(
+                    assumption="weekly_application_rate"
+                )
+        if not updates:
+            return request
+        return request.model_copy(update=updates)
+
+    async def _assumption_setpoint_paths(
+        self, request: TargetSearchRequest, current: float
+    ) -> list[TargetPath]:
+        paths: list[TargetPath] = []
+        for name in ("flow", "weekly_application_rate"):
+            assumption = next(
+                (item for item in request.base.assumptions if item.name == name),
+                None,
+            )
+            if assumption is None:
+                continue
+            span = assumption.maximum - assumption.value
+            if span <= 0:
+                continue
+            for fraction, adjective in ((0.4, "Moderate"), (0.85, "Aggressive")):
+                value = assumption.value + span * fraction
+                change = InterventionChangeInput(
+                    metric=name,
+                    operation="set",
+                    value=value,
+                    unit=assumption.unit,
+                    provenance="EXPLORATION_ASSUMPTION",
+                )
+                changed = apply_parsed_changes_to_assumptions(
+                    request.base.assumptions,
+                    [InterventionChangeResponse.model_validate(change.model_dump())],
+                )
+                priced = await self._simulate(
+                    request.base.model_copy(
+                        update={
+                            "assumptions": changed,
+                            "parsed_changes": [change],
+                            "intervention": None,
+                        }
+                    ),
+                    persist=False,
+                )
+                if priced.scenario_probability is None:
+                    continue
+                if priced.scenario_probability <= current + 1e-9:
+                    continue
+                if (
+                    priced.scenario_probability + request.probability_tolerance
+                    < request.target_probability
+                ):
+                    continue
+                paths.append(
+                    TargetPath(
+                        label=(
+                            f"{adjective} {assumption.name.replace('_', ' ')} "
+                            f"({value:.4g} {assumption.unit})"
+                        ),
+                        action_ids=[f"lever:{name}:{fraction}"],
+                        resulting_probability=priced.scenario_probability,
+                        resource_cost=ResourceCost(),
+                        assumptions=changed,
+                        fragility_pp=priced.fragility_pp,
+                        valid_because=(
+                            "Assumption lever was re-simulated and clears the target."
+                        ),
+                        model_provenance={
+                            "family": "assumption_lever",
+                            "version": "1.0.0",
+                        },
+                    )
+                )
+        return paths
+
     async def _discrete_target_paths(
         self, request: TargetSearchRequest, current: float
     ) -> list[TargetPath]:
@@ -1097,14 +1180,19 @@ class WhatIfService:
             priced = await self._simulate(
                 request.base.model_copy(update={"intervention": intervention}), persist=False
             )
+            if priced.scenario_probability is None:
+                continue
             if (
-                priced.scenario_probability or current
-            ) + request.probability_tolerance < request.target_probability:
+                priced.scenario_probability + request.probability_tolerance
+                < request.target_probability
+            ):
                 continue
             verified = await self._simulate(
                 request.base.model_copy(update={"intervention": intervention}), persist=False
             )
-            probability = verified.scenario_probability or 0
+            if verified.scenario_probability is None:
+                continue
+            probability = verified.scenario_probability
             if probability + request.probability_tolerance < request.target_probability:
                 continue
             paths.append(
@@ -1146,9 +1234,13 @@ class WhatIfService:
             priced = await self._simulate(
                 request.base.model_copy(update={"assumptions": changed}), persist=False
             )
+            if priced.scenario_probability is None:
+                low = midpoint
+                continue
             reaches = (
-                priced.scenario_probability or 0
-            ) + request.probability_tolerance >= request.target_probability
+                priced.scenario_probability + request.probability_tolerance
+                >= request.target_probability
+            )
             if reaches:
                 best = midpoint
             if reaches == variable.increasing:
@@ -1164,7 +1256,9 @@ class WhatIfService:
         verified = await self._simulate(
             request.base.model_copy(update={"assumptions": changed}), persist=False
         )
-        probability = verified.scenario_probability or 0
+        probability = verified.scenario_probability
+        if probability is None:
+            return None
         if probability + request.probability_tolerance < request.target_probability:
             return None
         return TargetPath(
@@ -1397,6 +1491,8 @@ class WhatIfService:
             evidence,
             scenario_labels=labels,
             seed=request.seed,
+            parsed_changes=request.parsed_changes,
+            config=request.config.model_copy(update={"seed": request.seed}),
         )
         if resolved is None:
             return None

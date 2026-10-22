@@ -27,6 +27,7 @@ type Props = {
   onSeeFutures: (path: PathStrategy) => void;
   selectedSimulation: SimulationPoint | null;
   onSelectSimulation: (point: SimulationPoint | null) => void;
+  onFind?: () => void;
 };
 
 export default function PathsToGoalView({
@@ -45,6 +46,7 @@ export default function PathsToGoalView({
   onSeeFutures,
   selectedSimulation,
   onSelectSimulation,
+  onFind,
 }: Props) {
   const paths = pathsProp ?? [];
   const loadingPaths = loading || pathsProp === undefined;
@@ -102,8 +104,7 @@ export default function PathsToGoalView({
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
       <section className="composer">
         <div className="composer-intro">
-          <p className="section-label">Paths to goal</p>
-          <h2>What realistic strategies could get you there?</h2>
+          <h2>What would move the odds?</h2>
         </div>
       </section>
 
@@ -166,7 +167,10 @@ export default function PathsToGoalView({
           <button
             type="button"
             className="primary-action compact"
-            onClick={() => setFinding(true)}
+            onClick={() => {
+              setFinding(true);
+              onFind?.();
+            }}
           >
             Find feasible paths
           </button>

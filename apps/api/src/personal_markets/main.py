@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 
@@ -47,6 +48,7 @@ from personal_markets.wiring import (
     PersistingWorkflow,
     build_inference,
 )
+from personal_markets.workspace_seed.api import router as workspace_seed_router
 
 configure_windows_selector_event_loop()
 
@@ -55,6 +57,12 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    commit: str | None = None
+
+
+def _deployed_commit() -> str | None:
+    value = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("PM_BUILD_COMMIT")
+    return value[:12] if value else None
 
 
 class HealthDetailsResponse(HealthResponse):
@@ -254,6 +262,7 @@ def create_app() -> FastAPI:
             status="ok",
             service="personal-markets-api",
             version="0.1.0",
+            commit=_deployed_commit(),
         )
 
     @application.get("/health/details", response_model=HealthDetailsResponse, tags=["system"])
@@ -279,6 +288,7 @@ def create_app() -> FastAPI:
     application.include_router(integrations_router, dependencies=private)
     application.include_router(evidence_sources_router, dependencies=private)
     application.include_router(upload_router, dependencies=private)
+    application.include_router(workspace_seed_router)
     if settings.mcp_enabled:
         from personal_markets.remote_mcp.consent_api import router as remote_mcp_router
         from personal_markets.remote_mcp.factory import mount_remote_mcp

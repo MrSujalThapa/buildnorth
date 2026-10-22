@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "scripts" / "mypy_baseline.json"
-ERROR = re.compile(r"((?:apps|scripts)/[^:]+):(\d+): error: (.+?)  \[([^]]+)\]")
+ERROR = re.compile(r"((?:apps|scripts)[/\\][^:]+):(\d+): error: (.+?)  \[([^]]+)\]")
 
 
 def findings(from_gh_run: str | None = None) -> Counter[str]:
@@ -36,7 +36,7 @@ def findings(from_gh_run: str | None = None) -> Counter[str]:
         if match is None:
             continue
         filename, line_number, message, code = match.groups()
-        path = ROOT / filename
+        path = ROOT / filename.replace("\\", "/")
         source = path.read_text(encoding="utf-8").splitlines()
         line = source[int(line_number) - 1].strip()
         key = json.dumps([path.relative_to(ROOT).as_posix(), code, message, line])
