@@ -407,6 +407,42 @@ test.describe("Resource-specific evidence", () => {
     await page.screenshot({ path: `test-results/remediation-evidence-sync-${testInfo.project.name}.png`, fullPage: true });
   });
 
+  test("approved source watch can be paused, stopped, and restarted", async ({ page }, testInfo) => {
+    let watchStatus: "active" | "paused" | "revoked" | null = null;
+    const watch = () => ({
+      id: "40000000-0000-0000-0000-000000000001", goal_id: CAREER,
+      plugin_id: "notion", resource_id: "12345678-1234-1234-1234-123456789abc",
+      scope: "parent", status: watchStatus, last_success_at: null, last_error: null,
+    });
+    await page.route("**/api/v1/goals/*/evidence/sources/recipes", (route) => route.fulfill({ json: [
+      { goal_id: CAREER, plugin_id: "notion", label: "Book Reports", approved: true, steps: [
+        { capability_id: "notion.page.read", resource_uri: "composio://notion/12345678-1234-1234-1234-123456789abc", arguments: {} },
+      ] },
+    ] }));
+    await page.route("**/api/v1/goals/*/evidence/sources/watches", (route) => {
+      if (route.request().method() === "POST") {
+        expect(route.request().postDataJSON()).toMatchObject({ plugin_id: "notion", scope: "parent" });
+        watchStatus = "active";
+        return route.fulfill({ json: watch() });
+      }
+      return route.fulfill({ json: watchStatus ? [watch()] : [] });
+    });
+    await page.route("**/api/v1/goals/*/evidence/sources/watches/*", (route) => {
+      watchStatus = route.request().postDataJSON().status;
+      return route.fulfill({ json: watch() });
+    });
+    await page.goto(`/goals/${CAREER}/evidence`);
+    await page.getByRole("button", { name: "Watch area" }).click();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await page.getByRole("button", { name: "Pause" }).click();
+    await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+    await page.getByRole("button", { name: "Stop" }).click();
+    await expect(page.getByRole("button", { name: "Restart" })).toBeVisible();
+    await page.getByRole("button", { name: "Restart" }).click();
+    await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    await page.screenshot({ path: `test-results/source-watch-${testInfo.project.name}.png`, fullPage: true });
+  });
+
   test("What If keeps execution-adjusted odds separate", async ({ page }) => {
     await page.route("**/api/v1/what-if/simulate", (route) =>
       route.fulfill({

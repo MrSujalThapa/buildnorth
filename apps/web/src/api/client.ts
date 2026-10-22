@@ -342,7 +342,18 @@ export interface SourceRecipeRecord {
   plugin_id: string;
   label: string;
   approved: boolean;
-  steps: { capability_id: string; tool_name?: string | null; arguments: Record<string, unknown> }[];
+  steps: { capability_id: string; tool_name?: string | null; resource_uri?: string | null; arguments: Record<string, unknown> }[];
+}
+
+export interface SourceWatchRecord {
+  id: string;
+  goal_id: string;
+  plugin_id: string;
+  resource_id: string;
+  scope: "resource" | "parent";
+  status: "active" | "paused" | "revoked";
+  last_success_at: string | null;
+  last_error: string | null;
 }
 
 export interface GoalSyncJob {
@@ -882,6 +893,16 @@ export const api = {
     request<SourcePlannerProposal>(`/api/v1/goals/${goalId}/evidence/sources/plan`, undefined, signal),
   evidenceSourceRecipes: (goalId: string, signal?: AbortSignal) =>
     request<SourceRecipeRecord[]>(`/api/v1/goals/${goalId}/evidence/sources/recipes`, undefined, signal),
+  sourceWatches: (goalId: string, signal?: AbortSignal) =>
+    request<SourceWatchRecord[]>(`/api/v1/goals/${goalId}/evidence/sources/watches`, undefined, signal),
+  saveSourceWatch: (goalId: string, body: { plugin_id: string; resource_id: string; scope: "resource" | "parent" }) =>
+    request<SourceWatchRecord>(`/api/v1/goals/${goalId}/evidence/sources/watches`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  updateSourceWatch: (goalId: string, watchId: string, status: "active" | "paused" | "revoked") =>
+    request<SourceWatchRecord>(`/api/v1/goals/${goalId}/evidence/sources/watches/${watchId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+    }),
   saveEvidenceSourceRecipe: (
     goalId: string,
     pluginId: string,

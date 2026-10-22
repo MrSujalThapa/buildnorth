@@ -384,6 +384,42 @@
   font-size: 12px;
 }
 
+.evidence-recipe-list li.watchable {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  border-radius: 10px;
+  color: var(--app-ink);
+  font-size: 13px;
+}
+
+.evidence-watch-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evidence-watch-actions button {
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+  color: var(--app-ink);
+  padding: 6px 9px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.evidence-watch-actions button:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.evidence-watch-actions button:disabled { opacity: .5; cursor: default; }
+.evidence-watch-error { color: var(--app-danger, #9a3d32); }
+
 .evidence-sync-bar > button {
   min-height: 42px;
   padding: 0 16px;
