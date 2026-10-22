@@ -1,12 +1,12 @@
 import asyncio
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import Engine, create_engine, text
 
 from personal_markets.persistence.query_stats import instrument, track_queries
 
 
-def _engine():
+def _engine() -> Engine:
     engine = create_engine("sqlite://")
     instrument(engine)
     instrument(engine)
