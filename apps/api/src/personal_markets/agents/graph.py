@@ -22,6 +22,7 @@ from personal_markets.agents.state import (
 )
 from personal_markets.core.errors import ResourceNotFoundError
 from personal_markets.evidence.metrics import anchor_reported_today_increment
+from personal_markets.evidence.source_policy import withhold_commit_only_solution_claims
 from personal_markets.ports import (
     CriticArtifact,
     EvidenceAgentProposal,
@@ -404,6 +405,9 @@ class LangGraphAgentWorkflow:
     async def _validate_evidence(self, state: AgentGraphState) -> dict[str, Any]:
         proposal = EvidenceAgentProposal.model_validate(
             state.get("evidence_proposal") or {"events": []}
+        )
+        proposal = withhold_commit_only_solution_claims(
+            proposal, list(state.get("mcp_records") or [])
         )
         errors: list[str] = []
         for event in proposal.events:
