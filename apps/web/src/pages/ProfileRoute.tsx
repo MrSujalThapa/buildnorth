@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ExecutionProfileRadar } from "../components/behavior/ExecutionProfileRadar";
 import { api } from "../api/client";
+import { useRefreshAccount } from "../auth/AuthGate";
 import { linkedGoals, resolveAreas, suggestAreas, type ProfileArea } from "./profileAreas";
 
 function moved<T>(items: T[], from: number, to: number): T[] {
@@ -41,6 +42,7 @@ async function cropPhoto(file: File, x: number, y: number): Promise<File> {
 
 export function ProfileRoute() {
   const queryClient = useQueryClient();
+  const refreshAccount = useRefreshAccount();
   const profile = useQuery({ queryKey: ["profile"], queryFn: ({ signal }) => api.profile(signal) });
   const photo = useQuery({ queryKey: ["profile-photo"], queryFn: ({ signal }) => api.profilePhoto(signal), staleTime: 5 * 60_000 });
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -78,7 +80,9 @@ export function ProfileRoute() {
   }, [selectedPhoto]);
   const save = useMutation({
     mutationFn: (body: { display_name: string; username: string; bio: string }) => api.patchProfile(body),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["profile"] }); },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
   const saveParameters = useMutation({
     mutationFn: (parameter_ids: string[]) => api.patchProfile({ parameter_ids }),
@@ -202,6 +206,7 @@ export function ProfileRoute() {
               } else if (pending) {
                 await upload.mutateAsync(pending);
               }
+              await refreshAccount().catch(() => undefined);
               setPendingRemove(false);
               setSelectedPhoto(null);
               setEditing(false);
