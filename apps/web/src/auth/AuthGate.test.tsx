@@ -21,13 +21,13 @@ afterEach(() => {
   session.setAccessTokenProvider(null);
 });
 
-test("stalled account lookup presents a retry instead of spinning forever", async () => {
+test("stalled account lookup presents a retry instead of spinning forever", () => {
   vi.useFakeTimers();
   vi.spyOn(session, "clerkEnabled").mockReturnValue(true);
   vi.spyOn(api, "me").mockImplementation(() => new Promise(() => {}));
   render(<MemoryRouter><ThemeProvider><AuthGate><Location /></AuthGate></ThemeProvider></MemoryRouter>);
   expect(screen.getByText("Checking your session.")).toBeInTheDocument();
-  await act(async () => { vi.advanceTimersByTime(12_000); });
+  act(() => { vi.advanceTimersByTime(12_000); });
   expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
