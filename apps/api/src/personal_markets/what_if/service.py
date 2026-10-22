@@ -6,6 +6,7 @@ from uuid import UUID
 
 import numpy as np
 
+from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.demo_fixtures import (
@@ -277,9 +278,7 @@ class WhatIfService:
         return result
 
     @staticmethod
-    def _unmapped_changes_result(
-        request: WhatIfRequest, assumptions: list
-    ) -> WhatIfResult | None:
+    def _unmapped_changes_result(request: WhatIfRequest, assumptions: list) -> WhatIfResult | None:
         if not request.parsed_changes:
             return None
         if request.intervention is not None and request.intervention.effect_per_unit is not None:
@@ -312,7 +311,15 @@ class WhatIfService:
             composed = await self._simulate_composition(goal, request, evidence, persist=persist)
             if composed is not None:
                 return composed
-            request = self._apply_behavior_execution(goal, request, evidence)
+            explicit_trials = []
+            if self._owner_id is not None:
+                plans, observations = await get_commitment_store().list_for_goals(
+                    self._owner_id, [goal.goal_id]
+                )
+                explicit_trials = trials_from_commitments(plans, observations)
+            request = self._apply_behavior_execution(
+                goal, request, evidence, commitment_trials=explicit_trials
+            )
             user_overrides = {item.name: item.value for item in request.assumptions}
             baseline_ctx = resolve_simulation_context(
                 goal, evidence, parsed_changes=[], assumption_overrides=user_overrides
@@ -1423,6 +1430,7 @@ class WhatIfService:
         goal: GoalContract,
         request: WhatIfRequest,
         evidence: list,
+        commitment_trials: list | None = None,
     ) -> WhatIfRequest:
         self._last_behavior_profile = None
         incoming = next(
@@ -1434,7 +1442,7 @@ class WhatIfService:
             and abs(incoming.value - 0.72) > 1e-6
         ):
             return request
-        if not evidence:
+        if not evidence and not commitment_trials:
             return request
         intervention = request.intervention
         context = context_from_text(
@@ -1449,7 +1457,9 @@ class WhatIfService:
             domain=goal.state_dimensions[0] if goal.state_dimensions else "general",
             planned_amount=intervention.amount if intervention else None,
         )
-        profile = self._behavior.profile_from_evidence(evidence, goal, context)
+        profile = self._behavior.profile_from_evidence(
+            evidence, goal, context, commitment_trials=commitment_trials
+        )
         self._last_behavior_profile = profile
         if not profile.execution.usable:
             return request

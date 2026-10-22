@@ -51,13 +51,17 @@ def build_profile(
     *,
     as_of: datetime,
 ) -> BehaviorProfile:
-    posts = hierarchical_posteriors(trials, context, as_of=as_of, half_life_days=execution.half_life_days)
+    posts = hierarchical_posteriors(
+        trials, context, as_of=as_of, half_life_days=execution.half_life_days
+    )
     features = execution.features
     sources = sorted({item.source for item in trials})
     completed = sum(item.outcome for item in trials)
     window = None
     if trials:
-        window = max(1.0, (as_of - min(item.observed_at for item in trials)).total_seconds() / 86400)
+        window = max(
+            1.0, (as_of - min(item.observed_at for item in trials)).total_seconds() / 86400
+        )
 
     follow_post = posts["global"] if context.action_type == "overall" else posts["action"]
     follow_mean = (
@@ -78,12 +82,13 @@ def build_profile(
             evidence_window_days=window,
             sources=sources,
             n_eff=follow_post.n_eff,
-            formula="recency-weighted Beta-Bernoulli with hierarchical shrinkage",
+            formula="dual-horizon weighted Beta-Bernoulli with hierarchical shrinkage",
             details=[
                 f"{len(trials)} comparable commitments",
                 f"{completed:.0f} completed",
                 f"recency-weighted completion = {follow_mean:.3f}",
                 f"half-life = {execution.half_life_days:.0f} days",
+                "long-term baseline half-life = 365 days",
                 f"sources: {', '.join(sources) or 'none'}",
                 f"confidence = {follow_conf}",
             ],
@@ -110,7 +115,9 @@ def build_profile(
         ),
     )
 
-    realism_n = sum(1 for item in trials if item.planned_amount and item.realized_amount is not None)
+    realism_n = sum(
+        1 for item in trials if item.planned_amount and item.realized_amount is not None
+    )
     realism_limited, realism_conf = _confidence(float(realism_n), 4)
     realism_value = features.get("realism", 1.0)
     realism = BehaviorDimension(
@@ -234,7 +241,16 @@ def build_profile(
         estimator_version=ESTIMATOR_VERSION,
         as_of=as_of,
         execution=execution,
-        dimensions=[follow, consistency, realism, momentum, reliability, recovery, quality, relevance],
+        dimensions=[
+            follow,
+            consistency,
+            realism,
+            momentum,
+            reliability,
+            recovery,
+            quality,
+            relevance,
+        ],
         evidence_sufficiency=execution.confidence,
         n_raw=execution.n_raw,
         n_eff=execution.n_eff,

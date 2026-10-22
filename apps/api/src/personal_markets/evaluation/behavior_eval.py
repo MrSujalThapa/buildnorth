@@ -10,6 +10,8 @@ import numpy as np
 from personal_markets.behavior.domain import ActionContext, CommitmentTrial
 from personal_markets.behavior.model import (
     DEFAULT_HALF_LIFE,
+    ESTIMATOR_VERSION,
+    HALF_LIFE_CANDIDATES,
     estimate_execution,
     fit_logistic,
     hierarchical_posteriors,
@@ -59,7 +61,9 @@ def _trial(row: dict[str, Any]) -> CommitmentTrial:
     )
 
 
-def _folds(rows: list[dict[str, Any]]) -> list[tuple[list[CommitmentTrial], ActionContext, float, datetime]]:
+def _folds(
+    rows: list[dict[str, Any]],
+) -> list[tuple[list[CommitmentTrial], ActionContext, float, datetime]]:
     by_user: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         by_user.setdefault(str(row["user_id"]), []).append(row)
@@ -171,13 +175,21 @@ def run_behavior_evaluation(path: Path | None = None) -> dict[str, Any]:
     systems = {
         "always_one": _predict(test, half_life=half_life, logistic=logistic, mode="always_one"),
         "global_prior": _predict(test, half_life=half_life, logistic=logistic, mode="global_prior"),
-        "gpt_heuristic": _predict(test, half_life=half_life, logistic=logistic, mode="gpt_heuristic"),
+        "gpt_heuristic": _predict(
+            test, half_life=half_life, logistic=logistic, mode="gpt_heuristic"
+        ),
         "global_only": _predict(test, half_life=half_life, logistic=logistic, mode="global_only"),
-        "global_domain": _predict(test, half_life=half_life, logistic=logistic, mode="global_domain"),
+        "global_domain": _predict(
+            test, half_life=half_life, logistic=logistic, mode="global_domain"
+        ),
         "plus_action": _predict(test, half_life=half_life, logistic=logistic, mode="plus_action"),
         "plus_decay": _predict(test, half_life=half_life, logistic=logistic, mode="plus_decay"),
-        "logistic_overfit": _predict(test, half_life=half_life, logistic=logistic, mode="full_logistic"),
-        "behavior_model": _predict(test, half_life=half_life, logistic=logistic, mode="plus_action"),
+        "logistic_overfit": _predict(
+            test, half_life=half_life, logistic=logistic, mode="full_logistic"
+        ),
+        "behavior_model": _predict(
+            test, half_life=half_life, logistic=logistic, mode="plus_action"
+        ),
     }
     metrics = {}
     for name, preds in systems.items():
@@ -229,6 +241,74 @@ def run_behavior_evaluation(path: Path | None = None) -> dict[str, Any]:
     }
 
 
+def run_behavior_evaluation_v2(path: Path | None = None) -> dict[str, Any]:
+    """Chronological synthetic holdout; never an empirical calibration claim."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in load_dataset(path):
+        grouped.setdefault(str(row["user_id"]), []).append(row)
+    validation = []
+    test = []
+    for user_rows in grouped.values():
+        ordered = sorted(user_rows, key=lambda item: item["observed_at"])
+        if len(ordered) < 15:
+            continue
+        split_train = int(len(ordered) * 0.6)
+        split_test = int(len(ordered) * 0.8)
+        for index in range(split_train, len(ordered)):
+            row = ordered[index]
+            stamp = datetime.fromisoformat(row["observed_at"])
+            context = ActionContext(
+                action_type=str(row.get("action_type") or "unspecified"),
+                domain=str(row.get("domain") or "general"),
+                planned_amount=row.get("planned_amount"),
+                tokens=list(row.get("tokens") or []),
+            )
+            fold = (
+                [_trial(item) for item in ordered[:index]],
+                context,
+                float(row["outcome"]),
+                stamp,
+            )
+            (validation if index < split_test else test).append(fold)
+    if not validation or not test:
+        raise ValueError("behavior dataset is too small for chronological validation")
+    selected = select_half_life(validation, HALF_LIFE_CANDIDATES)
+    labels = [int(round(fold[2])) for fold in test]
+    model = [
+        estimate_execution(history, context, as_of=stamp, half_life_days=selected).probability
+        for history, context, _label, stamp in test
+    ]
+    global_baseline = [
+        (2.0 + sum(trial.outcome for trial in history)) / (4.0 + len(history))
+        for history, _context, _label, _stamp in test
+    ]
+    recent_baseline = [
+        float(np.mean([trial.outcome for trial in history[-5:]])) if history else 0.5
+        for history, _context, _label, _stamp in test
+    ]
+    metrics = {}
+    for name, predictions in {
+        "dual_horizon_action_model": model,
+        "global_historical_rate": global_baseline,
+        "recent_five_rate": recent_baseline,
+    }.items():
+        metrics[name] = {
+            "brier": brier_score(labels, predictions),
+            "log_loss": log_loss(labels, predictions),
+            "ece": _ece(labels, predictions),
+        }
+    return {
+        "protocol": "behavior_adherence_v2_chronological_synthetic",
+        "estimator_version": ESTIMATOR_VERSION,
+        "n_users": len(grouped),
+        "n_validation": len(validation),
+        "n_test": len(test),
+        "selected_recent_half_life_days": selected,
+        "metrics": metrics,
+        "limitation": "Synthetic data only; not empirically calibrated on real commitments.",
+    }
+
+
 def generate_dataset(path: Path | None = None, *, seed: int = 20260830) -> Path:
     target = path or dataset_path()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -257,11 +337,17 @@ def generate_dataset(path: Path | None = None, *, seed: int = 20260830) -> Path:
         for week in range(48):
             action = str(rng.choice(list(domain_ps)))
             domain = "career" if action == "coding" else action
-            p = 0.55 * domain_ps[action] + 0.25 * global_p + 0.20 * (0.9 if week > 36 and rng.random() < 0.2 else domain_ps[action])
+            p = (
+                0.55 * domain_ps[action]
+                + 0.25 * global_p
+                + 0.20 * (0.9 if week > 36 and rng.random() < 0.2 else domain_ps[action])
+            )
             p = float(np.clip(p, 0.05, 0.95))
             planned = float(rng.choice([1.0, 1.5, 2.0, 3.0]))
             outcome = 1.0 if rng.random() < p else 0.0
-            realized = planned * (0.7 + 0.3 * outcome) if outcome else planned * rng.uniform(0.0, 0.4)
+            realized = (
+                planned * (0.7 + 0.3 * outcome) if outcome else planned * rng.uniform(0.0, 0.4)
+            )
             stamp = start + timedelta(days=week * 7 + int(rng.integers(0, 3)))
             session_events = int(rng.choice([1, 1, 1, 4, 8])) if action == "coding" else 1
             rows.append(

@@ -4,7 +4,12 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from personal_markets.behavior.dimensions import build_profile
-from personal_markets.behavior.domain import ActionContext, BehaviorProfile, ExecutionEstimate
+from personal_markets.behavior.domain import (
+    ActionContext,
+    BehaviorProfile,
+    CommitmentTrial,
+    ExecutionEstimate,
+)
 from personal_markets.behavior.features import context_from_text, trials_from_evidence
 from personal_markets.behavior.model import DEFAULT_HALF_LIFE, estimate_execution
 from personal_markets.evidence.domain import NormalizedEvidence
@@ -28,13 +33,14 @@ class BehaviorService:
         context: ActionContext | None = None,
         *,
         as_of: datetime | None = None,
+        commitment_trials: list[CommitmentTrial] | None = None,
     ) -> BehaviorProfile:
         stamp = as_of or datetime.now(UTC)
         action = context or context_from_text(
             " ".join([goal.title, *goal.state_dimensions]),
             domain=(goal.state_dimensions[0] if goal.state_dimensions else "general"),
         )
-        trials = trials_from_evidence(events)
+        trials = [*trials_from_evidence(events), *(commitment_trials or [])]
         execution = estimate_execution(
             trials,
             action,
@@ -51,5 +57,12 @@ class BehaviorService:
         context: ActionContext | None = None,
         *,
         as_of: datetime | None = None,
+        commitment_trials: list[CommitmentTrial] | None = None,
     ) -> ExecutionEstimate:
-        return self.profile_from_evidence(events, goal, context, as_of=as_of).execution
+        return self.profile_from_evidence(
+            events,
+            goal,
+            context,
+            as_of=as_of,
+            commitment_trials=commitment_trials,
+        ).execution

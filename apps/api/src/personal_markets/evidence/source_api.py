@@ -1,10 +1,20 @@
+from __future__ import annotations
+
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from personal_markets.agents.source_planner_service import SourcePlannerService
+from personal_markets.behavior.commitments import (
+    Commitment,
+    CommitmentObservation,
+    OutcomeStatus,
+    get_commitment_store,
+    trials_from_commitments,
+)
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
 from personal_markets.evidence.service import EvidenceService
@@ -45,6 +55,83 @@ class WatchStatusBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: str
+
+
+class CreateCommitmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str = Field(min_length=1, max_length=80)
+    action: str = Field(min_length=1, max_length=160)
+    planned_quantity: float = Field(gt=0)
+    unit: str = Field(min_length=1, max_length=40)
+    window_start: datetime
+    window_end: datetime
+
+    @model_validator(mode="after")
+    def validate_window(self) -> CreateCommitmentBody:
+        if self.window_start.tzinfo is None or self.window_end.tzinfo is None:
+            raise ValueError("Commitment windows need a timezone")
+        if self.window_end <= self.window_start:
+            raise ValueError("Commitment window must end after it starts")
+        return self
+
+
+class ObserveCommitmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: OutcomeStatus
+    actual_quantity: float | None = Field(default=None, ge=0)
+    observed_at: datetime
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> ObserveCommitmentBody:
+        if self.observed_at.tzinfo is None:
+            raise ValueError("Observation timestamp needs a timezone")
+        if self.status in {"completed", "partial"} and self.actual_quantity is None:
+            raise ValueError("An observed quantity is required")
+        return self
+
+
+@router.get("/{goal_id}/commitments")
+async def list_commitments(
+    goal_id: UUID,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> dict[str, list[Commitment] | list[CommitmentObservation]]:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    plans, observations = await get_commitment_store().list_for_goals(principal.user_id, [goal_id])
+    return {"commitments": plans, "observations": observations}
+
+
+@router.post("/{goal_id}/commitments", response_model=Commitment)
+async def create_commitment(
+    goal_id: UUID,
+    body: CreateCommitmentBody,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> Commitment:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    plan = Commitment(owner_id=principal.user_id, goal_id=goal_id, **body.model_dump())
+    return await get_commitment_store().create(plan)
+
+
+@router.post(
+    "/{goal_id}/commitments/{commitment_id}/observations", response_model=CommitmentObservation
+)
+async def observe_commitment(
+    goal_id: UUID,
+    commitment_id: UUID,
+    body: ObserveCommitmentBody,
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> CommitmentObservation:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    plans, _ = await get_commitment_store().list_for_goals(principal.user_id, [goal_id])
+    if not any(plan.id == commitment_id for plan in plans):
+        raise ResourceNotFoundError("Commitment not found")
+    return await get_commitment_store().observe(
+        principal.user_id, commitment_id, **body.model_dump()
+    )
 
 
 @router.get("/{goal_id}/evidence/sources/plan", response_model=SourcePlannerProposal)
@@ -157,7 +244,12 @@ async def behavior_profile(
 ) -> dict[str, object]:
     goal = await goals.get_goal_by_string(str(goal_id), owner_id=principal.user_id)
     events = await evidence.list_for_goal(goal.goal_id)
-    profile = BehaviorService().profile_from_evidence(events, goal)
+    plans, observations = await get_commitment_store().list_for_goals(
+        principal.user_id, [goal.goal_id]
+    )
+    profile = BehaviorService().profile_from_evidence(
+        events, goal, commitment_trials=trials_from_commitments(plans, observations)
+    )
     return profile.model_dump(mode="json")
 
 

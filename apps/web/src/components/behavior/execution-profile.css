@@ -29,6 +29,11 @@
   align-items: start;
 }
 
+.execution-layout.empty {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+}
+
 .execution-profile svg {
   width: min(100%, 460px);
   height: auto;

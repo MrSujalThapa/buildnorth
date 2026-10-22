@@ -89,6 +89,19 @@
 
 .setting-row strong { font-size: 13px; }
 .setting-row span { margin-top: 5px; max-width: 620px; color: var(--app-muted); font-size: 11px; line-height: 1.45; }
+.settings-refresh {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-surface);
+  color: var(--app-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-refresh:hover { border-color: var(--app-accent); }
+.settings-refresh:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
 
 .setting-switch input { display: none; }
 .setting-switch > span {

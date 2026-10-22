@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -16,6 +17,7 @@ from personal_markets.identity.credentials import (
     CredentialMetadata,
     CredentialStore,
     InferencePreference,
+    StoredCredential,
     UserProvider,
 )
 from personal_markets.identity.domain import Principal
@@ -47,11 +49,16 @@ class InferenceSettingsService:
 
     async def view(self, principal: Principal, *, refresh_models: bool = False) -> dict[str, Any]:
         try:
-            credentials = []
-            for provider in ("openai", "anthropic"):
-                row = await self._store.get(principal.user_id, provider)
-                if row:
-                    credentials.append(row.metadata().model_dump(mode="json"))
+            openai_row, anthropic_row, preference, byok_usage = await asyncio.gather(
+                self._store.get(principal.user_id, "openai"),
+                self._store.get(principal.user_id, "anthropic"),
+                self._store.preference(principal.user_id),
+                self._audit.byok_summary(principal.user_id),
+            )
+            stored = {"openai": openai_row, "anthropic": anthropic_row}
+            credentials = [
+                row.metadata().model_dump(mode="json") for row in stored.values() if row is not None
+            ]
             provider = hosted_provider(self._settings)
             hosted_configured = bool(
                 {
@@ -60,24 +67,23 @@ class InferenceSettingsService:
                     "spur": self._settings.spur_api_key,
                 }.get(provider)
             )
-            hosted_model = (
-                self._settings.inference_model
-                or (
-                    self._settings.resolved_spur_model()
-                    if provider == "spur"
-                    else default_model(provider)
-                    if provider not in {"none", ""}
-                    else None
-                )
+            hosted_model = self._settings.inference_model or (
+                self._settings.resolved_spur_model()
+                if provider == "spur"
+                else default_model(provider)
+                if provider not in {"none", ""}
+                else None
             )
             discovered: dict[str, list[dict[str, Any]]] = {}
             for item in credentials:
                 listed = await self.discover_models(
-                    principal, item["provider"], refresh=refresh_models
+                    principal,
+                    item["provider"],
+                    refresh=refresh_models,
+                    credential=stored[item["provider"]],
                 )
                 if listed:
                     discovered[item["provider"]] = listed
-            preference = await self._store.preference(principal.user_id)
             byok_models = (
                 discovered.get(preference.provider, []) if preference.mode == "byok" else []
             )
@@ -101,7 +107,7 @@ class InferenceSettingsService:
                 "hosted_provider": provider,
                 "hosted_configured": hosted_configured,
                 "hosted_model": hosted_model,
-                "byok_usage": await self._audit.byok_summary(principal.user_id),
+                "byok_usage": byok_usage,
             }
         except DomainError:
             raise
@@ -109,14 +115,19 @@ class InferenceSettingsService:
             raise ProviderNotConfiguredError("Inference settings could not be loaded") from None
 
     async def discover_models(
-        self, principal: Principal, provider: UserProvider, *, refresh: bool = False
+        self,
+        principal: Principal,
+        provider: UserProvider,
+        *,
+        refresh: bool = False,
+        credential: StoredCredential | None = None,
     ) -> list[dict[str, Any]]:
         cache_key = (str(principal.user_id), provider)
         cached = self._discovered.get(cache_key)
         if cached and not refresh and cached[0] > time.monotonic():
             return cached[1]
         try:
-            row = await self._store.get(principal.user_id, provider)
+            row = credential or await self._store.get(principal.user_id, provider)
         except Exception:
             return []
         if row is None or row.status == "invalid":
@@ -141,6 +152,7 @@ class InferenceSettingsService:
         await NativeInferenceAdapter(provider, key).validate_key()
         try:
             await self._store.put_and_activate(principal.user_id, provider, ciphertext, key[-4:])
+            self._discovered.pop((str(principal.user_id), provider), None)
             row = await self._store.get(principal.user_id, provider)
             if row is None:
                 raise ValueError
@@ -167,6 +179,7 @@ class InferenceSettingsService:
         except ProviderAuthenticationError:
             try:
                 await self._store.set_status(principal.user_id, provider, row.version, "invalid")
+                self._discovered.pop((str(principal.user_id), provider), None)
             except Exception:
                 raise ProviderNotConfiguredError(
                     "Credential status storage is unavailable"
@@ -181,6 +194,7 @@ class InferenceSettingsService:
     async def delete_key(self, principal: Principal, provider: UserProvider) -> None:
         try:
             await self._store.delete(principal.user_id, provider)
+            self._discovered.pop((str(principal.user_id), provider), None)
         except Exception:
             raise ProviderNotConfiguredError(
                 "Credential deletion failed; retry before continuing"

@@ -28,10 +28,14 @@ def goal_text(goal: dict[str, Any] | None) -> str:
 
 
 def resource_text(resource: dict[str, Any]) -> str:
-    return " ".join(
+    description = " ".join(
         str(resource.get(key) or "")
         for key in ("label", "name", "description", "rationale", "why", "resource_type", "type", "mime_type")
     )
+    # Small activity vocabulary; this is source metadata, never evidence.
+    if "neetcode" in description.lower():
+        description += " leetcode algorithm practice problems"
+    return description
 
 
 def score_resource(resource: dict[str, Any], goal: dict[str, Any] | None) -> float:

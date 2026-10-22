@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 
+from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.portfolio import portfolio_profile
 from personal_markets.collections.service import CollectionService
 from personal_markets.core.errors import ForbiddenError
@@ -58,15 +59,35 @@ async def get_profile(
 
     event_rows = await asyncio.gather(*(goal_evidence(goal.goal_id) for goal in owned))
     grouped = {str(goal.goal_id): rows for goal, rows in zip(owned, event_rows, strict=True)}
-    radar = portfolio_profile(owned, grouped, dimensions=account.profile.dimensions)
+    commitments, observations = await get_commitment_store().list_for_goals(
+        principal.user_id, [goal.goal_id for goal in owned]
+    )
+    explicit_trials = trials_from_commitments(commitments, observations)
+    plan_goals = {str(plan.id): plan.goal_id for plan in commitments}
+    radar = portfolio_profile(
+        owned,
+        grouped,
+        dimensions=account.profile.dimensions,
+        commitment_trials=explicit_trials,
+    )
     radar_areas = []
     for area in account.profile.dimensions:
         members = [goal for goal in owned if goal.goal_id in area.goal_ids]
         if members:
-            radar_areas.append({
-                "label": area.label,
-                "radar": portfolio_profile(members, grouped).model_dump(mode="json"),
-            })
+            radar_areas.append(
+                {
+                    "label": area.label,
+                    "radar": portfolio_profile(
+                        members,
+                        grouped,
+                        commitment_trials=[
+                            trial
+                            for trial in explicit_trials
+                            if plan_goals.get(trial.trial_id.split(":")[1]) in area.goal_ids
+                        ],
+                    ).model_dump(mode="json"),
+                }
+            )
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),

@@ -74,6 +74,17 @@ def get_credential_store() -> CredentialStore:
 
 
 def get_inference_settings_service() -> "InferenceSettingsService":
+    if get_settings().environment in {"test", "pytest"}:
+        return _build_inference_settings_service()
+    return _production_inference_settings_service()
+
+
+@lru_cache
+def _production_inference_settings_service() -> "InferenceSettingsService":
+    return _build_inference_settings_service()
+
+
+def _build_inference_settings_service() -> "InferenceSettingsService":
     from personal_markets.identity.inference_audit import InferenceAudit
     from personal_markets.identity.inference_settings import InferenceSettingsService
 

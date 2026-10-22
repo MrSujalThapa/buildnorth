@@ -21,15 +21,8 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
   const [hosted, setHosted] = useState(account?.hosted);
   const [usageError, setUsageError] = useState<string | null>(null);
   useEffect(() => {
-    if (!account) return;
-    let cancelled = false;
-    void api.me().then((next) => {
-      if (!cancelled) setHosted(next.hosted);
-    }).catch(() => {
-      if (!cancelled) setUsageError("Hosted usage could not be refreshed. Reload to try again.");
-    });
-    return () => { cancelled = true; };
-  }, [account]);
+    setHosted(account?.hosted);
+  }, [account?.hosted]);
   return (
     <main className="utility-page">
       <section className="utility-shell">
@@ -59,6 +52,12 @@ export default function SettingsPage({ theme, onSetTheme }: Props) {
                     : "Sign in to see your hosted Spur allowance."}
                 </span>
               </div>
+              {account ? <button type="button" className="settings-refresh" onClick={() => {
+                setUsageError(null);
+                void api.me().then((next) => setHosted(next.hosted)).catch(() => {
+                  setUsageError("Balance could not be refreshed. Try again.");
+                });
+              }}>Refresh</button> : null}
             </div>
             {hosted ? (
               <p className="setting-note">{hosted.billing_note}</p>

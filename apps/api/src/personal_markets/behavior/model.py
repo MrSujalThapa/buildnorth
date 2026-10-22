@@ -15,7 +15,7 @@ from personal_markets.behavior.domain import (
 from personal_markets.behavior.tokenize import overlap_score
 from personal_markets.forecasting.decay import ExponentialDecay
 
-ESTIMATOR_VERSION = "behavior_hierarchical_beta_v1"
+ESTIMATOR_VERSION = "behavior_hierarchical_beta_v2_dual_horizon"
 PRIOR_ALPHA = 2.0
 PRIOR_BETA = 2.0
 K_DOMAIN = 8.0
@@ -23,6 +23,8 @@ K_ACTION = 6.0
 MIN_N_EFF = 4.0
 HALF_LIFE_CANDIDATES = (7.0, 14.0, 21.0, 28.0, 42.0)
 DEFAULT_HALF_LIFE = 21.0
+LONG_BASELINE_HALF_LIFE_DAYS = 365.0
+LONG_BASELINE_WEIGHT = 0.5
 
 # Fitted later on the frozen train split; defaults are weakly regularized.
 DEFAULT_LOGISTIC = {
@@ -36,7 +38,10 @@ DEFAULT_LOGISTIC = {
 
 
 def recency_weights(ages_days: np.ndarray, half_life_days: float) -> np.ndarray:
-    return ExponentialDecay(half_life_days).weights(ages_days.astype(np.float64))
+    ages = ages_days.astype(np.float64)
+    recent = ExponentialDecay(half_life_days).weights(ages)
+    baseline = ExponentialDecay(LONG_BASELINE_HALF_LIFE_DAYS).weights(ages)
+    return (1.0 - LONG_BASELINE_WEIGHT) * recent + LONG_BASELINE_WEIGHT * baseline
 
 
 def beta_posterior(
@@ -100,7 +105,9 @@ def hierarchical_posteriors(
 
     domain_mask = _mask(
         trials,
-        lambda item: item.domain == context.domain or overlap_score(item.tokens, [context.domain]) > 0.2,
+        lambda item: (
+            item.domain == context.domain or overlap_score(item.tokens, [context.domain]) > 0.2
+        ),
     )
     if not np.any(domain_mask):
         domain_mask = np.ones(len(trials), dtype=bool)
@@ -113,8 +120,11 @@ def hierarchical_posteriors(
 
     action_mask = _mask(
         trials,
-        lambda item: item.action_type == context.action_type
-        or overlap_score(item.tokens, context.tokens, item.action_type, context.action_type) >= 0.12,
+        lambda item: (
+            item.action_type == context.action_type
+            or overlap_score(item.tokens, context.tokens, item.action_type, context.action_type)
+            >= 0.12
+        ),
     )
     if not np.any(action_mask):
         action_post = domain_post.model_copy(update={"scope": "action", "n_eff": 0.0})
@@ -129,7 +139,9 @@ def hierarchical_posteriors(
     return {"global": global_post, "domain": domain_post, "action": action_post}
 
 
-def feature_vector(trials: list[CommitmentTrial], context: ActionContext, as_of: datetime) -> dict[str, float]:
+def feature_vector(
+    trials: list[CommitmentTrial], context: ActionContext, as_of: datetime
+) -> dict[str, float]:
     if not trials:
         return {
             "n_raw": 0.0,
@@ -219,7 +231,9 @@ def _recovery_rate(trials: list[CommitmentTrial], horizon_days: float = 7.0) -> 
     return resumes / misses
 
 
-def logistic_execution(theta: float, features: dict[str, float], coefficients: dict[str, float] | None = None) -> float:
+def logistic_execution(
+    theta: float, features: dict[str, float], coefficients: dict[str, float] | None = None
+) -> float:
     coef = coefficients or DEFAULT_LOGISTIC
     theta = min(1.0 - 1e-6, max(1e-6, theta))
     amount = max(features.get("planned_amount", 0.0), 0.0)
@@ -323,7 +337,9 @@ def fit_logistic(
     xs: list[list[float]] = []
     ys: list[float] = []
     for history, context, label, as_of in rows:
-        posts = hierarchical_posteriors(history, context, as_of=as_of, half_life_days=half_life_days)
+        posts = hierarchical_posteriors(
+            history, context, as_of=as_of, half_life_days=half_life_days
+        )
         features = feature_vector(history, context, as_of)
         features["planned_amount"] = float(context.planned_amount or 0.0)
         theta = min(1.0 - 1e-6, max(1e-6, posts["action"].mean))

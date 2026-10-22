@@ -1,4 +1,6 @@
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -18,6 +20,7 @@ from personal_markets.goals.service import GoalService
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
 from personal_markets.integrations.goal_sync_service import _supported_goal_step
 from personal_markets.integrations.mcp_domain import ReadCapabilityRecord
+from personal_markets.integrations.plugins import PluginStatus
 from personal_markets.persistence.agent_store import (
     InMemoryAgentRunStore,
     InMemoryEvidenceRepository,
@@ -111,6 +114,48 @@ def test_accessible_book_report_promotes_notion_for_reading_goal() -> None:
     )
     assert [item.plugin_id for item in result.recommended] == ["notion"]
     assert result.recommended[0].resources[0].recommended
+
+
+@pytest.mark.asyncio
+async def test_obvious_connected_resource_plan_skips_inference() -> None:
+    goal = GoalContract(
+        goal_id=uuid4(),
+        title="Read 20 books",
+        goal_type=GoalType.CONTINUOUS_TARGET,
+        success_definition={"metric": "books_read", "target": 20},
+        deadline=datetime.now(UTC) + timedelta(days=120),
+        state_dimensions=["books_read"],
+    )
+    owner_id = uuid4()
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, owner_id)
+    gateway = SimpleNamespace(
+        views=AsyncMock(return_value=[SimpleNamespace(
+            definition=SimpleNamespace(
+                id="notion", name="Notion", description="Notes",
+                used_for=[], capabilities=[]),
+            connection=SimpleNamespace(status=PluginStatus.CONNECTED),
+        )]),
+        list_capabilities=AsyncMock(return_value=[]),
+        list_resources=AsyncMock(return_value=[{
+            "uri": "page-1", "name": "Book Reports", "resource_type": "page",
+        }]),
+    )
+    inference = SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("paid inference")))
+    service = SourcePlannerService(
+        settings=Settings(environment="test"),
+        inference=inference,
+        goals=GoalService(repo),
+        evidence=EvidenceService(InMemoryEvidenceRepository()),
+        gateway=gateway,
+        run_store=InMemoryAgentRunStore(),
+        repository=get_integration_repository(),
+        owner_id=owner_id,
+    )
+    plan = await service.plan(str(goal.goal_id))
+    assert plan.recommended[0].plugin_id == "notion"
+    assert plan.recommended[0].resources[0].recommended
+    inference.complete.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -113,6 +113,19 @@ class SourcePlannerService:
                     "connection_status": "not_connected",
                 }
             )
+        goal_payload = goal.model_dump(mode="json")
+        if any(item["recommended"] for item in rank_resources(available_resources, goal_payload)):
+            # Metadata proposes a watch candidate; the later evidence pipeline
+            # still validates content before committing any observation.
+            return self._attach_ranked_resources(
+                SourcePlannerProposal(
+                    goal_title=goal.title,
+                    goal_type=str(goal.goal_type),
+                    state_dimensions=goal.state_dimensions,
+                ),
+                available_resources,
+                goal_payload,
+            )
         thread_id = str(uuid4())
         payload = {
             "goal": goal.model_dump(mode="json"),

@@ -83,7 +83,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
         {!hasMeasurements ? <p className="execution-empty">Your execution profile appears as planned actions are verified.</p> : null}
         {hasMeasurements && !complete ? <p className="execution-empty">Some traits need more observations.</p> : null}
       </header>
-      <div className="execution-layout">
+      <div className={`execution-layout${hasMeasurements ? "" : " empty"}`}>
         {dimensions.length >= 3 ? <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Follow-through profile radar">
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
