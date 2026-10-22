@@ -96,6 +96,18 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   const complete = dimensions.length >= 3 && dimensions.every(measured);
   const hasMeasurements = dimensions.some(measured);
+  // A fully unobserved profile is not a radar chart. Do not draw predefined
+  // axes and empty rings that suggest the user's personal parameters exist.
+  if (!hasMeasurements) {
+    return (
+      <section className={`execution-profile${compact ? " compact" : ""}`}>
+        <div className="execution-unmeasured" role="status">
+          <strong>No measured parameters yet</strong>
+          <p>Verified activity is needed before a meaningful profile can be displayed.</p>
+        </div>
+      </section>
+    );
+  }
   const outline = complete
     ? dimensions
         .map((item, index) => {
@@ -112,7 +124,6 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   return (
     <section className={`execution-profile${compact ? " compact" : ""}`}>
-      {!hasMeasurements ? <p className="execution-empty">Your execution profile appears as planned actions are verified.</p> : null}
       {hasMeasurements && !complete ? <p className="execution-empty">Some traits need more observations.</p> : null}
       <div className="radar-stage">
         {dimensions.length >= 3 ? (
