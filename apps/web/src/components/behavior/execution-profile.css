@@ -23,21 +23,16 @@
   line-height: 1.4;
 }
 
-.execution-layout {
-  display: grid;
-  grid-template-columns: minmax(280px, 460px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-}
-
-.execution-layout.empty {
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
+.radar-stage {
+  position: relative;
+  width: min(100%, 560px);
+  margin: 8px auto 0;
 }
 
 .execution-profile svg {
-  width: min(100%, 460px);
+  width: 100%;
   height: auto;
+  display: block;
 }
 
 .radar-empty-core {
@@ -83,26 +78,106 @@
   stroke-width: 1;
 }
 
-.radar-fill {
-  stroke: none;
+.radar-spoke {
+  stroke: var(--what-if-border, var(--app-border));
+  stroke-width: 1;
+}
+
+.radar-wedge {
+  fill-opacity: 0.42;
+  stroke-opacity: 0.9;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
 }
 
 .radar-outline {
   fill: none;
-  stroke: var(--what-if-accent, #5ec8bd);
-  stroke-width: 1.8;
-}
-
-.radar-node {
-  fill: var(--what-if-bg, var(--app-bg));
-  stroke: var(--what-if-accent, #5ec8bd);
+  stroke: var(--app-ink, #161513);
+  stroke-opacity: 0.55;
   stroke-width: 1.6;
 }
 
-.radar-label {
-  fill: var(--what-if-muted, var(--app-muted));
-  font-size: 11px;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+.radar-node {
+  stroke: var(--app-bg, #f4f2ee);
+  stroke-width: 2;
+}
+
+.radar-axis {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 112px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--app-ink, #161513);
+  font: 600 13px/1.2 "Instrument Sans", "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.radar-axis i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.radar-axis.selected {
+  font-weight: 700;
+}
+
+.radar-axis:focus-visible {
+  outline: 2px solid var(--app-accent, #1f8f86);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.radar-detail {
+  width: min(100%, 420px);
+  margin: 4px auto 0;
+  display: grid;
+  gap: 6px;
+}
+
+.radar-detail header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.radar-detail h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.radar-detail header strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.radar-detail p {
+  margin: 0;
+  color: var(--app-ink, #161513);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.radar-method {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-muted, #706d68);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .execution-sufficiency {
@@ -117,27 +192,6 @@
   color: var(--what-if-ink, var(--app-ink));
 }
 
-.execution-layout ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.execution-layout button {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 0;
-  border: 0;
-  border-bottom: 1px solid var(--what-if-border, var(--app-border));
-  background: transparent;
-  color: inherit;
-  text-align: left;
-}
-
 .execution-provenance {
   padding: 8px 0 10px;
   color: var(--what-if-muted, var(--app-muted));
@@ -148,8 +202,22 @@
   margin-top: 6px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .radar-wedge,
+  .radar-outline,
+  .radar-node {
+    animation: radar-in 420ms ease-out;
+  }
+}
+
+@keyframes radar-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @media (max-width: 720px) {
-  .execution-layout {
-    grid-template-columns: 1fr;
+  .radar-axis {
+    font-size: 12px;
+    max-width: 88px;
   }
 }

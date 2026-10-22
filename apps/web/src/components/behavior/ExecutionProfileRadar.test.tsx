@@ -7,7 +7,7 @@ test("partial evidence plots only observed traits without completing a polygon",
     estimator_version: "synthetic_test_fixture",
     execution: { probability: 0.65, n_eff: 3, confidence: "limited", source: "TEST", usable: false, notes: [] },
     dimensions: [
-      { key: "follow", label: "Follow-through", value: 0.7, display_percent: 70,
+      { key: "follow_through", label: "Follow-through", value: 0.7, display_percent: 70,
         limited_evidence: false, confidence: "limited",
         provenance: { comparable_commitments: 3, completed: 2, sources: [], n_eff: 3, formula: "Observed", details: [] } },
       { key: "consistency", label: "Consistency", value: null, display_percent: null,
@@ -22,5 +22,7 @@ test("partial evidence plots only observed traits without completing a polygon",
   const { container } = render(<ExecutionProfileRadar profile={profile} />);
   expect(screen.getByText("Some traits need more observations.")).toBeVisible();
   expect(container.querySelectorAll(".radar-node")).toHaveLength(1);
-  expect(container.querySelector(".radar-fill")).toBeNull();
+  expect(container.querySelector(".radar-wedge")).toBeNull();
+  expect(screen.queryByText("Observed")).toBeNull();
+  expect(screen.getByText("You completed 2 of 3 comparable commitments.")).toBeVisible();
 });

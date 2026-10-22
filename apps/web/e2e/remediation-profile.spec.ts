@@ -4,9 +4,22 @@ import { readFileSync } from "node:fs";
 const goal = { goal_id: "20000000-0000-0000-0000-000000000001", title: "Read 20 books", goal_type: "continuous_target", deadline: "2026-12-31T23:59:59Z", forecast_status: "ANCHORED", state_dimensions: ["books_read"] };
 const avatar = readFileSync("e2e/fixtures/avatar.png");
 const traitKeys = ["Follow-through", "Consistency", "Commitment realism", "Momentum", "Reliability", "Recovery"];
+const traitValues = [0.7, 0.62, 0.48, 0.74, 0.55, 0.81];
 const emptyTraits = traitKeys.map((label, index) => ({
-  key: `trait-${index}`, label, value: null, display_percent: null, limited_evidence: true,
-  confidence: "insufficient", provenance: { comparable_commitments: 0, completed: 0, sources: [], n_eff: 0, formula: "", details: [] },
+  key: ["follow_through", "consistency", "commitment_realism", "momentum", "reliability", "recovery"][index],
+  label,
+  value: traitValues[index],
+  display_percent: Math.round((traitValues[index] ?? 0) * 100),
+  limited_evidence: false,
+  confidence: "medium",
+  provenance: {
+    comparable_commitments: index === 0 ? 10 : 6,
+    completed: index === 0 ? 7 : 4,
+    sources: ["synthetic_fixture"],
+    n_eff: 8,
+    formula: "dual-horizon weighted Beta-Bernoulli with hierarchical shrinkage",
+    details: ["hidden unless requested"],
+  },
 }));
 
 test("profile editing and custom dimensions work at desktop and mobile widths", async ({ page }, testInfo) => {
@@ -18,7 +31,7 @@ test("profile editing and custom dimensions work at desktop and mobile widths", 
   await page.route("**/api/v1/profile/photo", async (route) => {
     const method = route.request().method();
     if (method === "PUT") {
-      uploadedPhoto = route.request().postDataBuffer();
+      uploadedPhoto = route.request().postDataBuffer() ?? avatar;
       return route.fulfill({ json: { status: "saved" } });
     }
     if (method === "DELETE") {
@@ -42,19 +55,18 @@ test("profile editing and custom dimensions work at desktop and mobile widths", 
     } });
   });
   await page.goto("/profile");
-  await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
   await expect(page.getByText("@reader")).toBeVisible();
-  await expect(page.getByText("Your execution profile appears as planned actions are verified.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add photo" })).toHaveCount(0);
+  await expect(page.getByText("You completed 7 of 10 comparable commitments.")).toBeVisible();
+  await expect(page.getByText("hierarchical shrinkage")).toHaveCount(0);
   await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Edit areas" }).click();
-  await page.getByRole("button", { name: "Add area" }).click();
-  await page.getByRole("textbox", { name: "Area 1 name" }).fill("Reading");
-  await page.getByRole("checkbox", { name: "Read 20 books" }).check();
+  await page.getByRole("button", { name: "Add Reading" }).click();
   await page.getByRole("dialog", { name: "Your areas" }).getByRole("button", { name: "Save" }).click();
   await expect.poll(() => dimensions).toEqual([{ label: "Reading", goal_ids: [goal.goal_id] }]);
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeVisible();
-  await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Cancel" }).click();
   await page.locator("#profile-photo-input").setInputFiles({
     name: "avatar.png", mimeType: "image/png",
     buffer: avatar,
@@ -62,10 +74,13 @@ test("profile editing and custom dimensions work at desktop and mobile widths", 
   await expect(page.getByLabel("Profile photo preview").locator("img")).toBeVisible();
   await page.getByRole("slider", { name: "Horizontal position" }).fill("20");
   await expect(page.getByLabel("Profile photo preview").locator("img")).toHaveCSS("object-position", "20% 50%");
-  await page.getByRole("button", { name: "Save photo" }).click();
-  await expect(page.getByText("Replace photo")).toBeVisible();
+  const uploaded = page.waitForResponse((response) => response.url().includes("/api/v1/profile/photo") && response.request().method() === "PUT");
+  await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Save" }).click();
+  await uploaded;
+  await expect(page.getByLabel("Profile photo").locator("img")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Profile photo preview").locator("img")).toBeVisible();
+  await expect(page.getByLabel("Profile photo").locator("img")).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.getByRole("button", { name: "Remove photo" }).click();
   await expect(page.getByLabel("Initials avatar")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
