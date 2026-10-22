@@ -40,7 +40,8 @@ async def test_in_memory_latest_job_uses_insertion_order_when_timestamps_tie() -
     await store.update(first.id, status="failed")
     second = await store.enqueue(owner_id, goal_id)
     store._jobs[second.id] = second.model_copy(update={"created_at": first.created_at})
-    assert (await store.latest(owner_id, goal_id)).id == second.id
+    latest = await store.latest(owner_id, goal_id)
+    assert latest is not None and latest.id == second.id
     await store.update(second.id, status="failed")
     third = await store.enqueue(owner_id, goal_id)
     assert third.receipt["replay_job_ids"] == [str(first.id), str(second.id)]

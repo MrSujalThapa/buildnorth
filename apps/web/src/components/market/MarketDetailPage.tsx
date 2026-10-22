@@ -1,11 +1,9 @@
 ﻿import { useMemo, useState } from "react";
 import {
   ArrowLeft,
-  Bell,
   BookOpen,
   Code2,
   Rocket,
-  Star,
   Users,
   X,
 } from "lucide-react";
@@ -142,14 +140,6 @@ export default function MarketDetailPage({
             <ArrowLeft size={27} strokeWidth={1.8} />
           </button>
 
-          <div className="market-topbar-actions">
-            <button className="icon-btn" type="button" aria-label="Watch market">
-              <Star size={26} strokeWidth={1.8} />
-            </button>
-            <button className="icon-btn" type="button" aria-label="Market alerts">
-              <Bell size={26} strokeWidth={1.8} />
-            </button>
-          </div>
         </header>
 
         <div className="market-heading">
