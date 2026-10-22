@@ -53,7 +53,9 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             outcome = await service.sync_goal_sources(str(job.goal_id), on_stage=stage)
         if isinstance(outcome, dict):
             receipt.update(outcome)
-            failed = outcome.get("status") not in {"no_new_records", "no_recipes"}
+            failed = outcome.get("status") not in {"no_new_records", "no_recipes"} or (
+                bool(watch_uris) and outcome.get("status") == "no_recipes"
+            )
         else:
             receipt["workflow_thread_id"] = str(outcome.thread_id)
             receipt["workflow_status"] = outcome.status
@@ -65,13 +67,23 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             # forecast change, not a failed provider sync.
             failed = outcome.status not in {"completed", "unchanged"}
         receipt["completed_at"] = datetime.now(UTC).isoformat()
+        result_error = (
+            "Watched source is no longer approved. Review monitoring setup."
+            if failed and isinstance(outcome, dict) and outcome.get("status") == "no_recipes"
+            else "Goal update failed. Review the run before retrying." if failed else None
+        )
         await store.update(
             job.id,
             status="failed" if failed else "completed",
             receipt=receipt,
             finished_at=datetime.now(UTC),
-            error="Goal update failed. Review the run before retrying." if failed else None,
+            error=result_error,
         )
+        if watch_uris:
+            await get_source_watch_store().record_result(
+                job.owner_id, job.goal_id, watch_uris,
+                error=result_error,
+            )
     except TimeoutError:
         await store.update(
             job.id,
@@ -80,6 +92,11 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             finished_at=datetime.now(UTC),
             error="Sync took too long. Review the result before retrying.",
         )
+        if watch_uris:
+            await get_source_watch_store().record_result(
+                job.owner_id, job.goal_id, watch_uris,
+                error="Sync took too long. Review the result before retrying.",
+            )
     except Exception as error:  # noqa: BLE001
         _log.exception("goal_source_sync_job_failed", run_id=str(job.id), goal_id=str(job.goal_id))
         receipt["error_type"] = type(error).__name__
@@ -98,6 +115,10 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             finished_at=datetime.now(UTC),
             error=public_error,
         )
+        if watch_uris:
+            await get_source_watch_store().record_result(
+                job.owner_id, job.goal_id, watch_uris, error=public_error,
+            )
 
 
 async def goal_sync_worker(application: Any, stop: asyncio.Event) -> None:

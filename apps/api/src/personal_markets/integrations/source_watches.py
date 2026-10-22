@@ -79,6 +79,25 @@ class InMemorySourceWatchStore:
             self._rows[watch.id] = watch
             return watch
 
+    async def record_result(
+        self, owner_id: UUID, goal_id: UUID, uris: list[str], *, error: str | None
+    ) -> None:
+        now = datetime.now(UTC)
+        selected = set(uris)
+        async with self._lock:
+            for watch in list(self._rows.values()):
+                if (
+                    watch.owner_id == owner_id
+                    and watch.goal_id == goal_id
+                    and watch.status == "active"
+                    and f"composio://{watch.plugin_id}/{watch.resource_id}" in selected
+                ):
+                    self._rows[watch.id] = watch.model_copy(update={
+                        "last_success_at": now if error is None else watch.last_success_at,
+                        "last_error": error,
+                        "updated_at": now,
+                    })
+
     async def enqueue_due(self, limit: int = 25) -> int:
         now = datetime.now(UTC)
         count = 0
@@ -202,6 +221,31 @@ class PostgresSourceWatchStore:
                 .first()
             )
             return SourceWatch.model_validate(dict(row)) if row else None
+
+    async def record_result(
+        self, owner_id: UUID, goal_id: UUID, uris: list[str], *, error: str | None
+    ) -> None:
+        async with transaction(self._engine) as conn:
+            for uri in set(uris):
+                if not uri.startswith("composio://") or "/" not in uri[11:]:
+                    continue
+                plugin_id, resource_id = uri[11:].split("/", 1)
+                await conn.execute(
+                    text("""
+                    update source_watches set
+                      last_success_at = case when cast(:error as text) is null then now()
+                        else last_success_at end,
+                      last_error = :error, updated_at = now()
+                    where owner_id = :owner_id and goal_id = :goal_id
+                      and plugin_id = :plugin_id and resource_id = :resource_id
+                      and status = 'active'
+                    """),
+                    {
+                        "owner_id": owner_id, "goal_id": goal_id,
+                        "plugin_id": plugin_id, "resource_id": resource_id,
+                        "error": error,
+                    },
+                )
 
     async def enqueue_due(self, limit: int = 25) -> int:
         # Advance checkpoints only when a new job is durably queued. An active

@@ -33,6 +33,20 @@ async def test_sync_jobs_dedupe_and_scope_by_owner() -> None:
 
 
 @pytest.mark.asyncio
+async def test_in_memory_latest_job_uses_insertion_order_when_timestamps_tie() -> None:
+    store = InMemoryGoalSyncJobStore()
+    owner_id, goal_id = uuid4(), uuid4()
+    first = await store.enqueue(owner_id, goal_id)
+    await store.update(first.id, status="failed")
+    second = await store.enqueue(owner_id, goal_id)
+    store._jobs[second.id] = second.model_copy(update={"created_at": first.created_at})
+    assert (await store.latest(owner_id, goal_id)).id == second.id
+    await store.update(second.id, status="failed")
+    third = await store.enqueue(owner_id, goal_id)
+    assert third.receipt["replay_job_ids"] == [str(first.id), str(second.id)]
+
+
+@pytest.mark.asyncio
 async def test_stranded_sync_is_reported_without_automatic_retry() -> None:
     store = InMemoryGoalSyncJobStore()
     job = await store.enqueue(uuid4(), uuid4())

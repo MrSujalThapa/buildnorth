@@ -35,6 +35,26 @@ async def test_watch_requires_owner_and_goal_to_change_status() -> None:
 
 
 @pytest.mark.asyncio
+async def test_watch_result_tracks_failure_and_last_success_without_cross_owner_write() -> None:
+    store = InMemorySourceWatchStore()
+    watch = await store.save(SourceWatch(
+        owner_id=uuid4(), goal_id=uuid4(), plugin_connection_id=uuid4(),
+        plugin_id="github", resource_id="owner/repo",
+    ))
+    uri = "composio://github/owner/repo"
+    await store.record_result(uuid4(), watch.goal_id, [uri], error="Permission denied")
+    assert (await store.list_for_goal(watch.owner_id, watch.goal_id))[0].last_error is None
+    await store.record_result(watch.owner_id, watch.goal_id, [uri], error="Permission denied")
+    failed = (await store.list_for_goal(watch.owner_id, watch.goal_id))[0]
+    assert failed.last_error == "Permission denied"
+    assert failed.last_success_at is None
+    await store.record_result(watch.owner_id, watch.goal_id, [uri], error=None)
+    succeeded = (await store.list_for_goal(watch.owner_id, watch.goal_id))[0]
+    assert succeeded.last_error is None
+    assert succeeded.last_success_at is not None
+
+
+@pytest.mark.asyncio
 async def test_due_watch_enqueues_once_and_respects_pause(monkeypatch: pytest.MonkeyPatch) -> None:
     store = InMemorySourceWatchStore()
     jobs = InMemoryGoalSyncJobStore()

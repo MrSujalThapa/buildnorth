@@ -51,15 +51,12 @@ class InMemoryGoalSyncJobStore:
                 if job.owner_id == owner_id and job.goal_id == goal_id and job.status in ACTIVE
             ]
             if active:
-                return max(active, key=lambda job: job.created_at)
-            latest = max(
+                return active[-1]
+            latest = next(
                 (
-                    job
-                    for job in self._jobs.values()
+                    job for job in reversed(list(self._jobs.values()))
                     if job.owner_id == owner_id and job.goal_id == goal_id
-                ),
-                key=lambda job: job.created_at,
-                default=None,
+                ), None,
             )
             replay_ids = _replay_ids(latest)
             job = GoalSyncJob(
@@ -76,7 +73,7 @@ class InMemoryGoalSyncJobStore:
             for job in self._jobs.values()
             if job.owner_id == owner_id and job.goal_id == goal_id
         ]
-        return max(jobs, key=lambda job: job.created_at) if jobs else None
+        return jobs[-1] if jobs else None
 
     async def get(self, owner_id: UUID, goal_id: UUID, job_id: UUID) -> GoalSyncJob | None:
         job = self._jobs.get(job_id)
