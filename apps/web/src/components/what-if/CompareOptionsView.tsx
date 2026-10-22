@@ -58,8 +58,7 @@ export default function CompareOptionsView({
       <div className="mode-stage">
         <section className="composer" aria-label={`Compare options for ${market.title}`}>
           <div className="composer-intro">
-            <p className="section-label">Compare</p>
-            <h2>Which option looks strongest for this goal?</h2>
+            <h2>Which path looks stronger?</h2>
           </div>
         </section>
         <div className="unpriced-state">
@@ -82,8 +81,8 @@ export default function CompareOptionsView({
     return (
       <div className="mode-stage">
         <div className="unpriced-state">
-          <strong>No comparison paths returned</strong>
-          <span>{message ?? "Backend did not return priced comparison paths for this goal."}</span>
+          <strong>Couldn't compare these paths</strong>
+          <span>{message ?? "This goal needs two actions that can actually be simulated."}</span>
         </div>
       </div>
     );
@@ -137,8 +136,7 @@ export default function CompareOptionsView({
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
       <section className="composer" aria-label={`Compare options for ${market.title}`}>
         <div className="composer-intro">
-          <p className="section-label">Compare</p>
-          <h2>Which option looks strongest for this goal?</h2>
+          <h2>Which path looks stronger?</h2>
         </div>
       </section>
 

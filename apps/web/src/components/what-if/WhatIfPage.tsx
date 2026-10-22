@@ -174,44 +174,6 @@ function tuneCopyForMarket(category: string) {
 
 
 
-function suggestionCopy(category: string, title: string) {
-
-  if (category === "Career") {
-
-    return [
-
-      "What if I send 10 more targeted applications every week?",
-
-      "What if I spend 4 more hours a week on interview prep?",
-
-    ];
-
-  }
-
-  if (category === "Startup") {
-
-    return [
-
-      "What if I quit my internship and work on my startup full time?",
-
-      "What if I talk to 5 users every week?",
-
-    ];
-
-  }
-
-  return [
-
-    `What if I spend more focused time on ${title.toLowerCase()}?`,
-
-    "What if I make this a daily habit?",
-
-  ];
-
-}
-
-
-
 function demoPreviewFallback(
 
   market: Market,
@@ -478,9 +440,6 @@ export default function WhatIfPage({
 
   const copy = tuneCopyForMarket(market.category);
 
-  const suggestions = suggestionCopy(market.category, market.title);
-
-
 
   function changeMode(next: WhatIfMode) {
 
@@ -642,8 +601,6 @@ export default function WhatIfPage({
 
               question={question}
 
-              suggestions={suggestions}
-
               copy={copy}
 
               running={simulation.simulation.isPending}
@@ -700,7 +657,7 @@ export default function WhatIfPage({
 
               priced={baselinePriced}
 
-              message={futuresDistribution?.message ?? priceabilityMessage}
+              message={futuresDistribution?.message ?? null}
 
               selectedSimulation={selectedSimulation}
 
@@ -826,11 +783,11 @@ export default function WhatIfPage({
                   <div>
                     <strong>{item.intervention_title ?? "Saved exploration"}</strong>
                     <span className="meta">
-                      {item.created_at ? new Date(item.created_at).toLocaleString() : "Saved run"}
+                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : "Saved run"}
+                      {" · saved result"}
                     </span>
-                    <span className="meta">Loads the saved prompt; rerun to refresh results.</span>
                     {item.scenario_probability == null ? (
-                      <span className="meta">Unpriced · add a measurable rate to compare odds.</span>
+                      <span className="meta">Not priced</span>
                     ) : null}
                   </div>
                   <div className="past-metrics">
@@ -912,7 +869,7 @@ export default function WhatIfPage({
 
                 <div><span>Duration</span><strong>{plan.durationWeeks} weeks</strong></div>
 
-                <div><span>Follow-through</span><strong>{plan.followThrough}%</strong></div>
+                <div><span>Assumed follow-through</span><strong>{plan.followThrough}%</strong></div>
 
               </div>
 
@@ -995,7 +952,7 @@ export default function WhatIfPage({
 
                 <label>
 
-                  <span>Follow-through<strong>{plan.followThrough}%</strong></span>
+                  <span>Assumed follow-through<strong>{plan.followThrough}%</strong></span>
 
                   <input
 

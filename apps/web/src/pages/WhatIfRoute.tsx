@@ -91,8 +91,18 @@ export function WhatIfRoute() {
       const state = baselineRef.current;
       if (!state?.priced) return null;
       const parsed = await api.parseDecision({ goal_id: goalId, text: decision });
-      const labels = parsed.scenario_labels.length ? parsed.scenario_labels : parsed.unsupported;
-      return api.possibleFutures(buildFuturesRequest(goalId, state, decision, labels));
+      if (!parsed.scenario_labels.length) {
+        return {
+          priced: true,
+          message: "This question doesn’t map to outcomes this goal can estimate.",
+          outcomes: [],
+          other_probability: 0,
+          evidence_basis: [],
+          model_version: "unsupported",
+          run_id: null,
+        };
+      }
+      return api.possibleFutures(buildFuturesRequest(goalId, state, decision, parsed.scenario_labels));
     },
   });
 

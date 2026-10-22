@@ -11,6 +11,7 @@ import {
 } from "../../adapters/simulations";
 import SimulationCloud, { type CloudSeries } from "./SimulationCloud";
 import SimulationInspector from "./SimulationInspector";
+import { ScenarioComposer } from "./ScenarioComposer";
 
 type Props = {
   market: Market;
@@ -75,25 +76,16 @@ export default function PossibleFuturesView({
 
   return (
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
-      <section className="composer">
-        <div className="composer-intro">
-          <p className="section-label">Possible futures</p>
-          <h2>{pathLabel ? `If you take ${pathLabel}` : "What are the main ways this could play out?"}</h2>
-        </div>
-        <div className="composer-row">
-          <input
-            name="future-decision"
-            autoComplete="off"
-            value={decision}
-            onChange={(event) => onDecisionChange(event.target.value)}
-            placeholder="What if I quit my internship and work on my startup full time…"
-            aria-label="Decision to explore"
-          />
-          <button type="button" className="primary-action" onClick={onRun} disabled={loading}>
-            {loading ? "Mapping…" : "Map futures"}
-          </button>
-        </div>
-      </section>
+      <ScenarioComposer
+        id="future-decision"
+        label={pathLabel ? `Futures if you take ${pathLabel}` : "Decision to explore"}
+        value={decision}
+        onChange={onDecisionChange}
+        onSubmit={onRun}
+        busy={loading}
+        submitLabel="Map futures"
+        placeholder="What if this happens?"
+      />
 
       {!priced ? (
         <div className="unpriced-state">
@@ -108,7 +100,7 @@ export default function PossibleFuturesView({
 
       {priced && !loading && !hasResults ? (
         <div className="past-empty">
-          Describe a decision and map futures. Unsupported scenarios return NOT_PRICED with an explanation.
+          {message ?? "Ask a question to see the outcomes this goal can estimate."}
         </div>
       ) : null}
 

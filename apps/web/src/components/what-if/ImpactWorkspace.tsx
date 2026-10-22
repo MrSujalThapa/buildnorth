@@ -7,6 +7,7 @@ import { DEFAULT_IMPACT_AXES, type SimulationPoint } from "../../adapters/simula
 import type { Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
 import type { Priceability } from "../../api/client";
 import MissingStatePanel from "./MissingStatePanel";
+import { ScenarioComposer } from "./ScenarioComposer";
 import OutcomeRangeChart from "./OutcomeRangeChart";
 import ProbabilityDistribution from "./ProbabilityDistribution";
 import SimulationCloud from "./SimulationCloud";
@@ -27,7 +28,6 @@ type Props = {
   preview: WhatIfPreview;
   impact: ImpactViewModel;
   question: string;
-  suggestions: string[];
   copy: TuneCopy;
   onQuestionChange: (value: string) => void;
   onRun: () => void;
@@ -115,7 +115,6 @@ export default function ImpactWorkspace({
   preview,
   impact,
   question,
-  suggestions,
   copy,
   onQuestionChange,
   onRun,
@@ -182,32 +181,16 @@ export default function ImpactWorkspace({
 
   return (
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
-      <section className="composer">
-        <label htmlFor="impact-question">What are you considering?</label>
-        <div className="composer-row">
-          <input
-            id="impact-question"
-            name="impact-question"
-            autoComplete="off"
-            value={question}
-            onChange={(event) => onQuestionChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") onRun();
-            }}
-            placeholder="What if I change the plan…"
-          />
-          <button className="primary-action" type="button" onClick={onRun} disabled={running}>
-            Run scenario
-          </button>
-        </div>
-        <div className="suggestion-row">
-          {suggestions.map((suggestion) => (
-            <button key={suggestion} type="button" onClick={() => onQuestionChange(suggestion)}>
-              {suggestion.replace(/^What if I /i, "")}
-            </button>
-          ))}
-        </div>
-      </section>
+      <ScenarioComposer
+        id="impact-question"
+        label="What are you considering?"
+        value={question}
+        onChange={onQuestionChange}
+        onSubmit={onRun}
+        busy={running}
+        submitLabel="Run scenario"
+        placeholder="What if I change this?"
+      />
 
       {view === "simple" ? (
         <section className="impact-workspace">
@@ -224,13 +207,13 @@ export default function ImpactWorkspace({
             <div className="tune-controls">
               <TuneSlider label={copy.effortLabel} helper={copy.effortHelper} value={plan.effortHours} min={0} max={6} step={0.25} unit={copy.effortUnit} onChange={(effortHours) => onPlanChange({ ...plan, effortHours })} />
               <TuneSlider label={copy.cadenceLabel} helper={copy.cadenceHelper} value={plan.cadence} min={0} max={30} step={1} unit={copy.cadenceUnit} onChange={(cadence) => onPlanChange({ ...plan, cadence })} />
-              <TuneSlider label="How likely are you to stick with this?" helper="Be realistic, not optimistic" value={plan.followThrough} min={20} max={100} step={1} unit="%" onChange={(followThrough) => onPlanChange({ ...plan, followThrough })} />
+              <TuneSlider label="Assumed follow-through" helper="This changes the scenario only. It does not rewrite your history." value={plan.followThrough} min={20} max={100} step={1} unit="%" onChange={(followThrough) => onPlanChange({ ...plan, followThrough })} />
               <TuneSlider label="How long will you do it?" helper="The period you expect to keep the plan" value={plan.durationWeeks} min={1} max={24} step={1} unit="weeks" onChange={(durationWeeks) => onPlanChange({ ...plan, durationWeeks })} />
             </div>
             <div className="metric-row three">
               <div><span>Time</span><strong>{preview.weeklyHours} hrs / week</strong></div>
               <div><span>Duration</span><strong>{plan.durationWeeks} weeks</strong></div>
-              <div><span>Follow-through</span><strong>{plan.followThrough}%</strong></div>
+              <div><span>Assumption</span><strong>{plan.followThrough}%</strong></div>
             </div>
           </aside>
 

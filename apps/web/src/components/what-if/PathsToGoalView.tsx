@@ -102,8 +102,7 @@ export default function PathsToGoalView({
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
       <section className="composer">
         <div className="composer-intro">
-          <p className="section-label">Paths to goal</p>
-          <h2>What realistic strategies could get you there?</h2>
+          <h2>What would move the odds?</h2>
         </div>
       </section>
 

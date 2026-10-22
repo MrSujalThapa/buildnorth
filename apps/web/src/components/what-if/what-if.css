@@ -311,6 +311,86 @@
   text-wrap: pretty;
 }
 
+.scenario-composer-surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px 10px 10px 16px;
+  border: 1px solid var(--what-if-border);
+  border-radius: 22px;
+  background: var(--what-if-surface, var(--app-surface));
+}
+
+.scenario-composer-surface textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 140px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  padding: 10px 0;
+}
+
+.scenario-composer-surface textarea:focus {
+  outline: none;
+}
+
+.scenario-composer-surface:focus-within {
+  border-color: var(--what-if-accent, var(--app-accent));
+}
+
+.scenario-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.composer-icon,
+.composer-submit {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.composer-icon {
+  background: transparent;
+  color: var(--what-if-muted, var(--app-muted));
+}
+
+.composer-icon.recording {
+  background: #9c4232;
+  color: white;
+}
+
+.composer-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.composer-submit {
+  background: var(--what-if-ink, var(--app-ink));
+  color: var(--what-if-bg, var(--app-bg));
+}
+
+.composer-submit:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.composer-speech-error {
+  margin: 8px 4px 0;
+  color: var(--what-if-muted);
+  font-size: 13px;
+}
+
 .composer-row {
   margin-top: 10px;
   display: grid;
@@ -1322,12 +1402,41 @@
 }
 
 .past-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--what-if-border);
+}
+
+.past-item-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 20px;
+  align-items: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.past-item-button strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.past-item-button .meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--what-if-muted);
+  font-size: 13px;
+}
+
+.past-item-button:focus-visible {
+  outline: 2px solid var(--what-if-accent);
+  outline-offset: 3px;
 }
 
 .past-metrics {
