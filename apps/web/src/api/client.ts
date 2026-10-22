@@ -760,6 +760,10 @@ export const api = {
         body: JSON.stringify(body),
       }),
     ),
+  startThreadAsync: (body: { kind: string; intent?: string; goal_id?: string; evidence_text?: string; github_login?: string }) =>
+    request<WorkflowSnapshot>("/api/v1/agent/threads", {
+      method: "POST", headers: ASYNC_JSON_HEADERS, body: JSON.stringify(body),
+    }),
   getThread: (threadId: string, signal?: AbortSignal) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
   resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
@@ -770,6 +774,10 @@ export const api = {
         body: JSON.stringify(body),
       }),
     ),
+  resumeThreadAsync: (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
+    request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/resume`, {
+      method: "POST", headers: ASYNC_JSON_HEADERS, body: JSON.stringify(body),
+    }),
   addManualState: (
     goalId: string,
     entries: { key: string; label: string; value: number; unit: string }[],

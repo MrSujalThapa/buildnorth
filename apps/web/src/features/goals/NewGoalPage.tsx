@@ -1,22 +1,49 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../../api/client";
 import { AgentDebug, AgentProgress } from "../agents/AgentProgress";
 import "./new-goal.css";
+
+const PENDING_GOAL_THREAD = "playitout:pending-goal-thread";
 
 export function NewGoalPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [intent, setIntent] = useState("");
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(null);
+  const [threadId, setThreadId] = useState(() => sessionStorage.getItem(PENDING_GOAL_THREAD));
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const thread = useQuery({
+    queryKey: ["new-goal-thread", threadId],
+    queryFn: () => api.getThread(threadId!),
+    enabled: Boolean(threadId),
+    refetchInterval: (query) => query.state.data?.status === "running" ? 2000 : false,
+  });
+
+  useEffect(() => {
+    const data = thread.data;
+    if (!data || data.thread_id !== threadId) return;
+    setSnapshot(data);
+    if (data.status === "failed") setError("The agent workflow failed. Check inference settings and try again.");
+    if (["completed", "limited", "withheld", "failed", "cancelled"].includes(data.status)) {
+      sessionStorage.removeItem(PENDING_GOAL_THREAD);
+      setThreadId(null);
+    }
+    if (data.goal && ["completed", "limited", "withheld"].includes(data.status)) {
+      void queryClient.invalidateQueries({ queryKey: ["goals"] });
+      void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
+      void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
+    }
+  }, [navigate, queryClient, thread.data, threadId]);
 
   const start = useMutation({
-    mutationFn: () => api.startThread({ kind: "create_goal", intent }),
+    mutationFn: () => api.startThreadAsync({ kind: "create_goal", intent }),
     onSuccess: (data) => {
       setSnapshot(data);
+      sessionStorage.setItem(PENDING_GOAL_THREAD, data.thread_id);
+      setThreadId(data.thread_id);
       setError(null);
       if (data.status === "failed") {
         setError("The agent workflow failed. Check inference settings and try again.");
@@ -34,10 +61,12 @@ export function NewGoalPage() {
   const resume = useMutation({
     mutationFn: (body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) => {
       if (!snapshot) throw new Error("missing thread");
-      return api.resumeThread(snapshot.thread_id, body);
+      return api.resumeThreadAsync(snapshot.thread_id, body);
     },
     onSuccess: (data) => {
       setSnapshot(data);
+      sessionStorage.setItem(PENDING_GOAL_THREAD, data.thread_id);
+      setThreadId(data.thread_id);
       setError(null);
       setAnswers({});
       if (data.status === "failed") {
@@ -87,6 +116,8 @@ export function NewGoalPage() {
         </form>
       ) : null}
       <AgentProgress snapshot={snapshot} />
+      {snapshot?.status === "running" ? <p className="field-hint" role="status">Working on your goal…</p> : null}
+      {thread.isError ? <p className="field-hint" role="alert">Could not check progress. Reload this page to try again.</p> : null}
       {error ? (
         <div className="notice" role="alert">
           <h2>Workflow unavailable</h2>

@@ -101,3 +101,10 @@ Tests: contracts, futures (startup+hiring conditioning), demo portfolio, paramet
 ## Next unfinished task
 
 If interrupted: create a Vercel Deployment Protection **Shareable Link** (not team Share) for git-alias `buildnorth-git-ux-consumer-c0fb66-...` without disabling SSO; keep using local `:8000` as the compatible API until a non-production host exists. Then signed-in A–L. Cron still owned by Codex.
+
+### 2026-10-22 — authenticated local goal creation failure
+
+- Verified local browser at `localhost:5173`, branch API at `127.0.0.1:8000`, and isolated development PostgreSQL at `127.0.0.1:54322`. Genuine Clerk session was active. No hosted Supabase write occurred.
+- Input: “Read 20 books by December 31, 2026. I have finished six books so far.” Browser stayed on “Understanding goal…” for two minutes, then showed a blank New market body. Local `workflow_threads` recorded `running / parse_request` for over four minutes, with no new `agent_runs` row. This is **FAIL** for G1; no goal or forecast was created.
+- Fix in progress: New Goal now receives the async thread immediately, polls status, shows honest progress, and stores the thread ID in session storage to recover after reload. Polling no longer overwrites a terminal background failure with an older LangGraph running checkpoint. Three frontend and two backend focused tests pass; the full real goal journey remains failed until the backend call is traced and rerun.
+- Render Cron form was opened but never submitted. The newer branch-specific instruction leaves cron ownership unresolved; no new paid service was provisioned.
