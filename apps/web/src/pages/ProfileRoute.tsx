@@ -4,6 +4,7 @@ import { ExecutionProfileRadar } from "../components/behavior/ExecutionProfileRa
 import { api } from "../api/client";
 import { useRefreshAccount } from "../auth/AuthGate";
 import { linkedGoals, resolveAreas, suggestAreas, type ProfileArea } from "./profileAreas";
+import { saveProfileWithPhoto } from "./profileSave";
 
 function moved<T>(items: T[], from: number, to: number): T[] {
   const next = [...items];
@@ -199,20 +200,26 @@ export function ProfileRoute() {
           };
           const pending = selectedPhoto;
           const shouldRemove = pendingRemove;
+          const previous = {
+            display_name: fields.display_name ?? "",
+            username: fields.username ?? "",
+            bio: fields.bio ?? "",
+          };
           setSaveError(null);
           void (async () => {
             try {
-              await save.mutateAsync({ display_name: field("display_name"), username: field("username"), bio: field("bio") });
-              if (shouldRemove) {
-                await remove.mutateAsync();
-              } else if (pending) {
-                await upload.mutateAsync(pending);
-              }
+              await saveProfileWithPhoto(
+                { display_name: field("display_name"), username: field("username"), bio: field("bio") },
+                previous,
+                (details) => save.mutateAsync(details),
+                shouldRemove ? () => remove.mutateAsync() : pending ? () => upload.mutateAsync(pending) : undefined,
+              );
               await refreshAccount().catch(() => undefined);
               setPendingRemove(false);
               setSelectedPhoto(null);
               setEditing(false);
             } catch (error) {
+              await refreshAccount().catch(() => undefined);
               setSaveError(error instanceof Error ? error.message : "Could not save profile.");
             }
           })();
