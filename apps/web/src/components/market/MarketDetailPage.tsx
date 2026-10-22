@@ -22,6 +22,7 @@ type Props = {
   onBack: () => void;
   onWhatIf: () => void;
   onEvidence?: () => void;
+  demoMode?: boolean;
 };
 
 function categoryCopy(category?: string | null) {
@@ -113,6 +114,7 @@ export default function MarketDetailPage({
   onBack,
   onWhatIf,
   onEvidence,
+  demoMode = false,
 }: Props) {
   const ranges = ODDS_EXPLORER_RANGES;
   const [chartSelection, setChartSelection] = useState<ChartSelection | null>(null);
@@ -145,6 +147,7 @@ export default function MarketDetailPage({
         <div className="market-heading">
           <h1>{market.title}</h1>
           <p className="market-meta">{market.meta}</p>
+          {demoMode ? <p className="profile-demo-note">Synthetic demonstration · no account records</p> : null}
         </div>
 
         <section className="market-quote">
@@ -200,7 +203,7 @@ export default function MarketDetailPage({
           ) : (
             <>
               <div className="market-price" data-testid="goal-price">{market.odds.toFixed(1)}%</div>
-              <div className="market-price-hint">Current modeled odds</div>
+              <div className="market-price-hint">{demoMode ? "Illustrative odds · synthetic history" : "Current modeled odds"}</div>
             </>
           )}
         </section>
@@ -242,7 +245,7 @@ export default function MarketDetailPage({
           </section>
         ) : null}
 
-        <section className="market-section recent-events">
+        {!demoMode ? <section className="market-section recent-events">
           <h2>Recent events</h2>
           <div className="event-list">
             {market.events.map((event) => {
@@ -265,11 +268,11 @@ export default function MarketDetailPage({
               );
             })}
           </div>
-        </section>
+        </section> : null}
 
         <section className="return-panel">
           <div className="return-stat">
-            <div className="return-label">Today's odds change</div>
+            <div className="return-label">{demoMode ? "Today's illustrative change" : "Today's odds change"}</div>
             <div className={`return-value ${(market.todayReturn ?? 0) >= 0 ? "positive" : "negative"}`}>
               {market.todayReturn == null ? "—" : signedPoints(market.todayReturn)}
             </div>
@@ -278,21 +281,21 @@ export default function MarketDetailPage({
           <div className="return-divider" />
 
           <div className="return-stat">
-            <div className="return-label">Total odds change</div>
+            <div className="return-label">{demoMode ? "Total illustrative change" : "Total odds change"}</div>
             <div className={`return-value ${(market.totalReturn ?? 0) >= 0 ? "positive" : "negative"}`}>
               {market.totalReturn == null ? "—" : signedPoints(market.totalReturn)}
             </div>
           </div>
         </section>
 
-        <div className="market-actions">
+        {!demoMode ? <div className="market-actions">
           <button className="primary-action" type="button" onClick={onWhatIf}>
             What if
           </button>
           <button className="secondary-action" type="button" onClick={onEvidence}>
             Evidence
           </button>
-        </div>
+        </div> : null}
       </section>
     </main>
   );

@@ -97,12 +97,10 @@ export function MarketsRoute() {
         setSearchParams(next);
       }}
       onSelectMarket={(marketId) => {
-        if (demoMode) return;
-        void navigate(`/goals/${marketId}`);
+        void navigate(`/goals/${marketId}${demoMode ? "?demo=1" : ""}`);
       }}
       onOpenCollection={(collectionId) => {
-        if (demoMode) return;
-        void navigate(`/collections/${collectionId}`);
+        void navigate(`/collections/${collectionId}${demoMode ? "?demo=1" : ""}`);
       }}
       onCreateCollection={(name) => createCollection.mutateAsync(name).then(() => undefined)}
       onArchiveGoals={(goalIds) => archiveGoals.mutateAsync(goalIds).then(() => undefined)}

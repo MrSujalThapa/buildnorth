@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.agents.budget import InMemoryUsageStore
+from personal_markets.core.config import get_settings
 from personal_markets.evidence.domain import NormalizedEvidence, SubmissionContext
 from personal_markets.evidence.mapping import proposal_to_normalized, with_corroboration
 from personal_markets.persistence.database import transaction
@@ -353,7 +354,7 @@ class PostgresThreadStore:
             row = (
                 (
                     await connection.execute(
-                        text("select result_json from workflow_threads where id = :id"),
+                        text("select result_json, status, updated_at from workflow_threads where id = :id"),
                         {"id": thread_id},
                     )
                 )
@@ -362,6 +363,31 @@ class PostgresThreadStore:
             )
         if row is None:
             return None
+        if row["status"] == "running":
+            stale_after = timedelta(seconds=get_settings().inference_run_timeout_seconds + 60)
+            if datetime.now(UTC) - row["updated_at"] > stale_after:
+                async with transaction(self._engine) as connection:
+                    expired = (
+                        (
+                            await connection.execute(
+                                text("""
+                                update workflow_threads set status = 'failed',
+                                  current_step = 'failed',
+                                  result_json = result_json ||
+                                    '{"status":"failed","current_step":"failed"}'::jsonb,
+                                  updated_at = now()
+                                where id = :id and status = 'running'
+                                  and updated_at = :previous_update
+                                returning result_json
+                                """),
+                                {"id": thread_id, "previous_update": row["updated_at"]},
+                            )
+                        )
+                        .mappings()
+                        .one_or_none()
+                    )
+                if expired is not None:
+                    return WorkflowSnapshot.model_validate(expired["result_json"])
         return WorkflowSnapshot.model_validate(row["result_json"])
 
 

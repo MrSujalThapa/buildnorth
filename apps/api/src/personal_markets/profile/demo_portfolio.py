@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid5
 
 from personal_markets.agents.state import NAMESPACE
+from personal_markets.collections.domain import CollectionSeries
+from personal_markets.collections.portfolio import portfolio_summary
 
 DEMO_PORTFOLIO_NAMESPACE = uuid5(NAMESPACE, "playitout:demo-portfolio")
 
@@ -75,7 +77,7 @@ def _goal(
 
 
 def demo_portfolio(*, as_of: datetime | None = None) -> dict[str, object]:
-    stamp = as_of or datetime(2026, 10, 21, tzinfo=UTC)
+    stamp = as_of or datetime.now(UTC)
     specs = [
         (
             "net-worth",
@@ -113,6 +115,24 @@ def demo_portfolio(*, as_of: datetime | None = None) -> dict[str, object]:
             0.21,
             0.58,
         ),
+        (
+            "reading",
+            "Read 20 books this year",
+            "continuous_target",
+            ["books_read_count"],
+            0.19,
+            0.14,
+            0.62,
+        ),
+        (
+            "project",
+            "Ship a technical project",
+            "deadline_event",
+            ["completed_milestones"],
+            0.25,
+            0.17,
+            0.67,
+        ),
     ]
     goals = [
         _goal(slug, title, goal_type=goal_type, dimensions=dimensions, as_of=stamp)
@@ -122,27 +142,30 @@ def demo_portfolio(*, as_of: datetime | None = None) -> dict[str, object]:
         _goal_id(slug): _history(slug, start=start, dip=dip, recover=recover, as_of=stamp)
         for slug, _title, _type, _dims, start, dip, recover in specs
     }
-    career_ids = [_goal_id("offer"), _goal_id("startup")]
+    career_ids = [_goal_id(slug) for slug in ("offer", "startup", "project", "net-worth")]
     collection_id = str(uuid5(DEMO_PORTFOLIO_NAMESPACE, "career-collection"))
     series = [
         {
             "goal_id": goal_id,
             "title": next(item["title"] for item in goals if item["goal_id"] == goal_id),
-            "color": "#1f8f86" if goal_id == career_ids[0] else "#b56a52",
+            "color": ("#1f8f86", "#b56a52", "#5475a6", "#9a7b45")[index],
             "points": [
-                {"timestamp": point["created_at"], "value": point["probability"]}
+                {"timestamp": point["created_at"], "value": float(point["probability"]) * 100}
                 for point in histories[goal_id]
             ],
             "withheld": False,
         }
-        for goal_id in career_ids
+        for index, goal_id in enumerate(career_ids)
     ]
+    odds, change, priced = portfolio_summary(
+        [CollectionSeries.model_validate(item) for item in series], now=stamp
+    )
     collections = [
         {
             "collection": {
                 "collection_id": collection_id,
                 "owner_id": str(DEMO_PORTFOLIO_NAMESPACE),
-                "name": "Career bets",
+                "name": "Next chapter",
                 "description": "Isolated demonstration collection. Not your data.",
                 "icon": None,
                 "color": None,
@@ -151,18 +174,18 @@ def demo_portfolio(*, as_of: datetime | None = None) -> dict[str, object]:
             },
             "progress": {
                 "label": "progress",
-                "value": 0.325,
-                "available": 2,
-                "total": 2,
-                "incomplete": False,
-                "methodology": "Demonstration equal-weight blend. Not a live forecast.",
-                "notes": ["Isolated demonstration data."],
+                "value": None,
+                "available": 0,
+                "total": len(career_ids),
+                "incomplete": True,
+                "methodology": "No measured progress. Demo odds are shown separately.",
+                "notes": ["Synthetic demonstration, not account data."],
             },
             "series": series,
-            "portfolio_odds": 0.325,
-            "change_pp": 4.2,
-            "priced_goals": 2,
-            "total_goals": 2,
+            "portfolio_odds": odds,
+            "change_pp": change,
+            "priced_goals": priced,
+            "total_goals": len(career_ids),
             "portfolio_methodology": "Demonstration equal-weight blend. Not a live forecast.",
         }
     ]
