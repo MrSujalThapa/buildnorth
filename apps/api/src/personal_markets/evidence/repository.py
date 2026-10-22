@@ -10,6 +10,10 @@ class EvidenceRepository(Protocol):
 
     async def list_for_goal(self, goal_id: UUID) -> list[NormalizedEvidence]: ...
 
+    async def list_for_goals(
+        self, goal_ids: list[UUID]
+    ) -> dict[UUID, list[NormalizedEvidence]]: ...
+
     async def find_fingerprint(
         self, user_id: UUID, fingerprint: str
     ) -> NormalizedEvidence | None: ...

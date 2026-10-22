@@ -37,6 +37,9 @@ class InMemoryEvidenceRepository:
             self._events[item] for item in self._goal_links.get(goal_id, []) if item in self._events
         ]
 
+    async def list_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[NormalizedEvidence]]:
+        return {goal_id: await self.list_for_goal(goal_id) for goal_id in goal_ids}
+
     async def find_fingerprint(self, user_id: UUID, fingerprint: str) -> NormalizedEvidence | None:
         evidence_id = self._by_fingerprint.get((user_id, fingerprint))
         return self._events.get(evidence_id) if evidence_id else None
@@ -186,6 +189,27 @@ class PostgresEvidenceRepository:
                 )
             ).mappings()
         return [self._to_domain(dict(row)) for row in rows]
+
+    async def list_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[NormalizedEvidence]]:
+        grouped: dict[UUID, list[NormalizedEvidence]] = {goal_id: [] for goal_id in goal_ids}
+        if not goal_ids:
+            return grouped
+        async with autocommit_connection(self._engine) as connection:
+            rows = (
+                await connection.execute(
+                    text("""
+                    select g.goal_id as linked_goal_id, e.* from evidence_events e
+                    join goal_evidence g on g.evidence_id = e.id
+                    where g.goal_id = any(:goal_ids)
+                    order by e.created_at
+                    """),
+                    {"goal_ids": goal_ids},
+                )
+            ).mappings()
+            for row in rows:
+                record = dict(row)
+                grouped[record.pop("linked_goal_id")].append(self._to_domain(record))
+        return grouped
 
     async def link_goal(self, goal_id: UUID, evidence_id: UUID) -> None:
         async with transaction(self._engine) as connection:

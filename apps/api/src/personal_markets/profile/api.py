@@ -77,19 +77,14 @@ async def owner_trials_and_evidence(
     owner_id: UUID, goal_ids: list[UUID], evidence: EvidenceService
 ) -> tuple[list[CommitmentTrial], list[NormalizedEvidence]]:
     """All of an owner's planned-versus-observed trials plus goal evidence."""
-    evidence_limit = asyncio.Semaphore(8)
-
-    async def goal_evidence(goal_id: UUID) -> list[NormalizedEvidence]:
-        async with evidence_limit:
-            return await evidence.list_for_goal(goal_id)
-
-    event_rows, (plans, observations) = await asyncio.gather(
-        asyncio.gather(*(goal_evidence(goal_id) for goal_id in goal_ids)),
+    by_goal, (plans, observations) = await asyncio.gather(
+        evidence.list_for_goals(goal_ids),
         get_commitment_store().list_for_goals(owner_id, goal_ids),
     )
     trials = trials_from_commitments(plans, observations)
     rows: list[NormalizedEvidence] = []
-    for goal_id, items in zip(goal_ids, event_rows, strict=True):
+    for goal_id in goal_ids:
+        items = by_goal.get(goal_id, [])
         rows.extend(items)
         trials.extend(
             trial.model_copy(update={"trial_id": f"{goal_id}:{trial.trial_id}"})
@@ -107,12 +102,13 @@ async def get_profile(
     collections: Annotated[CollectionService, Depends(get_collection_service)],
     evidence: Annotated[EvidenceService, Depends(get_evidence_service)],
 ) -> dict[str, Any]:
-    usage, owned, collection_rows = await asyncio.gather(
+    usage, profile, owned, collection_rows = await asyncio.gather(
         budget.usage_for(principal),
+        identity.profile_for(principal),
         goals.list_goals(owner_id=principal.user_id),
         collections.list_for(principal.user_id),
     )
-    account = await identity.account_view(principal, usage)
+    account = await identity.account_view(principal, usage, profile)
     trials, rows = await owner_trials_and_evidence(
         principal.user_id, [goal.goal_id for goal in owned], evidence
     )
