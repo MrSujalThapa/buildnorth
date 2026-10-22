@@ -1054,6 +1054,44 @@
   border-top: 1px solid var(--what-if-border);
 }
 
+.compare-paths {
+  display: grid;
+  gap: 12px;
+}
+
+.compare-path-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.compare-path-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.compare-path-fields span {
+  color: var(--what-if-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.compare-path-fields textarea {
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--what-if-border);
+  border-radius: 12px;
+  background: var(--what-if-elevated);
+  resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .compare-path-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 .option-picker {
   display: flex;
   flex-wrap: wrap;

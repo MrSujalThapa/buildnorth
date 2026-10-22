@@ -27,6 +27,7 @@ type Props = {
   onSeeFutures: (path: PathStrategy) => void;
   selectedSimulation: SimulationPoint | null;
   onSelectSimulation: (point: SimulationPoint | null) => void;
+  onFind?: () => void;
 };
 
 export default function PathsToGoalView({
@@ -45,6 +46,7 @@ export default function PathsToGoalView({
   onSeeFutures,
   selectedSimulation,
   onSelectSimulation,
+  onFind,
 }: Props) {
   const paths = pathsProp ?? [];
   const loadingPaths = loading || pathsProp === undefined;
@@ -165,7 +167,10 @@ export default function PathsToGoalView({
           <button
             type="button"
             className="primary-action compact"
-            onClick={() => setFinding(true)}
+            onClick={() => {
+              setFinding(true);
+              onFind?.();
+            }}
           >
             Find feasible paths
           </button>

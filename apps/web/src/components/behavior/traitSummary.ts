@@ -1,14 +1,12 @@
 import type { BehaviorDimension } from "./ExecutionProfileRadar";
 
 export const TRAIT_COLORS: Record<string, string> = {
-  follow_through: "#2ec4b6",
-  consistency: "#ff9f1c",
-  commitment_realism: "#e71d36",
-  momentum: "#2e86de",
-  reliability: "#6a994e",
-  recovery: "#c9184a",
-  evidence_quality: "#7a746c",
-  goal_relevance: "#b08968",
+  weekly_applications: "#2ec4b6",
+  weekly_focus_hours: "#ff9f1c",
+  monthly_savings: "#2e86de",
+  weekly_running_km: "#6a994e",
+  books_per_month: "#b08968",
+  sleep_hours: "#c9184a",
 };
 
 const FALLBACK = ["#2ec4b6", "#ff9f1c", "#2e86de", "#e71d36", "#6a994e", "#c9184a"];
@@ -18,45 +16,18 @@ export function traitColor(key: string, index: number): string {
 }
 
 export function chartLabel(label: string): string {
-  if (label === "Commitment realism") return "Planning";
-  if (label === "Recovery after misses") return "Recovery";
   return label;
 }
 
-/** Consumer copy. Only states what the measured counts and score support. */
+/** Consumer copy from the parameter's measured average, not a personality trait. */
 export function traitSummary(item: BehaviorDimension): string {
   if (item.limited_evidence || item.value == null || item.display_percent == null) {
-    return "Not enough history yet.";
+    return item.provenance.details[0] ?? "Not enough measurements yet.";
   }
+  const measured = item.provenance.details.find((line) => line.startsWith("Current average"));
+  if (measured) return measured;
   const count = item.provenance.comparable_commitments;
-  const completed = Math.round(item.provenance.completed);
-  const percent = item.display_percent;
-
-  if (item.key === "follow_through" && count > 0) {
-    return `You completed ${completed} of ${count} comparable commitments.`;
-  }
-  if (item.key === "consistency") {
-    return percent >= 60
-      ? "Your routine has been more consistent recently."
-      : "Your routine has varied more than a steady cadence.";
-  }
-  if (item.key === "commitment_realism") {
-    return percent >= 70
-      ? "What you plan and what you finish have been close."
-      : "Finished work has often landed short of the plan.";
-  }
-  if (item.key === "momentum") {
-    return percent >= 55
-      ? "Recent follow-through is ahead of your longer record."
-      : "Recent follow-through is behind your longer record.";
-  }
-  if (item.key === "reliability") {
-    return "This is the cautious floor of your follow-through, not a best case.";
-  }
-  if (item.key === "recovery" && count > 0) {
-    return percent >= 60
-      ? "You usually resume within a week after a miss."
-      : "Getting back within a week after a miss has been uncommon.";
-  }
-  return "Measured from your recorded commitments.";
+  return count
+    ? `Based on ${count} observation${count === 1 ? "" : "s"} in the selected window.`
+    : "Measured from recorded observations.";
 }

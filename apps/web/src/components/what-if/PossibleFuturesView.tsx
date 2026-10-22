@@ -62,7 +62,7 @@ export default function PossibleFuturesView({
     .filter((cluster) => cluster.tone === "positive")
     .reduce((sum, cluster) => sum + cluster.probability, 0);
   const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId);
-  const hasResults = clusters.length > 0 && points.length > 0;
+  const hasResults = clusters.length > 0;
 
   const series: CloudSeries[] = [
     {
@@ -154,13 +154,18 @@ export default function PossibleFuturesView({
           <div className="viz-block">
             <div className="panel-head tight">
               <div>
-                <p className="section-label">Simulation cloud</p>
-                <h2>{visiblePoints.length.toLocaleString()} sampled futures</h2>
+                <p className="section-label">Outcome spread</p>
+                <h2>
+                  {points.length
+                    ? "Quantiles from the conditioned model"
+                    : "Outcome probabilities from the conditioned model"}
+                </h2>
               </div>
-              <span className="meta">Backend distribution · each dot is one hypothetical draw</span>
+              <span className="meta">p10 / median / p90 when the model supplies them</span>
             </div>
+            {points.length ? (
             <SimulationCloud
-              ariaLabel="Possible futures simulation cloud"
+              ariaLabel="Possible futures quantile markers"
               layout={axes.layout}
               xAxis={axes.x}
               yAxis={axes.y}
@@ -170,6 +175,9 @@ export default function PossibleFuturesView({
               clusters={centroids}
               series={series}
             />
+            ) : (
+              <p className="quiet-copy">Quantile markers are shown when the model returns p10, median, and p90.</p>
+            )}
           </div>
 
           {selectedSimulation ? (

@@ -203,7 +203,7 @@ export interface ScenarioDistribution {
 }
 
 export interface PathComparisonResult {
-  paths: { id: string; label: string; primary_goal_probability: number; expected_outcome: number; median: number; p10: number; p90: number; downside_probability: number; fragility_pp: number | null; resource_cost: { hours_per_week: number; money: number; energy: number }; execution_probability: number; model_status: string }[];
+  paths: { id: string; label: string; primary_goal_probability: number | null; expected_outcome: number | null; median: number | null; p10: number | null; p90: number | null; downside_probability: number | null; fragility_pp: number | null; resource_cost: { hours_per_week: number; money: number; energy: number }; execution_probability: number | null; model_status: string }[];
   model_family: string;
   model_version: string;
   seed: number;
@@ -325,6 +325,7 @@ export interface ProfilePayload {
   collection_count: number;
   radar: BehaviorProfile;
   radar_areas?: { label: string; radar: BehaviorProfile }[];
+  radar_kind?: "parameters" | "traits";
   privacy: string;
 }
 
@@ -724,6 +725,8 @@ export const api = {
       body: JSON.stringify({ goal_ids: goalIds }),
     }),
   profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
+  demoProfileRadar: (signal?: AbortSignal) =>
+    request<{ demo: boolean; radar: BehaviorProfile; message: string }>("/api/v1/profile/demo-radar", undefined, signal),
   profilePhoto,
   uploadProfilePhoto: (file: File) => {
     const body = new FormData();

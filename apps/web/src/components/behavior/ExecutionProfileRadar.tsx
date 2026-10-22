@@ -70,13 +70,27 @@ function labelAnchor(index: number, total: number) {
   } as const;
 }
 
+const REJECTED_TRAIT_KEYS = new Set([
+  "follow_through",
+  "consistency",
+  "commitment_realism",
+  "momentum",
+  "reliability",
+  "recovery",
+]);
+
 function measured(item: BehaviorDimension): boolean {
   return !item.limited_evidence && item.value != null;
 }
 
+function isRejectedTraitChart(dimensions: BehaviorDimension[]): boolean {
+  return dimensions.length > 0 && dimensions.every((item) => REJECTED_TRAIT_KEYS.has(item.key));
+}
+
 export function ExecutionProfileRadar({ profile, compact = false }: Props) {
   const uid = useId().replace(/:/g, "");
-  const dimensions = profile?.dimensions ?? [];
+  const rejected = isRejectedTraitChart(profile?.dimensions ?? []);
+  const dimensions = rejected ? [] : profile?.dimensions ?? [];
   const firstMeasured = dimensions.find(measured)?.key ?? null;
   const [locked, setLocked] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
@@ -86,10 +100,13 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
   const activeIndex = dimensions.findIndex((item) => item.key === activeKey);
   const tooltipPt = activeIndex >= 0 ? point(activeIndex, dimensions.length, 0.55) : { x: CX, y: CY };
 
-  if (!profile || !dimensions.length) {
+  if (!profile || !dimensions.length || !dimensions.some(measured)) {
     return (
       <section className={`execution-profile${compact ? " compact" : ""}`}>
-        <p className="execution-empty">No verified commitments yet.</p>
+        <p className="execution-empty">
+          {profile?.execution.notes?.[0]
+            ?? "No measured parameters yet. Add observations, or view the isolated demonstration profile."}
+        </p>
       </section>
     );
   }
@@ -112,11 +129,11 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   return (
     <section className={`execution-profile${compact ? " compact" : ""}`}>
-      {!hasMeasurements ? <p className="execution-empty">Your execution profile appears as planned actions are verified.</p> : null}
-      {hasMeasurements && !complete ? <p className="execution-empty">Some traits need more observations.</p> : null}
+      {profile.execution.notes?.[0] ? <p className="execution-empty">{profile.execution.notes[0]}</p> : null}
+      {hasMeasurements && !complete ? <p className="execution-empty">Some parameters need more observations.</p> : null}
       <div className="radar-stage">
         {dimensions.length >= 3 ? (
-          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Follow-through profile radar">
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Parameter profile radar">
             <defs>
               <filter id={`${uid}-glow`} x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="6" result="blur" />

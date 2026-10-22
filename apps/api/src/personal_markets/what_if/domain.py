@@ -424,12 +424,15 @@ class PossibleFuturesRequest(BaseModel):
     assumptions: list[Assumption] = Field(default_factory=list)
     evidence_basis: list[str] = Field(default_factory=list)
     seed: int = 20260829
+    parsed_changes: list[InterventionChangeInput] = Field(default_factory=list)
+    config: SimulationConfig = Field(default_factory=SimulationConfig)
 
 
 class PathDefinition(BaseModel):
     id: str
     label: str
     intervention: StructuredIntervention
+    parsed_changes: list[InterventionChangeInput] = Field(default_factory=list)
     secondary_outcomes: dict[str, float] = Field(default_factory=dict)
 
 
@@ -441,15 +444,15 @@ class PathComparisonRequest(BaseModel):
 class PathComparisonItem(BaseModel):
     id: str
     label: str
-    primary_goal_probability: float
-    expected_outcome: float
-    median: float
-    p10: float
-    p90: float
-    downside_probability: float
-    fragility_pp: float | None
+    primary_goal_probability: float | None = None
+    expected_outcome: float | None = None
+    median: float | None = None
+    p10: float | None = None
+    p90: float | None = None
+    downside_probability: float | None = None
+    fragility_pp: float | None = None
     resource_cost: ResourceCost
-    execution_probability: float
+    execution_probability: float | None = None
     assumptions: list[Assumption]
     model_status: str
     secondary_outcomes: dict[str, float]

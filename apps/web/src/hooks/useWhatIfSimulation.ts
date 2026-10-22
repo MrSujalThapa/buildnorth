@@ -7,8 +7,9 @@ import {
   type WhatIfBaselineState,
   type WhatIfResult,
 } from "../api/client";
+import { simulationConfigForView } from "../adapters/whatIfRequests";
 import { previewFromResult } from "../adapters/whatIfViewModel";
-import type { Market, WhatIfPlan, WhatIfPreview } from "../adapters/templateTypes";
+import type { Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../adapters/templateTypes";
 
 type TuneValues = {
   current: number;
@@ -43,7 +44,7 @@ export function useWhatIfSimulation(
   goal: Goal | undefined,
   market: Market | undefined,
   plan: WhatIfPlan,
-  options?: { onScenarioPersisted?: () => void },
+  options?: { onScenarioPersisted?: () => void; analysisDepth?: WhatIfView },
 ) {
   const goalId = goal?.goal_id ?? "";
   const baseline = useQuery({
@@ -123,9 +124,9 @@ export function useWhatIfSimulation(
         diminishing_return: Number(defaultIntervention.diminishing_return ?? 0.04),
         cost: defaultIntervention.cost ?? { hours_per_week: planWeeklyHours(plan), money: 0, energy: 0 },
       },
-      config: baseline.data.config,
+      config: simulationConfigForView(options?.analysisDepth ?? "simple", baseline.data.config.seed),
     };
-  }, [assumptions, baseline.data, goal, plan, targetDimension, values]);
+  }, [assumptions, baseline.data, goal, options?.analysisDepth, plan, targetDimension, values]);
 
   useEffect(() => {
     if (!request) return;

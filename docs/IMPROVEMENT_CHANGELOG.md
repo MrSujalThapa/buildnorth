@@ -2,6 +2,22 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-22 — What If contracts and parameter radar
+
+**Hypothesis:** Futures/Compare/Reverse were failing at the intervention handoff (labels without `parsed_changes`, empty reverse candidates, unpriced 0%), and Profile still rendered the rejected six-trait skeleton.
+
+**Changes:** Shared `parsed_changes` across Change/Futures/Compare. Reverse fills candidates from baseline compare levers when the client sends none. Unpriced compare paths stay `null`. Simple vs Deeper use different Monte Carlo draw counts. Profile radar now scores measurable parameters from evidence, with an isolated `/api/v1/profile/demo-radar` fixture that never writes to a user. The six execution-trait axes are no longer shown.
+
+**Measured result:** `uv run python -m pytest apps/api/tests/test_what_if_contracts.py apps/api/tests/test_what_if_futures.py apps/api/tests/test_pass4_remaining.py apps/api/tests/test_parameter_profile.py apps/api/tests/test_profile_dimensions.py apps/api/tests/test_commitments.py -q` — 24 passed (14 What If + 3 parameter/profile + remaining pass4/commitments in those files). Vitest What If adapters + radar — 8 passed. Authenticated production Profile/What If browser: **NOT TESTED** in this checkpoint. Cron/watch-runner untouched. Production user was not seeded.
+
+## 2026-10-21 — Preview origin CORS/azp allowlist
+
+**Hypothesis:** Vercel preview `Failed to fetch` on `/api/v1/me` is a CORS preflight 400 (missing `Access-Control-Allow-Origin`), not Clerk signature failure, Render 5xx, or a cold start.
+
+**Changes:** Added the git-alias and unique Vercel preview origins plus localhost to Render `playitout-api` `PM_CORS_ORIGINS` and `PM_CLERK_AUTHORIZED_PARTIES`, keeping production `https://buildnorth-delta.vercel.app`. JWT issuer/signature/azp checks unchanged. Cron/watch-runner untouched. Regression tests cover allowed production/preview/localhost origins and rejected arbitrary origins.
+
+**Measured result:** Live `OPTIONS /api/v1/me` from the git-alias and unique preview origins returned 200 with matching `Access-Control-Allow-Origin` and `authorization` allowed. Anonymous `GET /api/v1/me` from the preview origin returned 401 with CORS headers. Signed-in Chrome on the unique preview origin then got `/api/v1/me` 200 and `/api/v1/goals/dashboard` 200. Arbitrary origin preflight stayed 400. Render web deploy `dep-dbco6uq9lscs73eii50g` used `main` `d3073d8`. Cron/watch-runner were not modified.
+
 ## 2026-10-21 — Consumer profile, radar, and What If presentation
 
 **Hypothesis:** The forecasting and behavior models can stay in place while the default UI stops showing estimator diagnostics, fake-complete radar polygons, and unexplained follow-through defaults.

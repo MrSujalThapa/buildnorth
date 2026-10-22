@@ -54,6 +54,12 @@ export function ProfileRoute() {
   const [customArea, setCustomArea] = useState("");
   const goals = useQuery({ queryKey: ["goals", "list"], queryFn: ({ signal }) => api.goals(signal), enabled: editingDimensions });
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [demoRadar, setDemoRadar] = useState(false);
+  const demo = useQuery({
+    queryKey: ["profile-demo-radar"],
+    queryFn: ({ signal }) => api.demoProfileRadar(signal),
+    enabled: demoRadar,
+  });
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -124,14 +130,36 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="profile-radar-heading">
-          <h2>Execution profile</h2>
-          <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
+          <h2>Parameter profile</h2>
+          <div className="profile-radar-actions">
+            <button
+              type="button"
+              className="markets-select"
+              aria-pressed={demoRadar}
+              onClick={() => setDemoRadar((current) => !current)}
+            >
+              {demoRadar ? "Hide demonstration" : "View demonstration"}
+            </button>
+            <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
+          </div>
         </div>
-        <div className="profile-area-filter" role="group" aria-label="Life area">
-          <button type="button" aria-pressed={selectedArea === "Overall"} onClick={() => setSelectedArea("Overall")}>Overall</button>
-          {profile.data.radar_areas?.map((area) => <button type="button" key={area.label} aria-pressed={selectedArea === area.label} onClick={() => setSelectedArea(area.label)}>{area.label}</button>)}
-        </div>
-        <ExecutionProfileRadar profile={profile.data.radar_areas?.find((area) => area.label === selectedArea)?.radar ?? profile.data.radar} />
+        {demoRadar ? (
+          <p className="profile-demo-note" role="status">
+            {demo.data?.message ?? "Loading isolated demonstration data. This is not your profile."}
+          </p>
+        ) : (
+          <div className="profile-area-filter" role="group" aria-label="Evidence filter">
+            <button type="button" aria-pressed={selectedArea === "Overall"} onClick={() => setSelectedArea("Overall")}>All measurements</button>
+            {profile.data.radar_areas?.map((area) => <button type="button" key={area.label} aria-pressed={selectedArea === area.label} onClick={() => setSelectedArea(area.label)}>{area.label}</button>)}
+          </div>
+        )}
+        <ExecutionProfileRadar
+          profile={
+            demoRadar
+              ? demo.data?.radar
+              : profile.data.radar_areas?.find((area) => area.label === selectedArea)?.radar ?? profile.data.radar
+          }
+        />
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <form className="confirm-card profile-editor" onSubmit={(event) => {

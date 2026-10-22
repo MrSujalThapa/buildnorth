@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from personal_markets.behavior.portfolio import portfolio_profile
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.identity.domain import ProfileDimension
+from personal_markets.profile.parameters import build_parameter_profile, flatten_goal_evidence
 
 
-def test_profile_dimensions_follow_user_order_and_keep_unknown_scores_null() -> None:
+def test_profile_parameters_do_not_use_life_area_or_trait_axes() -> None:
     goal = GoalContract(
         goal_id=uuid4(), title="Read 20 books", goal_type=GoalType.CONTINUOUS_TARGET,
         success_definition={"metric": "books_read", "target": 20, "current": 6},
@@ -17,10 +17,8 @@ def test_profile_dimensions_follow_user_order_and_keep_unknown_scores_null() -> 
         ProfileDimension(label="Music"),
         ProfileDimension(label="Reading", goal_ids=[goal.goal_id]),
     ]
-    profile = portfolio_profile([goal], {}, dimensions=dimensions)
-    assert [item.key for item in profile.dimensions] == [
-        "follow_through", "consistency", "commitment_realism",
-        "momentum", "reliability", "recovery",
-    ]
-    assert all(item.value is None for item in profile.dimensions)
-    assert profile.execution.usable is False
+    profile = build_parameter_profile(flatten_goal_evidence({str(goal.goal_id): []}))
+    assert profile.dimensions == []
+    forbidden = {"Follow-through", "Reading", "Music"}
+    assert all(item.label not in forbidden for item in profile.dimensions)
+    assert [item.label for item in dimensions] == ["Music", "Reading"]

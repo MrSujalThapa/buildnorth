@@ -459,8 +459,10 @@
 .profile-custom-area { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
 .profile-custom-area label { grid-column: 1 / -1; font-size: 13px; color: var(--app-muted); }
 .profile-area-link { margin: 0; color: var(--app-muted); font-size: 13px; }
-.profile-radar-heading { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; }
+.profile-radar-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
 .profile-radar-heading h2 { margin: 0; font-size: 22px; }
+.profile-radar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-demo-note { margin: 8px 0 0; color: var(--app-muted); font-size: 14px; }
 .profile-dimension-editor { max-height: min(80vh, 720px); overflow: auto; }
 .profile-dimension-row { border-top: 1px solid var(--app-border); padding-top: 12px; }
 .profile-dimension-controls { display: flex; gap: 4px; margin: 5px 0 10px; }

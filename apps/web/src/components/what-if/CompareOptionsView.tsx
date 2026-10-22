@@ -24,6 +24,7 @@ type Props = {
   onIsolate: (id: string | null) => void;
   selectedSimulation: SimulationPoint | null;
   onSelectSimulation: (point: SimulationPoint | null) => void;
+  onComparePaths?: (paths: { id: string; label: string }[]) => void;
 };
 
 export default function CompareOptionsView({
@@ -40,27 +41,77 @@ export default function CompareOptionsView({
   onIsolate,
   selectedSimulation,
   onSelectSimulation,
+  onComparePaths,
 }: Props) {
   const catalog = optionsProp ?? [];
   const [customLabel, setCustomLabel] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pathA, setPathA] = useState("");
+  const [pathB, setPathB] = useState("");
   const selected = catalog.filter((option) => selectedIds.includes(option.id));
   const available = catalog.filter((option) => !selectedIds.includes(option.id));
-  const leader = [...selected].sort((a, b) => (b.odds ?? 0) - (a.odds ?? 0))[0];
+  const leader = [...selected].sort((a, b) => (b.odds ?? -1) - (a.odds ?? -1))[0];
   const points = comparePoints ?? [];
   const visiblePoints = isolatedId
     ? points.filter((point) => point.optionId === isolatedId)
     : points;
   const reps = representativesFor(visiblePoints);
 
+  function submitCustomPaths() {
+    const a = pathA.trim();
+    const b = pathB.trim();
+    if (!a || !b) return;
+    onComparePaths?.([
+      { id: "path-a", label: a },
+      { id: "path-b", label: b },
+    ]);
+  }
+
+  const composer = (
+    <section className="composer compare-paths" aria-label={`Compare options for ${market.title}`}>
+      <div className="composer-intro">
+        <h2>Which path looks stronger?</h2>
+        <p>Describe two real alternatives. Both are interpreted, then simulated from the same baseline.</p>
+      </div>
+      <div className="compare-path-fields">
+        <label>
+          <span>Path A</span>
+          <textarea
+            name="compare-path-a"
+            rows={2}
+            value={pathA}
+            disabled={loading}
+            placeholder="e.g. apply to 10 startups each week"
+            onChange={(event) => setPathA(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Path B</span>
+          <textarea
+            name="compare-path-b"
+            rows={2}
+            value={pathB}
+            disabled={loading}
+            placeholder="e.g. apply to 5 large companies each week"
+            onChange={(event) => setPathB(event.target.value)}
+          />
+        </label>
+      </div>
+      <button
+        type="button"
+        className="primary-action compact"
+        disabled={loading || !pathA.trim() || !pathB.trim()}
+        onClick={submitCustomPaths}
+      >
+        Compare these paths
+      </button>
+    </section>
+  );
+
   if (!priced) {
     return (
       <div className="mode-stage">
-        <section className="composer" aria-label={`Compare options for ${market.title}`}>
-          <div className="composer-intro">
-            <h2>Which path looks stronger?</h2>
-          </div>
-        </section>
+        {composer}
         <div className="unpriced-state">
           <strong>Comparison unavailable</strong>
           <span>{message ?? "Add the missing state or evidence required to price this goal."}</span>
@@ -72,18 +123,8 @@ export default function CompareOptionsView({
   if (loading && !catalog.length) {
     return (
       <div className="mode-stage">
+        {composer}
         <p role="status">Pricing comparison options from backend…</p>
-      </div>
-    );
-  }
-
-  if (!catalog.length) {
-    return (
-      <div className="mode-stage">
-        <div className="unpriced-state">
-          <strong>Couldn't compare these paths</strong>
-          <span>{message ?? "This goal needs two actions that can actually be simulated."}</span>
-        </div>
       </div>
     );
   }
@@ -118,27 +159,32 @@ export default function CompareOptionsView({
   }
 
   function addCustom() {
+    const label = customLabel.trim();
+    if (!label) return;
+    if (!pathA.trim()) {
+      setPathA(label);
+      setCustomLabel("");
+      setPickerOpen(false);
+      return;
+    }
+    if (!pathB.trim()) {
+      setPathB(label);
+      setCustomLabel("");
+      setPickerOpen(false);
+      return;
+    }
     const match = catalog.find(
-      (option) => option.label.toLowerCase() === customLabel.trim().toLowerCase(),
+      (option) => option.label.toLowerCase() === label.toLowerCase(),
     );
     if (match) {
       addOption(match);
-      setCustomLabel("");
-      return;
-    }
-    if (available[0]) {
-      addOption(available[0]);
       setCustomLabel("");
     }
   }
 
   return (
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
-      <section className="composer" aria-label={`Compare options for ${market.title}`}>
-        <div className="composer-intro">
-          <h2>Which path looks stronger?</h2>
-        </div>
-      </section>
+      {composer}
 
       <section className="option-picker" aria-label="Options to compare">
         {selected.map((option, index) => (

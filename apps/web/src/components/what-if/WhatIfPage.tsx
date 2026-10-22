@@ -82,7 +82,7 @@ type Props = {
 
   pathsMessage?: string | null;
 
-  onRunCompare?: () => void;
+  onRunCompare?: (paths?: { id: string; label: string }[]) => void;
 
   onRunFutures?: (decision: string) => void;
 
@@ -333,6 +333,7 @@ export default function WhatIfPage({
 
   const simulation = useWhatIfSimulation(goal, market, plan, {
     onScenarioPersisted: onExplorationsRefresh,
+    analysisDepth: view,
   });
 
   const futuresSimulation = useMemo(
@@ -419,10 +420,18 @@ export default function WhatIfPage({
 
 
   useEffect(() => {
+    const ids = catalog.map((item) => item.id);
+    setCompareIds((current) => {
+      const kept = current.filter((id) => ids.includes(id));
+      if (kept.length >= 2) return kept;
+      return ids.slice(0, 2);
+    });
+  }, [catalog]);
 
-    if (mode === "compare") compareRef.current?.();
-
-  }, [mode]);
+  useEffect(() => {
+    if (mode !== "compare") return;
+    if (catalog.length >= 2) compareRef.current?.();
+  }, [catalog.length, mode]);
 
 
 
@@ -707,6 +716,8 @@ export default function WhatIfPage({
 
               onSelectSimulation={setSelectedSimulation}
 
+              onComparePaths={(paths) => compareRef.current?.(paths)}
+
             />
 
           ) : null}
@@ -746,6 +757,8 @@ export default function WhatIfPage({
               selectedSimulation={selectedSimulation}
 
               onSelectSimulation={setSelectedSimulation}
+
+              onFind={() => pathsRef.current?.(targetOdds / 100)}
 
             />
 

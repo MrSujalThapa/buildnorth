@@ -13,6 +13,10 @@ function levelFromNumber(value: number, thresholds: [number, number]): CompareOp
   return "High";
 }
 
+function asPercent(value: number | null | undefined): number | null {
+  return value == null ? null : value * 100;
+}
+
 export function toCompareOptions(
   baseline: WhatIfBaselineState | undefined,
   comparison: PathComparisonResult | undefined,
@@ -21,12 +25,21 @@ export function toCompareOptions(
     return comparison.paths.map((path) => ({
       id: path.id,
       label: path.label,
-      odds: path.primary_goal_probability * 100,
-      downside: levelFromNumber(path.downside_probability, [0.25, 0.5]),
+      odds: asPercent(path.primary_goal_probability),
+      downside:
+        path.downside_probability == null
+          ? "Medium"
+          : levelFromNumber(path.downside_probability, [0.25, 0.5]),
       time: levelFromNumber(path.resource_cost.hours_per_week, [5, 12]),
-      followThrough: Math.round(path.execution_probability * 100),
+      followThrough:
+        path.execution_probability == null ? 0 : Math.round(path.execution_probability * 100),
       sensitivity: levelFromNumber(path.fragility_pp ?? 0, [3, 8]),
-      note: `${path.model_status.replaceAll("_", " ")} · median ${Math.round(path.median * 100)}%`,
+      note:
+        path.primary_goal_probability == null
+          ? `${path.model_status.replaceAll("_", " ")} · not priced`
+          : `${path.model_status.replaceAll("_", " ")} · median ${
+              path.median == null ? "—" : `${Math.round(path.median * 100)}%`
+            }`,
     }));
   }
 
@@ -61,7 +74,7 @@ export function toGoalPaths(
     return targetSearch.paths.map((path, index) => ({
       id: `path-${index}`,
       label: path.label,
-      odds: path.resulting_probability * 100,
+      odds: asPercent(path.resulting_probability),
       requirement: path.valid_because,
       subpaths: path.action_ids.map((id) => id.replaceAll("_", " ")),
     }));
@@ -71,9 +84,17 @@ export function toGoalPaths(
     return comparison.paths.map((path) => ({
       id: path.id,
       label: path.label,
-      odds: path.primary_goal_probability * 100,
-      requirement: `p10 ${Math.round(path.p10 * 100)}% · p90 ${Math.round(path.p90 * 100)}%`,
-      subpaths: [`Execution ${Math.round(path.execution_probability * 100)}%`, path.model_status],
+      odds: asPercent(path.primary_goal_probability),
+      requirement:
+        path.p10 == null || path.p90 == null
+          ? path.model_status.replaceAll("_", " ")
+          : `p10 ${Math.round(path.p10 * 100)}% · p90 ${Math.round(path.p90 * 100)}%`,
+      subpaths: [
+        path.execution_probability == null
+          ? "Execution unknown"
+          : `Execution ${Math.round(path.execution_probability * 100)}%`,
+        path.model_status,
+      ],
     }));
   }
 
@@ -126,24 +147,22 @@ export function futuresFromDistribution(
     goalRate: outcome.median ?? (outcome.probability ?? 0.5),
   }));
 
+  // Only plot quantiles the backend actually computed. Do not invent Monte Carlo dots.
   const points: SimulationPoint[] = [];
   let pointId = 1;
   distribution.outcomes.forEach((outcome, index) => {
     const clusterId = `outcome-${index}`;
-    const copies = Math.max(1, Math.round((outcome.probability ?? 0.1) * 500));
-    const xCenter =
-      outcome.median != null
-        ? outcome.median * (marketCategory === "Career" ? axes.xMax : 100)
-        : axes.xMin + (index + 1) * ((axes.xMax - axes.xMin) / Math.max(distribution.outcomes.length, 1));
-    const yCenter =
-      outcome.median != null
-        ? outcome.median * 100
-        : axes.yMin + (axes.yMax - axes.yMin) * 0.5;
-    for (let i = 0; i < copies; i += 1) {
+    const markers: Array<[string, number | null]> = [
+      ["p10", outcome.p10],
+      ["median", outcome.median],
+      ["p90", outcome.p90],
+    ];
+    for (const [, value] of markers) {
+      if (value == null) continue;
       points.push({
         id: pointId++,
-        x: xCenter + ((i % 5) - 2) * 0.8,
-        y: yCenter + ((i % 7) - 3) * 0.6,
+        x: value * (marketCategory === "Career" ? axes.xMax : 100),
+        y: (outcome.probability ?? 0) * 100,
         clusterId,
         goalHit: (outcome.median ?? outcome.probability ?? 0) >= 0.5,
         seed: pointId + index,
@@ -154,7 +173,7 @@ export function futuresFromDistribution(
   return { clusters, points };
 }
 
-/** Build comparison cloud points from backend path quantiles — no local fixture draws. */
+/** Plot backend quantiles only — never fabricate Monte Carlo trajectories. */
 export function comparePointsFromResult(
   comparison: PathComparisonResult | undefined,
 ): SimulationPoint[] | undefined {
@@ -162,26 +181,21 @@ export function comparePointsFromResult(
   const points: SimulationPoint[] = [];
   let pointId = 1;
   for (const path of comparison.paths) {
-    const samples = [
-      path.p10 * 100,
-      path.median * 100,
-      path.primary_goal_probability * 100,
-      path.p90 * 100,
-    ];
+    if (path.primary_goal_probability == null) continue;
+    const samples = [path.p10, path.median, path.primary_goal_probability, path.p90]
+      .filter((value): value is number => value != null)
+      .map((value) => value * 100);
     samples.forEach((center, index) => {
-      const copies = index === 2 ? 6 : 4;
-      for (let i = 0; i < copies; i += 1) {
-        points.push({
-          id: pointId++,
-          x: path.resource_cost.hours_per_week + ((i % 3) - 1) * 0.5,
-          y: center + ((i % 5) - 2) * 0.35,
-          optionId: path.id,
-          clusterId: path.id,
-          goalHit: center >= 50,
-          seed: pointId + index,
-        });
-      }
+      points.push({
+        id: pointId++,
+        x: path.resource_cost.hours_per_week,
+        y: center,
+        optionId: path.id,
+        clusterId: path.id,
+        goalHit: center >= 50,
+        seed: pointId + index,
+      });
     });
   }
-  return points;
+  return points.length ? points : undefined;
 }

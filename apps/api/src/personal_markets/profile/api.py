@@ -8,8 +8,6 @@ from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 
-from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
-from personal_markets.behavior.portfolio import portfolio_profile
 from personal_markets.collections.service import CollectionService
 from personal_markets.core.errors import ForbiddenError
 from personal_markets.evidence.domain import NormalizedEvidence
@@ -20,6 +18,11 @@ from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import AccountView, Principal, ProfileDimension, UserProfile
 from personal_markets.identity.factory import get_identity_service, get_inference_budget_service
 from personal_markets.identity.service import IdentityService
+from personal_markets.profile.parameters import (
+    build_parameter_profile,
+    demo_parameter_profile,
+    flatten_goal_evidence,
+)
 from personal_markets.profile.photo_store import get_photo_store
 from personal_markets.wiring import get_collection_service, get_evidence_service, get_goal_service
 
@@ -59,42 +62,48 @@ async def get_profile(
 
     event_rows = await asyncio.gather(*(goal_evidence(goal.goal_id) for goal in owned))
     grouped = {str(goal.goal_id): rows for goal, rows in zip(owned, event_rows, strict=True)}
-    commitments, observations = await get_commitment_store().list_for_goals(
-        principal.user_id, [goal.goal_id for goal in owned]
-    )
-    explicit_trials = trials_from_commitments(commitments, observations)
-    plan_goals = {str(plan.id): plan.goal_id for plan in commitments}
-    radar = portfolio_profile(
-        owned,
-        grouped,
-        dimensions=account.profile.dimensions,
-        commitment_trials=explicit_trials,
-    )
+    radar = build_parameter_profile(flatten_goal_evidence(grouped))
     radar_areas = []
     for area in account.profile.dimensions:
         members = [goal for goal in owned if goal.goal_id in area.goal_ids]
-        if members:
-            radar_areas.append(
-                {
-                    "label": area.label,
-                    "radar": portfolio_profile(
-                        members,
-                        grouped,
-                        commitment_trials=[
-                            trial
-                            for trial in explicit_trials
-                            if plan_goals.get(trial.trial_id.split(":")[1]) in area.goal_ids
-                        ],
-                    ).model_dump(mode="json"),
-                }
-            )
+        if not members:
+            continue
+        subset = {
+            str(goal.goal_id): grouped.get(str(goal.goal_id), []) for goal in members
+        }
+        radar_areas.append(
+            {
+                "label": area.label,
+                "radar": build_parameter_profile(
+                    flatten_goal_evidence(subset)
+                ).model_dump(mode="json"),
+            }
+        )
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),
         "collection_count": len(collection_rows),
         "radar": radar.model_dump(mode="json"),
         "radar_areas": radar_areas,
+        "radar_kind": "parameters",
         "privacy": "private",
+    }
+
+
+@router.get("/demo-radar")
+async def get_demo_radar(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> dict[str, Any]:
+    del principal
+    profile = demo_parameter_profile()
+    return {
+        "demo": True,
+        "radar": profile.model_dump(mode="json"),
+        "radar_kind": "parameters",
+        "message": (
+            "Demonstration data computed from isolated fixture observations. "
+            "This is not your profile."
+        ),
     }
 
 
