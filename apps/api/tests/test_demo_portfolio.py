@@ -1,8 +1,10 @@
+from typing import Any, cast
+
 from personal_markets.profile.demo_portfolio import demo_portfolio
 
 
 def test_demo_portfolio_is_isolated_and_nonlinear() -> None:
-    payload = demo_portfolio()
+    payload = cast(dict[str, Any], demo_portfolio())
     assert payload["demo"] is True
     assert "not written" in str(payload["message"]).lower()
     goals = payload["goals"]

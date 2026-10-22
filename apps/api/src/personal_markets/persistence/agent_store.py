@@ -14,7 +14,7 @@ from personal_markets.ports import EvidenceEventProposal, WorkflowSnapshot
 
 
 def running_thread_expired(
-    updated_at: datetime, *, timeout_seconds: int, now: datetime
+    updated_at: datetime, *, timeout_seconds: float, now: datetime
 ) -> bool:
     return now - updated_at > timedelta(seconds=timeout_seconds + 60)
 

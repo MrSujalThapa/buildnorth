@@ -150,7 +150,7 @@ def demo_portfolio(*, as_of: datetime | None = None) -> dict[str, object]:
             "title": next(item["title"] for item in goals if item["goal_id"] == goal_id),
             "color": ("#1f8f86", "#b56a52", "#5475a6", "#9a7b45")[index],
             "points": [
-                {"timestamp": point["created_at"], "value": float(point["probability"]) * 100}
+                {"timestamp": point["created_at"], "value": float(str(point["probability"])) * 100}
                 for point in histories[goal_id]
             ],
             "withheld": False,

@@ -13,6 +13,7 @@ from personal_markets.what_if.domain import (
     InterventionChangeInput,
     PossibleFuturesRequest,
     ScenarioDefinition,
+    ScenarioDistribution,
 )
 from personal_markets.what_if.service import WhatIfService
 
@@ -252,7 +253,7 @@ async def test_possible_futures_prices_career_from_funnel_model() -> None:
     assert total == pytest.approx(1.0)
 
 
-def _prob(result, needle: str) -> float:
+def _prob(result: ScenarioDistribution, needle: str) -> float:
     for item in result.outcomes:
         if needle.lower() in item.label.lower():
             return float(item.probability or 0)

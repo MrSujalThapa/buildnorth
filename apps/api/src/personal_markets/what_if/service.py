@@ -893,7 +893,14 @@ class WhatIfService:
             continuous = await self._continuous_target_path(request)
             if continuous is not None:
                 paths.append(continuous)
-        paths.sort(key=lambda item: (self._cost_score(item.resource_cost), len(item.action_ids)))
+        candidate_ids = {candidate.id for candidate in request.candidates}
+        paths.sort(
+            key=lambda item: (
+                not any(action_id in candidate_ids for action_id in item.action_ids),
+                self._cost_score(item.resource_cost),
+                len(item.action_ids),
+            )
+        )
         result = TargetSearchResult(
             target_probability=request.target_probability,
             current_probability=current,

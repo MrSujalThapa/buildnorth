@@ -1,5 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
+from httpx import Response
 
 from helpers import isolated_app
 from personal_markets.core.config import Settings
@@ -118,7 +119,7 @@ def _production_cors_settings(**overrides: object) -> Settings:
     )
 
 
-def _preflight(client: TestClient, origin: str):
+def _preflight(client: TestClient, origin: str) -> Response:
     return client.options(
         "/api/v1/me",
         headers={
@@ -129,7 +130,9 @@ def _preflight(client: TestClient, origin: str):
     )
 
 
-def test_deployed_cors_allows_production_preview_and_localhost(monkeypatch) -> None:
+def test_deployed_cors_allows_production_preview_and_localhost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
     with TestClient(isolated_app()) as client:
         for origin in ALLOWED_WEB_ORIGINS:
@@ -139,7 +142,7 @@ def test_deployed_cors_allows_production_preview_and_localhost(monkeypatch) -> N
             assert "authorization" in response.headers["access-control-allow-headers"].lower()
 
 
-def test_deployed_cors_rejects_arbitrary_origin(monkeypatch) -> None:
+def test_deployed_cors_rejects_arbitrary_origin(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
     with TestClient(isolated_app()) as client:
         response = _preflight(client, ARBITRARY_ORIGIN)
@@ -147,7 +150,9 @@ def test_deployed_cors_rejects_arbitrary_origin(monkeypatch) -> None:
     assert "access-control-allow-origin" not in {key.lower() for key in response.headers}
 
 
-def test_anonymous_me_is_401_and_still_allows_preview_origin(monkeypatch) -> None:
+def test_anonymous_me_is_401_and_still_allows_preview_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr("personal_markets.main.get_settings", lambda: _production_cors_settings())
     app = isolated_app()
     app.state.auth_bypass_principal = None

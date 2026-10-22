@@ -183,7 +183,10 @@ def test_http_allowed_azp_without_aud_reaches_me(
 
 
 def test_http_preview_and_production_azp_are_accepted(
-    monkeypatch, rsa_key, clerk_settings, install_trusted_jwks
+    monkeypatch: pytest.MonkeyPatch,
+    rsa_key: rsa.RSAPrivateKey,
+    clerk_settings: Settings,
+    install_trusted_jwks: list[Any],
 ) -> None:
     preview = (
         "https://buildnorth-git-ux-consumer-c0fb66-sujalthapa242-3741s-projects.vercel.app"

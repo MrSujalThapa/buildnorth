@@ -19,6 +19,7 @@ from personal_markets.what_if.domain import (
     ScenarioDefinition,
     TargetSearchRequest,
     WhatIfBaselineState,
+    WhatIfRequest,
     WhatIfResult,
 )
 from personal_markets.what_if.futures_decision import parse_futures_decision
@@ -78,7 +79,7 @@ async def _finance_service(goal: GoalContract) -> WhatIfService:
     return WhatIfService(GoalService(goal_repo), evidence=evidence_service)
 
 
-def _prob(result, needle: str) -> float:
+def _prob(result: WhatIfResult, needle: str) -> float:
     for item in result.outcomes:
         if needle.lower() in item.label.lower():
             return float(item.probability or 0)
@@ -132,7 +133,7 @@ async def test_compare_unpriced_path_stays_null() -> None:
     await repo.create(goal, uuid4())
 
     class MixedPriceService(WhatIfService):
-        async def _simulate(self, request, *, persist: bool) -> WhatIfResult:
+        async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
             del persist
             if request.parsed_changes:
                 return WhatIfResult(

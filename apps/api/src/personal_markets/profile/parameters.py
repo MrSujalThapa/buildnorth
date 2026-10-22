@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 from personal_markets.behavior.domain import (
@@ -134,7 +135,7 @@ def _dimension_from_spec(
     limited = n < 2
     mean = sum(value for _, value in rows) / n if n else None
     normalized = _normalize(mean, spec) if mean is not None else None
-    sources = sorted(
+    sources: list[str] = sorted(
         {
             item.provenance.source_type
             for item in evidence
@@ -186,7 +187,9 @@ def build_parameter_profile(
         dimensions = [item for item in dimensions if item.provenance.comparable_commitments]
     measured = [item for item in dimensions if not item.limited_evidence and item.value is not None]
     n_eff = sum(item.provenance.n_eff for item in dimensions)
-    sufficiency = "high" if len(measured) >= 3 else "low" if measured else "insufficient"
+    sufficiency: Literal["high", "low", "insufficient"] = (
+        "high" if len(measured) >= 3 else "low" if measured else "insufficient"
+    )
     return BehaviorProfile(
         estimator_version=ESTIMATOR_VERSION,
         as_of=stamp,
@@ -277,11 +280,11 @@ def demo_parameter_evidence(*, as_of: datetime | None = None) -> list[Normalized
             )
         )
     hours = [6.0, 8.5, 7.0, 5.5, 9.0, 8.0]
-    for index, value in enumerate(hours):
+    for index, float_value in enumerate(hours):
         rows.append(
             _event(
                 "hours_per_week",
-                value,
+                float_value,
                 days_ago=10 * (len(hours) - index),
                 domain="career",
                 unit="hours/week",
@@ -301,11 +304,11 @@ def demo_parameter_evidence(*, as_of: datetime | None = None) -> list[Normalized
             )
         )
     running = [18.0, 22.0, 12.0, 28.0, 24.0, 30.0, 21.0]
-    for index, value in enumerate(running):
+    for index, float_value in enumerate(running):
         rows.append(
             _event(
                 "weekly_distance_km",
-                value,
+                float_value,
                 days_ago=8 * (len(running) - index),
                 domain="running",
                 unit="km/week",
@@ -313,11 +316,11 @@ def demo_parameter_evidence(*, as_of: datetime | None = None) -> list[Normalized
             )
         )
     books = [1.0, 2.0, 1.0, 3.0]
-    for index, value in enumerate(books):
+    for index, float_value in enumerate(books):
         rows.append(
             _event(
                 "books_read",
-                value,
+                float_value,
                 days_ago=21 * (len(books) - index),
                 domain="learning",
                 unit="books/month",

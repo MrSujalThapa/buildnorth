@@ -404,7 +404,9 @@ async def test_notion_page_sync_keeps_document_and_dedupes() -> None:
     from uuid import uuid4
 
     from personal_markets.integrations.mcp_domain import (
-        ConnectionType, PluginConnectionRecord, SyncRecipeStep,
+        ConnectionType,
+        PluginConnectionRecord,
+        SyncRecipeStep,
     )
 
     repo = InMemoryIntegrationRepository()
@@ -555,7 +557,10 @@ async def test_notion_picker_omits_untitled_id_only_results() -> None:
 
     async def execute(_user_id, _tool_name, _arguments, **_kwargs):
         return {"results": [
-            {"id": "3ffaf8d1-37de-8050-bea2-e9a62716f138", "title": [{"plain_text": "Oct 20th book report"}]},
+            {
+                "id": "3ffaf8d1-37de-8050-bea2-e9a62716f138",
+                "title": [{"plain_text": "Oct 20th book report"}],
+            },
             {"id": "8c8af8d1-37de-8200-b371-017da61970ef", "title": []},
         ]}
 
@@ -621,12 +626,12 @@ async def test_browse_requests_remote_catalog_without_blocking_the_default_list(
     from personal_markets.core.config import Settings
 
     service = IntegrationGatewayService(settings=Settings(environment="test"))
-    calls: list[dict] = []
+    calls: list[dict[str, object]] = []
 
     class RemoteCatalog:
         available = True
 
-        async def search_toolkits(self, **kwargs):
+        async def search_toolkits(self, **kwargs: object) -> object:
             calls.append(kwargs)
             return type("Page", (), {"items": [], "next_cursor": None, "total_items": 0})()
 

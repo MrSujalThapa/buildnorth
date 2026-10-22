@@ -205,7 +205,10 @@ async def test_identical_paths_match_and_dominant_path_wins() -> None:
         )
     )
     assert result.paths[0].primary_goal_probability == result.paths[1].primary_goal_probability
-    assert result.paths[2].primary_goal_probability > result.paths[0].primary_goal_probability
+    better = result.paths[2].primary_goal_probability
+    baseline = result.paths[0].primary_goal_probability
+    assert better is not None and baseline is not None
+    assert better > baseline
 
 
 @pytest.mark.asyncio
