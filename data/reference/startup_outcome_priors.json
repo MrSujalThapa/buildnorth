@@ -37,6 +37,7 @@
     "positive_revenue_growth": {"bootstrap_sustainable": 0.06, "high_growth_trajectory": 0.04}
   },
   "seed_round_hazard": {
+    "period_days": 30.4375,
     "baseline_logit": -2.2,
     "term_sheet_logit_boost": 1.4,
     "runway_months_under_3_logit_penalty": -0.8,

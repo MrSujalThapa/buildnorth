@@ -157,7 +157,8 @@ def test_projected_crossing_is_uncertain_not_already_achieved() -> None:
     ]
     numeric = build_running_numeric_inputs(goal, _proposal(goal), evidence, now=now)
     assert numeric is not None
-    assert numeric.state["current_value"] < 3000
+    # The improving trend projects past the latest trial, shrunk toward no change.
+    assert 3000 - 30 < numeric.state["current_value"] < 3100
     probability, transforms = price_from_numeric_inputs(numeric)
     assert probability is not None
     diagnostics = transforms["threshold_diagnostics"]
@@ -386,7 +387,21 @@ def test_what_if_baseline_accepts_any_fitted_training_trend(weekly_change: float
     state = build_baseline_state(goal, evidence)
     flow = next(item for item in state.assumptions if item.id == "flow")
     assert flow.minimum <= flow.value <= flow.maximum
-    assert flow.value == pytest.approx(weekly_change, abs=1.0)
+    # The fitted trend keeps its sign and is shrunk toward zero by the slope prior.
+    assert 0.6 * abs(weekly_change) < abs(flow.value) < abs(weekly_change)
+    assert (flow.value > 0) == (weekly_change > 0)
+
+
+def test_single_trial_carries_prior_trend_uncertainty() -> None:
+    goal = _goal()
+    now = datetime.now(UTC)
+    one = build_running_numeric_inputs(
+        goal, _proposal(goal), [_evidence("10k_time_seconds", 3150, observed_at=now)], now=now
+    )
+    assert one is not None
+    assert one.assumptions["trend_projection_uncertainty"] > 0
+    probability, _ = price_from_numeric_inputs(one)
+    assert probability is not None and 0.0001 < probability < 0.5
 
 
 def test_race_entry_deadline_event_without_time_target_is_not_running_threshold() -> None:

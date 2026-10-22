@@ -244,12 +244,16 @@ def build_startup_numeric_inputs(
                 state.mrr / 1000.0
             )
         clock = now or datetime.now(UTC)
-        periods = max(1, math.ceil((goal.deadline - clock).total_seconds() / 604800))
+        period_days = float(ref.seed_round_hazard.get("period_days", 30.4375))
+        periods = max(
+            1, math.ceil((goal.deadline - clock).total_seconds() / (period_days * 86400))
+        )
         transforms = cast(
             dict[str, Any],
             {
                 "startup_state": _state_dict(state),
                 "seed_hazard_logit": logit,
+                "hazard_period_days": period_days,
                 "reference_version": ref.version,
             },
         )

@@ -153,7 +153,12 @@ class BaselineForecastService:
         return deterministic_critic(evidence, evidence_ids, pricing)
 
     async def publish(
-        self, goal: GoalContract, pricing: PricingResult, critic: CriticArtifact
+        self,
+        goal: GoalContract,
+        pricing: PricingResult,
+        critic: CriticArtifact,
+        *,
+        published_at: datetime | None = None,
     ) -> str:
         if critic.decision == "withhold":
             return "withheld"
@@ -183,7 +188,10 @@ class BaselineForecastService:
                 for item in history
             ):
                 return "unchanged"
-        await self._repository.publish(goal, published, critic)
+        if published_at is None:
+            await self._repository.publish(goal, published, critic)
+        else:
+            await self._repository.publish(goal, published, critic, published_at=published_at)
         return "limited" if critic.decision == "publish_with_limitations" else "completed"
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:

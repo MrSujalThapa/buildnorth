@@ -145,3 +145,14 @@ def test_inputs_builder_routes_startup() -> None:
     goal = _goal()
     evidence = [_evidence("mrr", 4000)]
     assert build_numeric_inputs(goal, _proposal(goal), evidence) is not None
+
+
+def test_seed_round_hazard_is_applied_per_month() -> None:
+    now = datetime.now(UTC)
+    goal = _goal(deadline=now + timedelta(days=365))
+    numeric = build_startup_numeric_inputs(
+        goal, _proposal(goal), [_evidence("mrr", 5000.0)], now=now
+    )
+    assert numeric is not None
+    assert numeric.state["periods_remaining"] == 12
+    assert numeric.state["pricing_transforms"]["hazard_period_days"] == pytest.approx(30.4375)

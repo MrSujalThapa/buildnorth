@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from personal_markets.evidence.domain import NormalizedEvidence
@@ -18,25 +19,29 @@ def build_numeric_inputs(
     evidence: list[NormalizedEvidence],
     *,
     overrides: dict[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> NumericInputs | None:
-    """Map validated goal/evidence into typed numerical inputs for baseline pricing."""
+    """Map validated goal/evidence into typed numerical inputs for baseline pricing.
+
+    `now` prices the goal as of an earlier moment, e.g. when replaying evidence history.
+    """
     from personal_markets.forecasting.compiler import spec_from_mapping
     from personal_markets.forecasting.composition import composition_numeric_inputs
 
     composed_spec = spec_from_mapping(goal.model_requirements.get("forecast_spec"))
     if composed_spec is not None:
-        return composition_numeric_inputs(goal, evidence, overrides=overrides)
+        return composition_numeric_inputs(goal, evidence, overrides=overrides, now=now)
     # Ordered most specific first. Finance matches any money-denominated target, so it
     # must run after the domains that also happen to be measured in dollars.
     if is_hiring_goal(goal, proposal):
-        return build_hiring_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+        return build_hiring_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
     if is_running_goal(goal, proposal):
-        return build_running_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+        return build_running_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
     if is_startup_goal(goal, proposal):
-        return build_startup_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+        return build_startup_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
     if is_finance_goal(goal, proposal):
-        return build_finance_numeric_inputs(goal, proposal, evidence, overrides=overrides)
-    return composition_numeric_inputs(goal, evidence, overrides=overrides)
+        return build_finance_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
+    return composition_numeric_inputs(goal, evidence, overrides=overrides, now=now)
 
 
 def proposal_from_goal(goal: GoalContract) -> GoalArchitectProposal:

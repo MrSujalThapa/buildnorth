@@ -33,7 +33,12 @@ class PublishedBaseline:
 
 class BaselineForecastRepository(Protocol):
     async def publish(
-        self, goal: GoalContract, pricing: PricingResult, critic: CriticArtifact
+        self,
+        goal: GoalContract,
+        pricing: PricingResult,
+        critic: CriticArtifact,
+        *,
+        published_at: datetime | None = None,
     ) -> PublishedBaseline | None: ...
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]: ...
@@ -45,7 +50,12 @@ class InMemoryBaselineForecastRepository:
         self._history: dict[UUID, dict[str, PublishedBaseline]] = {}
 
     async def publish(
-        self, goal: GoalContract, pricing: PricingResult, critic: CriticArtifact
+        self,
+        goal: GoalContract,
+        pricing: PricingResult,
+        critic: CriticArtifact,
+        *,
+        published_at: datetime | None = None,
     ) -> PublishedBaseline | None:
         self.published.append((goal, pricing, critic))
         point = history_point(goal, pricing)
@@ -53,7 +63,9 @@ class InMemoryBaselineForecastRepository:
             return None
         points = self._history.setdefault(goal.goal_id, {})
         if point.material_hash not in points:
-            points[point.material_hash] = replace(point, published_at=datetime.now(UTC))
+            points[point.material_hash] = replace(
+                point, published_at=published_at or datetime.now(UTC)
+            )
         return points[point.material_hash]
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:
@@ -66,7 +78,12 @@ class PostgresBaselineForecastRepository:
         self._memory = InMemoryBaselineForecastRepository()
 
     async def publish(
-        self, goal: GoalContract, pricing: PricingResult, critic: CriticArtifact
+        self,
+        goal: GoalContract,
+        pricing: PricingResult,
+        critic: CriticArtifact,
+        *,
+        published_at: datetime | None = None,
     ) -> PublishedBaseline | None:
         point = history_point(goal, pricing)
         if point is None:
@@ -77,11 +94,12 @@ class PostgresBaselineForecastRepository:
                 insert into market_forecast_history (
                   goal_id, probability, forecast_status, evidence_watermark,
                   model_family, model_version, assumption_hash, material_hash,
-                  simulation_artifact_id, source_kind, receipt_json
+                  simulation_artifact_id, source_kind, receipt_json, created_at
                 ) values (
                   :goal_id, :probability, :forecast_status, :evidence_watermark,
                   :model_family, :model_version, :assumption_hash, :material_hash,
-                  null, 'published_forecast', cast(:receipt as jsonb)
+                  null, 'published_forecast', cast(:receipt as jsonb),
+                  coalesce(cast(:published_at as timestamptz), now())
                 ) on conflict (goal_id, material_hash) do nothing
                 """),
                 {
@@ -94,9 +112,10 @@ class PostgresBaselineForecastRepository:
                     "assumption_hash": point.assumption_hash,
                     "material_hash": point.material_hash,
                     "receipt": json.dumps(jsonable_receipt(point.receipt), allow_nan=False),
+                    "published_at": published_at,
                 },
             )
-        await self._memory.publish(goal, pricing, critic)
+        await self._memory.publish(goal, pricing, critic, published_at=published_at)
         return point
 
     def history(self, goal_id: UUID) -> list[PublishedBaseline]:
