@@ -1,20 +1,15 @@
 ﻿import { useState } from "react";
 import { Plus, X } from "lucide-react";
 
+import { formatOutcomeRange, type OutcomeScale } from "../../adapters/outcomeFormat";
 import type { CompareOption, Market, WhatIfView } from "../../adapters/templateTypes";
-import {
-  distributionStats,
-  representativesFor,
-  type SimulationPoint,
-} from "../../adapters/simulations";
-import SimulationCloud, { type CloudSeries } from "./SimulationCloud";
-import ProbabilityDistribution from "./ProbabilityDistribution";
+import OutcomeIntervals, { type OutcomeIntervalRow } from "./OutcomeIntervals";
 
 type Props = {
   market: Market;
   view: WhatIfView;
   options?: CompareOption[];
-  comparePoints?: SimulationPoint[];
+  outcomeScale: OutcomeScale;
   loading?: boolean;
   priced?: boolean;
   message?: string | null;
@@ -22,8 +17,6 @@ type Props = {
   onSelectedIdsChange: (ids: string[]) => void;
   isolatedId: string | null;
   onIsolate: (id: string | null) => void;
-  selectedSimulation: SimulationPoint | null;
-  onSelectSimulation: (point: SimulationPoint | null) => void;
   onComparePaths?: (paths: { id: string; label: string }[]) => void;
 };
 
@@ -31,7 +24,7 @@ export default function CompareOptionsView({
   market,
   view,
   options: optionsProp,
-  comparePoints,
+  outcomeScale,
   loading = false,
   priced = true,
   message,
@@ -39,8 +32,6 @@ export default function CompareOptionsView({
   onSelectedIdsChange,
   isolatedId,
   onIsolate,
-  selectedSimulation,
-  onSelectSimulation,
   onComparePaths,
 }: Props) {
   const catalog = optionsProp ?? [];
@@ -51,11 +42,17 @@ export default function CompareOptionsView({
   const selected = catalog.filter((option) => selectedIds.includes(option.id));
   const available = catalog.filter((option) => !selectedIds.includes(option.id));
   const leader = [...selected].sort((a, b) => (b.odds ?? -1) - (a.odds ?? -1))[0];
-  const points = comparePoints ?? [];
-  const visiblePoints = isolatedId
-    ? points.filter((point) => point.optionId === isolatedId)
-    : points;
-  const reps = representativesFor(visiblePoints);
+  const highlightedId = isolatedId ?? leader?.id ?? null;
+  const intervalRows: OutcomeIntervalRow[] = selected
+    .filter((option) => !isolatedId || option.id === isolatedId)
+    .map((option) => ({
+      id: option.id,
+      label: option.label,
+      p10: option.outcome?.p10 ?? null,
+      p50: option.outcome?.p50 ?? null,
+      p90: option.outcome?.p90 ?? null,
+      selected: option.id === highlightedId,
+    }));
 
   function submitCustomPaths() {
     const a = pathA.trim();
@@ -128,17 +125,6 @@ export default function CompareOptionsView({
       </div>
     );
   }
-
-  const series: CloudSeries[] = selected.map((option) => ({
-    id: option.id,
-    label: option.label,
-    points: points.filter((point) => point.optionId === option.id),
-    tone:
-      isolatedId === option.id || (!isolatedId && leader?.id === option.id)
-        ? "aqua"
-        : "neutral",
-    visible: isolatedId ? isolatedId === option.id : true,
-  }));
 
   function removeOption(id: string) {
     if (selectedIds.length <= 2) {
@@ -244,10 +230,14 @@ export default function CompareOptionsView({
             <em>{leader?.odds == null ? "—" : `${leader.odds.toFixed(0)}%`}</em>
           </div>
 
+          <OutcomeIntervals
+            ariaLabel="Simulated results for each option"
+            rows={intervalRows}
+            scale={outcomeScale}
+          />
+
           <div className="compare-strips">
             {selected.map((option) => {
-              const optionPoints = points.filter((point) => point.optionId === option.id);
-              const stats = distributionStats(optionPoints);
               const isLeader = option.id === leader?.id;
               return (
                 <button
@@ -260,13 +250,8 @@ export default function CompareOptionsView({
                     <h3>{option.label}</h3>
                     <strong>{option.odds == null ? "—" : `${option.odds.toFixed(0)}%`}</strong>
                   </header>
-                  <ProbabilityDistribution
-                    compact
-                    ariaLabel={`${option.label} resulting odds distribution`}
-                    series={[{ id: option.id, label: option.label, points: optionPoints, selected: isLeader }]}
-                  />
                   <dl>
-                    <div><dt>Likely range</dt><dd>{optionPoints.length ? `${stats.p10.toFixed(0)}–${stats.p90.toFixed(0)}%` : "—"}</dd></div>
+                    <div><dt>Likely result</dt><dd>{formatOutcomeRange(option.outcome?.p10 ?? null, option.outcome?.p90 ?? null, outcomeScale.unit)}</dd></div>
                     <div><dt>Downside</dt><dd>{option.downside}</dd></div>
                     <div><dt>Time</dt><dd>{option.time}</dd></div>
                   </dl>
@@ -300,56 +285,28 @@ export default function CompareOptionsView({
             <div className="viz-block">
               <div className="panel-head tight">
                 <div>
-                  <p className="section-label">Distribution overlap</p>
-                  <h2>How the resulting odds differ</h2>
+                  <p className="section-label">Outcome overlap</p>
+                  <h2>Where each option could finish</h2>
                 </div>
-                <span className="meta">{visiblePoints.length.toLocaleString()} backend draws</span>
               </div>
-              <ProbabilityDistribution
-                ariaLabel="Overlay of resulting odds distributions for selected options"
-                series={series.filter((item) => item.visible).map((item) => ({ id: item.id, label: item.label, points: item.points, selected: item.tone === "aqua" }))}
+              <OutcomeIntervals
+                ariaLabel="Simulated result ranges for selected options"
+                rows={intervalRows}
+                scale={outcomeScale}
               />
             </div>
-            {selectedSimulation ? (
-              <aside className="quiet-panel">
-                <p className="section-label">Selected draw</p>
-                <p className="quiet-copy">
-                  Resulting odds {selectedSimulation.y.toFixed(0)}% · resource cost{" "}
-                  {selectedSimulation.x.toFixed(1)} h/wk
-                </p>
-                <button type="button" className="text-action" onClick={() => onSelectSimulation(null)}>
-                  Clear selection
-                </button>
-              </aside>
-            ) : (
-              <aside className="quiet-panel">
-                <p className="section-label">Tradeoff</p>
-                <ul className="stack-list">
-                  {selected.map((option) => (
-                    <li key={option.id}>
-                      <span>{option.label}</span>
-                      <strong>{option.odds?.toFixed(0)}%</strong>
-                    </li>
-                  ))}
-                </ul>
-                <p className="quiet-copy">Aqua marks the isolated or leading option. Gray is overlap. Tails show execution risk, not color-coded categories.</p>
-              </aside>
-            )}
-          </div>
-          <div className="deep-secondary compare-samples">
-            <article className="viz-block">
-              <div className="panel-head tight"><div><p className="section-label">Sampled futures</p><h3>Inspect overlap and tails</h3></div></div>
-              <SimulationCloud
-                ariaLabel="Selectable comparison simulation samples"
-                layout="beeswarm"
-                xAxis={{ label: "Resulting odds", format: (value) => `${value.toFixed(0)}%`, min: 0, max: 100 }}
-                yAxis={{ label: "Likelihood", format: () => "", min: 0, max: 1 }}
-                selectedId={selectedSimulation?.id ?? null}
-                onSelect={onSelectSimulation}
-                representatives={reps}
-                series={series}
-              />
-            </article>
+            <aside className="quiet-panel">
+              <p className="section-label">Goal odds</p>
+              <ul className="stack-list">
+                {selected.map((option) => (
+                  <li key={option.id}>
+                    <span>{option.label}</span>
+                    <strong>{option.odds == null ? "—" : `${option.odds.toFixed(0)}%`}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="quiet-copy">Odds are the share of simulated futures that meet the target. Overlapping bars mean the options are hard to tell apart.</p>
+            </aside>
           </div>
         </section>
       )}

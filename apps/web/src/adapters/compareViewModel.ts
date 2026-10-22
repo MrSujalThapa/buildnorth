@@ -4,7 +4,8 @@ import type {
   TargetSearchResult,
   WhatIfBaselineState,
 } from "../api/client";
-import type { CompareOption, FutureOutcome, GoalPath } from "./templateTypes";
+import { formatOutcome } from "./outcomeFormat";
+import type { CompareOption, FutureOutcome } from "./templateTypes";
 import type { PathStrategy, SimulationCluster, SimulationPoint } from "./simulations";
 
 function levelFromNumber(value: number, thresholds: [number, number]): CompareOption["downside"] {
@@ -22,25 +23,29 @@ export function toCompareOptions(
   comparison: PathComparisonResult | undefined,
 ): CompareOption[] {
   if (comparison?.paths.length) {
-    return comparison.paths.map((path) => ({
-      id: path.id,
-      label: path.label,
-      odds: asPercent(path.primary_goal_probability),
-      downside:
-        path.downside_probability == null
-          ? "Medium"
-          : levelFromNumber(path.downside_probability, [0.25, 0.5]),
-      time: levelFromNumber(path.resource_cost.hours_per_week, [5, 12]),
-      followThrough:
-        path.execution_probability == null ? 0 : Math.round(path.execution_probability * 100),
-      sensitivity: levelFromNumber(path.fragility_pp ?? 0, [3, 8]),
-      note:
-        path.primary_goal_probability == null
-          ? `${path.model_status.replaceAll("_", " ")} · not priced`
-          : `${path.model_status.replaceAll("_", " ")} · median ${
-              path.median == null ? "—" : `${Math.round(path.median * 100)}%`
-            }`,
-    }));
+    const unit = baseline?.target_unit ?? null;
+    return comparison.paths.map((path) => {
+      const priced = path.primary_goal_probability != null;
+      return {
+        id: path.id,
+        label: path.label,
+        odds: asPercent(path.primary_goal_probability),
+        downside:
+          path.downside_probability == null
+            ? "Medium"
+            : levelFromNumber(path.downside_probability, [0.25, 0.5]),
+        time: levelFromNumber(path.resource_cost.hours_per_week, [5, 12]),
+        followThrough:
+          path.execution_probability == null ? 0 : Math.round(path.execution_probability * 100),
+        sensitivity: levelFromNumber(path.fragility_pp ?? 0, [3, 8]),
+        note: priced
+          ? `${path.model_status.replaceAll("_", " ")} · median result ${
+              path.median == null ? "—" : formatOutcome(path.median, unit)
+            }`
+          : `${path.model_status.replaceAll("_", " ")} · not priced`,
+        outcome: priced ? { p10: path.p10, p50: path.median, p90: path.p90 } : null,
+      };
+    });
   }
 
   return (baseline?.compare_candidates ?? []).map((candidate) => ({
@@ -52,6 +57,7 @@ export function toCompareOptions(
     followThrough: 70,
     sensitivity: "Medium" as const,
     note: candidate.provenance.join(" · ") || "Awaiting backend comparison.",
+    outcome: null,
   }));
 }
 
@@ -64,41 +70,6 @@ export function toFutureOutcomes(distribution: ScenarioDistribution | undefined)
       outcome.probability != null ? Math.round(outcome.probability * 100) : null,
     tone: outcome.downside ? "negative" : outcome.probability != null && outcome.probability >= 0.25 ? "positive" : "neutral",
   }));
-}
-
-export function toGoalPaths(
-  targetSearch: TargetSearchResult | undefined,
-  comparison: PathComparisonResult | undefined,
-): GoalPath[] {
-  if (targetSearch?.paths.length) {
-    return targetSearch.paths.map((path, index) => ({
-      id: `path-${index}`,
-      label: path.label,
-      odds: asPercent(path.resulting_probability),
-      requirement: path.valid_because,
-      subpaths: path.action_ids.map((id) => id.replaceAll("_", " ")),
-    }));
-  }
-
-  if (comparison?.paths.length) {
-    return comparison.paths.map((path) => ({
-      id: path.id,
-      label: path.label,
-      odds: asPercent(path.primary_goal_probability),
-      requirement:
-        path.p10 == null || path.p90 == null
-          ? path.model_status.replaceAll("_", " ")
-          : `p10 ${Math.round(path.p10 * 100)}% · p90 ${Math.round(path.p90 * 100)}%`,
-      subpaths: [
-        path.execution_probability == null
-          ? "Execution unknown"
-          : `Execution ${Math.round(path.execution_probability * 100)}%`,
-        path.model_status,
-      ],
-    }));
-  }
-
-  return [];
 }
 
 function fragilityLabel(value: number | null | undefined): "Low" | "Medium" | "High" {
@@ -171,31 +142,4 @@ export function futuresFromDistribution(
   });
 
   return { clusters, points };
-}
-
-/** Plot backend quantiles only — never fabricate Monte Carlo trajectories. */
-export function comparePointsFromResult(
-  comparison: PathComparisonResult | undefined,
-): SimulationPoint[] | undefined {
-  if (!comparison?.paths.length) return undefined;
-  const points: SimulationPoint[] = [];
-  let pointId = 1;
-  for (const path of comparison.paths) {
-    if (path.primary_goal_probability == null) continue;
-    const samples = [path.p10, path.median, path.primary_goal_probability, path.p90]
-      .filter((value): value is number => value != null)
-      .map((value) => value * 100);
-    samples.forEach((center, index) => {
-      points.push({
-        id: pointId++,
-        x: path.resource_cost.hours_per_week,
-        y: center,
-        optionId: path.id,
-        clusterId: path.id,
-        goalHit: center >= 50,
-        seed: pointId + index,
-      });
-    });
-  }
-  return points.length ? points : undefined;
 }

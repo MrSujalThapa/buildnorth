@@ -392,6 +392,19 @@ def test_what_if_baseline_accepts_any_fitted_training_trend(weekly_change: float
     assert (flow.value > 0) == (weekly_change > 0)
 
 
+def test_what_if_baseline_reports_the_goal_unit_for_outcome_values() -> None:
+    goal = _goal(model_requirements={"forecast_spec": {"units": "seconds"}})
+    now = datetime.now(UTC)
+    evidence = [
+        _evidence("10k_time_seconds", 3200 - 20 * week, observed_at=now - timedelta(weeks=8 - week))
+        for week in range(0, 8, 2)
+    ]
+    state = build_baseline_state(goal, evidence)
+    assert state.priced
+    assert state.target_unit == "seconds"
+    assert build_baseline_state(_goal(), evidence).target_unit is None
+
+
 def test_single_trial_carries_prior_trend_uncertainty() -> None:
     goal = _goal()
     now = datetime.now(UTC)

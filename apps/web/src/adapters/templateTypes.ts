@@ -90,6 +90,8 @@ export type CompareOption = {
   followThrough: number;
   sensitivity: "Low" | "Medium" | "High";
   note: string;
+  /** Simulated end-value quantiles in the goal's unit; null until priced. */
+  outcome: { p10: number | null; p50: number | null; p90: number | null } | null;
 };
 
 export type GoalPath = {

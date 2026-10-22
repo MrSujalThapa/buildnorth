@@ -118,6 +118,7 @@ def build_baseline_state(
         ),
         current_value=resolved.current_value,
         target_value=resolved.target_value,
+        target_unit=_target_unit(goal),
         periods=resolved.periods,
         direction=resolved.direction,
         current_probability=resolved.baseline_probability,
@@ -520,6 +521,12 @@ def _reference_versions(numeric: NumericInputs) -> tuple[str, ...]:
         if isinstance(version, str):
             return (version,)
     return ()
+
+
+def _target_unit(goal: GoalContract) -> str | None:
+    spec = goal.model_requirements.get("forecast_spec")
+    units = spec.get("units") if isinstance(spec, dict) else None
+    return str(units).strip() or None if units else None
 
 
 def _evidence_watermark(evidence: list[NormalizedEvidence]) -> str:

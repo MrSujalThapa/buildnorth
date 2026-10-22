@@ -4,7 +4,7 @@ import { ArrowLeft, X } from "lucide-react";
 
 import type { Goal, PathComparisonResult, ScenarioDistribution, WhatIfBaselineState, WhatIfExploration, WhatIfResult } from "../../api/client";
 
-import { futuresFromDistribution, comparePointsFromResult, toCompareOptions } from "../../adapters/compareViewModel";
+import { futuresFromDistribution, toCompareOptions } from "../../adapters/compareViewModel";
 import { formatProbabilityPercent } from "../../adapters/formatProbability";
 
 import { type PathStrategy } from "../../adapters/simulations";
@@ -298,11 +298,6 @@ export default function WhatIfPage({
     [futuresDistribution, market.category],
   );
 
-  const comparePoints = useMemo(
-    () => comparePointsFromResult(compareResult),
-    [compareResult],
-  );
-
   const baselinePriced = baseline?.priced ?? false;
   const priceabilityMessage = baseline?.priceability?.reason ?? baseline?.priceability?.headline;
 
@@ -375,10 +370,12 @@ export default function WhatIfPage({
     });
   }, [catalog]);
 
+  // Price the suggested candidates once. Re-running after any result would drop
+  // user-described paths, because a bare run only carries the baseline candidates.
   useEffect(() => {
-    if (mode !== "compare") return;
+    if (mode !== "compare" || compareResult) return;
     if (catalog.length >= 2) compareRef.current?.();
-  }, [catalog.length, mode]);
+  }, [catalog.length, compareResult, mode]);
 
 
 
@@ -651,7 +648,7 @@ export default function WhatIfPage({
 
               options={catalog}
 
-              comparePoints={comparePoints}
+              outcomeScale={impact.outcomeScale}
 
               loading={compareLoading}
 
@@ -666,10 +663,6 @@ export default function WhatIfPage({
               isolatedId={isolatedId}
 
               onIsolate={setIsolatedId}
-
-              selectedSimulation={selectedSimulation}
-
-              onSelectSimulation={setSelectedSimulation}
 
               onComparePaths={(paths) => compareRef.current?.(paths)}
 
