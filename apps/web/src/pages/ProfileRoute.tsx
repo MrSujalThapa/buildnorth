@@ -49,11 +49,11 @@ export function ProfileRoute() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editingDimensions, setEditingDimensions] = useState(false);
-  const [selectedArea, setSelectedArea] = useState("Overall");
   const [dimensions, setDimensions] = useState<ProfileArea[]>([]);
   const [customArea, setCustomArea] = useState("");
   const goals = useQuery({ queryKey: ["goals", "list"], queryFn: ({ signal }) => api.goals(signal), enabled: editingDimensions });
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [removePhotoOnSave, setRemovePhotoOnSave] = useState(false);
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -68,7 +68,7 @@ export function ProfileRoute() {
   }, [selectedPhoto]);
   const save = useMutation({
     mutationFn: (body: { display_name: string; username: string; bio: string }) => api.patchProfile(body),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["profile"] }); setEditing(false); setSelectedPhoto(null); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["profile"] }); },
   });
   const saveDimensions = useMutation({
     mutationFn: () => api.patchProfile({ dimensions: resolveAreas(dimensions, goals.data ?? []) }),
@@ -90,13 +90,14 @@ export function ProfileRoute() {
   const fields = account.profile ?? { display_name: null, username: null, bio: null, avatar_value: null, dimensions: [] };
   const handle = fields.username || account.email?.split("@")[0] || "you";
   const display = fields.display_name || handle;
-  const shownPhoto = previewUrl || photoUrl;
+  const shownPhoto = previewUrl || (removePhotoOnSave ? null : photoUrl);
   const suggestions = suggestAreas(goals.data ?? [], dimensions.map((item) => item.label));
 
   function choosePhoto(file: File | undefined) {
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { setPhotoError("Choose a photo under 2 MB."); return; }
     setPhotoError(null);
+    setRemovePhotoOnSave(false);
     setPhotoPosition({ x: 50, y: 50 });
     setSelectedPhoto(file);
   }
@@ -121,30 +122,42 @@ export function ProfileRoute() {
             <span>@{handle}</span>
             {fields.bio ? <p>{fields.bio}</p> : null}
           </div>
-          <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
+          <button type="button" className="secondary" onClick={() => { setRemovePhotoOnSave(false); setEditing(true); }}>Edit</button>
         </section>
         <div className="profile-radar-heading">
           <h2>Execution profile</h2>
-          <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
         </div>
-        <div className="profile-area-filter" role="group" aria-label="Life area">
-          <button type="button" aria-pressed={selectedArea === "Overall"} onClick={() => setSelectedArea("Overall")}>Overall</button>
-          {profile.data.radar_areas?.map((area) => <button type="button" key={area.label} aria-pressed={selectedArea === area.label} onClick={() => setSelectedArea(area.label)}>{area.label}</button>)}
-        </div>
-        <ExecutionProfileRadar profile={profile.data.radar_areas?.find((area) => area.label === selectedArea)?.radar ?? profile.data.radar} />
+        <ExecutionProfileRadar profile={profile.data.radar} />
+        <section className="profile-life-areas" aria-labelledby="profile-life-areas-title">
+          <div className="profile-radar-heading">
+            <h2 id="profile-life-areas-title">Life areas</h2>
+            <button type="button" className="markets-select" onClick={() => { setDimensions(fields.dimensions ?? []); setEditingDimensions(true); }}>Edit areas</button>
+          </div>
+          <div className="profile-area-filter" aria-label="Tracked life areas">
+            {(fields.dimensions ?? []).length
+              ? (fields.dimensions ?? []).map((area) => <span className="profile-life-area" key={area.label}>{area.label}</span>)
+              : <span className="field-hint">No life areas selected.</span>}
+          </div>
+        </section>
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
-        <form className="confirm-card profile-editor" onSubmit={(event) => {
+        <form className="confirm-card profile-editor" onSubmit={async (event) => {
           event.preventDefault();
           const data = new FormData(event.currentTarget);
           const field = (name: string) => {
             const value = data.get(name);
             return typeof value === "string" ? value : "";
           };
-          const pending = selectedPhoto;
-          save.mutate({ display_name: field("display_name"), username: field("username"), bio: field("bio") }, {
-            onSuccess: () => { if (pending) upload.mutate(pending); },
-          });
+          try {
+            await save.mutateAsync({ display_name: field("display_name"), username: field("username"), bio: field("bio") });
+            if (removePhotoOnSave) await remove.mutateAsync();
+            if (selectedPhoto) await upload.mutateAsync(selectedPhoto);
+            setEditing(false);
+            setRemovePhotoOnSave(false);
+            setSelectedPhoto(null);
+          } catch {
+            // Keep the editor open. The failed mutation displays its own actionable error.
+          }
         }}>
           <h2 id="edit-profile-title">Edit profile</h2>
           <div className="profile-edit-photo">
@@ -154,7 +167,7 @@ export function ProfileRoute() {
             <div className="profile-edit-photo-actions">
               <label className="markets-select" htmlFor="profile-photo-input">{photoUrl || selectedPhoto ? "Change photo" : "Add photo"}</label>
               <input id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { choosePhoto(event.target.files?.[0]); event.currentTarget.value = ""; }} />
-              {photoUrl || selectedPhoto ? <button type="button" className="markets-select" disabled={remove.isPending} onClick={() => { if (selectedPhoto) setSelectedPhoto(null); else remove.mutate(); }}>Remove photo</button> : null}
+              {photoUrl || selectedPhoto ? <button type="button" className="markets-select" disabled={remove.isPending} onClick={() => { setSelectedPhoto(null); setRemovePhotoOnSave(true); }}>Remove photo</button> : null}
             </div>
           </div>
           {selectedPhoto ? (
@@ -173,8 +186,8 @@ export function ProfileRoute() {
           <textarea id="bio" name="bio" className="ui-field" rows={3} defaultValue={fields.bio ?? ""} maxLength={280} />
           {save.isError ? <p role="alert">Could not save profile. Check the username and try again.</p> : null}
           <div className="composer-actions">
-            <button type="submit" className="ui-button" disabled={save.isPending || upload.isPending}>{save.isPending || upload.isPending ? "Saving…" : "Save"}</button>
-            <button type="button" className="secondary ui-button ui-button-secondary" onClick={() => { setEditing(false); setSelectedPhoto(null); }}>Cancel</button>
+            <button type="submit" className="ui-button" disabled={save.isPending || upload.isPending || remove.isPending}>{save.isPending || upload.isPending || remove.isPending ? "Saving…" : "Save"}</button>
+            <button type="button" className="secondary ui-button ui-button-secondary" onClick={() => { setEditing(false); setSelectedPhoto(null); setRemovePhotoOnSave(false); }}>Cancel</button>
           </div>
         </form>
       </div> : null}
