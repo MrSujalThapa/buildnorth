@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -156,6 +157,46 @@ async def test_obvious_connected_resource_plan_skips_inference() -> None:
     assert plan.recommended[0].plugin_id == "notion"
     assert plan.recommended[0].resources[0].recommended
     inference.complete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_connected_resource_discovery_runs_concurrently() -> None:
+    goal = GoalContract(
+        goal_id=uuid4(), title="Read 20 books", goal_type=GoalType.CONTINUOUS_TARGET,
+        success_definition={"metric": "books_read", "target": 20},
+        deadline=datetime.now(UTC) + timedelta(days=120), state_dimensions=["books_read"],
+    )
+    owner_id = uuid4()
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, owner_id)
+    entered: set[str] = set()
+    both_entered = asyncio.Event()
+
+    async def resources(plugin_id: str) -> list[dict[str, str]]:
+        entered.add(plugin_id)
+        if len(entered) == 2:
+            both_entered.set()
+        await asyncio.wait_for(both_entered.wait(), timeout=1)
+        return [{"uri": f"{plugin_id}-page", "name": "Book Reports"}]
+
+    views = [SimpleNamespace(
+        definition=SimpleNamespace(id=plugin_id, name=plugin_id, description="Notes", used_for=[], capabilities=[]),
+        connection=SimpleNamespace(status=PluginStatus.CONNECTED),
+    ) for plugin_id in ("notion", "another")]
+    gateway = SimpleNamespace(
+        views=AsyncMock(return_value=views),
+        list_capabilities=AsyncMock(return_value=[]),
+        list_resources=resources,
+    )
+    service = SourcePlannerService(
+        settings=Settings(environment="test"),
+        inference=SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("paid inference"))),
+        goals=GoalService(repo), evidence=EvidenceService(InMemoryEvidenceRepository()),
+        gateway=gateway, run_store=InMemoryAgentRunStore(),
+        repository=get_integration_repository(), owner_id=owner_id,
+    )
+    await service.plan(str(goal.goal_id))
+    assert entered == {"notion", "another"}
 
 
 @pytest.mark.asyncio

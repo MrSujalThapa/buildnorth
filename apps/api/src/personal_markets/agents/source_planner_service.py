@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -55,12 +56,36 @@ class SourcePlannerService:
         goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         evidence = await self._evidence.list_for_goal(goal.goal_id)
         plugin_views = await self._gateway.views()
+        semaphore = asyncio.Semaphore(4)
+
+        async def load_connected(plugin_id: str) -> tuple[list[dict], list[dict]]:
+            async with semaphore:
+                async def resources_or_empty() -> list[dict]:
+                    try:
+                        return await self._gateway.list_resources(plugin_id)
+                    except Exception:
+                        return []
+
+                return await asyncio.gather(
+                    self._gateway.list_capabilities(plugin_id), resources_or_empty()
+                )
+
+        connected_ids = [
+            view.definition.id
+            for view in plugin_views
+            if view.connection.status == PluginStatus.CONNECTED
+        ]
+        connected_results = dict(zip(
+            connected_ids,
+            await asyncio.gather(*(load_connected(plugin_id) for plugin_id in connected_ids)),
+            strict=True,
+        ))
         catalog = []
         available_resources: list[dict[str, object]] = []
         for view in plugin_views:
             capabilities = view.definition.capabilities
             if view.connection.status == PluginStatus.CONNECTED:
-                discovered = await self._gateway.list_capabilities(view.definition.id)
+                discovered, resources = connected_results[view.definition.id]
                 capabilities = [
                     {
                         "capability_id": item.get("capability_id"),
@@ -70,10 +95,6 @@ class SourcePlannerService:
                     }
                     for item in discovered
                 ]
-                try:
-                    resources = await self._gateway.list_resources(view.definition.id)
-                except Exception:
-                    resources = []
                 for item in resources:
                     label = str(item.get("name") or item.get("uri") or "")
                     if "default scope" in label.lower():
