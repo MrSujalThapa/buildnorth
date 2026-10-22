@@ -160,7 +160,9 @@ export function ProfileRoute() {
               type="button"
               className="markets-select"
               onClick={() => {
-                setSelectedParameters(fields.parameter_ids ?? profile.data.available_parameters?.map((item) => item.id) ?? []);
+                setSelectedParameters(fields.parameter_ids?.length
+                  ? fields.parameter_ids
+                  : profile.data.available_parameters?.map((item) => item.id) ?? []);
                 setEditingParameters(true);
               }}
             >
@@ -276,7 +278,7 @@ export function ProfileRoute() {
       {editingParameters ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-parameters-title">
         <div className="confirm-card profile-editor">
           <h2 id="edit-parameters-title">Measurable parameters</h2>
-          <p className="quiet-copy">Choose axes from recorded quantities. These are not personality traits or goal names.</p>
+          <p className="quiet-copy">Choose at least three measured quantities.</p>
           {(profile.data.available_parameters ?? []).map((item) => (
             <label key={item.id} className="ui-choice">
               <input
@@ -300,7 +302,7 @@ export function ProfileRoute() {
           <div className="composer-actions">
             <button
               type="button"
-              disabled={saveParameters.isPending || selectedParameters.length === 0}
+              disabled={saveParameters.isPending || selectedParameters.length < 3}
               onClick={() => saveParameters.mutate(selectedParameters)}
             >
               {saveParameters.isPending ? "Saving…" : "Save"}
