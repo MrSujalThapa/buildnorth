@@ -107,7 +107,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
           {complete ? <polygon className="radar-outline" points={outline} /> : null}
           {!hasMeasurements ? <circle className="radar-empty-core" cx={CX} cy={CY} r="38" /> : null}
           {dimensions.map((item, index) => {
-            const labelPt = point(index, dimensions.length, 1.28);
+            const labelPt = point(index, dimensions.length, 1.23);
             const valuePt = point(index, dimensions.length, item.value ?? 0);
             const measured = !item.limited_evidence && item.value != null;
             return (

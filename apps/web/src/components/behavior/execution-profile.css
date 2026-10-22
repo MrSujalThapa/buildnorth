@@ -17,8 +17,9 @@
 .execution-disclaimer,
 .execution-empty {
   margin: 6px 0 0;
-  color: var(--what-if-muted, var(--app-muted));
-  font-size: 13px;
+  color: var(--app-ink);
+  opacity: 0.72;
+  font-size: 14px;
   line-height: 1.4;
 }
 
@@ -100,7 +101,7 @@
 
 .radar-label {
   fill: var(--what-if-muted, var(--app-muted));
-  font-size: 10px;
+  font-size: 11px;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
 
