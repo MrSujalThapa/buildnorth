@@ -84,15 +84,12 @@ export function WhatIfRoute() {
     mutationFn: async (extra?: { id: string; label: string }[]) => {
       const state = baselineRef.current;
       if (!state?.priced) return null;
-      const extraPaths = [];
-      for (const path of extra ?? []) {
-        const parsed = await api.parseIntervention({ goal_id: goalId, text: path.label });
-        extraPaths.push({
-          id: path.id,
-          label: path.label,
-          parsed_changes: parsed.changes,
-        });
-      }
+      const extraPaths = await Promise.all(
+        (extra ?? []).map(async (path) => {
+          const parsed = await api.parseIntervention({ goal_id: goalId, text: path.label });
+          return { id: path.id, label: path.label, parsed_changes: parsed.changes };
+        }),
+      );
       const request = buildCompareRequest(goalId, state, extraPaths, viewRef.current);
       if (!Array.isArray(request.paths) || request.paths.length < 2) {
         return {

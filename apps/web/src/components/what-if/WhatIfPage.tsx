@@ -294,8 +294,8 @@ export default function WhatIfPage({
   });
 
   const futuresSimulation = useMemo(
-    () => futuresFromDistribution(futuresDistribution, market.category),
-    [futuresDistribution, market.category],
+    () => futuresFromDistribution(futuresDistribution),
+    [futuresDistribution],
   );
 
   const baselinePriced = baseline?.priced ?? false;
@@ -602,8 +602,6 @@ export default function WhatIfPage({
 
             <PossibleFuturesView
 
-              market={market}
-
               view={view}
 
               decision={decision}
@@ -620,17 +618,13 @@ export default function WhatIfPage({
 
               message={futuresDistribution?.message ?? null}
 
-              selectedSimulation={selectedSimulation}
-
-              onSelectSimulation={setSelectedSimulation}
-
               selectedClusterId={selectedClusterId}
 
               onSelectCluster={setSelectedClusterId}
 
-              apiClusters={futuresSimulation?.clusters}
+              scenarios={futuresSimulation}
 
-              apiPoints={futuresSimulation?.points}
+              outcomeScale={impact.outcomeScale}
 
             />
 

@@ -6,7 +6,7 @@ import type {
 } from "../api/client";
 import { formatOutcome } from "./outcomeFormat";
 import type { CompareOption, FutureOutcome } from "./templateTypes";
-import type { PathStrategy, SimulationCluster, SimulationPoint } from "./simulations";
+import type { PathStrategy } from "./simulations";
 
 function levelFromNumber(value: number, thresholds: [number, number]): CompareOption["downside"] {
   if (value <= thresholds[0]) return "Low";
@@ -96,50 +96,30 @@ export function toPathStrategies(targetSearch: TargetSearchResult | undefined): 
   }));
 }
 
-export function futuresFromDistribution(
-  distribution: ScenarioDistribution | undefined,
-  marketCategory: string,
-): { clusters: SimulationCluster[]; points: SimulationPoint[] } | undefined {
-  if (!distribution?.outcomes.length) return undefined;
-  const axes =
-    marketCategory === "Startup"
-      ? { xMin: 0, xMax: 100, yMin: 2, yMax: 42 }
-      : marketCategory === "Career"
-        ? { xMin: 1, xMax: 28, yMin: 8, yMax: 100 }
-        : { xMin: 0, xMax: 100, yMin: 0, yMax: 100 };
+export type FutureScenario = {
+  id: string;
+  label: string;
+  /** Share of simulated futures in this scenario, 0–100; null when unweighted. */
+  probability: number | null;
+  tone: "positive" | "neutral" | "negative";
+  /** Terminal-value quantiles in the goal's unit, not odds. */
+  outcome: { p10: number | null; p50: number | null; p90: number | null } | null;
+};
 
-  const clusters: SimulationCluster[] = distribution.outcomes.map((outcome, index) => ({
+export function futuresFromDistribution(distribution: ScenarioDistribution | undefined): FutureScenario[] | undefined {
+  if (!distribution?.outcomes.length) return undefined;
+  return distribution.outcomes.map((outcome, index) => ({
     id: `outcome-${index}`,
     label: outcome.label,
-    short: outcome.label.split(" ").slice(0, 2).join(" "),
-    probability:
-      outcome.probability != null ? Math.round(outcome.probability * 100) : 0,
-    tone: outcome.downside ? "negative" : outcome.probability != null && outcome.probability >= 0.25 ? "positive" : "neutral",
-    goalRate: outcome.median ?? (outcome.probability ?? 0.5),
+    probability: outcome.probability != null ? Math.round(outcome.probability * 100) : null,
+    tone: outcome.downside
+      ? "negative"
+      : outcome.probability != null && outcome.probability >= 0.25
+        ? "positive"
+        : "neutral",
+    outcome:
+      outcome.p10 == null && outcome.median == null && outcome.p90 == null
+        ? null
+        : { p10: outcome.p10, p50: outcome.median, p90: outcome.p90 },
   }));
-
-  // Only plot quantiles the backend actually computed. Do not invent Monte Carlo dots.
-  const points: SimulationPoint[] = [];
-  let pointId = 1;
-  distribution.outcomes.forEach((outcome, index) => {
-    const clusterId = `outcome-${index}`;
-    const markers: Array<[string, number | null]> = [
-      ["p10", outcome.p10],
-      ["median", outcome.median],
-      ["p90", outcome.p90],
-    ];
-    for (const [, value] of markers) {
-      if (value == null) continue;
-      points.push({
-        id: pointId++,
-        x: value * (marketCategory === "Career" ? axes.xMax : 100),
-        y: (outcome.probability ?? 0) * 100,
-        clusterId,
-        goalHit: (outcome.median ?? outcome.probability ?? 0) >= 0.5,
-        seed: pointId + index,
-      });
-    }
-  });
-
-  return { clusters, points };
 }

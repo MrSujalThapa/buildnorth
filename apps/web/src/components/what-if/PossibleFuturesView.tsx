@@ -1,20 +1,10 @@
-﻿import { useMemo } from "react";
-
-import type { Market, WhatIfView } from "../../adapters/templateTypes";
-import {
-  clusterCentroids,
-  distributionStats,
-  futuresAxes,
-  representativesFor,
-  type SimulationCluster,
-  type SimulationPoint,
-} from "../../adapters/simulations";
-import SimulationCloud, { type CloudSeries } from "./SimulationCloud";
-import SimulationInspector from "./SimulationInspector";
+﻿import type { FutureScenario } from "../../adapters/compareViewModel";
+import { formatOutcomeRange, type OutcomeScale } from "../../adapters/outcomeFormat";
+import type { WhatIfView } from "../../adapters/templateTypes";
+import OutcomeIntervals from "./OutcomeIntervals";
 import { ScenarioComposer } from "./ScenarioComposer";
 
 type Props = {
-  market: Market;
   view: WhatIfView;
   decision: string;
   pathLabel?: string | null;
@@ -23,16 +13,17 @@ type Props = {
   loading?: boolean;
   priced?: boolean;
   message?: string | null;
-  selectedSimulation: SimulationPoint | null;
-  onSelectSimulation: (point: SimulationPoint | null) => void;
   selectedClusterId: string | null;
   onSelectCluster: (id: string | null) => void;
-  apiClusters?: SimulationCluster[];
-  apiPoints?: SimulationPoint[];
+  scenarios?: FutureScenario[];
+  outcomeScale: OutcomeScale;
 };
 
+function share(scenario: FutureScenario | undefined): string {
+  return scenario?.probability == null ? "—" : `${scenario.probability}%`;
+}
+
 export default function PossibleFuturesView({
-  market,
   view,
   decision,
   pathLabel,
@@ -41,38 +32,31 @@ export default function PossibleFuturesView({
   loading = false,
   priced = true,
   message,
-  selectedSimulation,
-  onSelectSimulation,
   selectedClusterId,
   onSelectCluster,
-  apiClusters,
-  apiPoints,
+  scenarios: scenariosProp,
+  outcomeScale,
 }: Props) {
-  const points = apiPoints ?? [];
-  const clusters = apiClusters ?? [];
-  const axes = useMemo(() => futuresAxes(market), [market]);
-  const centroids = useMemo(() => clusterCentroids(points, clusters), [clusters, points]);
-  const visiblePoints = selectedClusterId
-    ? points.filter((point) => point.clusterId === selectedClusterId)
-    : points;
-  const reps = useMemo(() => representativesFor(visiblePoints), [visiblePoints]);
-  const stats = useMemo(() => distributionStats(visiblePoints), [visiblePoints]);
-  const mostLikely = [...clusters].sort((a, b) => b.probability - a.probability)[0];
-  const strongChance = clusters
-    .filter((cluster) => cluster.tone === "positive")
-    .reduce((sum, cluster) => sum + cluster.probability, 0);
-  const selectedCluster = clusters.find((cluster) => cluster.id === selectedClusterId);
-  const hasResults = clusters.length > 0;
-
-  const series: CloudSeries[] = [
-    {
-      id: "futures",
-      label: pathLabel ? `Futures if ${pathLabel}` : "Possible futures",
-      points: visiblePoints,
-      tone: "aqua",
-      visible: true,
-    },
-  ];
+  const scenarios = scenariosProp ?? [];
+  const mostLikely = [...scenarios].sort((a, b) => (b.probability ?? -1) - (a.probability ?? -1))[0];
+  const strongChance = scenarios
+    .filter((scenario) => scenario.tone === "positive")
+    .reduce((sum, scenario) => sum + (scenario.probability ?? 0), 0);
+  const selected = scenarios.find((scenario) => scenario.id === selectedClusterId);
+  const hasResults = scenarios.length > 0;
+  const rangeFor = (scenario: FutureScenario) =>
+    formatOutcomeRange(scenario.outcome?.p10 ?? null, scenario.outcome?.p90 ?? null, outcomeScale.unit);
+  const intervalRows = scenarios
+    .filter((scenario) => scenario.outcome && (scenario.probability ?? 0) > 0)
+    .map((scenario) => ({
+      id: scenario.id,
+      label: scenario.label,
+      p10: scenario.outcome?.p10 ?? null,
+      p50: scenario.outcome?.p50 ?? null,
+      p90: scenario.outcome?.p90 ?? null,
+      selected: scenario.id === (selectedClusterId ?? mostLikely?.id),
+    }));
+  const toggle = (id: string) => onSelectCluster(selectedClusterId === id ? null : id);
 
   return (
     <div className={view === "deep" ? "mode-stage deep" : "mode-stage"}>
@@ -105,141 +89,99 @@ export default function PossibleFuturesView({
       ) : null}
 
       {hasResults ? (
-      <section className={view === "deep" ? "futures-workspace deep" : "futures-workspace"}>
-        {view === "simple" ? (
-          <div className="futures-simple">
-            <div className="futures-answer">
-              <span>Most likely way this plays out</span>
-              <strong>{mostLikely?.label ?? "—"}</strong>
-              <em>{mostLikely ? `${mostLikely.probability}%` : "—"}</em>
-            </div>
-            <div className="scenario-distribution" aria-label="Possible future scenarios">
-              {clusters.map((cluster) => (
-                <button
-                  key={cluster.id}
-                  type="button"
-                  className={selectedClusterId === cluster.id ? "selected" : ""}
-                  onClick={() => onSelectCluster(selectedClusterId === cluster.id ? null : cluster.id)}
-                >
-                  <span>{cluster.label}</span>
-                  <strong>{cluster.probability}%</strong>
-                  <i style={{ width: `${cluster.probability}%` }} aria-hidden="true" />
-                </button>
-              ))}
-            </div>
-            <div className="futures-selection" aria-live="polite">
-              <span>{selectedCluster?.label ?? "Select a scenario"}</span>
-              <p>{selectedCluster ? `Conditional goal odds: ${Math.round(selectedCluster.goalRate * 100)}%. Open Deeper Analysis to inspect representative futures and the downside inside this scenario.` : "Choose a scenario to see its conditional odds and assumptions."}</p>
-            </div>
-          </div>
-        ) : (
-          <>
-        <div className="futures-summary">
-          <div>
-            <span>Most likely</span>
-            <strong>{mostLikely?.label ?? "—"}</strong>
-            <em>{mostLikely ? `${mostLikely.probability}%` : "—"}</em>
-          </div>
-          <div>
-            <span>Strong upside region</span>
-            <strong>{strongChance}%</strong>
-          </div>
-          <div>
-            <span>Goal success in this sample</span>
-            <strong>{Math.round(stats.goalRate * 100)}%</strong>
-          </div>
-        </div>
-
-        <div className="deep-primary">
-          <div className="viz-block">
-            <div className="panel-head tight">
-              <div>
-                <p className="section-label">Outcome spread</p>
-                <h2>
-                  {points.length
-                    ? "Quantiles from the conditioned model"
-                    : "Outcome probabilities from the conditioned model"}
-                </h2>
+        <section className={view === "deep" ? "futures-workspace deep" : "futures-workspace"}>
+          {view === "simple" ? (
+            <div className="futures-simple">
+              <div className="futures-answer">
+                <span>Most likely way this plays out</span>
+                <strong>{mostLikely?.label ?? "—"}</strong>
+                <em>{share(mostLikely)}</em>
               </div>
-              <span className="meta">p10 / median / p90 when the model supplies them</span>
-            </div>
-            {points.length ? (
-            <SimulationCloud
-              ariaLabel="Possible futures quantile markers"
-              layout={axes.layout}
-              xAxis={axes.x}
-              yAxis={axes.y}
-              selectedId={selectedSimulation?.id ?? null}
-              onSelect={onSelectSimulation}
-              representatives={reps}
-              clusters={centroids}
-              series={series}
-            />
-            ) : (
-              <p className="quiet-copy">Quantile markers are shown when the model returns p10, median, and p90.</p>
-            )}
-          </div>
-
-          {selectedSimulation ? (
-            <SimulationInspector
-              simulationId={selectedSimulation.id}
-              narrative={{
-                headline: selectedCluster?.label ?? "Selected future",
-                timeline: [],
-                assumptions: message ? [message] : [],
-                events: [],
-                goalAchieved: selectedSimulation.goalHit,
-                outcomeValue: `${selectedSimulation.y.toFixed(0)}%`,
-              }}
-              onClose={() => onSelectSimulation(null)}
-            />
-          ) : (
-            <aside className="quiet-panel">
-              <p className="section-label">Scenario families</p>
-              <ul className="cluster-list">
-                {clusters.map((cluster) => (
-                  <li key={cluster.id}>
-                    <button
-                      type="button"
-                      className={selectedClusterId === cluster.id ? "selected" : ""}
-                      onClick={() =>
-                        onSelectCluster(selectedClusterId === cluster.id ? null : cluster.id)
-                      }
-                    >
-                      <span>{cluster.label}</span>
-                      <strong>{cluster.probability}%</strong>
-                    </button>
-                  </li>
+              <div className="scenario-distribution" aria-label="Possible future scenarios">
+                {scenarios.map((scenario) => (
+                  <button
+                    key={scenario.id}
+                    type="button"
+                    className={selectedClusterId === scenario.id ? "selected" : ""}
+                    onClick={() => toggle(scenario.id)}
+                  >
+                    <span>{scenario.label}</span>
+                    <strong>{share(scenario)}</strong>
+                    <i style={{ width: `${scenario.probability ?? 0}%` }} aria-hidden="true" />
+                  </button>
                 ))}
-              </ul>
-              {selectedCluster ? (
-                <p className="quiet-copy">
-                  Goal success inside this family: {Math.round(selectedCluster.goalRate * 100)}%.
+              </div>
+              <div className="futures-selection" aria-live="polite">
+                <span>{selected?.label ?? "Select a scenario"}</span>
+                <p>
+                  {selected
+                    ? `${share(selected)} of simulated futures.${selected.outcome ? ` Likely result ${rangeFor(selected)}.` : ""}`
+                    : "Choose a scenario to see how often it happens and where it finishes."}
                 </p>
-              ) : (
-                <p className="quiet-copy">Select a family or any dot. Representative markers are median, p10, and p90 — not lucky draws.</p>
-              )}
-            </aside>
-          )}
-        </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="futures-summary">
+                <div>
+                  <span>Most likely</span>
+                  <strong>{mostLikely?.label ?? "—"}</strong>
+                  <em>{share(mostLikely)}</em>
+                </div>
+                <div>
+                  <span>Favourable scenarios</span>
+                  <strong>{strongChance}%</strong>
+                </div>
+              </div>
 
-          <div className="deep-secondary">
-            <article>
-              <p className="section-label">Distribution</p>
-              <ul className="stack-list">
-                <li><span>p10</span><strong>{axes.x.format(stats.p10)}</strong></li>
-                <li><span>p50</span><strong>{axes.x.format(stats.p50)}</strong></li>
-                <li><span>p90</span><strong>{axes.x.format(stats.p90)}</strong></li>
-              </ul>
-            </article>
-            <article>
-              <p className="section-label">Provenance</p>
-              <p>Scenario weights and draws come from the backend numerical engine, not local fixtures.</p>
-            </article>
-          </div>
-          </>
-        )}
-      </section>
+              <div className="deep-primary">
+                <div className="viz-block">
+                  <div className="panel-head tight">
+                    <div>
+                      <p className="section-label">Outcome spread</p>
+                      <h2>Where each scenario finishes</h2>
+                    </div>
+                  </div>
+                  {intervalRows.length ? (
+                    <OutcomeIntervals ariaLabel="Simulated result range per scenario" rows={intervalRows} scale={outcomeScale} />
+                  ) : (
+                    <p className="quiet-copy">The model returned scenario weights without result quantiles.</p>
+                  )}
+                </div>
+
+                <aside className="quiet-panel">
+                  <p className="section-label">Scenario families</p>
+                  <ul className="cluster-list">
+                    {scenarios.map((scenario) => (
+                      <li key={scenario.id}>
+                        <button
+                          type="button"
+                          className={selectedClusterId === scenario.id ? "selected" : ""}
+                          onClick={() => toggle(scenario.id)}
+                        >
+                          <span>{scenario.label}</span>
+                          <strong>{share(scenario)}</strong>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="quiet-copy">
+                    {selected?.outcome
+                      ? `${selected.label}: likely result ${rangeFor(selected)}.`
+                      : "Percentages are the share of simulated futures in each scenario."}
+                  </p>
+                </aside>
+              </div>
+
+              <div className="deep-secondary">
+                <article>
+                  <p className="section-label">Provenance</p>
+                  <p>Scenario weights and result ranges come from the backend numerical engine, not local fixtures.</p>
+                </article>
+              </div>
+            </>
+          )}
+        </section>
       ) : null}
     </div>
   );
