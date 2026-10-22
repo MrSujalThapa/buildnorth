@@ -10,12 +10,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.identity.domain import (
+    CustomParameter,
     Invitation,
     Principal,
     RedeemResult,
     UserProfile,
     merge_stored_dimensions,
     split_stored_dimensions,
+    split_stored_parameters,
 )
 from personal_markets.persistence.database import transaction
 
@@ -445,7 +447,8 @@ class PostgresIdentityRepository:
                     await connection.execute(
                         text(
                             """
-                            select display_name, username, bio, avatar_value, profile_dimensions_json
+                            select display_name, username, bio, avatar_value,
+                              profile_dimensions_json, profile_parameters_json
                             from app_users where id = :id
                             """
                         ),
@@ -458,6 +461,10 @@ class PostgresIdentityRepository:
         if row is None:
             return UserProfile()
         areas, parameter_ids = split_stored_dimensions(row.get("profile_dimensions_json") or [])
+        stored = split_stored_parameters(row.get("profile_parameters_json"))
+        custom: list[CustomParameter] = []
+        if stored is not None:
+            parameter_ids, custom = stored
         return UserProfile(
             display_name=row.get("display_name"),
             username=row.get("username"),
@@ -465,6 +472,7 @@ class PostgresIdentityRepository:
             avatar_value=row.get("avatar_value"),
             dimensions=areas,
             parameter_ids=parameter_ids,
+            custom_parameters=custom,
         )
 
     async def upsert_profile(self, user_id: UUID, profile: UserProfile) -> UserProfile:
@@ -477,7 +485,8 @@ class PostgresIdentityRepository:
                         username = :username,
                         bio = :bio,
                         avatar_value = :avatar_value,
-                        profile_dimensions_json = cast(:dimensions as jsonb)
+                        profile_dimensions_json = cast(:dimensions as jsonb),
+                        profile_parameters_json = cast(:parameters as jsonb)
                     where id = :id
                     """
                 ),
@@ -487,8 +496,14 @@ class PostgresIdentityRepository:
                     "username": profile.username,
                     "bio": profile.bio,
                     "avatar_value": profile.avatar_value,
-                    "dimensions": json.dumps(
-                        merge_stored_dimensions(profile.dimensions, profile.parameter_ids)
+                    "dimensions": json.dumps(merge_stored_dimensions(profile.dimensions, [])),
+                    "parameters": json.dumps(
+                        {
+                            "selected": profile.parameter_ids,
+                            "custom": [
+                                item.model_dump(mode="json") for item in profile.custom_parameters
+                            ],
+                        }
                     ),
                 },
             )

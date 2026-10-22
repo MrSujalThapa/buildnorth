@@ -8,7 +8,7 @@ from personal_markets.behavior.commitments import (
     InMemoryCommitmentStore,
     trials_from_commitments,
 )
-from personal_markets.behavior.portfolio import portfolio_profile
+from personal_markets.behavior.traits import estimate_traits
 from personal_markets.core.errors import ResourceNotFoundError, SemanticProviderError
 from personal_markets.goals.domain import GoalContract, GoalType
 
@@ -122,9 +122,7 @@ async def test_explicit_commitment_changes_radar_without_goal_progress() -> None
         deadline=datetime.now(UTC) + timedelta(days=100),
         state_dimensions=["problems_solved"],
     )
-    profile = portfolio_profile(
-        [goal], {}, commitment_trials=trials_from_commitments(plans, observations)
-    )
-    follow = next(item for item in profile.dimensions if item.key == "follow_through")
-    assert follow.value is not None and follow.value > 0.5
+    profile = estimate_traits(trials_from_commitments(plans, observations), [])
+    discipline = next(item for item in profile.traits if item.id == "discipline")
+    assert discipline.value is not None and discipline.value > 0.5
     assert goal.success_definition["current"] == 0

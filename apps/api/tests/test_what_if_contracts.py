@@ -17,6 +17,7 @@ from personal_markets.what_if.domain import (
     PossibleFuturesRequest,
     ResourceLimitsInput,
     ScenarioDefinition,
+    ScenarioDistribution,
     TargetSearchRequest,
     WhatIfBaselineState,
     WhatIfRequest,

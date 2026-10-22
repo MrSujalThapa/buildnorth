@@ -85,13 +85,41 @@ class ProfileDimension(BaseModel):
 PARAMETER_MARKER_PREFIX = "__param__:"
 
 
+class CustomParameter(BaseModel):
+    """User-defined radar trait. Scored only from evidence recorded on `metric`."""
+
+    id: str = Field(min_length=8, max_length=48)
+    name: str = Field(min_length=2, max_length=32)
+    description: str = Field(min_length=4, max_length=160)
+    metric: str = Field(min_length=7, max_length=48)
+    scale_min: float = 0.0
+    scale_max: float = 1.0
+
+
 class UserProfile(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     username: str | None = None
     bio: str | None = Field(default=None, max_length=280)
     avatar_value: str | None = Field(default=None, max_length=32)
     dimensions: list[ProfileDimension] = Field(default_factory=list, max_length=12)
-    parameter_ids: list[str] = Field(default_factory=list, max_length=8)
+    parameter_ids: list[str] = Field(default_factory=list, max_length=10)
+    custom_parameters: list[CustomParameter] = Field(default_factory=list, max_length=6)
+
+
+def split_stored_parameters(
+    raw: object,
+) -> tuple[list[str], list[CustomParameter]] | None:
+    """Read `profile_parameters_json`. None means the row predates the column."""
+    if not isinstance(raw, dict) or "selected" not in raw:
+        return None
+    selected = [str(item) for item in raw.get("selected") or [] if item]
+    custom: list[CustomParameter] = []
+    for item in raw.get("custom") or []:
+        try:
+            custom.append(CustomParameter.model_validate(item))
+        except ValueError:
+            continue
+    return selected, custom
 
 
 def split_stored_dimensions(

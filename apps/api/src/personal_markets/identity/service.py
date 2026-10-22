@@ -207,6 +207,11 @@ class IdentityService:
             if "parameter_ids" in patch.model_fields_set
             else current.parameter_ids
         )
+        custom_parameters = (
+            patch.custom_parameters
+            if "custom_parameters" in patch.model_fields_set
+            else current.custom_parameters
+        )
         updated = UserProfile(
             display_name=(display or "").strip() or None,
             username=username or None,
@@ -214,6 +219,7 @@ class IdentityService:
             avatar_value=(avatar or "").strip() or None,
             dimensions=dimensions,
             parameter_ids=parameter_ids,
+            custom_parameters=custom_parameters,
         )
         return await self._repository.upsert_profile(principal.user_id, updated)
 

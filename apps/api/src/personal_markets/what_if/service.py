@@ -10,16 +10,6 @@ from personal_markets.behavior.commitments import get_commitment_store, trials_f
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.core.errors import ResourceNotFoundError
-from personal_markets.demo_fixtures import (
-    demo_fixtures_enabled,
-    fixture_action_frontier,
-    fixture_compare,
-    fixture_futures,
-    fixture_simulate,
-    fixture_target_search,
-    is_demo_goal,
-    patch_baseline_state,
-)
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.primitives import at_numerical_bound
@@ -103,8 +93,6 @@ class WhatIfService:
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
         state = build_baseline_state(goal, evidence)
-        if demo_fixtures_enabled() and is_demo_goal(goal_id):
-            return patch_baseline_state(state)
         return await self._overlay_published_baseline(UUID(goal_id), state)
 
     async def _overlay_published_baseline(
@@ -124,17 +112,9 @@ class WhatIfService:
         return state
 
     async def simulate(self, request: WhatIfRequest) -> WhatIfResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_simulate(request.goal_id)
-            if fixture is not None:
-                return fixture
         return await self._simulate(request, persist=True)
 
     async def fast_reprice(self, request: WhatIfRequest) -> WhatIfResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_simulate(request.goal_id)
-            if fixture is not None:
-                return fixture
         return await self._simulate(request, persist=False)
 
     async def _simulate_composition(
@@ -316,8 +296,11 @@ class WhatIfService:
                 return composed
             explicit_trials = []
             if self._owner_id is not None:
+                # Every owned goal's commitments form the person-level (global) level of
+                # the hierarchical execution model; this goal's actions refine it.
+                owned = await self._goals.list_goals(owner_id=self._owner_id)
                 plans, observations = await get_commitment_store().list_for_goals(
-                    self._owner_id, [goal.goal_id]
+                    self._owner_id, [item.goal_id for item in owned] or [goal.goal_id]
                 )
                 explicit_trials = trials_from_commitments(plans, observations)
             request = self._apply_behavior_execution(
@@ -851,10 +834,6 @@ class WhatIfService:
         return items
 
     async def target_search(self, request: TargetSearchRequest) -> TargetSearchResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_target_search(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         baseline = await self._simulate(
             request.base.model_copy(update={"intervention": None}), persist=False
         )
@@ -917,10 +896,6 @@ class WhatIfService:
         return await self._persist_target_search(request, result)
 
     async def action_frontier(self, request: TargetSearchRequest) -> ActionFrontierResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_action_frontier(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         baseline = await self._simulate(
             request.base.model_copy(update={"intervention": None}), persist=False
         )
@@ -1000,10 +975,6 @@ class WhatIfService:
         )
 
     async def possible_futures(self, request: PossibleFuturesRequest) -> ScenarioDistribution:
-        if demo_fixtures_enabled() and is_demo_goal(request.goal_id):
-            fixture = fixture_futures(request.goal_id)
-            if fixture is not None:
-                return fixture
         if any(item.weight is None for item in request.outcomes):
             resolved = await self._resolve_futures_weights(request)
             if resolved is not None:
@@ -1058,10 +1029,6 @@ class WhatIfService:
         return await self._persist_distribution(request, distribution)
 
     async def compare_paths(self, request: PathComparisonRequest) -> PathComparisonResult:
-        if demo_fixtures_enabled() and is_demo_goal(request.base.goal_id):
-            fixture = fixture_compare(request.base.goal_id)
-            if fixture is not None:
-                return fixture
         goal = await self._require_goal(request.base.goal_id)
         budget = budget_from_goal(goal)
         items: list[PathComparisonItem] = []

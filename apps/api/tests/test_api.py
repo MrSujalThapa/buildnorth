@@ -1,12 +1,14 @@
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
-from httpx import Response
 
 from helpers import isolated_app
 from personal_markets.core.config import Settings
 
 
-def test_health_endpoint_and_backend_boot() -> None:
+def test_health_endpoint_and_backend_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123456789abcdef0123")
     with TestClient(isolated_app()) as client:
         response = client.get("/health", headers={"x-request-id": "test-request"})
     assert response.status_code == 200
@@ -14,6 +16,7 @@ def test_health_endpoint_and_backend_boot() -> None:
         "status": "ok",
         "service": "personal-markets-api",
         "version": "0.1.0",
+        "commit": "0123456789ab",
     }
     assert "database" not in response.json()
     assert response.headers["x-request-id"] == "test-request"
