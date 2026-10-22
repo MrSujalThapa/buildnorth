@@ -56,7 +56,7 @@ PASS / PARTIAL / FAIL / BLOCKED / NOT TESTED
 | M1 | Isolated demo markets/collections/histories | PARTIAL | `GET /api/v1/profile/demo-portfolio` + Markets `?demo=1`. Nonlinear synthetic_demo histories; no user writes |
 | O1 | Observability scheduled loop | BLOCKED | Cron owned by Codex |
 | X1 | Consumer UX, composer attachments, speech | PARTIAL | Mic uses browser Speech Recognition; attach control is disabled with an honest reason |
-| K1 | Performance measurements | NOT TESTED | |
+| K1 | Performance measurements | PARTIAL | Local `/health` 70ms after Postgres was up. No signed-in p95 on What If/simulate |
 | D1 | Preview + authenticated browser matrix | PARTIAL | Git-alias still SSO-protected; production Render lacks new contracts |
 
 ---
@@ -89,12 +89,15 @@ Tests: contracts, futures (startup+hiring conditioning), demo portfolio, paramet
 
 ### Deployment blocker (do not treat as end of pass)
 
-- Vercel git-alias remains behind Deployment Protection SSO. Shareable Links / Protection Bypass for Automation were not created from this session (Hobby one-link limit; requires dashboard/token).
-- Production Render `playitout-api` is still `main` and ignores new request fields. Compatible backend for this commit is the branch API, not production.
-- Do not disable SSO. Do not seed `sujalthapa242`. Cron/watch-runner untouched.
+- Exact commit `32572be` unique preview: `https://buildnorth-eb8pzeuj8-sujalthapa242-3741s-projects.vercel.app`. Vercel Deployment Protection sends unauthenticated browsers to `vercel.com/login?next=/sso-api?...`. Do **not** disable SSO.
+- The dashboard **Share** control on that deployment is team-member access ("Only people with access can view"), not a Deployment Protection Shareable Link / `_vercel_share` bypass. Protection Bypass for Automation was not created (requires Deployment Protection settings + Hobby one-link limit).
+- Production CORS: git-alias origin OPTIONS `/api/v1/me` **200**. Unique `eb8pzeuj8` origin OPTIONS **400** (not on Render allowlist). Production origin 200.
+- Production Render still serves `main` and lacks `include_sensitivity`, `demo-portfolio`, goal-family `parse-decision`. Compatible API for this commit is local `npm run dev:api` on `:8000` (OpenAPI contains `parse-decision`, `demo-portfolio`, `include_sensitivity`). Local `/health` 70ms. Local Vite `:5173` is signed **out** (Clerk Google). Unauthenticated `GET /api/v1/profile/demo-portfolio` is 401 as required.
+- Local API cannot start without Docker/Postgres `127.0.0.1:54322`. Docker was down; after `supabase start`, the branch API booted. This is local, not production, and does not write `sujalthapa242`.
+- Do not seed production `sujalthapa242`. Cron/watch-runner untouched.
 
 ---
 
 ## Next unfinished task
 
-If interrupted: push this branch, obtain a Vercel Shareable Link or bypass token without disabling SSO, run the branch API (not production Render), then signed-in A–L acceptance. Cron still owned by Codex.
+If interrupted: create a Vercel Deployment Protection **Shareable Link** (not team Share) for git-alias `buildnorth-git-ux-consumer-c0fb66-...` without disabling SSO; keep using local `:8000` as the compatible API until a non-production host exists. Then signed-in A–L. Cron still owned by Codex.
