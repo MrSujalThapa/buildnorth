@@ -54,7 +54,7 @@ describe("comparePointsFromResult", () => {
       seed: 1,
       run_id: "run",
     });
-    expect(options[0].odds).toBeNull();
+    expect(options[0]?.odds).toBeNull();
     expect(comparePointsFromResult({
       paths: options.map((option) => ({
         id: option.id,

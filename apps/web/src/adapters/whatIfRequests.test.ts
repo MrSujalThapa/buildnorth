@@ -50,8 +50,8 @@ describe("whatIfRequests", () => {
       { id: "path-b", label: "Save 800 a month", parsed_changes: [{ metric: "flow", operation: "set", value: 800, unit: "CAD", frequency: null, scope: "goal_state", provenance: "USER_ASSUMPTION" }] },
     ]);
     expect(request.paths).toHaveLength(2);
-    expect(request.paths[0].parsed_changes[0].value).toBe(400);
-    expect(request.paths[1].parsed_changes[0].value).toBe(800);
+    expect(request.paths[0]?.parsed_changes[0]?.value).toBe(400);
+    expect(request.paths[1]?.parsed_changes[0]?.value).toBe(800);
   });
 
   it("attaches parsed_changes to futures so the decision can condition the model", () => {
@@ -63,12 +63,12 @@ describe("whatIfRequests", () => {
       [{ metric: "monthly_contribution", operation: "set", value: 2000, unit: "CAD/month", frequency: null, scope: "goal_state", provenance: "USER_ASSUMPTION" }],
     );
     expect(request.parsed_changes).toHaveLength(1);
-    expect(request.parsed_changes[0].metric).toBe("monthly_contribution");
+    expect(request.parsed_changes[0]?.metric).toBe("monthly_contribution");
   });
 
   it("uses more draws for deeper analysis", () => {
-    expect(simulationConfigForView("deep", 1).minimum_draws).toBeGreaterThan(
-      simulationConfigForView("simple", 1).minimum_draws,
-    );
+    const deep = simulationConfigForView("deep", 1).minimum_draws ?? 0;
+    const simple = simulationConfigForView("simple", 1).minimum_draws ?? 0;
+    expect(deep).toBeGreaterThan(simple);
   });
 });
