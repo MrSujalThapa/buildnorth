@@ -27,7 +27,10 @@ BEHAVIOR_EVENT_TYPES = frozenset(
     }
 )
 ACTIVITY_ONLY_TYPES = frozenset(
-    {"repository_activity", "issue_activity", "observation", "note", "external_event"}
+    {
+        "repository_activity", "issue_activity", "observation", "note", "external_event",
+        "source_activity", "source_plan",
+    }
 )
 
 

@@ -124,41 +124,34 @@ def _infer_events(
     status = str(row.get("status") or row.get("state") or row.get("outcome") or "").lower()
     planned = row.get("planned_duration") or row.get("duration_planned") or row.get("planned_hours")
     actual = row.get("actual_duration") or row.get("duration_actual") or row.get("hours")
-    if status in {"completed", "done", "attended", "kept"}:
+    if status in {
+        "completed", "done", "attended", "kept", "missed", "skipped", "no-show", "cancelled"
+    }:
         events.append(
             {
-                "event_type": "commitment_completed",
+                # Provider task status is activity evidence, not proof that the
+                # user previously committed to a matching action window.
+                "event_type": "source_activity",
                 "domain": str(row.get("domain") or plugin_id),
-                "metric": str(row.get("metric") or "commitment_outcome"),
+                "metric": str(row.get("metric") or "activity_status"),
                 "numeric_value": actual,
-                "categorical_value": "completed",
+                "categorical_value": status,
                 "unit": str(row.get("unit") or "hours") if actual is not None else None,
                 "observed_at": observed,
-                "summary": str(row.get("title") or row.get("name") or "Completed commitment"),
-            }
-        )
-    elif status in {"missed", "skipped", "no-show", "cancelled"}:
-        events.append(
-            {
-                "event_type": "commitment_missed",
-                "domain": str(row.get("domain") or plugin_id),
-                "metric": str(row.get("metric") or "commitment_outcome"),
-                "categorical_value": "missed",
-                "observed_at": observed,
-                "summary": str(row.get("title") or row.get("name") or "Missed commitment"),
+                "summary": str(row.get("title") or row.get("name") or "Source activity"),
             }
         )
     elif planned is not None:
         events.append(
             {
-                "event_type": "commitment_created",
+                "event_type": "source_plan",
                 "domain": str(row.get("domain") or plugin_id),
                 "metric": str(row.get("metric") or "duration_planned"),
                 "numeric_value": planned,
                 "categorical_value": "planned",
                 "unit": str(row.get("unit") or "hours"),
                 "observed_at": observed,
-                "summary": str(row.get("title") or row.get("name") or "Planned commitment"),
+                "summary": str(row.get("title") or row.get("name") or "Source plan"),
             }
         )
     if plugin_id == "github" and ("commit" in tool_name.lower() or "commit" in row):

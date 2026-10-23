@@ -891,3 +891,8 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Both watch stores now group due resources by owner and goal, and write only those due resource URIs into a job receipt. The previous Postgres query included every active resource on the goal, even if its checkpoint was in the future; that could cause extra provider reads and inference. A focused in-memory test verifies two due pages enter one job while a later page is excluded and its checkpoint remains untouched.
 - The scheduled runner defaults to one processed sync job per invocation (hard range 1–5 for explicit calls) and logs total run duration. It may queue up to five due resources in one pass so a multi-page goal can be processed together. This limits work per 15-minute run but does not constitute a dollar-denominated BYOK inference cap. The Render card gate still prevents production schedule and charge verification.
 
+### 2026-10-23 — Provider activity is not a commitment
+
+- Read-only inspection of the authorized `MrSujalThapa/neetcode-submissions` history showed multiple commits for successive submissions to the same problem. Commits can establish repository activity, but they cannot establish distinct accepted solutions or prior planned sessions.
+- The generic Composio normalizer previously emitted `commitment_completed`, `commitment_missed`, or `commitment_created` from provider status/duration fields alone. It now emits `source_activity` or `source_plan` hints, which the behavioral trial extractor explicitly excludes. Two focused regression tests confirm that a provider task's completed status plus a provider plan cannot create a follow-through trial. This protects the execution model but does not add solved-problem verification.
+

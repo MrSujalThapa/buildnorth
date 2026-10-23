@@ -463,6 +463,23 @@ def test_github_nested_commits_ignore_provider_request_id() -> None:
     assert first[0].payload_hash == second[0].payload_hash
 
 
+def test_provider_task_status_is_activity_without_commitment_claim() -> None:
+    from uuid import uuid4
+
+    records = normalize_tool_result(
+        plugin_id="notion", plugin_connection_id=uuid4(), sync_run_id=uuid4(),
+        tool_name="NOTION_LIST_TASKS", user_id="test-user",
+        payload={"results": [
+            {"id": "done", "title": "Practice", "status": "completed", "actual_duration": 45},
+            {"id": "plan", "title": "Practice", "planned_duration": 60},
+        ]},
+    )
+    assert [record.payload["events"][0]["event_type"] for record in records] == [
+        "source_activity", "source_plan",
+    ]
+    assert records[0].payload["events"][0]["numeric_value"] == 45
+
+
 def test_github_normalization_keeps_activity_types_and_does_not_invent_events() -> None:
     from uuid import uuid4
 

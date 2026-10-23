@@ -122,6 +122,12 @@ def test_unobserved_plan_and_unpaired_activity_do_not_become_execution_trials() 
     assert trials_from_evidence([completed]) == []
 
 
+def test_provider_plan_and_status_cannot_create_execution_trial() -> None:
+    source_plan = _event("source_plan", "planned", 8)
+    source_activity = _event("source_activity", "completed", 7)
+    assert trials_from_evidence([source_plan, source_activity]) == []
+
+
 def test_resource_ranker_uses_metadata_not_provider_map() -> None:
     goal = {"title": "Receive a software engineering offer", "state_dimensions": ["interview_practice"]}
     ranked = rank_resources(
