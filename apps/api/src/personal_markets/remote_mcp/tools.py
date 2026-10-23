@@ -72,6 +72,7 @@ from personal_markets.remote_mcp.scopes import (
 from personal_markets.remote_mcp.store import AuditRecord, RemoteMcpStore, SubmissionRecord, digest
 from personal_markets.remote_mcp.temporal import (
     delta_pp,
+    direction_for,
     evidence_observed_in_window,
     largest_consecutive_move,
     parse_when,
@@ -188,7 +189,8 @@ def _milestones_from_spec(spec: dict[str, Any]) -> list[MilestoneItem]:
     for node in primitives:
         if not isinstance(node, dict) or not node.get("id"):
             continue
-        config = node.get("config") if isinstance(node.get("config"), dict) else {}
+        raw_config = node.get("config")
+        config: dict[Any, Any] = raw_config if isinstance(raw_config, dict) else {}
         target = config.get("target")
         raw_prerequisites = node.get("prerequisites")
         prerequisites = raw_prerequisites if isinstance(raw_prerequisites, list) else []
@@ -1609,7 +1611,7 @@ class RemoteMcpTools:
             "latest_published_at": point_view(latest)["published_at"],
         }
         if relative in {"largest_increase", "largest_drop"}:
-            direction = "increase" if relative == "largest_increase" else "drop"
+            direction = direction_for(relative)
             pair = largest_consecutive_move(history, direction=direction)
             if pair is None:
                 return ForecastCompare(

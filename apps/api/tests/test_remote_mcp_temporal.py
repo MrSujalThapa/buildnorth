@@ -6,6 +6,7 @@ from uuid import UUID
 from personal_markets.forecasting.repository import PublishedBaseline
 from personal_markets.remote_mcp.temporal import (
     MONTH_WINDOW_DAYS,
+    direction_for,
     evidence_observed_in_window,
     largest_consecutive_move,
     select_as_of,
@@ -30,6 +31,17 @@ def _point(probability: float, when: datetime, watermark: str) -> PublishedBasel
         receipt={},
         published_at=when,
     )
+
+
+def test_direction_for_only_accepts_published_step_selectors() -> None:
+    assert direction_for("largest_increase") == "increase"
+    assert direction_for("largest_drop") == "drop"
+    try:
+        direction_for("previous")
+    except ValueError as error:
+        assert "published-step" in str(error)
+    else:
+        raise AssertionError("previous is not a move direction")
 
 
 def test_since_start_is_the_earliest_published_receipt() -> None:

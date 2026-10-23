@@ -26,6 +26,15 @@ RelativeAsOf = Literal[
 MoveDirection = Literal["increase", "drop"]
 
 
+def direction_for(relative: str) -> MoveDirection:
+    """Map a compare_forecasts selector onto a successive published step."""
+    if relative == "largest_increase":
+        return "increase"
+    if relative == "largest_drop":
+        return "drop"
+    raise ValueError("relative is not a published-step direction")
+
+
 def parse_when(value: str | None) -> datetime | None:
     if not value:
         return None
