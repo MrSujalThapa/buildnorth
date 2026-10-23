@@ -563,6 +563,17 @@ async def test_resource_discovery_prefers_authenticated_github_repositories() ->
     assert [item.name for item in resources] == ["owner/repo"]
 
 
+def test_gateway_availability_does_not_construct_composio_client() -> None:
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(
+        environment="test", composio_enabled=True, composio_api_key="test-key",
+    ))
+    assert gateway.available
+    assert "_client" not in gateway.__dict__
+
+
 @pytest.mark.asyncio
 async def test_notion_picker_omits_untitled_id_only_results() -> None:
     from uuid import uuid4

@@ -4,6 +4,7 @@ import asyncio
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from typing import Any
 from uuid import UUID
 
@@ -74,15 +75,22 @@ class ComposioIntegrationGateway:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._client: Any | None = None
-        if settings.composio_enabled and settings.composio_api_key:
-            from composio import Composio
 
-            self._client = Composio(api_key=settings.composio_api_key)
+    @cached_property
+    def _client(self) -> Any | None:
+        api_key = self._settings.composio_api_key
+        if not self.available or not api_key:
+            return None
+        from composio import Composio
+
+        return Composio(api_key=api_key)
 
     @property
     def available(self) -> bool:
-        return self._client is not None
+        injected = self.__dict__.get("_client")
+        return injected is not None or bool(
+            self._settings.composio_enabled and self._settings.composio_api_key
+        )
 
     async def search_toolkits(
         self,
