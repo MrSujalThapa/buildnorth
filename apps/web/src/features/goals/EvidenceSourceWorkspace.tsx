@@ -144,17 +144,19 @@ export function EvidenceSourceWorkspace({
     queryFn: ({ signal }) => api.sourceWatches(goalId, signal),
     enabled: Boolean(goalId) && monitoringEnabled,
   });
-  const saveWatch = useMutation({
-    mutationFn: ({ recipe, resourceIds }: { recipe: SourceRecipeRecord; resourceIds: string[] }) =>
-      Promise.all(resourceIds.map((resourceId) => api.saveSourceWatch(goalId, {
+  const updateWatches = useMutation({
+    mutationFn: ({ recipe, resourceIds = [], selected = [], status }: {
+      recipe: SourceRecipeRecord;
+      resourceIds?: string[];
+      selected?: SourceWatchRecord[];
+      status: "active" | "paused" | "revoked";
+    }) => Promise.all([
+      ...resourceIds.map((resourceId) => api.saveSourceWatch(goalId, {
         plugin_id: recipe.plugin_id, resource_id: resourceId,
         scope: recipe.plugin_id === "notion" ? "parent" : "resource",
-      }))),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["evidence-source-watches", goalId] }); },
-  });
-  const changeWatch = useMutation({
-    mutationFn: ({ selected, status }: { selected: SourceWatchRecord[]; status: "active" | "paused" | "revoked" }) =>
-      Promise.all(selected.map((watch) => api.updateSourceWatch(goalId, watch.id, status))),
+      })),
+      ...selected.map((watch) => api.updateSourceWatch(goalId, watch.id, status)),
+    ]),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["evidence-source-watches", goalId] }); },
   });
   const syncJob = useQuery({
@@ -381,15 +383,14 @@ export function EvidenceSourceWorkspace({
                       return <span className="evidence-watch-actions">
                         {active.some((watch) => watch.last_error) ? <span role="status" className="evidence-watch-error">Monitoring needs attention</span> : null}
                         {active.length ? <span className="evidence-watch-state">Monitoring {active.length} of {resourceIds.length}</span> : null}
-                        <button type="button" disabled={Boolean(disconnected) || saveWatch.isPending || changeWatch.isPending} onClick={() => {
-                          if (active.length === resourceIds.length) changeWatch.mutate({ selected: active, status: "paused" });
+                        <button type="button" disabled={Boolean(disconnected) || updateWatches.isPending} onClick={() => {
+                          if (active.length === resourceIds.length) updateWatches.mutate({ recipe, selected: active, status: "paused" });
                           else {
-                            if (paused.length) changeWatch.mutate({ selected: paused, status: "active" });
                             const missing = resourceIds.filter((resourceId) => !selected.some((watch) => watch?.resource_id === resourceId && watch.status !== "revoked"));
-                            if (missing.length) saveWatch.mutate({ recipe, resourceIds: missing });
+                            updateWatches.mutate({ recipe, resourceIds: missing, selected: paused, status: "active" });
                           }
                         }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : recipe.plugin_id === "notion" ? `Watch ${resourceIds.length === 1 ? "area" : `${resourceIds.length} areas`}` : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
-                        {existing.some((watch) => watch.status !== "revoked") ? <button type="button" disabled={changeWatch.isPending} onClick={() => changeWatch.mutate({ selected: existing.filter((watch) => watch.status !== "revoked"), status: "revoked" })}>Stop</button> : null}
+                        {existing.some((watch) => watch.status !== "revoked") ? <button type="button" disabled={updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, selected: existing.filter((watch) => watch.status !== "revoked"), status: "revoked" })}>Stop</button> : null}
                       </span>;
                     })() : null}
                   </li>
@@ -417,7 +418,7 @@ export function EvidenceSourceWorkspace({
             : syncJob.data.error ?? "Sync failed. Try again."
         }</p> : null}
         {saveRecipe.isError ? <p className="field-hint" role="alert">Could not save source: {String(saveRecipe.error)}</p> : null}
-        {saveWatch.isError || changeWatch.isError ? <p className="field-hint" role="alert">Could not update monitoring. Check source access and try again.</p> : null}
+        {updateWatches.isError ? <p className="field-hint" role="alert">Could not update monitoring. Check source access and try again.</p> : null}
         {syncSources.isError ? <p className="field-hint" role="alert">Sync failed: {String(syncSources.error)}</p> : null}
 
         <AgentProgress snapshot={snapshot} />

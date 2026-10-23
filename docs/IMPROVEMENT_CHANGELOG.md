@@ -872,3 +872,9 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 
 - Production Notion recipe persistence and two manual syncs were verified with authorized pages; the second reported no new updates. The monitor UI was feature-gated and only supported one resource per saved recipe. It now derives distinct approved resource IDs across recipe steps and can activate/pause/revoke all selected resources. The production flag remains off until the independently scheduled worker is operational. Focused web typecheck and a multi-resource ID test pass.
 
+### 2026-10-22 — Render Cron deployment gate and watch controls
+
+- Render billing showed a $50 promotional credit balance and no card. A 15-minute `0.5c-512mb` Docker Cron Job using the existing watch runner was prepared at the displayed $0.00016/min rate. Render opened an Add Card dialog on deployment; the job was **not created**. The $1/month minimum and credits do not bypass Render's card gate for this workspace. No payment details or alternative paid infrastructure were added. The scheduled-run, asleep-web-service, and automatic Notion-entry acceptance checks remain BLOCKED.
+- A scoped, unlinked Render environment group was created with only the runner's database, Composio, BYOK-decryption and configured inference settings. It has no service access until linked. The dashboard's group-creation flow unexpectedly exposed masked values to browser accessibility output; the values were not copied into source control or this changelog. Coordinate credential rotation before using the group in production.
+- The multi-resource monitoring UI now performs pause/resume/create changes under one mutation state so one click cannot report completion while another request is pending. Focused TypeScript build and resource-ID test pass. Production monitoring remains hidden.
+
