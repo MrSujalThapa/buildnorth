@@ -496,4 +496,6 @@ Vercel's production `VITE_BACKGROUND_MONITORING=true` setting was added and depl
 
 The next instrumentation change records database connection acquisition separately from statement execution in `Server-Timing` and request logs. It is tested locally but awaits deployment and a new authenticated sample; it does not itself reduce latency.
 
-An additional scoped optimization defers Composio SDK client construction until a provider operation actually needs it. Connected-source and saved-recipe navigation only needs local persisted rows. Twenty-eight focused integration tests pass locally; CI, deployment and authenticated before/after measurements remain pending, so this is not a performance PASS.
+An additional scoped optimization defers Composio SDK client construction until a provider operation actually needs it. Connected-source and saved-recipe navigation only needs local persisted rows. Thirty focused integration tests pass locally; CI, deployment and authenticated before/after measurements remain pending, so this is not a performance PASS.
+
+The Notion picker also now follows bounded search pages when the Composio action's current input schema explicitly permits `start_cursor`. It stops after 100 results, five pages or a repeated cursor. This addresses a first-page discovery limit but cannot grant access to pages the Notion integration was not shared with. Production Book Reports parent discovery remains unverified.

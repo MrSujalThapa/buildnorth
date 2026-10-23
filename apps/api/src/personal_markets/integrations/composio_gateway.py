@@ -12,6 +12,22 @@ from personal_markets.core.config import Settings
 from personal_markets.integrations.mcp_domain import MCPResourceDescriptor, MCPToolDescriptor
 
 _TOOLKIT_CACHE_TTL_SECONDS = 600.0
+_RESOURCE_DISCOVERY_PAGE_LIMIT = 5
+_RESOURCE_DISCOVERY_RESULT_LIMIT = 100
+
+
+def _resource_rows(payload: dict[str, Any]) -> list[Any]:
+    rows = (
+        payload.get("records") or payload.get("items") or payload.get("results")
+        or payload.get("repositories") or payload.get("pages")
+        or payload.get("data") or []
+    )
+    if isinstance(rows, dict):
+        rows = (
+            rows.get("items") or rows.get("repositories") or rows.get("results")
+            or rows.get("pages") or rows.get("data") or []
+        )
+    return rows if isinstance(rows, list) else []
 _toolkit_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
 
@@ -405,20 +421,46 @@ class ComposioIntegrationGateway:
             {},
             connected_account_id=connected_account_id,
         )
+        pages = [payload]
+        # Notion search commonly returns a short first page. Consult the actual
+        # action schema before passing a cursor; never guess provider arguments.
+        if toolkit_slug == "notion" and payload.get("next_cursor"):
+            tools = await self.list_tools(user_id, toolkit_slug, limit=100)
+            tool = next((item for item in tools if item.name == tool_name), None)
+            schema = tool.input_schema if tool else {}
+            if isinstance(schema.get("parameters"), dict):
+                schema = schema["parameters"]
+            properties = schema.get("properties") or {}
+            if isinstance(properties, dict) and "start_cursor" in properties:
+                cursor = str(payload["next_cursor"])
+                seen_cursors: set[str] = set()
+                for _ in range(_RESOURCE_DISCOVERY_PAGE_LIMIT - 1):
+                    if cursor in seen_cursors:
+                        break
+                    seen_cursors.add(cursor)
+                    arguments: dict[str, Any] = {"start_cursor": cursor}
+                    if "page_size" in properties:
+                        arguments["page_size"] = 100
+                    page = await self.execute_tool(
+                        user_id, tool_name, arguments,
+                        connected_account_id=connected_account_id,
+                    )
+                    pages.append(page)
+                    discovered_count = sum(len(_resource_rows(item)) for item in pages)
+                    if discovered_count >= _RESOURCE_DISCOVERY_RESULT_LIMIT:
+                        break
+                    cursor = str(page.get("next_cursor") or "")
+                    if not cursor:
+                        break
         resources: list[MCPResourceDescriptor] = []
-        rows = (
-            payload.get("records") or payload.get("items") or payload.get("results")
-            or payload.get("repositories") or payload.get("pages")
-            or payload.get("data") or []
-        )
-        if isinstance(rows, dict):
-            rows = (
-                rows.get("items") or rows.get("repositories") or rows.get("results")
-                or rows.get("pages") or rows.get("data") or []
-            )
-        if not isinstance(rows, list):
-            return resources
-        for row in rows[:50]:
+        seen_resource_ids: set[str] = set()
+        result_limit = _RESOURCE_DISCOVERY_RESULT_LIMIT if toolkit_slug == "notion" else 50
+        rows: list[Any] = []
+        for page in pages:
+            rows.extend(_resource_rows(page))
+            if len(rows) >= result_limit:
+                break
+        for row in rows[:result_limit]:
             if not isinstance(row, dict):
                 continue
             title = row.get("title")
@@ -455,6 +497,9 @@ class ComposioIntegrationGateway:
             label = str(title or row.get("full_name") or row.get("name") or "").strip()
             if not label:
                 continue
+            if resource_id in seen_resource_ids:
+                continue
+            seen_resource_ids.add(resource_id)
             resource_type = str(
                 ("private" if row["private"] else "public")
                 if isinstance(row.get("private"), bool)
