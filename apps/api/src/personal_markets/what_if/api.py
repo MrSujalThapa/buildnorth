@@ -4,6 +4,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from personal_markets.agents.intervention_service import InterventionAgentService
+from personal_markets.forecasting.course_grade import (
+    CourseGradeRequest,
+    CourseGradeResult,
+    evaluate_course_grade,
+)
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
@@ -145,3 +150,12 @@ async def parse_intervention(
     service: Annotated[InterventionAgentService, Depends(get_intervention_service)],
 ) -> ParseInterventionResponse:
     return await service.parse(payload.goal_id, payload.text)
+
+
+@router.post("/course-grade", response_model=CourseGradeResult)
+async def course_grade(
+    payload: CourseGradeRequest,
+    _: Annotated[Principal, Depends(get_invited_principal)],
+) -> CourseGradeResult:
+    """Syllabus arithmetic only. Hypothetical remaining scores are not stored."""
+    return evaluate_course_grade(payload)

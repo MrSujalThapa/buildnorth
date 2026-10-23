@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -22,6 +22,7 @@ type Props = {
   onBack: () => void;
   onWhatIf: () => void;
   onEvidence?: () => void;
+  children?: ReactNode;
 };
 
 function categoryCopy(category?: string | null) {
@@ -113,6 +114,7 @@ export default function MarketDetailPage({
   onBack,
   onWhatIf,
   onEvidence,
+  children,
 }: Props) {
   const ranges = ODDS_EXPLORER_RANGES;
   const [chartSelection, setChartSelection] = useState<ChartSelection | null>(null);
@@ -293,6 +295,7 @@ export default function MarketDetailPage({
             Evidence
           </button>
         </div>
+        {children}
       </section>
     </main>
   );

@@ -41,7 +41,13 @@ def resource_text(resource: dict[str, Any]) -> str:
 def score_resource(resource: dict[str, Any], goal: dict[str, Any] | None) -> float:
     left = resource_text(resource)
     right = goal_text(goal)
-    return overlap_score(tokenize(left), tokenize(right), left, right)
+    full_score = overlap_score(tokenize(left), tokenize(right), left, right)
+    # Long goal contracts dilute a clear resource-title match. This score only
+    # ranks source suggestions; downstream validation must inspect content.
+    title = str(resource.get("label") or resource.get("name") or "")
+    goal_title = str((goal or {}).get("title") or (goal or {}).get("goal_title") or "")
+    title_score = overlap_score(tokenize(title), tokenize(goal_title), title, goal_title)
+    return max(full_score, title_score)
 
 
 def relevance_label(score: float) -> str:

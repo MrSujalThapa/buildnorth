@@ -168,8 +168,14 @@ export default function ImpactWorkspace({
         error={stateError}
       />
     );
+  } else if (preview.scenarioOdds !== null) {
+    unpricedPanel = (
+      <div className="empty-state">
+        <strong>Outcome range unavailable</strong>
+        <span>The scenario odds were computed, but this result has no simulated outcome distribution.</span>
+      </div>
+    );
   } else if (preview.currentOdds !== null) {
-    // The baseline priced; there is simply no scenario to draw yet.
     unpricedPanel = (
       <div className="empty-state">
         <strong>Your baseline odds are priced</strong>
@@ -229,7 +235,7 @@ export default function ImpactWorkspace({
               <div className="odds-pair">
                 <div><span>Current odds</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
                 <div className="odds-arrow" aria-hidden="true">→</div>
-                <div><span>Realistic resulting odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
+                <div><span>Scenario odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
               </div>
               <div className={`delta ${deltaTone}`}>
                 <strong>
@@ -239,7 +245,7 @@ export default function ImpactWorkspace({
                       : "Unpriced"
                     : `${preview.improvementPoints >= 0 ? "+" : ""}${preview.improvementPoints.toFixed(1)} pts`}
                 </strong>
-                <span>possible change</span>
+                <span>hypothetical change</span>
               </div>
             </div>
             {impact.causalCaption ? <p className="quiet-copy">{impact.causalCaption}</p> : null}
@@ -247,7 +253,7 @@ export default function ImpactWorkspace({
             <div className="panel-head tight">
               <div>
                 <p className="section-label">Where you could finish</p>
-                <h2>Simulated results across {impact.drawCount?.toLocaleString() ?? "simulated"} futures</h2>
+                <h2>{bins.length ? `Simulated results across ${impact.drawCount?.toLocaleString() ?? "simulated"} futures` : "Outcome range"}</h2>
               </div>
             </div>
 
@@ -270,7 +276,7 @@ export default function ImpactWorkspace({
             <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
             <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
             <div className="selected-metric">
-              <span>Realistic resulting odds</span>
+              <span>Scenario odds</span>
               <strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong>
             </div>
           </div>
