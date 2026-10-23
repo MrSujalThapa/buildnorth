@@ -240,6 +240,38 @@ export interface ParseInterventionResult {
   research_claims?: string[];
 }
 
+export interface CourseGradeComponent {
+  label: string;
+  score: number | null;
+  weight: number;
+  known: boolean;
+}
+
+export interface CourseGradeRequest {
+  components: CourseGradeComponent[];
+  target?: number | null;
+  remaining_score?: number | null;
+  scenarios?: number[];
+}
+
+export interface CourseGradeResult {
+  status: string;
+  average: number | null;
+  known_contribution: number | null;
+  known_weight: number | null;
+  remaining_weight: number | null;
+  required_remaining: number | null;
+  required_is_uniform: boolean;
+  unattainable: boolean;
+  already_met: boolean;
+  scenarios: { label: string; remaining_score: number; average: number; meets_target: boolean | null }[];
+  questions: string[];
+  missing: string[];
+  message: string;
+  arithmetic_only: boolean;
+  writes_evidence: boolean;
+}
+
 export interface SourceResourceSelection {
   resource_id: string;
   label: string;
@@ -903,6 +935,10 @@ export const api = {
     }),
   parseDecision: (body: { goal_id: string; text: string }) =>
     request<ParseDecisionResult>("/api/v1/what-if/parse-decision", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  courseGrade: (body: CourseGradeRequest) =>
+    request<CourseGradeResult>("/api/v1/what-if/course-grade", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }),
   baselineState: (goalId: string, signal?: AbortSignal) =>

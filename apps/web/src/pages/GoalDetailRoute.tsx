@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../api/client";
+import { isCourseStandingGoal } from "../adapters/courseGrade";
 import { toMarketDetail } from "../adapters/marketViewModel";
+import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
 
 export function GoalDetailRoute() {
@@ -75,7 +77,9 @@ export function GoalDetailRoute() {
         onBack={() => { void navigate("/markets"); }}
         onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
         onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}
-      />
+      >
+        {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
+      </MarketDetailPage>
     </>
   );
 }

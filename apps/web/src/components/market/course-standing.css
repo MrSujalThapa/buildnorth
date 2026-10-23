@@ -1,0 +1,126 @@
+.course-standing {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--market-border);
+}
+
+.course-standing .panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.course-standing h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.035em;
+}
+
+.course-standing .meta,
+.course-standing .quiet-copy {
+  color: var(--market-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.course-standing table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.course-standing th,
+.course-standing td {
+  padding: 8px 8px 8px 0;
+  text-align: left;
+}
+
+.course-standing th {
+  color: var(--market-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.course-standing th:first-child { width: 48%; }
+.course-standing th:nth-child(2),
+.course-standing th:nth-child(3) { width: 26%; }
+
+.course-standing input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--market-border);
+  border-radius: 8px;
+  background: var(--market-bg);
+  color: var(--market-text);
+  font: inherit;
+}
+
+.course-standing input:focus-visible,
+.course-standing button:focus-visible {
+  outline: 2px solid var(--market-accent);
+  outline-offset: 2px;
+}
+
+.course-standing-actions,
+.course-standing-scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.course-standing label {
+  display: grid;
+  gap: 6px;
+  color: var(--market-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.course-standing-actions label,
+.course-standing-scenarios label { width: min(160px, 100%); }
+
+.course-standing button {
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid var(--market-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--market-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.course-standing button[type="submit"] {
+  border-color: var(--market-text);
+  background: var(--market-text);
+  color: var(--market-bg);
+}
+
+.course-standing button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.course-standing-result {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--market-border);
+}
+
+.course-standing-result p:first-child { margin: 0; font-weight: 650; }
+.course-standing-result ul { padding-left: 20px; line-height: 1.8; }
+
+@media (max-width: 640px) {
+  .course-standing .panel-head { display: block; }
+  .course-standing .meta { display: block; margin-top: 7px; }
+  .course-standing th:first-child { width: 42%; }
+  .course-standing th:nth-child(2),
+  .course-standing th:nth-child(3) { width: 29%; }
+  .course-standing th,
+  .course-standing td { padding-right: 5px; }
+  .course-standing input { padding-inline: 7px; }
+}
