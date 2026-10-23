@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Literal
@@ -106,32 +107,38 @@ class InMemorySourceWatchStore:
                 (w for w in self._rows.values() if w.status == "active" and w.next_check_at <= now),
                 key=lambda w: w.next_check_at,
             )[:limit]
+            grouped: dict[tuple[UUID, UUID], list[SourceWatch]] = {}
             for watch in due:
-                jobs = get_goal_sync_job_store()
-                active = await jobs.latest(watch.owner_id, watch.goal_id)
+                grouped.setdefault((watch.owner_id, watch.goal_id), []).append(watch)
+            jobs = get_goal_sync_job_store()
+            for (owner_id, goal_id), watches in grouped.items():
+                active = await jobs.latest(owner_id, goal_id)
                 if active is not None and active.status in {
                     "queued", "fetching_sources", "processing_evidence", "updating_forecast"
                 }:
                     continue
-                job = await jobs.enqueue(watch.owner_id, watch.goal_id)
-                uri = f"composio://{watch.plugin_id}/{watch.resource_id}"
-                uris = set(job.receipt.get("watch_resource_uris", []))
+                job = await jobs.enqueue(owner_id, goal_id)
+                uris = {
+                    f"composio://{watch.plugin_id}/{watch.resource_id}"
+                    for watch in watches
+                }
                 await jobs.update(
                     job.id,
                     receipt={
                         **job.receipt,
                         "origin": "watch",
-                        "watch_resource_uris": sorted(uris | {uri}),
+                        "watch_resource_uris": sorted(uris),
                     },
                 )
-                self._rows[watch.id] = watch.model_copy(
-                    update={
-                        "last_checked_at": now,
-                        "next_check_at": now + timedelta(minutes=watch.interval_minutes),
-                        "updated_at": now,
-                    }
-                )
-                count += 1
+                for watch in watches:
+                    self._rows[watch.id] = watch.model_copy(
+                        update={
+                            "last_checked_at": now,
+                            "next_check_at": now + timedelta(minutes=watch.interval_minutes),
+                            "updated_at": now,
+                        }
+                    )
+                    count += 1
         return count
 
 
@@ -255,7 +262,7 @@ class PostgresSourceWatchStore:
                 (
                     await conn.execute(
                         text("""
-                select id, owner_id, goal_id from source_watches
+                select id, owner_id, goal_id, plugin_id, resource_id from source_watches
                 where status = 'active' and next_check_at <= now()
                 order by next_check_at for update skip locked limit :limit
             """),
@@ -265,39 +272,40 @@ class PostgresSourceWatchStore:
                 .mappings()
                 .all()
             )
-            grouped: dict[tuple[UUID, UUID], list[UUID]] = {}
+            grouped: dict[tuple[UUID, UUID], list[dict[str, object]]] = {}
             for row in rows:
-                grouped.setdefault((row["owner_id"], row["goal_id"]), []).append(row["id"])
+                grouped.setdefault((row["owner_id"], row["goal_id"]), []).append(dict(row))
             enqueued = 0
-            for (owner_id, goal_id), watch_ids in grouped.items():
+            for (owner_id, goal_id), due_watches in grouped.items():
+                uris = sorted({
+                    f"composio://{watch['plugin_id']}/{watch['resource_id']}"
+                    for watch in due_watches
+                })
                 inserted = (
                     await conn.execute(
                     text("""
                     insert into goal_sync_jobs (id, owner_id, goal_id, status, receipt)
-                    select :id, :owner_id, :goal_id, 'queued',
-                      jsonb_build_object('origin', 'watch', 'watch_resource_uris',
-                        coalesce((select jsonb_agg(distinct
-                          ('composio://' || sw.plugin_id || '/' || sw.resource_id))
-                          from source_watches sw
-                          where sw.owner_id = :owner_id and sw.goal_id = :goal_id
-                            and sw.status = 'active'), '[]'::jsonb))
+                    values (:id, :owner_id, :goal_id, 'queued', cast(:receipt as jsonb))
                     on conflict do nothing returning id
                 """),
-                    {"id": uuid4(), "owner_id": owner_id, "goal_id": goal_id},
+                    {
+                        "id": uuid4(), "owner_id": owner_id, "goal_id": goal_id,
+                        "receipt": json.dumps({"origin": "watch", "watch_resource_uris": uris}),
+                    },
                     )
                 ).scalar_one_or_none()
                 if inserted is None:
                     continue
-                for watch_id in watch_ids:
+                for watch in due_watches:
                     await conn.execute(
                         text("""
                         update source_watches set last_checked_at = now(),
                           next_check_at = now() + make_interval(mins => interval_minutes),
                           updated_at = now() where id = :id
                         """),
-                        {"id": watch_id},
+                        {"id": watch["id"]},
                     )
-                enqueued += len(watch_ids)
+                enqueued += len(due_watches)
             return enqueued
 
 

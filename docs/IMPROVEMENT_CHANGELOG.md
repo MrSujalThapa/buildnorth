@@ -882,3 +882,8 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 
 - Corrected the all-revoked control label back to “Restart.” A two-resource mocked watch now verifies activation, pause, stop and restart in both desktop Chrome and a 390 px mobile viewport (2/2 Playwright paths). The screenshots were inspected: the controls remain visible and usable in both layouts. The test cannot establish live scheduled ingestion because Render rejected Cron creation without a card.
 
+### 2026-10-23 — Due-only watch scheduling and bounded runs
+
+- Both watch stores now group due resources by owner and goal, and write only those due resource URIs into a job receipt. The previous Postgres query included every active resource on the goal, even if its checkpoint was in the future; that could cause extra provider reads and inference. A focused in-memory test verifies two due pages enter one job while a later page is excluded and its checkpoint remains untouched.
+- The scheduled runner defaults to one processed sync job per invocation (hard range 1–5 for explicit calls) and logs total run duration. It may queue up to five due resources in one pass so a multi-page goal can be processed together. This limits work per 15-minute run but does not constitute a dollar-denominated BYOK inference cap. The Render card gate still prevents production schedule and charge verification.
+

@@ -100,6 +100,39 @@ async def test_due_watch_waits_for_existing_job(monkeypatch: pytest.MonkeyPatch)
 
 
 @pytest.mark.asyncio
+async def test_due_watch_job_reads_only_due_resources(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = InMemorySourceWatchStore()
+    jobs = InMemoryGoalSyncJobStore()
+    monkeypatch.setattr(
+        "personal_markets.integrations.source_watches.get_goal_sync_job_store", lambda: jobs
+    )
+    owner_id, goal_id, connection_id = uuid4(), uuid4(), uuid4()
+    now = datetime.now(UTC)
+    for resource_id, due_at in (
+        ("page-a", now - timedelta(minutes=1)),
+        ("page-b", now - timedelta(minutes=1)),
+        ("page-later", now + timedelta(minutes=30)),
+    ):
+        await store.save(SourceWatch(
+            owner_id=owner_id, goal_id=goal_id, plugin_connection_id=connection_id,
+            plugin_id="notion", resource_id=resource_id, next_check_at=due_at,
+        ))
+
+    assert await store.enqueue_due() == 2
+    job = await jobs.latest(owner_id, goal_id)
+    assert job is not None
+    assert job.receipt["watch_resource_uris"] == [
+        "composio://notion/page-a", "composio://notion/page-b",
+    ]
+    later = next(
+        w for w in await store.list_for_goal(owner_id, goal_id)
+        if w.resource_id == "page-later"
+    )
+    assert later.last_checked_at is None
+    assert later.next_check_at > now
+
+
+@pytest.mark.asyncio
 async def test_parent_watch_reads_only_discovered_children_and_rechecks_revocation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

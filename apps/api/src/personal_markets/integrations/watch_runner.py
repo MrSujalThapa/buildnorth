@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 
 import structlog
 
@@ -18,11 +19,16 @@ from personal_markets.integrations.source_watches import get_source_watch_store
 from personal_markets.main import app
 
 
-async def run_once(max_jobs: int = 25) -> None:
+async def run_once(max_jobs: int = 1) -> None:
+    """Bound each invocation to at most one billable sync job by default."""
+    if not 1 <= max_jobs <= 5:
+        raise ValueError("max_jobs must be between 1 and 5")
     os.environ["PLAYITOUT_WATCH_RUNNER"] = "1"
     log = structlog.get_logger(__name__)
+    started = time.monotonic()
     async with app.router.lifespan_context(app):
-        scheduled = await get_source_watch_store().enqueue_due(limit=max_jobs)
+        # A goal may have several due resources but still needs one sync job.
+        scheduled = await get_source_watch_store().enqueue_due(limit=max_jobs * 5)
         log.info("source_watches_scheduled", count=scheduled)
         jobs = get_goal_sync_job_store()
         await jobs.expire_stranded()
@@ -33,7 +39,12 @@ async def run_once(max_jobs: int = 25) -> None:
                 break
             await execute_goal_sync_job(app, job)
             processed += 1
-        log.info("source_watch_runner_finished", scheduled=scheduled, processed=processed)
+        log.info(
+            "source_watch_runner_finished",
+            scheduled=scheduled,
+            processed=processed,
+            duration_seconds=round(time.monotonic() - started, 3),
+        )
 
 
 if __name__ == "__main__":
