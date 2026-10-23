@@ -263,7 +263,6 @@ export function EvidenceSourceWorkspace({
                 Current forecast: <strong>{forecastLabel}</strong>
               </span>
             ) : null}
-            {sourcePlan.data?.goal_type ? <span>Type: {sourcePlan.data.goal_type}</span> : null}
           </div>
         </header>
 
