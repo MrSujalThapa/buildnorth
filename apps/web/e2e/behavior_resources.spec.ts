@@ -491,6 +491,6 @@ test.describe("Resource-specific evidence", () => {
     await page.getByRole("button", { name: /Run scenario/i }).click();
     await expect(page.getByText("If fully executed")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Estimated follow-through")).toBeVisible();
-    await expect(page.getByText("Realistic resulting odds")).toBeVisible();
+    await expect(page.getByText("Scenario odds")).toBeVisible();
   });
 });

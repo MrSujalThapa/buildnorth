@@ -229,7 +229,7 @@ export default function ImpactWorkspace({
               <div className="odds-pair">
                 <div><span>Current odds</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
                 <div className="odds-arrow" aria-hidden="true">→</div>
-                <div><span>Realistic resulting odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
+                <div><span>Scenario odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
               </div>
               <div className={`delta ${deltaTone}`}>
                 <strong>
@@ -239,7 +239,7 @@ export default function ImpactWorkspace({
                       : "Unpriced"
                     : `${preview.improvementPoints >= 0 ? "+" : ""}${preview.improvementPoints.toFixed(1)} pts`}
                 </strong>
-                <span>possible change</span>
+                <span>hypothetical change</span>
               </div>
             </div>
             {impact.causalCaption ? <p className="quiet-copy">{impact.causalCaption}</p> : null}
@@ -270,7 +270,7 @@ export default function ImpactWorkspace({
             <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
             <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
             <div className="selected-metric">
-              <span>Realistic resulting odds</span>
+              <span>Scenario odds</span>
               <strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong>
             </div>
           </div>
