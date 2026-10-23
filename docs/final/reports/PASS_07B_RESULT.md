@@ -36,36 +36,56 @@ Savings paths still use the finance reference distribution. Running thresholds s
 
 Hiring fit uses application, response, phone-screen, OA, technical, final, and offer counts, plus rejections tagged to a stage. A stage with no rejection keeps its reference rate and is listed in `missing_inputs`. Practice hours do not change the probability. Parallel applications are treated as independent. The shrinkage is not a posterior and is not personal calibration: `calibration.applied` is false and the status is `not_empirically_calibrated`.
 
+Active count at a stage is the cumulative stock, minus people who advanced to the next stage, minus rejections recorded at that same stage, floored at zero. A rejection is not moved to another stage. A count that would go negative is recorded in `stage_count_inconsistencies` and the active count stays zero. Rejections that name no stage stay `unassigned` and are not subtracted anywhere. There is no separate time-based expiry: an in-flight application remains active until it advances or a rejection names its stage. Recency still discounts a stale pipeline; it does not delete unresolved applications.
+
 ## 5. API evidence, inference, and publication
 
 `POST /api/v1/goals/{goal_id}/evidence/manual` on an agent-created SWE offer goal:
 
-1. Ten applications publish a priced forecast (`REFERENCE_MODEL` on the service path).
-2. Two recruiter responses and eight application rejections publish a different probability (`FITTED_STATISTICAL`).
+1. Ten applications publish a priced forecast (`REFERENCE_MODEL`). On 2026-10-23 that API response was 0.171365.
+2. Two recruiter responses and eight application rejections publish a different probability (`FITTED_STATISTICAL`). The stored receipt has zero active applications, two active responses, and `future_application_rate` of 2 per week with source `REFERENCE`. The API response was 0.231615.
 3. Submitting those same two rows again returns `reprice_status: unchanged`, and the evidence list still has one rejection row with value 8.
 
-The receipt fields are asserted on `BaselineForecastService`, which is the service that endpoint calls. `GET /api/v1/what-if/history/{goal_id}` in the isolated test app reads the What If simulation repository, not that baseline store, so this test does not use it as proof of publication.
+The receipt fields are on the forecast stored by `BaselineForecastService`, which is the service that endpoint calls. `GET /api/v1/what-if/history/{goal_id}` in the isolated test app reads the What If simulation repository, not that baseline store, so this test does not use it as proof of publication.
 
 ## 6. Before and after
 
-Fixture deadline is 180 days after the run. On 2026-10-23 the service returned:
+The first published after-probability counted the 8 application rejections as still active. That figure is kept below as the previous measurement. The active-count fix does not change the fitted rate.
 
-- 10 applications, reference rate 0.12: probability **0.110010**, method `REFERENCE_MODEL`.
-- Same applications, 2 responses, 8 application rejections: fitted rate **0.164444…** = `(2 + 8 * 0.12) / 18`, probability **0.169858**, method `FITTED_STATISTICAL`.
+180-day SWE offer fixture, clock and evidence at 2026-10-23, deadline 180 days later. `BaselineForecastService` published:
 
-Those probabilities move if the deadline moves. The rate formula does not. The API test checks that the two published probabilities differ and that a duplicate submission does not. Practice hours left the probability unchanged.
+| State | Active applications | Current pipeline | Future applications (2/week, REFERENCE) | Published probability | Method |
+| --- | --- | --- | --- | --- | --- |
+| 10 applications | 10 | 0.018622 | 0.093122 | **0.110010** | `REFERENCE_MODEL` |
+| 10 applications, 2 responses, 8 application rejections, previous active-count formula | 8 | 0.050825 | 0.125407 | **0.169858** | `FITTED_STATISTICAL` |
+| Same evidence, corrected active counts | 0 (2 responses still in flight) | 0.031055 | 0.125407 | **0.152567** | `FITTED_STATISTICAL` |
+
+The corrected 180-day probability is 0.017291 lower than the previously published 0.169858. The applications-only probability is unchanged. Fitted `application_to_response` remains `(2 + 8 * 0.12) / 18` = 0.164444…. The future-application term uses that rate. The current-pipeline term does not keep the rejected applications.
+
+The same evidence was then published through `POST /api/v1/goals/{goal_id}/evidence/manual` on 2026-10-23. The agent-created goal deadline is `2027-08-31T23:59:59Z` (45 weekly periods), so these probabilities are not the 180-day fixture:
+
+| Publication | Active applications | Current pipeline | Future applications (2/week, REFERENCE) | Published probability | Method |
+| --- | --- | --- | --- | --- | --- |
+| 10 applications | 10 | 0.018622 | 0.155641 | **0.171365** | `REFERENCE_MODEL` |
+| 2 responses and 8 application rejections | 0 (2 responses still in flight) | 0.031055 | 0.206988 | **0.231615** | `FITTED_STATISTICAL` |
+
+On that longer horizon the corrected publication is higher than the applications-only publication because expected future applications are priced at the fitted rate. Recomputing the pre-fix active counts (8 applications still treated as active) with the same fitted rate and the same future term gives 0.247293. The corrected API publication is 0.015678 lower than that reconstruction. The receipt's `future_application_rate.source` is `REFERENCE`, `applications_per_week` is 2, and `applies_to` says the rate is not the current pipeline. `calibration.applied` is false. `trained_classifier` is null.
+
+Those probabilities move if the deadline moves. The rate formula and the active-count formula do not. A duplicate submission of the resolved rows returns `reprice_status: unchanged`. Practice hours left the probability unchanged.
 
 ## 7. Tests and CI
 
-Passed locally:
+Local checks on 2026-10-23, using a throwaway Postgres 17 at `127.0.0.1:54329` rather than the developer database:
 
-- `apps/api/tests/test_hiring_model.py`
-- `apps/api/tests/test_manual_evidence_api.py` including the new workflow
-- `apps/api/tests/test_baseline_reprice.py`
+- Migrations `0001` through `0022` applied. `seed-demo` second run inserted no new rows.
+- Ruff baseline: no new findings. Web eslint: 0 errors, 9 existing warnings.
+- Web `tsc` and the production build passed. Vitest: 105 tests passed.
+- Architecture check passed. Migration sanity passed (22 files).
+- `uv run python -m pytest` against that database exited 0. The progress line shows two skips.
+- `scripts/evaluate_openai_baseline.py` exited 2, status `not_executed`, `predictions_written` 0, because the frozen OULAD feature artifact is not on this machine. The result file it rewrote was restored and is not in this change.
+- `check_mypy_baseline.py` reports 7 errors, all in gitignored `scripts/_phase0_*.py`. Those files are not in the CI checkout. The mypy baseline was not edited.
 
-Ruff: no new findings. Architecture check passed. Mypy on `selection.py` and `hiring.py` is clean. `check_mypy_baseline.py` still reports the pre-existing errors in gitignored `scripts/_phase0_*.py`, which are not in the CI checkout.
-
-Full GitHub Actions (Postgres, the whole suite, web build) was not run. Local Python is 3.14. CI is 3.12.
+Python here is 3.14. CI is 3.12. The GitHub Actions run for this commit is checked after the push.
 
 ## 8. Integration dependencies
 

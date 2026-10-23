@@ -78,6 +78,7 @@ def hiring_prediction_block(
     reference_version: str,
     pseudo_counts: float,
     weekly_rate_source: str,
+    weekly_rate: float,
 ) -> dict[str, Any]:
     calibration_reason = (
         "Resolved stage rates are shrunk toward the mechanistic hiring prior. "
@@ -108,8 +109,12 @@ def hiring_prediction_block(
         "statistical_assumptions": [
             "Parallel applications are treated as independent.",
             "In-flight applications are not counted as failures.",
+            "A rejection is removed only from the stage it names.",
             "Practice volume does not change the probability.",
-            f"Weekly application rate source: {weekly_rate_source}.",
+            (
+                f"Future applications use {weekly_rate:g} per week ({weekly_rate_source}). "
+                "The reference default is 2 per week. This rate is not the current pipeline."
+            ),
         ],
         "calibration": {
             "applied": False,

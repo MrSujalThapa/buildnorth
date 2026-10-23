@@ -109,9 +109,9 @@ def aggregate_funnel_from_evidence(
     now: datetime | None = None,
 ) -> HiringFunnelState:
     clock = now or datetime.now(UTC)
-    rejections: dict[str, int] = {}
     last_activity: datetime | None = None
     practice_hours = 0.0
+    rejection_rows: dict[str, list[tuple[datetime, float, ObservationKind]]] = {}
     stocks: dict[str, list[tuple[datetime, float, ObservationKind]]] = {
         "application": [],
         "response": [],
@@ -136,13 +136,19 @@ def aggregate_funnel_from_evidence(
         stage = _resolve_stage(metric, event_type, category, summary)
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)
-            rejections[rejection_stage] = rejections.get(rejection_stage, 0) + int(count)
+            rejection_rows.setdefault(rejection_stage, []).append((observed, count, kind))
             continue
         if stage == "practice":
             practice_hours += float(item.numeric_value or 0.0)
             continue
         if stage in stocks:
             stocks[stage].append((observed, count, kind))
+
+    rejections = {
+        stage: int(round(reduce_stock_value(rows)))
+        for stage, rows in rejection_rows.items()
+    }
+    rejections = {stage: count for stage, count in rejections.items() if count > 0}
 
     return HiringFunnelState(
         applications=int(round(reduce_stock_value(stocks["application"]))),
@@ -232,17 +238,35 @@ def funnel_state_to_numeric_inputs(
     logit = math.log(hazard / (1.0 - hazard))
 
     active = _active_counts(state)
+    rate_source = "REFERENCE" if weekly_application_rate is None else "USER_ASSUMPTION"
     transforms: dict[str, Any] = {
         "funnel_state": active,
         "periods_remaining": periods,
         "pipeline_offer_probability": p_current,
+        "current_pipeline_offer_probability": p_current,
         "expected_new_pipeline_offer_probability": p_new,
+        "future_applications_offer_probability": p_new,
         "combined_offer_probability": p_total,
         "weekly_application_rate": weekly_rate,
+        "future_application_rate": {
+            "applications_per_week": weekly_rate,
+            "source": rate_source,
+            "reference_default_per_week": reference.weekly_application_rate,
+            "applies_to": "expected future applications, not the current pipeline",
+        },
         "reference_version": reference.version,
         "stage_rates": stage_rates,
         "practice_hours_observed": state.practice_hours,
     }
+    inconsistent = active.get("stage_count_inconsistencies") or []
+    if inconsistent:
+        transforms["count_consistency"] = {
+            "stages": inconsistent,
+            "note": (
+                "Passes plus rejections exceed the reported stock. The active count is "
+                "zero. Extra rejections were not assigned to another stage."
+            ),
+        }
     if state.practice_hours:
         transforms["practice_note"] = (
             "Practice volume is activity evidence only; it does not map to a strength score."
@@ -388,6 +412,10 @@ def _annotate_hiring_prediction(
         sufficiency = "reference_only"
     fitted_stages = {row["stage"] for row in fits}
     missing = [stage for stage in STAGE_CHAIN if stage not in fitted_stages and not offer_observed]
+    updated_state = dict(numeric.state)
+    transforms = dict(updated_state.get("pricing_transforms") or {})
+    future = transforms.get("future_application_rate") or {}
+    weekly_rate = float(future.get("applications_per_week") or reference.weekly_application_rate)
     block = hiring_prediction_block(
         method=method,
         sufficiency=sufficiency,
@@ -396,9 +424,20 @@ def _annotate_hiring_prediction(
         reference_version=reference.version,
         pseudo_counts=reference.resolved_outcome_pseudo_counts,
         weekly_rate_source="USER_ASSUMPTION" if weekly_rate_is_user else "REFERENCE",
+        weekly_rate=weekly_rate,
     )
-    updated_state = dict(numeric.state)
-    transforms = dict(updated_state.get("pricing_transforms") or {})
+    notes = list(block["limitations"])
+    active = updated_state.get("funnel") or {}
+    if active.get("stage_count_inconsistencies"):
+        notes.append(
+            "Passes plus rejections exceed the reported stock. Active count is zero. "
+            "Extra rejections were not assigned to another stage."
+        )
+    if active.get("unassigned_rejections"):
+        notes.append(
+            "Rejections that named no stage stay out of every active count."
+        )
+    block["limitations"] = notes
     transforms["prediction_method"] = method
     transforms["stage_rate_fits"] = fits
     updated_state["pricing_transforms"] = transforms
@@ -459,17 +498,37 @@ def _has_funnel_signal(state: HiringFunnelState) -> bool:
 
 
 def _active_counts(state: HiringFunnelState) -> dict[str, Any]:
-    return {
-        "applications": max(0, state.applications - state.responses),
-        "responses": max(0, state.responses - state.phone_screens),
-        "phone_screens": max(0, state.phone_screens - state.oas),
-        "oas": max(0, state.oas - state.technicals),
-        "technicals": max(0, state.technicals - state.finals),
-        "finals": max(0, state.finals - state.offers),
-        "offers": state.offers,
-        "rejections": dict(state.rejections),
-        "practice_hours": state.practice_hours,
-    }
+    """People still waiting at a stage.
+
+    Cumulative stock minus people who advanced minus rejections recorded at that
+    same stage. A rejection is not removed from an earlier stage, because the
+    evidence does not say which opportunity it was. Counts do not go below zero.
+    """
+    stages = (
+        ("applications", state.applications, state.responses, "application"),
+        ("responses", state.responses, state.phone_screens, "response"),
+        ("phone_screens", state.phone_screens, state.oas, "phone_screen"),
+        ("oas", state.oas, state.technicals, "oa"),
+        ("technicals", state.technicals, state.finals, "technical"),
+        ("finals", state.finals, state.offers, "final"),
+    )
+    active: dict[str, Any] = {}
+    inconsistent: list[str] = []
+    for name, stock, advanced, rejection_key in stages:
+        rejected = int(state.rejections.get(rejection_key, 0))
+        remaining = stock - advanced - rejected
+        if remaining < 0:
+            inconsistent.append(name)
+        active[name] = max(0, remaining)
+    active["offers"] = state.offers
+    active["rejections"] = dict(state.rejections)
+    active["practice_hours"] = state.practice_hours
+    if inconsistent:
+        active["stage_count_inconsistencies"] = inconsistent
+    unassigned = int(state.rejections.get("unassigned", 0))
+    if unassigned:
+        active["unassigned_rejections"] = unassigned
+    return active
 
 
 def _pipeline_offer_probability(state: HiringFunnelState, rates: dict[str, float]) -> float:
@@ -587,18 +646,25 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
 
 
 def _rejection_stage(metric: str, event_type: str, category: str, summary: str) -> str:
+    """Name the stage that rejected the opportunity. Unknown text stays unassigned."""
     blob = " ".join([metric, event_type, category, summary])
     if _matches(blob, ("final", "onsite")):
         return "final"
     if _matches(blob, ("technical", "coding")):
         return "technical"
-    if _matches(blob, ("oa", "online assessment", "hackerrank")):
+    if metric.strip() in {"oa", "online_assessment", "hackerrank", "codesignal"}:
         return "oa"
-    if _matches(blob, ("phone", "recruiter")):
+    if _matches(blob, ("online assessment", "online_assessment", "hackerrank", "codesignal")):
+        return "oa"
+    if _matches(blob, ("phone screen", "phone_screen", "recruiter screen")):
         return "phone_screen"
-    if _matches(blob, ("application", "resume")):
+    if _matches(blob, ("application", "resume", "applied")):
         return "application"
-    return category or "technical"
+    if _matches(blob, ("response", "reply", "callback")):
+        return "response"
+    if _matches(blob, ("phone",)):
+        return "phone_screen"
+    return "unassigned"
 
 
 def _matches(blob: str, tokens: tuple[str, ...]) -> bool:
