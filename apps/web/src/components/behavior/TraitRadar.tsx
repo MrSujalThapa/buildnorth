@@ -187,6 +187,12 @@ export function TraitRadar({ traits, series }: Props) {
                 onMouseEnter={() => setFocused(item.id)}
                 onFocus={() => setFocused(item.id)}
                 onClick={() => setFocused(item.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setFocused(item.id);
+                  }
+                }}
               >
                 <text x={pt.x} y={pt.y + place.dy} textAnchor={place.textAnchor}>
                   <tspan className="trait-axis-name">{item.name}</tspan>
