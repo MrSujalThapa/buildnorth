@@ -867,3 +867,8 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Production emergency-fund manual evidence (current balance and recurring contribution supplied in the product brief) produced two self-reported events and a 3.9% published forecast after previously withheld odds. Change returned 66% execution-adjusted and 83% conditional for a higher monthly contribution; Futures showed target reached 61%, Compare kept two monthly contribution paths distinct at 30%/68%. Reverse returned raw flow/currency-month and algorithm text; backend labels and reasons now use human-readable action wording, and UI no longer calls the highest-odds path most realistic. These copy changes await production deploy verification.
 
 
+
+### 2026-10-22 — Multi-resource monitoring controls
+
+- Production Notion recipe persistence and two manual syncs were verified with authorized pages; the second reported no new updates. The monitor UI was feature-gated and only supported one resource per saved recipe. It now derives distinct approved resource IDs across recipe steps and can activate/pause/revoke all selected resources. The production flag remains off until the independently scheduled worker is operational. Focused web typecheck and a multi-resource ID test pass.
+
