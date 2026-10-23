@@ -878,3 +878,7 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - A scoped, unlinked Render environment group was created with only the runner's database, Composio, BYOK-decryption and configured inference settings. It has no service access until linked. The dashboard's group-creation flow unexpectedly exposed masked values to browser accessibility output; the values were not copied into source control or this changelog. Coordinate credential rotation before using the group in production.
 - The multi-resource monitoring UI now performs pause/resume/create changes under one mutation state so one click cannot report completion while another request is pending. Focused TypeScript build and resource-ID test pass. Production monitoring remains hidden.
 
+### 2026-10-23 — Multi-resource watch browser verification
+
+- Corrected the all-revoked control label back to “Restart.” A two-resource mocked watch now verifies activation, pause, stop and restart in both desktop Chrome and a 390 px mobile viewport (2/2 Playwright paths). The screenshots were inspected: the controls remain visible and usable in both layouts. The test cannot establish live scheduled ingestion because Render rejected Cron creation without a card.
+
