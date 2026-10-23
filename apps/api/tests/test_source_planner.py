@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
+from personal_markets.integrations.gateway import UnifiedIntegrationGateway
 from personal_markets.integrations.goal_sync_service import _supported_goal_step
 from personal_markets.integrations.mcp_domain import ReadCapabilityRecord
 from personal_markets.integrations.plugins import PluginStatus
@@ -148,7 +150,7 @@ async def test_obvious_connected_resource_plan_skips_inference() -> None:
         inference=inference,
         goals=GoalService(repo),
         evidence=EvidenceService(InMemoryEvidenceRepository()),
-        gateway=gateway,
+        gateway=cast(UnifiedIntegrationGateway, gateway),
         run_store=InMemoryAgentRunStore(),
         repository=get_integration_repository(),
         owner_id=owner_id,
@@ -184,7 +186,7 @@ async def test_irrelevant_authorized_resource_does_not_trigger_paid_planning() -
     service = SourcePlannerService(
         settings=Settings(environment="test"), inference=inference,
         goals=GoalService(repo), evidence=EvidenceService(InMemoryEvidenceRepository()),
-        gateway=gateway, run_store=InMemoryAgentRunStore(),
+        gateway=cast(UnifiedIntegrationGateway, gateway), run_store=InMemoryAgentRunStore(),
         repository=get_integration_repository(), owner_id=owner_id,
     )
     plan = await service.plan(str(goal.goal_id))
@@ -216,7 +218,7 @@ async def test_failed_connected_discovery_does_not_trigger_paid_planning() -> No
     service = SourcePlannerService(
         settings=Settings(environment="test"), inference=inference,
         goals=GoalService(repo), evidence=EvidenceService(InMemoryEvidenceRepository()),
-        gateway=gateway, run_store=InMemoryAgentRunStore(),
+        gateway=cast(UnifiedIntegrationGateway, gateway), run_store=InMemoryAgentRunStore(),
         repository=get_integration_repository(), owner_id=owner_id,
     )
     plan = await service.plan(str(goal.goal_id))
@@ -257,7 +259,7 @@ async def test_connected_resource_discovery_runs_concurrently() -> None:
         settings=Settings(environment="test"),
         inference=SimpleNamespace(complete=AsyncMock(side_effect=AssertionError("paid inference"))),
         goals=GoalService(repo), evidence=EvidenceService(InMemoryEvidenceRepository()),
-        gateway=gateway, run_store=InMemoryAgentRunStore(),
+        gateway=cast(UnifiedIntegrationGateway, gateway), run_store=InMemoryAgentRunStore(),
         repository=get_integration_repository(), owner_id=owner_id,
     )
     await service.plan(str(goal.goal_id))

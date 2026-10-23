@@ -83,8 +83,8 @@ def evaluate_course_grade(request: CourseGradeRequest) -> CourseGradeResult:
     unknown: list[str] = []
     questions: list[str] = []
     for item, fraction in zip(request.components, fractions, strict=True):
-        if _is_known(item):
-            known_contribution += float(item.score) * fraction
+        if item.known and item.score is not None:
+            known_contribution += item.score * fraction
             known_weight += fraction
             continue
         remaining_weight += fraction
@@ -124,9 +124,9 @@ def evaluate_course_grade(request: CourseGradeRequest) -> CourseGradeResult:
             ),
         )
 
-    average = known_contribution
+    average: float | None = known_contribution
     if remaining_weight > 1e-9 and request.remaining_score is not None:
-        average += request.remaining_score * remaining_weight
+        average = known_contribution + request.remaining_score * remaining_weight
     elif remaining_weight > 1e-9:
         average = None
 
