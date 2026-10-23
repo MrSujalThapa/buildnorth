@@ -85,7 +85,7 @@ Local checks on 2026-10-23, using a throwaway Postgres 17 at `127.0.0.1:54329` r
 - `scripts/evaluate_openai_baseline.py` exited 2, status `not_executed`, `predictions_written` 0, because the frozen OULAD feature artifact is not on this machine. The result file it rewrote was restored and is not in this change.
 - `check_mypy_baseline.py` reports 7 errors, all in gitignored `scripts/_phase0_*.py`. Those files are not in the CI checkout. The mypy baseline was not edited.
 
-Python here is 3.14. CI is 3.12. The GitHub Actions run for this commit is checked after the push.
+Python here is 3.14. CI is 3.12. GitHub Actions run [40036188816](https://github.com/MrSujalThapa/buildnorth/actions/runs/40036188816) on `8155b1d` completed with success. PR #20 stayed a draft.
 
 ## 8. Integration dependencies
 
