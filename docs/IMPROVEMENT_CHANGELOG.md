@@ -866,6 +866,10 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 
 - Production emergency-fund manual evidence (current balance and recurring contribution supplied in the product brief) produced two self-reported events and a 3.9% published forecast after previously withheld odds. Change returned 66% execution-adjusted and 83% conditional for a higher monthly contribution; Futures showed target reached 61%, Compare kept two monthly contribution paths distinct at 30%/68%. Reverse returned raw flow/currency-month and algorithm text; backend labels and reasons now use human-readable action wording, and UI no longer calls the highest-odds path most realistic. These copy changes await production deploy verification.
 
+### 2026-10-23 — Notion date mention titles
+
+- A connected Notion page appeared in the production picker as an ISO timestamp while Notion rendered its title as a date mention. The Composio adapter now formats only typed Notion date mentions for resource labels, preserving IDs, URLs, and literal text titles. Two focused provider-adapter tests pass. This remains PARTIAL until a deployed authenticated picker confirms the specific page changed presentation.
+
 
 
 ### 2026-10-22 — Multi-resource monitoring controls
