@@ -413,6 +413,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 16px;
+  min-width: 0;
   border-radius: 10px;
   color: var(--app-ink);
   font-size: 13px;
@@ -426,6 +427,7 @@
 }
 
 .evidence-watch-actions button {
+  min-height: 36px;
   border: 0;
   border-radius: 6px;
   background: color-mix(in srgb, var(--app-accent) 12%, transparent);
@@ -434,6 +436,15 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.evidence-watch-actions button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.evidence-watch-actions button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--app-accent) 30%, transparent);
 }
 
 .evidence-watch-actions button:focus-visible {
@@ -660,6 +671,11 @@
 }
 
 @media (max-width: 700px) {
+  .evidence-watch-actions button,
+  .evidence-sync-bar > button {
+    min-height: 44px;
+  }
+
   .evidence-shell {
     padding: 28px 18px 56px;
   }

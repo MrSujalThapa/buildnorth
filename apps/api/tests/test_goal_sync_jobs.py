@@ -33,6 +33,16 @@ async def test_sync_jobs_dedupe_and_scope_by_owner() -> None:
 
 
 @pytest.mark.asyncio
+async def test_web_worker_cannot_claim_watch_job() -> None:
+    store = InMemoryGoalSyncJobStore()
+    job = await store.enqueue(uuid4(), uuid4())
+    await store.update(job.id, receipt={"origin": "watch"})
+    assert await store.claim() is None
+    claimed = await store.claim(include_watches=True)
+    assert claimed is not None and claimed.id == job.id
+
+
+@pytest.mark.asyncio
 async def test_in_memory_latest_job_uses_insertion_order_when_timestamps_tie() -> None:
     store = InMemoryGoalSyncJobStore()
     owner_id, goal_id = uuid4(), uuid4()
