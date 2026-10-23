@@ -135,9 +135,10 @@ class SourcePlannerService:
                 }
             )
         goal_payload = goal.model_dump(mode="json")
-        if any(item["recommended"] for item in rank_resources(available_resources, goal_payload)):
-            # Metadata proposes a watch candidate; the later evidence pipeline
-            # still validates content before committing any observation.
+        if available_resources:
+            # Authorized resource metadata is enough to rank suggestions. An
+            # inference failure must not hide the connected source picker, and
+            # a title match remains a suggestion rather than evidence.
             return self._attach_ranked_resources(
                 SourcePlannerProposal(
                     goal_title=goal.title,
