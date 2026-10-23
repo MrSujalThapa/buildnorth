@@ -492,5 +492,6 @@ test.describe("Resource-specific evidence", () => {
     await expect(page.getByText("If fully executed")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Estimated follow-through")).toBeVisible();
     await expect(page.getByText("Scenario odds")).toBeVisible();
+    await expect(page.getByText("Scenario baseline")).toBeVisible();
   });
 });
