@@ -25,7 +25,7 @@ def _resource_title_part(part: dict[str, Any], toolkit_slug: str) -> str:
     ):
         date = mention.get("date")
         start = date.get("start") if isinstance(date, dict) else None
-        if isinstance(start, str) and date.get("end") is None:
+        if isinstance(date, dict) and isinstance(start, str) and date.get("end") is None:
             try:
                 value = datetime.fromisoformat(start)
             except ValueError:

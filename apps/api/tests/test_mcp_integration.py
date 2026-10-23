@@ -572,15 +572,25 @@ async def test_notion_picker_omits_untitled_id_only_results() -> None:
 
 
 @pytest.mark.asyncio
-async def test_notion_picker_renders_date_mentions_without_rewriting_text_titles() -> None:
-    from uuid import uuid4
+async def test_notion_picker_renders_date_mentions_without_rewriting_text_titles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typing import Any
+    from uuid import UUID, uuid4
 
     from personal_markets.core.config import Settings
     from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
 
     gateway = ComposioIntegrationGateway(Settings(environment="test"))
 
-    async def execute(_user_id, _tool_name, _arguments, **_kwargs):
+    async def execute(
+        _user_id: UUID,
+        _tool_name: str,
+        _arguments: dict[str, Any],
+        *,
+        connected_account_id: str | None = None,
+    ) -> dict[str, Any]:
+        del connected_account_id
         return {"results": [
             {
                 "id": "34faf8d1-37de-80e1-ae62-e4f9434fbc0f",
@@ -595,7 +605,7 @@ async def test_notion_picker_renders_date_mentions_without_rewriting_text_titles
             },
         ]}
 
-    gateway.execute_tool = execute  # type: ignore[method-assign]
+    monkeypatch.setattr(gateway, "execute_tool", execute)
     resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
     assert [item.name for item in resources] == [
         "@April 27, 2026 4:15 PM",
