@@ -133,11 +133,11 @@ function InviteScreen({
   );
 }
 
-function LoadingScreen() {
+function LoadingScreen({ slow = false }: { slow?: boolean }) {
   return (
     <main className="auth-screen">
       <section className="auth-panel">
-        <Brand title="Play It Out" copy="Checking your session." />
+        <Brand title="Play It Out" copy={slow ? "Starting your workspace. This can take a moment." : "Checking your session."} />
       </section>
     </main>
   );
@@ -178,6 +178,7 @@ function ClerkGate({ children }: Props) {
   const [account, setAccount] = useState<AccountView | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [slow, setSlow] = useState(false);
   const [reload, setReload] = useState(0);
   const landed = useRef(false);
   const returnUrl = typeof window === "undefined" ? "/" : googleReturnUrl();
@@ -185,11 +186,15 @@ function ClerkGate({ children }: Props) {
 
   useEffect(() => {
     if (ready) return;
+    const slowTimer = window.setTimeout(() => setSlow(true), 8_000);
     const timer = window.setTimeout(() => {
       setSessionError("Session check is taking too long. Try again.");
       setReady(true);
-    }, 12_000);
-    return () => window.clearTimeout(timer);
+    }, 45_000);
+    return () => {
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(timer);
+    };
   }, [ready, reload]);
 
   useEffect(() => {
@@ -238,7 +243,7 @@ function ClerkGate({ children }: Props) {
   if (sessionError && (!isLoaded || !isSignedIn)) {
     return <SessionErrorScreen message={sessionError} onRetry={() => window.location.reload()} />;
   }
-  if (!isLoaded || !ready) return <LoadingScreen />;
+  if (!isLoaded || !ready) return <LoadingScreen slow={slow} />;
   if (!isSignedIn) {
     return (
       <main className="auth-screen">
@@ -266,6 +271,7 @@ function ClerkGate({ children }: Props) {
         message={sessionError}
         onRetry={() => {
           setReady(false);
+          setSlow(false);
           setReload((value) => value + 1);
         }}
         onSignOut={() => {

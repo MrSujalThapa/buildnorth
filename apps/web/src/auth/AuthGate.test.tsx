@@ -28,6 +28,9 @@ test("stalled account lookup presents a retry instead of spinning forever", () =
   render(<MemoryRouter><ThemeProvider><AuthGate><Location /></AuthGate></ThemeProvider></MemoryRouter>);
   expect(screen.getByText("Checking your session.")).toBeInTheDocument();
   act(() => { vi.advanceTimersByTime(12_000); });
+  expect(screen.getByText("Starting your workspace. This can take a moment.")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  act(() => { vi.advanceTimersByTime(33_000); });
   expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
