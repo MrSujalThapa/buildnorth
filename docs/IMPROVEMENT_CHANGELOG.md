@@ -864,5 +864,6 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 
 ### 2026-10-22 — Live financial What If acceptance and Reverse copy
 
-- Production emergency-fund manual evidence (current balance 6,500 and current monthly contribution 600, as supplied in the product brief) produced two self-reported events and a 3.9% published forecast after previously withheld odds. Change returned 66% execution-adjusted and 83% conditional for 1,000 monthly; Futures showed target reached 61%, Compare kept 800/1,000 paths distinct at 30%/68%. Reverse returned raw flow/currency-month and algorithm text; backend labels and reasons now use human-readable action wording, and UI no longer calls the highest-odds path most realistic. These copy changes await production deploy verification.
+- Production emergency-fund manual evidence (current balance and recurring contribution supplied in the product brief) produced two self-reported events and a 3.9% published forecast after previously withheld odds. Change returned 66% execution-adjusted and 83% conditional for a higher monthly contribution; Futures showed target reached 61%, Compare kept two monthly contribution paths distinct at 30%/68%. Reverse returned raw flow/currency-month and algorithm text; backend labels and reasons now use human-readable action wording, and UI no longer calls the highest-odds path most realistic. These copy changes await production deploy verification.
+
 
