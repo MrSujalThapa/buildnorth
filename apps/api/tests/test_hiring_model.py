@@ -440,3 +440,71 @@ def test_first_round_interviews_do_not_become_application_stock() -> None:
         state = aggregate_funnel_from_evidence(order)
         assert state.applications == 40
         assert state.technicals == 2
+
+
+def test_resolved_rejections_shrink_the_reference_rate() -> None:
+    goal = _goal()
+    proposal = _proposal(goal)
+    reference = load_hiring_reference()
+    prior = reference.stage_rates["application_to_response"]
+    pseudo = reference.resolved_outcome_pseudo_counts
+    applications = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted")
+    ]
+    resolved = [
+        *applications,
+        _evidence(metric="responses", numeric_value=2, summary="recruiter response"),
+        _evidence(
+            metric="application_rejections",
+            numeric_value=8,
+            summary="application rejected",
+        ),
+    ]
+    bare = build_hiring_numeric_inputs(goal, proposal, applications)
+    fitted = build_hiring_numeric_inputs(goal, proposal, resolved)
+    assert bare is not None and fitted is not None
+    assert bare.assumption_sources["baseline_logits"] == "REFERENCE"
+    assert "strength" not in str(bare.state).lower()
+    assert fitted.state["prediction"]["method"] == "FITTED_STATISTICAL"
+    assert fitted.state["prediction"]["trained_classifier"] is None
+    assert fitted.state["prediction"]["calibration"]["applied"] is False
+    expected = (2 + pseudo * prior) / (10 + pseudo)
+    stage = fitted.state["prediction"]["uncertainty"]["fitted_stages"][0]
+    assert stage["fitted_rate"] == pytest.approx(expected)
+    assert stage["stage"] == "application_to_response"
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    before = service.compute(goal, proposal, ["e1"], {}, ["hiring_funnel_rates.json"], bare)
+    after = service.compute(goal, proposal, ["e1", "e2"], {}, ["hiring_funnel_rates.json"], fitted)
+    assert before.raw_probability is not None and after.raw_probability is not None
+    assert after.raw_probability != pytest.approx(before.raw_probability)
+    assert before.receipt["prediction"]["method"] == "REFERENCE_MODEL"
+    assert after.receipt["prediction"]["method"] == "FITTED_STATISTICAL"
+    assert after.receipt["calibration"]["applied"] is False
+    rejected = {item["model_id"] for item in after.receipt["prediction"]["rejected_classifiers"]}
+    assert rejected == {"jth_offer_v1"}
+    assert after.receipt["llm_used_for_probability"] is False
+
+
+def test_practice_hours_do_not_change_the_fitted_probability() -> None:
+    goal = _goal()
+    proposal = _proposal(goal)
+    base = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted"),
+        _evidence(
+            metric="application_rejections",
+            numeric_value=8,
+            summary="application rejected",
+        ),
+    ]
+    practiced = [
+        *base,
+        _evidence(metric="practice_hours", numeric_value=40, summary="interview practice hours"),
+    ]
+    without = build_hiring_numeric_inputs(goal, proposal, base)
+    with_practice = build_hiring_numeric_inputs(goal, proposal, practiced)
+    assert without is not None and with_practice is not None
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    first = service.compute(goal, proposal, ["e1"], {}, [], without)
+    second = service.compute(goal, proposal, ["e1", "e2"], {}, [], with_practice)
+    assert first.raw_probability == pytest.approx(second.raw_probability)
+

@@ -50,7 +50,6 @@ class BaselineForecastService:
         research_source_ids: list[str],
         inputs: NumericInputs | None = None,
     ) -> PricingResult:
-        _ = proposal  # semantic only; never a probability source
         numeric = inputs or NumericInputs()
         from personal_markets.forecasting.composition import price_composition
 
@@ -124,7 +123,6 @@ class BaselineForecastService:
             "agent_run_ids": agent_run_ids,
             "assumptions": family_price.used_assumptions,
             "feature_transforms": family_price.transforms,
-            "calibration": {"method": None, "applied": False, "reason": "no valid calibrator"},
             "raw_probability": family_price.raw_probability if priced else None,
             "calibrated_probability": None,
             "final_probability": None,
@@ -137,6 +135,18 @@ class BaselineForecastService:
             "parameter_lineage": spec.parameter_provenance or family_price.used_assumptions,
             "compiler_version": spec.compiler_version,
         }
+        from personal_markets.forecasting.selection import attach_prediction
+
+        prediction = attach_prediction(
+            goal,
+            proposal,
+            numeric,
+            priced=priced,
+            model_family=str(metadata["family"]),
+            model_version=str(metadata["version"]),
+        )
+        receipt["prediction"] = prediction
+        receipt["calibration"] = prediction["calibration"]
         return PricingResult(
             priced=priced,
             forecast_status=family_price.forecast_status,

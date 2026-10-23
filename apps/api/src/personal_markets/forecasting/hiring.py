@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.metrics import ObservationKind, observation_kind, reduce_stock_value
@@ -51,6 +51,7 @@ class HiringReferenceRates:
     weekly_application_rate: float
     recency_half_life_days: float
     recency_floor: float
+    resolved_outcome_pseudo_counts: float
     reference_id: str
     version: str
     limitations: tuple[str, ...]
@@ -69,6 +70,9 @@ def load_hiring_reference(root: Path | None = None) -> HiringReferenceRates:
         weekly_application_rate=float(defaults.get("weekly_application_rate", 2.0)),
         recency_half_life_days=float(defaults.get("recency_half_life_days", 21.0)),
         recency_floor=float(defaults.get("recency_floor", 0.65)),
+        resolved_outcome_pseudo_counts=float(
+            defaults.get("resolved_outcome_pseudo_counts", 8.0)
+        ),
         reference_id=REFERENCE_ID,
         version=str(payload.get("version") or "unknown"),
         limitations=tuple(payload.get("limitations") or []),
@@ -261,6 +265,62 @@ def funnel_state_to_numeric_inputs(
     )
 
 
+_REJECTION_STAGE = {
+    "application": "application_to_response",
+    "response": "response_to_phone_screen",
+    "phone_screen": "phone_screen_to_oa",
+    "oa": "oa_to_technical",
+    "technical": "technical_to_final",
+    "final": "final_to_offer",
+}
+_STAGE_SUCCESS_FIELD = {
+    "application_to_response": "responses",
+    "response_to_phone_screen": "phone_screens",
+    "phone_screen_to_oa": "oas",
+    "oa_to_technical": "technicals",
+    "technical_to_final": "finals",
+    "final_to_offer": "offers",
+}
+
+
+def fit_resolved_stage_rates(
+    state: HiringFunnelState, reference: HiringReferenceRates
+) -> tuple[dict[str, float], list[dict[str, Any]]]:
+    """Shrink a stage rate toward the reference using resolved passes and rejections.
+
+    In-flight applications are not failures. A stage is fit only when that stage has
+    at least one recorded rejection. Successes are the count observed at the next
+    stage, which is a different set of people from the rejections.
+    """
+    pseudo = reference.resolved_outcome_pseudo_counts
+    if pseudo <= 0:
+        raise ValueError("resolved outcome pseudo-counts must be positive")
+    overrides: dict[str, float] = {}
+    rows: list[dict[str, Any]] = []
+    for rejection_stage, stage in _REJECTION_STAGE.items():
+        failures = float(state.rejections.get(rejection_stage, 0))
+        if failures <= 0:
+            continue
+        successes = float(getattr(state, _STAGE_SUCCESS_FIELD[stage]))
+        prior = float(reference.stage_rates[stage])
+        trials = successes + failures
+        fitted = (successes + pseudo * prior) / (trials + pseudo)
+        overrides[stage] = fitted
+        rows.append(
+            {
+                "stage": stage,
+                "successes": successes,
+                "failures": failures,
+                "trials": trials,
+                "prior_rate": prior,
+                "fitted_rate": fitted,
+                "pseudo_counts": pseudo,
+                "estimator": "resolved_outcomes_shrunk_to_reference",
+            }
+        )
+    return overrides, rows
+
+
 def build_hiring_numeric_inputs(
     goal: GoalContract,
     proposal: GoalArchitectProposal | None,
@@ -273,23 +333,82 @@ def build_hiring_numeric_inputs(
         return None
     state = aggregate_funnel_from_evidence(evidence, now=now)
     state = apply_funnel_overrides(state, overrides)
+    reference = load_hiring_reference()
+    personal_rates, fits = fit_resolved_stage_rates(state, reference)
     weekly_rate = None
-    stage_rate_overrides: dict[str, float] | None = None
+    explicit_rates: dict[str, float] = {}
     if overrides:
         if "weekly_application_rate" in overrides:
             weekly_rate = float(overrides["weekly_application_rate"])
-        stage_rate_overrides = {
-            key: float(value)
-            for key, value in overrides.items()
-            if key in STAGE_CHAIN
-        } or None
-    return funnel_state_to_numeric_inputs(
+        explicit_rates = {
+            key: float(value) for key, value in overrides.items() if key in STAGE_CHAIN
+        }
+    merged_rates = {**personal_rates, **explicit_rates}
+    numeric = funnel_state_to_numeric_inputs(
         goal,
         state,
+        rates=reference,
         weekly_application_rate=weekly_rate,
-        stage_rate_overrides=stage_rate_overrides,
+        stage_rate_overrides=merged_rates or None,
         now=now,
     )
+    if numeric is None:
+        return None
+    return _annotate_hiring_prediction(
+        numeric,
+        reference=reference,
+        fits=fits,
+        explicit_rates=explicit_rates,
+        weekly_rate_is_user=weekly_rate is not None,
+    )
+
+
+def _annotate_hiring_prediction(
+    numeric: NumericInputs,
+    *,
+    reference: HiringReferenceRates,
+    fits: list[dict[str, Any]],
+    explicit_rates: dict[str, float],
+    weekly_rate_is_user: bool,
+) -> NumericInputs:
+    from personal_markets.forecasting.selection import hiring_prediction_block
+
+    offer_observed = bool(
+        (numeric.state.get("pricing_transforms") or {}).get("offer_already_received")
+    )
+    method: Literal["DETERMINISTIC", "FITTED_STATISTICAL", "REFERENCE_MODEL"]
+    if offer_observed:
+        method = "DETERMINISTIC"
+        sufficiency = "observed_success"
+    elif fits:
+        method = "FITTED_STATISTICAL"
+        sufficiency = "resolved_stage_outcomes"
+    else:
+        method = "REFERENCE_MODEL"
+        sufficiency = "reference_only"
+    fitted_stages = {row["stage"] for row in fits}
+    missing = [stage for stage in STAGE_CHAIN if stage not in fitted_stages and not offer_observed]
+    block = hiring_prediction_block(
+        method=method,
+        sufficiency=sufficiency,
+        fits=fits,
+        missing_stages=missing,
+        reference_version=reference.version,
+        pseudo_counts=reference.resolved_outcome_pseudo_counts,
+        weekly_rate_source="USER_ASSUMPTION" if weekly_rate_is_user else "REFERENCE",
+    )
+    updated_state = dict(numeric.state)
+    transforms = dict(updated_state.get("pricing_transforms") or {})
+    transforms["prediction_method"] = method
+    transforms["stage_rate_fits"] = fits
+    updated_state["pricing_transforms"] = transforms
+    updated_state["prediction"] = block
+    sources = dict(numeric.assumption_sources)
+    if method == "FITTED_STATISTICAL" and not explicit_rates:
+        sources["baseline_logits"] = "FITTED"
+    elif explicit_rates:
+        sources["baseline_logits"] = "USER_ASSUMPTION"
+    return replace(numeric, state=updated_state, assumption_sources=sources)
 
 
 def _priced_inputs(
