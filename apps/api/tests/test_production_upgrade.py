@@ -78,16 +78,15 @@ def test_non_admin_me_omits_global_hosted_budget() -> None:
         assert admin["global_remaining_usd"] is not None
 
 
-def test_plugins_catalog_keeps_manual_and_csv_when_composio_is_off() -> None:
+def test_plugins_catalog_excludes_builtin_evidence_tools_when_composio_is_off() -> None:
     app = isolated_app()
     with TestClient(app) as client:
         response = client.get("/api/v1/plugins")
         assert response.status_code == 200, response.text
         body = response.json()
         ids = {item["definition"]["id"] for item in body["items"]}
-        assert {"manual", "csv"} <= ids
+        assert not {"manual", "csv"} & ids
         assert body["provider_status"] in {"unavailable", "available", "error"}
-        assert body["items"]
 
 
 def test_connected_plugin_view_does_not_require_remote_catalog() -> None:
@@ -246,10 +245,10 @@ def test_async_agent_start_returns_then_reaches_interrupt() -> None:
             assert created.json()["status"] == "running"
 
 
-async def test_plugin_search_does_not_drop_local_integrations() -> None:
+async def test_plugin_search_does_not_advertise_builtin_evidence_as_integrations() -> None:
     from uuid import uuid4
 
     service = IntegrationGatewayService()
     catalog = await service.search_catalog(search="csv", user_id=uuid4())
     ids = {item["definition"]["id"] for item in catalog["items"]}
-    assert "csv" in ids
+    assert "csv" not in ids

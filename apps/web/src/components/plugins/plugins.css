@@ -3,3 +3,4 @@
 @media(max-width:900px){.plugins-shell{padding:42px 30px 70px}.plugin-list{grid-template-columns:1fr}.plugins-header{align-items:stretch;flex-direction:column}.plugin-search{width:100%}}
 @media(max-width:700px){.plugins-shell{padding:30px 18px 48px}.plugins-header{padding-bottom:30px;gap:20px}.plugins-header h1{font-size:40px}.installed-strip{margin-right:-18px}.plugin-main{min-height:82px}.connection-state.connected{font-size:0}.connection-state.connected svg{width:18px;height:18px}.plugin-panel{padding:22px}}
 .plugin-search:focus-within{border-color:var(--app-accent);box-shadow:0 0 0 1px var(--app-accent)}.plugin-panel{overscroll-behavior:contain}
+.plugin-search svg{flex:none}.plugin-search input{min-width:0}.plugin-search input::placeholder{color:var(--app-muted);opacity:1}

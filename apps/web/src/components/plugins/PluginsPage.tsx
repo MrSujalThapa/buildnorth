@@ -109,14 +109,16 @@ export default function PluginsPage({
                   <span>{plugin.name}</span>
                 </button>
               ))}
-            <button
-              type="button"
-              onClick={() => document.getElementById("popular-title")?.scrollIntoView()}
-              aria-label="Add a plugin"
-            >
-              <Plus size={21} />
-              <span>Add</span>
-            </button>
+            {plugins.length > connectedIds.size ? (
+              <button
+                type="button"
+                onClick={() => document.getElementById("popular-title")?.scrollIntoView()}
+                aria-label="Add a plugin"
+              >
+                <Plus size={21} />
+                <span>Add</span>
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -174,7 +176,7 @@ export default function PluginsPage({
               })}
             </div>
           ) : (
-            <p className="plugins-empty">No plugins match “{query}”.</p>
+            <p className="plugins-empty">{query.trim() ? `No plugins match “${query}”.` : "No integrations available right now."}</p>
           )}
           {canBrowse && !query.trim() ? (
             <button type="button" className="plugin-browse" onClick={onBrowse} disabled={browsing}>

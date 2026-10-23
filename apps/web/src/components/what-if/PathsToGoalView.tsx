@@ -104,7 +104,7 @@ export default function PathsToGoalView({
         {view === "simple" ? (
           <div className="paths-simple">
             <div className="paths-answer">
-              <span>Most realistic strategy</span>
+              <span>Highest modeled odds</span>
               <strong>{paths[0]?.label ?? "—"}</strong>
               <em>{paths[0]?.odds == null ? "—" : `${paths[0].odds.toFixed(0)}%`}</em>
             </div>

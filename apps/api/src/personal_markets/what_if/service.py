@@ -22,6 +22,7 @@ from personal_markets.what_if.baseline_state import (
 )
 from personal_markets.what_if.domain import (
     ActionFrontierResult,
+    Assumption,
     ContinuousSearchVariable,
     DistributionBin,
     FrontierPoint,
@@ -64,6 +65,16 @@ from personal_markets.what_if.resources import (
 )
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
+
+
+def _target_lever_label(assumption: Assumption, value: float) -> str:
+    if assumption.name == "flow" and assumption.unit == "currency/month":
+        return f"Contribute {value:,.0f} each month"
+    if assumption.name == "flow" and assumption.unit == "seconds/week":
+        return f"Change weekly pace trend to {value:,.1f} seconds"
+    if assumption.name == "weekly_application_rate":
+        return f"Submit {value:,.0f} applications each week"
+    return f"Set {assumption.name.replace('_', ' ')} to {value:.4g} {assumption.unit}"
 
 
 class WhatIfService:
@@ -1114,7 +1125,7 @@ class WhatIfService:
             span = assumption.maximum - assumption.value
             if span <= 0:
                 continue
-            for fraction, adjective in ((0.4, "Moderate"), (0.85, "Aggressive")):
+            for fraction in (0.4, 0.85):
                 value = assumption.value + span * fraction
                 change = InterventionChangeInput(
                     metric=name,
@@ -1148,18 +1159,13 @@ class WhatIfService:
                     continue
                 paths.append(
                     TargetPath(
-                        label=(
-                            f"{adjective} {assumption.name.replace('_', ' ')} "
-                            f"({value:.4g} {assumption.unit})"
-                        ),
+                        label=_target_lever_label(assumption, value),
                         action_ids=[f"lever:{name}:{fraction}"],
                         resulting_probability=priced.scenario_probability,
                         resource_cost=ResourceCost(),
                         assumptions=changed,
                         fragility_pp=priced.fragility_pp,
-                        valid_because=(
-                            "Assumption lever was re-simulated and clears the target."
-                        ),
+                        valid_because="This modeled change reached your target in simulation.",
                         model_provenance={
                             "family": "assumption_lever",
                             "version": "1.0.0",
@@ -1262,15 +1268,13 @@ class WhatIfService:
         if probability + request.probability_tolerance < request.target_probability:
             return None
         return TargetPath(
-            label=f"Set {assumption.name.replace('_', ' ')} to {best:.4g}",
+            label=_target_lever_label(assumption, best),
             action_ids=[],
             resulting_probability=probability,
             resource_cost=ResourceCost(),
             assumptions=changed,
             fragility_pp=verified.fragility_pp,
-            valid_because=(
-                "Bounded monotonic binary search converged and the result was re-simulated."
-            ),
+            valid_because="This modeled change came closest to your target in simulation.",
             model_provenance={
                 "family": "continuous_target_transition",
                 "version": "1.0.0",

@@ -1,6 +1,7 @@
 ﻿import type { Market } from "../../adapters/templateTypes";
 
 import WealthsimpleAreaChart from "./WealthsimpleAreaChart";
+import { chartPointChange, chartTrend } from "./chartTrend";
 
 type Props = {
   market: Market;
@@ -13,18 +14,10 @@ function signedPointChange(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)} pp`;
 }
 
-function age(at: number) {
-  const days = Math.floor((Date.now() - at) / 86_400_000);
-  return days < 1 ? "today" : `${days}d ago`;
-}
-
 function changeLabel(market: Market): { text: string; change: number | null } {
-  if (market.todayReturn != null) {
-    return { text: `${signedPointChange(market.todayReturn)} today`, change: market.todayReturn };
-  }
-  if (market.lastRevision) {
-    const { change, at } = market.lastRevision;
-    return { text: `${signedPointChange(change)} · ${age(at)}`, change };
+  if (!market.historyUnavailable) {
+    const change = chartPointChange(market.history);
+    if (change != null) return { text: `${signedPointChange(change)} shown`, change };
   }
   return { text: "—", change: null };
 }
@@ -61,10 +54,8 @@ export default function MarketCard({
       </div>
 
       <div
-        className={`market-card-return ${
-          movement.change == null ? "" : movement.change >= 0 ? "positive" : "negative"
-        }`}
-        title={movement.change == null ? undefined : "Change at the most recent model revision"}
+        className={`market-card-return ${market.historyUnavailable ? "neutral" : chartTrend(market.history)}`}
+        title={movement.change == null ? undefined : "Change across the displayed forecast history"}
       >
         {movement.text}
       </div>

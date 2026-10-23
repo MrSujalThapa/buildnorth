@@ -647,12 +647,13 @@
 }
 
 .market-card-return.positive {
-  color: var(--app-accent);
+  color: #188453;
 }
 
 .market-card-return.negative {
   color: #c85f3e;
 }
+.market-card-return.neutral { color: var(--app-muted); }
 
 .market-card-return.is-caption {
   color: var(--app-muted);
@@ -660,8 +661,9 @@
 }
 
 .theme-dark .market-card-return.negative {
-  color: #c48872;
+  color: #f0837c;
 }
+.theme-dark .market-card-return.positive { color: #68cfa0; }
 
 .market-card-chart {
   width: calc(100% + 48px);
