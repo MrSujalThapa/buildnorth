@@ -339,6 +339,12 @@ class LangGraphAgentWorkflow:
 
     async def _collect_evidence(self, state: AgentGraphState) -> dict[str, Any]:
         text = (state.get("evidence_text") or "").strip()
+        if not text and state.get("kind") == "create_goal" and state.get("goal_proposal"):
+            proposal = GoalArchitectProposal.model_validate(state["goal_proposal"])
+            if proposal.current_state_known:
+                # Contract confirmation covers the user's stated current facts. The
+                # evidence agent still validates and types them before any commit.
+                text = (state.get("intent") or "").strip()
         records = list(state.get("github_records") or [])
         progress = list(state.get("progress") or [])
         if (

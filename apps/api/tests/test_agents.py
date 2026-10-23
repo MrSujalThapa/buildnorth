@@ -80,6 +80,32 @@ def workflow(provider: ScriptedInferenceProvider | None = None) -> LangGraphAgen
     return LangGraphAgentWorkflow(deps, MemorySaver())
 
 
+@pytest.mark.asyncio
+async def test_goal_creation_passes_confirmed_current_state_to_evidence_agent() -> None:
+    runtime = workflow()
+    intent = "Save $10,000 by December 2027. I already have $2,000 saved."
+    proposal = make_proposal(current_state_known={"savings": "$2,000"})
+    result = await runtime._collect_evidence(
+        {"kind": "create_goal", "intent": intent, "goal_proposal": proposal.model_dump()}
+    )
+    assert result["evidence_text"] == intent
+    assert runtime._after_collect_evidence(result) == "normalize_evidence"
+
+
+@pytest.mark.asyncio
+async def test_goal_creation_does_not_treat_target_alone_as_evidence() -> None:
+    runtime = workflow()
+    result = await runtime._collect_evidence(
+        {
+            "kind": "create_goal",
+            "intent": "Save $10,000 by December 2027.",
+            "goal_proposal": make_proposal().model_dump(),
+        }
+    )
+    assert result["evidence_text"] == ""
+    assert runtime._after_collect_evidence(result) == "decide_research"
+
+
 def test_strict_schema_sets_additional_properties_false() -> None:
     schema = strict_json_schema(GoalArchitectProposal)
     assert schema["additionalProperties"] is False
