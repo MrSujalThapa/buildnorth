@@ -69,7 +69,9 @@ Checks against a throwaway Postgres 17 on `127.0.0.1:54329` (migrations `0001`�
 | `seed-demo` on the throwaway database | idempotent second run, 5 demo goals |
 | `evaluate_openai_baseline.py` | exit 2, `not_executed`, 0 predictions. This machine stopped on a missing frozen OULAD artifact. It did not call a model. |
 
-ChatGPT Chat, ChatGPT Work, and Grok Bot remain **NOT TESTED**. A passing local suite does not change that. GitHub CI for this fix is recorded after the run finishes.
+ChatGPT Chat, ChatGPT Work, and Grok Bot remain **NOT TESTED**. A passing local suite does not change that.
+
+GitHub Actions run [40021460499](https://github.com/MrSujalThapa/buildnorth/actions/runs/40021460499) on `74c0077` completed with conclusion **success**. That run is the CI check for this mypy fix. Pull request #18 stays a draft.
 
 ## Client capability
 
@@ -94,6 +96,8 @@ None on the open remediation PR #17 or on the stashed Codex working tree (`feat/
 ## Commits and PR
 
 - `6438320` — Let personal agents read forecast readiness and published odds history.
+- `03a8009` — Record the Pass 06 draft PR on the result report.
+- `74c0077` — Give mypy a real direction type and a narrowed milestone config. CI run 40021460499 succeeded on this commit.
 - Draft PR: https://github.com/MrSujalThapa/buildnorth/pull/18
 - Not merged. Not deployed.
 

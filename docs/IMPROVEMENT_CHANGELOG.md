@@ -8,7 +8,7 @@ This file is both an engineering log and a hackathon deliverable.
 
 **Changes:** `direction_for` returns `Literal["increase", "drop"]`. Milestone config is narrowed with `isinstance` before `.get`. No baseline edit. No production deploy.
 
-**Measured result:** Throwaway Postgres 17, migrations `0001`–`0022`. Pytest **655 passed, 2 skipped**. Vitest **105 passed**. Ruff baseline clean of new findings. Web `tsc` and production build clean. Architecture and migration checks passed. OpenAI baseline script exited 2 with `not_executed` and 0 predictions. ChatGPT Chat, ChatGPT Work, and Grok Bot remain **NOT TESTED**.
+**Measured result:** Throwaway Postgres 17, migrations `0001`–`0022`. Pytest **655 passed, 2 skipped**. Vitest **105 passed**. Ruff baseline clean of new findings. Web `tsc` and production build clean. Architecture and migration checks passed. OpenAI baseline script exited 2 with `not_executed` and 0 predictions. GitHub Actions run `40021460499` on `74c0077` **succeeded**. ChatGPT Chat, ChatGPT Work, and Grok Bot remain **NOT TESTED**.
 
 ## 2026-10-23 — Pass 06 personal-agent reads on the existing MCP server
 
