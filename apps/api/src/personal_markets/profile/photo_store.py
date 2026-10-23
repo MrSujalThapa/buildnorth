@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.core.config import get_settings
-from personal_markets.persistence.database import create_engine, transaction
+from personal_markets.persistence.database import autocommit_connection, create_engine, transaction
 
 
 class InMemoryPhotoStore:
@@ -31,7 +31,7 @@ class PostgresPhotoStore:
         self._engine = engine
 
     async def get(self, user_id: UUID) -> bytes | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             return (await connection.execute(
                 text("select content from profile_photos where user_id = :user_id"),
                 {"user_id": user_id},

@@ -29,7 +29,7 @@ async def test_upsert_returns_entitlement_in_one_database_round_trip(monkeypatch
     async def one_connection(_engine):
         yield connection
 
-    monkeypatch.setattr("personal_markets.identity.store.transaction", one_connection)
+    monkeypatch.setattr("personal_markets.identity.store.autocommit_connection", one_connection)
     repository = PostgresIdentityRepository(MagicMock())
     stored = await repository.upsert_user(principal)
 

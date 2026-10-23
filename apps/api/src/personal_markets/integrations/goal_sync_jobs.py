@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.core.config import get_settings
-from personal_markets.persistence.database import create_engine, transaction
+from personal_markets.persistence.database import autocommit_connection, create_engine, transaction
 
 JOB_DEADLINE = timedelta(minutes=4)
 ACTIVE = {"queued", "fetching_sources", "processing_evidence", "updating_forecast"}
@@ -189,7 +189,7 @@ class PostgresGoalSyncJobStore:
             return self._row(existing)
 
     async def latest(self, owner_id: UUID, goal_id: UUID) -> GoalSyncJob | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -206,7 +206,7 @@ class PostgresGoalSyncJobStore:
             return self._row(row) if row else None
 
     async def get(self, owner_id: UUID, goal_id: UUID, job_id: UUID) -> GoalSyncJob | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(

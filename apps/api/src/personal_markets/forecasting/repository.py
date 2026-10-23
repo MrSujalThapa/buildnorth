@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.goals.domain import GoalContract
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.ports import CriticArtifact, PricingResult
 
 
@@ -122,7 +122,7 @@ class PostgresBaselineForecastRepository:
         return self._memory.history(goal_id)
 
     async def load_history(self, goal_id: UUID) -> list[PublishedBaseline]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(

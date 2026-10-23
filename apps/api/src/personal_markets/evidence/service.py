@@ -20,6 +20,9 @@ class EvidenceService:
     async def list_for_goal(self, goal_id: UUID) -> list[NormalizedEvidence]:
         return await self._repository.list_for_goal(goal_id)
 
+    async def list_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[NormalizedEvidence]]:
+        return await self._repository.list_for_goals(goal_ids)
+
     async def watch_goal(self, goal_id: UUID) -> None:
         track = getattr(self._repository, "track_goal", None)
         if callable(track):

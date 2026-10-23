@@ -20,7 +20,7 @@ from personal_markets.integrations.mcp_domain import (
     SyncRecipeStep,
     SyncRunRecord,
 )
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 
 class InMemoryIntegrationRepository:
@@ -162,7 +162,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         )
 
     async def get_connection(self, user_id: UUID, plugin_id: str) -> PluginConnectionRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -178,7 +178,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         return self._row_to_connection(dict(row)) if row else None
 
     async def list_connections(self, user_id: UUID) -> list[PluginConnectionRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("select * from plugin_connections where user_id = :user_id"),
@@ -222,7 +222,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         return rows
 
     async def list_capabilities(self, connection_id: UUID) -> list[ReadCapabilityRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -266,7 +266,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         return recipe
 
     async def get_recipe(self, connection_id: UUID) -> SyncRecipeRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -290,7 +290,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         )
 
     async def get_cursor(self, connection_id: UUID, capability_id: str) -> SyncCursorRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -400,7 +400,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
                     text(f"update plugin_connections set {', '.join(sets)} where id = :id"),
                     params,
                 )
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -500,7 +500,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
     ) -> list[RawSourceRecord]:
         if not job_ids:
             return []
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("""
@@ -572,7 +572,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         return recipe
 
     async def list_goal_recipes(self, goal_id: UUID) -> list[GoalSyncRecipeRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("select * from goal_sync_recipes where goal_id = :goal_id order by updated_at desc"),
@@ -600,7 +600,7 @@ class PostgresIntegrationRepository(InMemoryIntegrationRepository):
         return recipes
 
     async def get_goal_recipe(self, goal_id: UUID, plugin_id: str) -> GoalSyncRecipeRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(

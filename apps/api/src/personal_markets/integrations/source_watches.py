@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.core.config import get_settings
 from personal_markets.integrations.goal_sync_jobs import get_goal_sync_job_store
-from personal_markets.persistence.database import create_engine, transaction
+from personal_markets.persistence.database import autocommit_connection, create_engine, transaction
 
 
 class SourceWatch(BaseModel):
@@ -165,7 +165,7 @@ class PostgresSourceWatchStore:
             return SourceWatch.model_validate(dict(row))
 
     async def list_for_goal(self, owner_id: UUID, goal_id: UUID) -> list[SourceWatch]:
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             rows = (
                 (
                     await conn.execute(
@@ -182,7 +182,7 @@ class PostgresSourceWatchStore:
             return [SourceWatch.model_validate(dict(row)) for row in rows]
 
     async def active_resource_uris(self, owner_id: UUID, goal_id: UUID) -> set[str]:
-        async with self._engine.connect() as conn:
+        async with autocommit_connection(self._engine) as conn:
             rows = (
                 (
                     await conn.execute(

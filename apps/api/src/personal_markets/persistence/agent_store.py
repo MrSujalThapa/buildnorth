@@ -9,7 +9,7 @@ from personal_markets.agents.budget import InMemoryUsageStore
 from personal_markets.core.config import get_settings
 from personal_markets.evidence.domain import NormalizedEvidence, SubmissionContext
 from personal_markets.evidence.mapping import proposal_to_normalized, with_corroboration
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.ports import EvidenceEventProposal, WorkflowSnapshot
 
 
@@ -36,6 +36,9 @@ class InMemoryEvidenceRepository:
         return [
             self._events[item] for item in self._goal_links.get(goal_id, []) if item in self._events
         ]
+
+    async def list_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[NormalizedEvidence]]:
+        return {goal_id: await self.list_for_goal(goal_id) for goal_id in goal_ids}
 
     async def find_fingerprint(self, user_id: UUID, fingerprint: str) -> NormalizedEvidence | None:
         evidence_id = self._by_fingerprint.get((user_id, fingerprint))
@@ -140,7 +143,7 @@ class PostgresUsageStore:
             )
 
     async def totals(self, usage_date: date) -> dict[str, dict[str, int | float]]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("""
@@ -166,14 +169,14 @@ class PostgresEvidenceRepository:
         self._engine = engine
 
     async def goal_exists(self, goal_id: UUID) -> bool:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             value = await connection.scalar(
                 text("select 1 from goals where id = :id"), {"id": goal_id}
             )
         return value is not None
 
     async def list_for_goal(self, goal_id: UUID) -> list[NormalizedEvidence]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("""
@@ -187,6 +190,27 @@ class PostgresEvidenceRepository:
             ).mappings()
         return [self._to_domain(dict(row)) for row in rows]
 
+    async def list_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[NormalizedEvidence]]:
+        grouped: dict[UUID, list[NormalizedEvidence]] = {goal_id: [] for goal_id in goal_ids}
+        if not goal_ids:
+            return grouped
+        async with autocommit_connection(self._engine) as connection:
+            rows = (
+                await connection.execute(
+                    text("""
+                    select g.goal_id as linked_goal_id, e.* from evidence_events e
+                    join goal_evidence g on g.evidence_id = e.id
+                    where g.goal_id = any(:goal_ids)
+                    order by e.created_at
+                    """),
+                    {"goal_ids": goal_ids},
+                )
+            ).mappings()
+            for row in rows:
+                record = dict(row)
+                grouped[record.pop("linked_goal_id")].append(self._to_domain(record))
+        return grouped
+
     async def link_goal(self, goal_id: UUID, evidence_id: UUID) -> None:
         async with transaction(self._engine) as connection:
             await connection.execute(
@@ -199,7 +223,7 @@ class PostgresEvidenceRepository:
             )
 
     async def find_fingerprint(self, user_id: UUID, fingerprint: str) -> NormalizedEvidence | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -356,7 +380,7 @@ class PostgresThreadStore:
             )
 
     async def get(self, thread_id: UUID) -> WorkflowSnapshot | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -450,7 +474,7 @@ class PostgresAgentRunStore:
             )
 
     async def list_for_thread(self, thread_id: UUID) -> list[dict[str, Any]]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -492,7 +516,7 @@ class PostgresGithubCursorStore:
         self._engine = engine
 
     async def get(self, user_id: UUID, login: str) -> str | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             value = await connection.scalar(
                 text(
                     "select cursor from github_sync_cursors where user_id = :user_id and login = :login"

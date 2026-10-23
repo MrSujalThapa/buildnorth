@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 TokenKind = Literal["access", "refresh"]
 SubmissionStatus = Literal["pending", "committed", "failed"]
@@ -334,7 +334,7 @@ class PostgresRemoteMcpStore:
             )
 
     async def get_client(self, client_id: str) -> ClientRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -361,7 +361,7 @@ class PostgresRemoteMcpStore:
         )
 
     async def count_registrations(self, ip_hash: str, since: datetime) -> int:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             value = await connection.scalar(
                 text(
                     "select count(*) from remote_mcp_oauth_clients "
@@ -414,7 +414,7 @@ class PostgresRemoteMcpStore:
         )
 
     async def get_request(self, request_id: str) -> AuthorizationRequestRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -474,7 +474,7 @@ class PostgresRemoteMcpStore:
             )
 
     async def get_code(self, code_hash: str) -> CodeRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -555,7 +555,7 @@ class PostgresRemoteMcpStore:
         )
 
     async def get_connection(self, connection_id: UUID) -> ConnectionRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -569,7 +569,7 @@ class PostgresRemoteMcpStore:
         return self._connection(row) if row else None
 
     async def list_connections(self, user_id: UUID) -> list[ConnectionRecord]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -644,7 +644,7 @@ class PostgresRemoteMcpStore:
             )
 
     async def get_token(self, token_hash: str) -> TokenRecord | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(

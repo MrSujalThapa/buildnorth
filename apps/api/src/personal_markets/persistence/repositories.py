@@ -9,10 +9,10 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from personal_markets.evidence.mapping import proposal_to_normalized
 from personal_markets.evidence.domain import metadata_for
+from personal_markets.evidence.mapping import proposal_to_normalized
 from personal_markets.goals.domain import GoalContract
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.ports import EvidenceEventProposal
 
 
@@ -21,7 +21,7 @@ class PostgresGoalRepository:
         self._engine = engine
 
     async def list(self) -> list[GoalContract]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text("select * from goals where status = 'active' order by title")
@@ -30,7 +30,7 @@ class PostgresGoalRepository:
             return [self._to_domain(dict(row)) for row in rows]
 
     async def list_for_user(self, user_id: UUID) -> list[GoalContract]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -43,7 +43,7 @@ class PostgresGoalRepository:
             return [self._to_domain(dict(row)) for row in rows]
 
     async def get(self, goal_id: UUID) -> GoalContract | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -57,7 +57,7 @@ class PostgresGoalRepository:
             return self._to_domain(dict(row)) if row else None
 
     async def get_for_user(self, goal_id: UUID, user_id: UUID) -> GoalContract | None:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(
@@ -147,7 +147,7 @@ class PostgresGoalRepository:
             )
         if not result.rowcount:
             return None
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             row = (
                 (
                     await connection.execute(

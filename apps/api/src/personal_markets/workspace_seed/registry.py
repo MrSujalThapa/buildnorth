@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 from personal_markets.workspace_seed.fixtures import SEED_VERSION
 
 
@@ -27,7 +27,7 @@ class PostgresSeedRegistry:
         self._engine = engine
 
     async def list(self, owner_id: UUID) -> list[tuple[str, UUID]]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(

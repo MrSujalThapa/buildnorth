@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from personal_markets.persistence.database import transaction
+from personal_markets.persistence.database import autocommit_connection, transaction
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,7 +194,7 @@ class PostgresSimulationRepository:
         )
 
     async def history(self, goal_id: UUID) -> list[MarketHistoryPoint]:
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -209,7 +209,7 @@ class PostgresSimulationRepository:
     async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[MarketHistoryPoint]]:
         if not goal_ids:
             return {}
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
@@ -241,7 +241,7 @@ class PostgresSimulationRepository:
                 "order by created_at desc limit :limit"
             )
             params = {"id": goal_id, "run_kind": run_kind, "limit": limit}
-        async with self._engine.connect() as connection:
+        async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(text(query), params)
             ).mappings()
