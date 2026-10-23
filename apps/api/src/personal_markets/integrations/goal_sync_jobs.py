@@ -79,10 +79,14 @@ class InMemoryGoalSyncJobStore:
         job = self._jobs.get(job_id)
         return job if job and job.owner_id == owner_id and job.goal_id == goal_id else None
 
-    async def claim(self) -> GoalSyncJob | None:
+    async def claim(self, *, include_watches: bool = False) -> GoalSyncJob | None:
         async with self._lock:
             queued = sorted(
-                (job for job in self._jobs.values() if job.status == "queued"),
+                (
+                    job for job in self._jobs.values()
+                    if job.status == "queued"
+                    and (include_watches or job.receipt.get("origin") != "watch")
+                ),
                 key=lambda job: job.created_at,
             )
             if not queued:
@@ -222,7 +226,7 @@ class PostgresGoalSyncJobStore:
             )
             return self._row(row) if row else None
 
-    async def claim(self) -> GoalSyncJob | None:
+    async def claim(self, *, include_watches: bool = False) -> GoalSyncJob | None:
         async with transaction(self._engine) as connection:
             row = (
                 (
@@ -230,12 +234,13 @@ class PostgresGoalSyncJobStore:
                         text("""
                 with next_job as (
                   select id from goal_sync_jobs where status = 'queued'
+                    and (:include_watches or receipt->>'origin' is distinct from 'watch')
                   order by created_at for update skip locked limit 1
                 )
                 update goal_sync_jobs set status = 'fetching_sources',
                   started_at = now(), updated_at = now()
                 where id in (select id from next_job) returning *
-            """)
+            """), {"include_watches": include_watches}
                     )
                 )
                 .mappings()

@@ -34,7 +34,7 @@ async def run_once(max_jobs: int = 1) -> None:
         await jobs.expire_stranded()
         processed = 0
         while processed < max_jobs:
-            job = await jobs.claim()
+            job = await jobs.claim(include_watches=True)
             if job is None:
                 break
             await execute_goal_sync_job(app, job)

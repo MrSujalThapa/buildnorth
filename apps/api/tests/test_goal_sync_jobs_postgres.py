@@ -55,6 +55,10 @@ async def test_postgres_goal_sync_job_claim_dedupe_and_owner_scope() -> None:
         second = await store.enqueue(owner, goal_id)
         assert second.id != first.id
         assert (await store.latest(owner, goal_id)).id == second.id
+        await store.update(second.id, receipt={"origin": "watch"})
+        assert await store.claim() is None
+        watched = await store.claim(include_watches=True)
+        assert watched is not None and watched.id == second.id
     finally:
         if migrated:
             async with engine.begin() as connection:

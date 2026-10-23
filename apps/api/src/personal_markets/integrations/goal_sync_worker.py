@@ -123,12 +123,8 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
 
 async def goal_sync_worker(application: Any, stop: asyncio.Event) -> None:
     store = get_goal_sync_job_store()
-    last_watch_check = 0.0
     while not stop.is_set():
         try:
-            if asyncio.get_running_loop().time() - last_watch_check >= 60:
-                await get_source_watch_store().enqueue_due()
-                last_watch_check = asyncio.get_running_loop().time()
             await store.expire_stranded()
             job = await store.claim()
             if job is None:
