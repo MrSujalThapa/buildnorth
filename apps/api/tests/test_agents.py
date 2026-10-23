@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -15,7 +16,7 @@ from personal_markets.agents.graph import LangGraphAgentWorkflow
 from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.pricing import needs_research, price_goal
 from personal_markets.agents.retries import classify_provider_error
-from personal_markets.agents.state import AgentDependencies, complete_agent, redact
+from personal_markets.agents.state import AgentDependencies, AgentGraphState, complete_agent, redact
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import (
     PermanentProviderError,
@@ -89,7 +90,7 @@ async def test_goal_creation_passes_confirmed_current_state_to_evidence_agent() 
         {"kind": "create_goal", "intent": intent, "goal_proposal": proposal.model_dump()}
     )
     assert result["evidence_text"] == intent
-    assert runtime._after_collect_evidence(result) == "normalize_evidence"
+    assert runtime._after_collect_evidence(cast(AgentGraphState, result)) == "normalize_evidence"
 
 
 @pytest.mark.asyncio
@@ -103,7 +104,7 @@ async def test_goal_creation_does_not_treat_target_alone_as_evidence() -> None:
         }
     )
     assert result["evidence_text"] == ""
-    assert runtime._after_collect_evidence(result) == "decide_research"
+    assert runtime._after_collect_evidence(cast(AgentGraphState, result)) == "decide_research"
 
 
 def test_strict_schema_sets_additional_properties_false() -> None:
