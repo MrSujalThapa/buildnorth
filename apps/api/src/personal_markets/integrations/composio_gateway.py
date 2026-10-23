@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -11,6 +12,30 @@ from personal_markets.integrations.mcp_domain import MCPResourceDescriptor, MCPT
 
 _TOOLKIT_CACHE_TTL_SECONDS = 600.0
 _toolkit_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+
+def _resource_title_part(part: dict[str, Any], toolkit_slug: str) -> str:
+    """Render a date mention as a readable title without changing ordinary text."""
+    mention = part.get("mention")
+    if (
+        toolkit_slug == "notion"
+        and part.get("type") == "mention"
+        and isinstance(mention, dict)
+        and mention.get("type") == "date"
+    ):
+        date = mention.get("date")
+        start = date.get("start") if isinstance(date, dict) else None
+        if isinstance(date, dict) and isinstance(start, str) and date.get("end") is None:
+            try:
+                value = datetime.fromisoformat(start)
+            except ValueError:
+                pass
+            else:
+                label = f"@{value.strftime('%B')} {value.day}, {value.year}"
+                if "T" in start:
+                    label += f" {value.strftime('%I:%M %p').lstrip('0')}"
+                return label
+    return str(part.get("plain_text") or (part.get("text") or {}).get("content") or "")
 
 
 @dataclass(frozen=True)
@@ -391,14 +416,14 @@ class ComposioIntegrationGateway:
             title = row.get("title")
             if isinstance(title, list):
                 title = "".join(
-                    str(part.get("plain_text") or (part.get("text") or {}).get("content") or "")
+                    _resource_title_part(part, toolkit_slug)
                     for part in title if isinstance(part, dict)
                 )
             if not title and isinstance(row.get("properties"), dict):
                 for prop in row["properties"].values():
                     if isinstance(prop, dict) and prop.get("type") == "title":
                         title = "".join(
-                            str(part.get("plain_text") or (part.get("text") or {}).get("content") or "")
+                            _resource_title_part(part, toolkit_slug)
                             for part in prop.get("title", []) if isinstance(part, dict)
                         )
                         break

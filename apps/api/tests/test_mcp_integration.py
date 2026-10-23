@@ -572,6 +572,49 @@ async def test_notion_picker_omits_untitled_id_only_results() -> None:
 
 
 @pytest.mark.asyncio
+async def test_notion_picker_renders_date_mentions_without_rewriting_text_titles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typing import Any
+    from uuid import UUID, uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+
+    async def execute(
+        _user_id: UUID,
+        _tool_name: str,
+        _arguments: dict[str, Any],
+        *,
+        connected_account_id: str | None = None,
+    ) -> dict[str, Any]:
+        del connected_account_id
+        return {"results": [
+            {
+                "id": "34faf8d1-37de-80e1-ae62-e4f9434fbc0f",
+                "title": [{
+                    "type": "mention", "plain_text": "2026-04-27T16:15:00.000-04:00",
+                    "mention": {"type": "date", "date": {"start": "2026-04-27T16:15:00.000-04:00"}},
+                }],
+            },
+            {
+                "id": "34faf8d1-37de-80e1-ae62-e4f9434fbc10",
+                "title": [{"type": "text", "plain_text": "2026-04-27T16:15:00.000-04:00"}],
+            },
+        ]}
+
+    monkeypatch.setattr(gateway, "execute_tool", execute)
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == [
+        "@April 27, 2026 4:15 PM",
+        "2026-04-27T16:15:00.000-04:00",
+    ]
+    assert resources[0].metadata["provider_id"] == "34faf8d1-37de-80e1-ae62-e4f9434fbc0f"
+
+
+@pytest.mark.asyncio
 async def test_connected_notion_is_visible_without_catalog_page_containing_it() -> None:
     from datetime import UTC, datetime
     from uuid import uuid4
