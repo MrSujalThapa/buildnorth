@@ -28,10 +28,10 @@ type Props = {
 type SourceBucket = "recommended" | "connected" | "other";
 const monitoringEnabled = import.meta.env.VITE_BACKGROUND_MONITORING === "true";
 
-function singleResourceId(recipe: SourceRecipeRecord): string | null {
+export function watchedResourceIds(recipe: SourceRecipeRecord): string[] {
   const prefix = `composio://${recipe.plugin_id}/`;
   const uris = [...new Set(recipe.steps.map((step) => step.resource_uri).filter((uri) => uri?.startsWith(prefix)))];
-  return uris.length === 1 ? uris[0]!.slice(prefix.length) : null;
+  return uris.map((uri) => uri!.slice(prefix.length));
 }
 
 type SourceCardModel = {
@@ -144,17 +144,19 @@ export function EvidenceSourceWorkspace({
     queryFn: ({ signal }) => api.sourceWatches(goalId, signal),
     enabled: Boolean(goalId) && monitoringEnabled,
   });
-  const saveWatch = useMutation({
-    mutationFn: ({ recipe, resourceId }: { recipe: SourceRecipeRecord; resourceId: string }) =>
-      api.saveSourceWatch(goalId, {
+  const updateWatches = useMutation({
+    mutationFn: ({ recipe, resourceIds = [], selected = [], status }: {
+      recipe: SourceRecipeRecord;
+      resourceIds?: string[];
+      selected?: SourceWatchRecord[];
+      status: "active" | "paused" | "revoked";
+    }) => Promise.all([
+      ...resourceIds.map((resourceId) => api.saveSourceWatch(goalId, {
         plugin_id: recipe.plugin_id, resource_id: resourceId,
         scope: recipe.plugin_id === "notion" ? "parent" : "resource",
-      }),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["evidence-source-watches", goalId] }); },
-  });
-  const changeWatch = useMutation({
-    mutationFn: ({ watch, status }: { watch: SourceWatchRecord; status: "active" | "paused" | "revoked" }) =>
-      api.updateSourceWatch(goalId, watch.id, status),
+      })),
+      ...selected.map((watch) => api.updateSourceWatch(goalId, watch.id, status)),
+    ]),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["evidence-source-watches", goalId] }); },
   });
   const syncJob = useQuery({
@@ -371,18 +373,25 @@ export function EvidenceSourceWorkspace({
                 {savedRecipes.map((recipe: SourceRecipeRecord) => (
                   <li key={`${recipe.plugin_id}-${recipe.label}`} className={monitoringEnabled ? "watchable" : undefined}>
                     <span>{recipe.label}{plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin)) ? " · Reconnect source" : ""}</span>
-                    {monitoringEnabled && singleResourceId(recipe) ? (() => {
-                      const resourceId = singleResourceId(recipe)!;
-                      const watch = watches.data?.find((item) => item.plugin_id === recipe.plugin_id && item.resource_id === resourceId);
+                    {monitoringEnabled && watchedResourceIds(recipe).length ? (() => {
+                      const resourceIds = watchedResourceIds(recipe);
+                      const selected = resourceIds.map((resourceId) => watches.data?.find((item) => item.plugin_id === recipe.plugin_id && item.resource_id === resourceId));
+                      const active = selected.filter((watch) => watch?.status === "active") as SourceWatchRecord[];
+                      const paused = selected.filter((watch) => watch?.status === "paused") as SourceWatchRecord[];
+                      const revoked = selected.filter((watch) => watch?.status === "revoked") as SourceWatchRecord[];
+                      const existing = selected.filter((watch): watch is SourceWatchRecord => Boolean(watch));
                       const disconnected = plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin));
                       return <span className="evidence-watch-actions">
-                        {watch?.last_error && watch.status === "active" ? <span role="status" className="evidence-watch-error">Check failed · {watch.last_error}</span> : null}
-                        {watch?.status === "revoked" ? <span className="evidence-watch-state">Stopped</span> : null}
-                        <button type="button" disabled={Boolean(disconnected) || saveWatch.isPending || changeWatch.isPending} onClick={() => {
-                          if (!watch || watch.status === "revoked") saveWatch.mutate({ recipe, resourceId });
-                          else changeWatch.mutate({ watch, status: watch.status === "active" ? "paused" : "active" });
-                        }}>{watch?.status === "active" ? "Pause" : watch?.status === "paused" ? "Resume" : watch?.status === "revoked" ? "Restart" : recipe.plugin_id === "notion" ? "Watch area" : "Monitor"}</button>
-                        {watch && watch.status !== "revoked" ? <button type="button" disabled={changeWatch.isPending} onClick={() => changeWatch.mutate({ watch, status: "revoked" })}>Stop</button> : null}
+                        {active.some((watch) => watch.last_error) ? <span role="status" className="evidence-watch-error">Monitoring needs attention</span> : null}
+                        {active.length ? <span className="evidence-watch-state">Monitoring {active.length} of {resourceIds.length}</span> : null}
+                        <button type="button" disabled={Boolean(disconnected) || updateWatches.isPending} onClick={() => {
+                          if (active.length === resourceIds.length) updateWatches.mutate({ recipe, selected: active, status: "paused" });
+                          else {
+                            const missing = resourceIds.filter((resourceId) => !selected.some((watch) => watch?.resource_id === resourceId && watch.status !== "revoked"));
+                            updateWatches.mutate({ recipe, resourceIds: missing, selected: paused, status: "active" });
+                          }
+                        }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : revoked.length === resourceIds.length ? "Restart" : recipe.plugin_id === "notion" ? `Watch ${resourceIds.length === 1 ? "area" : `${resourceIds.length} areas`}` : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
+                        {existing.some((watch) => watch.status !== "revoked") ? <button type="button" disabled={updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, selected: existing.filter((watch) => watch.status !== "revoked"), status: "revoked" })}>Stop</button> : null}
                       </span>;
                     })() : null}
                   </li>
@@ -410,7 +419,7 @@ export function EvidenceSourceWorkspace({
             : syncJob.data.error ?? "Sync failed. Try again."
         }</p> : null}
         {saveRecipe.isError ? <p className="field-hint" role="alert">Could not save source: {String(saveRecipe.error)}</p> : null}
-        {saveWatch.isError || changeWatch.isError ? <p className="field-hint" role="alert">Could not update monitoring. Check source access and try again.</p> : null}
+        {updateWatches.isError ? <p className="field-hint" role="alert">Could not update monitoring. Check source access and try again.</p> : null}
         {syncSources.isError ? <p className="field-hint" role="alert">Sync failed: {String(syncSources.error)}</p> : null}
 
         <AgentProgress snapshot={snapshot} />
