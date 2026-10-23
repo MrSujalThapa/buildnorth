@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -28,6 +29,8 @@ from personal_markets.ports import (
     SourceRecommendation,
     SourceResourceSelection,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SourcePlannerService:
@@ -63,7 +66,11 @@ class SourcePlannerService:
                 async def resources_or_empty() -> list[dict]:
                     try:
                         return await self._gateway.list_resources(plugin_id)
-                    except Exception:
+                    except Exception as error:
+                        logger.warning(
+                            "source_resource_discovery_failed plugin_id=%s error_type=%s",
+                            plugin_id, type(error).__name__,
+                        )
                         return []
 
                 return await asyncio.gather(
@@ -135,9 +142,10 @@ class SourcePlannerService:
                 }
             )
         goal_payload = goal.model_dump(mode="json")
-        if any(item["recommended"] for item in rank_resources(available_resources, goal_payload)):
-            # Metadata proposes a watch candidate; the later evidence pipeline
-            # still validates content before committing any observation.
+        if connected_ids:
+            # Rank only resources discovered within the authorized connection.
+            # A weak title match is not evidence, and does not justify a paid
+            # inference request just to display source choices.
             return self._attach_ranked_resources(
                 SourcePlannerProposal(
                     goal_title=goal.title,

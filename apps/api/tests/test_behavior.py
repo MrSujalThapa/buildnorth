@@ -160,6 +160,26 @@ def test_resource_ranker_uses_metadata_not_provider_map() -> None:
     assert running[0]["label"] == "Running journal"
 
 
+def test_resource_title_match_survives_long_goal_contract() -> None:
+    ranked = rank_resources(
+        [{
+            "plugin_id": "notion", "id": "reports", "label": "Book Reports",
+            "resource_type": "page",
+        }],
+        {
+            "title": "Read 20 books by end of 2026",
+            "goal_type": "continuous_target",
+            "state_dimensions": ["books_read", "reading_minutes"],
+            "success_definition": {
+                "metric": "books_read", "target": 20,
+                "cadence": "weekly reading practice", "deadline": "December 31",
+            },
+        },
+    )
+    assert ranked[0]["recommended"] is True
+    assert ranked[0]["plugin_id"] == "notion"
+
+
 def _assumptions(execution: float = 0.72) -> list[Assumption]:
     values = {
         "flow": (5, -10, 20, "units/period"),

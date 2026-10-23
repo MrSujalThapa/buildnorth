@@ -133,6 +133,7 @@ export function EvidenceSourceWorkspace({
     queryKey: ["evidence-source-plan", goalId],
     queryFn: ({ signal }) => api.evidenceSourcePlan(goalId, signal),
     enabled: Boolean(goalId) && planRequested,
+    retry: false,
   });
   const recipes = useQuery({
     queryKey: ["evidence-source-recipes", goalId],
@@ -275,6 +276,9 @@ export function EvidenceSourceWorkspace({
         </div>
         {sourcePlan.isError ? (
           <p className="field-hint" role="alert">Suggestions are unavailable. Connected sources still work.</p>
+        ) : null}
+        {planRequested && sourcePlan.isSuccess && !sourcePlan.data.recommended.length ? (
+          <p className="field-hint" role="status">No suggested sources yet. Choose an authorized source below.</p>
         ) : null}
 
         {sections.map((section) => {
