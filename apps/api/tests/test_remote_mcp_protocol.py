@@ -7,6 +7,8 @@ from remote_mcp_support import API, MCP_URL, McpHarness, structured
 EXPECTED_TOOLS = {
     "list_goals",
     "get_goal",
+    "get_forecast_readiness",
+    "list_milestones",
     "get_forecast",
     "get_forecast_history",
     "get_evidence_summary",

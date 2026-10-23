@@ -12,7 +12,18 @@ from uuid import UUID
 
 from personal_markets.forecasting.repository import PublishedBaseline
 
-RelativeAsOf = Literal["latest", "previous", "last_week", "before_evidence"]
+# Rolling window, not a calendar month, so the bound does not depend on the day of month.
+MONTH_WINDOW_DAYS = 30
+
+RelativeAsOf = Literal[
+    "latest",
+    "previous",
+    "last_week",
+    "this_month",
+    "since_start",
+    "before_evidence",
+]
+MoveDirection = Literal["increase", "drop"]
 
 
 def parse_when(value: str | None) -> datetime | None:
@@ -70,8 +81,15 @@ def select_as_of(
         return ordered[-2], ""
 
     bound = as_of
+    if relative == "since_start":
+        dated = [item for item in ordered if publication_time(item) is not None]
+        if not dated:
+            return None, "No forecast has a publication time."
+        return dated[0], ""
     if relative == "last_week":
         bound = now - timedelta(days=7)
+    elif relative == "this_month":
+        bound = now - timedelta(days=MONTH_WINDOW_DAYS)
     elif relative == "before_evidence":
         if evidence_observed_at is None:
             raise ValueError(
@@ -101,6 +119,61 @@ def select_as_of(
 def delta_pp(later: float, earlier: float) -> float:
     """Signed change in percentage points, not a relative percent."""
     return (later - earlier) * 100.0
+
+
+def largest_consecutive_move(
+    history: list[PublishedBaseline], *, direction: MoveDirection
+) -> tuple[PublishedBaseline, PublishedBaseline] | None:
+    """Largest step between two successive published receipts.
+
+    Ties keep the later pair. Flat steps are not a move. Nothing is interpolated.
+    """
+    ordered = sort_history(history)
+    best: tuple[PublishedBaseline, PublishedBaseline] | None = None
+    best_magnitude = -1.0
+    for earlier, later in zip(ordered, ordered[1:], strict=False):
+        delta = delta_pp(later.probability, earlier.probability)
+        if direction == "increase" and delta <= 0:
+            continue
+        if direction == "drop" and delta >= 0:
+            continue
+        magnitude = abs(delta)
+        if magnitude >= best_magnitude:
+            best = (earlier, later)
+            best_magnitude = magnitude
+    return best
+
+
+def _aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
+def evidence_observed_in_window(
+    stamps: list[dict[str, Any]],
+    *,
+    after: datetime | None,
+    until: datetime | None,
+) -> list[dict[str, Any]]:
+    """Evidence whose observation time falls strictly after `after` and at or before `until`.
+
+    Rows without `observed_at` are omitted. Ingestion time is never used as the event time.
+    """
+    lower = _aware(after) if after is not None else None
+    upper = _aware(until) if until is not None else None
+    kept: list[dict[str, Any]] = []
+    for stamp in stamps:
+        observed = stamp.get("observed_at")
+        if not isinstance(observed, datetime):
+            continue
+        observed = _aware(observed)
+        if lower is not None and observed <= lower:
+            continue
+        if upper is not None and observed > upper:
+            continue
+        kept.append(stamp)
+    return kept
 
 
 def point_view(item: PublishedBaseline) -> dict[str, Any]:

@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-23 — Pass 06 personal-agent reads on the existing MCP server
+
+**Hypothesis:** Agents can answer “what were my odds” and “is this goal ready” from published receipts and the existing forecast spec, without a second MCP server, a second probability engine, or a production deploy.
+
+**Changes:** `get_forecast_readiness` and `list_milestones` on the current `/mcp` server. `compare_forecasts` accepts `this_month` (rolling 30 days), `since_start`, `largest_increase`, and `largest_drop`, and returns observation-time evidence changes between the two receipts. Flat history is reported as missing, not interpolated. Settings explains ChatGPT and Grok setup, scopes, and that those hosts are not verified. No migration. No production deploy. Codex’s uncommitted remediation on `feat/playitout-next-pass` was stashed and left out of this branch.
+
+**Measured result:** `uv run python -m pytest` on `test_remote_mcp_temporal.py`, `test_remote_mcp_protocol.py`, and `test_remote_mcp_pass05.py` — 32 passed. Vitest `personalAgents.test.tsx` — 2 passed. Production `/.well-known/oauth-protected-resource/mcp` and authorization-server metadata returned 200; unauthenticated `GET /mcp` returned 401. ChatGPT Chat, ChatGPT Work, and Grok Bot tool calls: **NOT TESTED**. Signed-in Settings browser: **NOT TESTED** (local `/settings` required Clerk; auth-bypass shell returned authentication required for `/api/v1/mcp/status`). No paid inference. Cron and production credentials were not modified.
+
 ## 2026-10-22 — Goal-family Futures, Reverse levers, Deeper sensitivity
 
 **Hypothesis:** Parsing a decision is not the same as conditioning the model. Reverse filling from compare-catalog chips is not discovery. Simple/Deeper need different analysis, not only more draws. Radar axes must be user-selected parameters. Demo market histories must stay isolated.

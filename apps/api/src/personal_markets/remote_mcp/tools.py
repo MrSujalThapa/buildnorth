@@ -72,8 +72,11 @@ from personal_markets.remote_mcp.scopes import (
 from personal_markets.remote_mcp.store import AuditRecord, RemoteMcpStore, SubmissionRecord, digest
 from personal_markets.remote_mcp.temporal import (
     delta_pp,
+    evidence_observed_in_window,
+    largest_consecutive_move,
     parse_when,
     point_view,
+    publication_time,
     select_as_of,
     sort_history,
 )
@@ -175,6 +178,32 @@ def _scalars(values: Any) -> dict[str, Any]:
         for key, value in list(values.items())[:_MAX_LIST]
         if isinstance(value, (int, float, str, bool)) or value is None
     }
+
+
+def _milestones_from_spec(spec: dict[str, Any]) -> list[MilestoneItem]:
+    primitives = spec.get("primitives")
+    if not isinstance(primitives, list):
+        return []
+    items: list[MilestoneItem] = []
+    for node in primitives:
+        if not isinstance(node, dict) or not node.get("id"):
+            continue
+        config = node.get("config") if isinstance(node.get("config"), dict) else {}
+        target = config.get("target")
+        raw_prerequisites = node.get("prerequisites")
+        prerequisites = raw_prerequisites if isinstance(raw_prerequisites, list) else []
+        items.append(
+            MilestoneItem(
+                id=str(node["id"])[:64],
+                kind=str(node["kind"]) if node.get("kind") else None,
+                metric=str(node["metric"]) if node.get("metric") else None,
+                target=None if target is None else str(target)[:80],
+                prerequisites=[str(item)[:64] for item in prerequisites[:8]],
+            )
+        )
+        if len(items) >= _MAX_LIST:
+            break
+    return items
 
 
 def _payload_hash(payload: dict[str, Any]) -> str:
@@ -343,7 +372,37 @@ class ForecastCompare(BaseModel):
     latest: dict[str, Any] | None = None
     as_of_point: dict[str, Any] | None = None
     delta_pp: float | None = None
+    delta_basis: str | None = None
     timestamps: dict[str, str | None] = Field(default_factory=dict)
+    evidence_changes: list[dict[str, Any]] = Field(default_factory=list)
+    extremum: dict[str, Any] | None = None
+    message: str
+
+
+class ForecastReadiness(BaseModel):
+    goal_id: str
+    priced: bool
+    publication_status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    contract_forecast_status: str
+    spec_status: str | None = None
+    model_family: str | None = None
+    probability: float | None = None
+    missing_inputs: list[dict[str, Any]] = Field(default_factory=list)
+    unpriced_reasons: list[str] = Field(default_factory=list)
+    message: str
+
+
+class MilestoneItem(BaseModel):
+    id: str
+    kind: str | None = None
+    metric: str | None = None
+    target: str | None = None
+    prerequisites: list[str] = Field(default_factory=list)
+
+
+class MilestoneList(BaseModel):
+    goal_id: str
+    milestones: list[MilestoneItem]
     message: str
 
 
@@ -519,6 +578,60 @@ class RemoteMcpTools:
             total=len(goals),
             next_cursor=str(following) if following < len(goals) else None,
         )
+
+    async def get_forecast_readiness(self, caller: Caller, goal_id: str) -> ForecastReadiness:
+        self.require_scope(caller, READ)
+        goal = await self._goal(caller, goal_id)
+        forecast = await self._forecast(caller, goal)
+        spec = goal.model_requirements.get("forecast_spec") or {}
+        reasons = [
+            str(item)
+            for item in (spec.get("unpriced_reasons") or [])
+            if isinstance(item, str)
+        ][:_MAX_LIST]
+        priced = forecast.status == "PUBLISHED"
+        if priced:
+            message = (
+                "A forecast has been published by PlayItOut's model. "
+                "Progress changes by submitting evidence, which may republish that forecast."
+            )
+        elif forecast.missing_inputs:
+            message = forecast.message or "The model is missing inputs."
+        else:
+            message = forecast.message or "No forecast has been published."
+        return ForecastReadiness(
+            goal_id=goal_id,
+            priced=priced,
+            publication_status=forecast.status,
+            contract_forecast_status=str(goal.forecast_status),
+            spec_status=str(spec.get("status")) if spec.get("status") else None,
+            model_family=forecast.model_family
+            or (spec.get("family") if isinstance(spec.get("family"), str) else None),
+            probability=forecast.probability,
+            missing_inputs=forecast.missing_inputs,
+            unpriced_reasons=reasons,
+            message=message,
+        )
+
+    async def list_milestones(self, caller: Caller, goal_id: str) -> MilestoneList:
+        self.require_scope(caller, READ)
+        goal = await self._goal(caller, goal_id)
+        spec = goal.model_requirements.get("forecast_spec") or {}
+        milestones = _milestones_from_spec(spec)
+        if milestones:
+            message = (
+                "These are stored model nodes, not a separate progress ledger. "
+                "Update progress with submit_structured_evidence. "
+                "Title, deadline, and success definition cannot be rewritten through MCP."
+            )
+        else:
+            message = (
+                "This goal has no stored milestone graph. "
+                "Tracked inputs are its state dimensions. "
+                "Update progress with submit_structured_evidence. "
+                "Title, deadline, and success definition cannot be rewritten through MCP."
+            )
+        return MilestoneList(goal_id=goal_id, milestones=milestones, message=message)
 
     async def get_goal(self, caller: Caller, goal_id: str) -> GoalDetail:
         self.require_scope(caller, READ)
@@ -1406,6 +1519,46 @@ class RemoteMcpTools:
 
     # --- history / conversational What If -----------------------------------------
 
+    async def _evidence_stamps(self, goal: GoalContract) -> list[dict[str, Any]]:
+        events = await self._deps().evidence.list_for_goal(goal.goal_id)
+        stamps: list[dict[str, Any]] = []
+        for item in events:
+            submission = item.provenance.submission
+            stamps.append(
+                {
+                    "evidence_id": str(item.evidence_id) if item.evidence_id else None,
+                    "metric": item.metric,
+                    "observed_at": item.observed_at,
+                    "ingested_at": submission.received_at if submission is not None else None,
+                    "verification_status": item.provenance.verification_status,
+                    "source_type": item.provenance.source_type,
+                }
+            )
+        return stamps
+
+    @staticmethod
+    def _changes_between(
+        stamps: list[dict[str, Any]],
+        earlier: datetime | None,
+        later: datetime | None,
+    ) -> list[dict[str, Any]]:
+        selected = evidence_observed_in_window(stamps, after=earlier, until=later)
+        views: list[dict[str, Any]] = []
+        for stamp in selected[:_MAX_LIST]:
+            observed = stamp.get("observed_at")
+            ingested = stamp.get("ingested_at")
+            views.append(
+                {
+                    "evidence_id": stamp.get("evidence_id"),
+                    "metric": stamp.get("metric"),
+                    "observed_at": observed.isoformat() if isinstance(observed, datetime) else None,
+                    "ingested_at": ingested.isoformat() if isinstance(ingested, datetime) else None,
+                    "verification_status": stamp.get("verification_status"),
+                    "source_type": stamp.get("source_type"),
+                }
+            )
+        return views
+
     async def compare_forecasts(
         self,
         caller: Caller,
@@ -1423,22 +1576,81 @@ class RemoteMcpTools:
                 status="NOT_PUBLISHED",
                 message="No forecast has been published for this goal.",
             )
+        stamps = await self._evidence_stamps(goal)
         observed_at = None
         ingested_at = None
         if evidence_id:
-            events = await self._deps().evidence.list_for_goal(goal.goal_id)
             match = next(
-                (item for item in events if str(item.evidence_id) == evidence_id),
+                (item for item in stamps if item.get("evidence_id") == evidence_id),
                 None,
             )
             if match is None:
                 raise ToolFailure("not_found", "Evidence not found")
-            observed_at = match.observed_at
-            if match.provenance.submission is not None:
-                ingested_at = match.provenance.submission.received_at
-        allowed = {None, "latest", "previous", "last_week", "before_evidence"}
+            observed_at = match.get("observed_at")
+            ingested_at = match.get("ingested_at")
+        allowed = {
+            None,
+            "latest",
+            "previous",
+            "last_week",
+            "this_month",
+            "since_start",
+            "before_evidence",
+            "largest_increase",
+            "largest_drop",
+        }
         if relative not in allowed:
             raise ToolFailure("invalid_argument", "relative is not a supported as-of selector")
+        latest = history[-1]
+        base_times = {
+            "as_of": as_of,
+            "event_observed_at": observed_at.isoformat() if observed_at else None,
+            "ingested_at": ingested_at.isoformat() if ingested_at else None,
+            "latest_published_at": point_view(latest)["published_at"],
+        }
+        if relative in {"largest_increase", "largest_drop"}:
+            direction = "increase" if relative == "largest_increase" else "drop"
+            pair = largest_consecutive_move(history, direction=direction)
+            if pair is None:
+                return ForecastCompare(
+                    goal_id=goal_id,
+                    status="NO_EARLIER_RECEIPT",
+                    latest=point_view(latest),
+                    timestamps=base_times,
+                    message=(
+                        "No successive published receipts moved in that direction. "
+                        "PlayItOut does not interpolate a peak or a trough."
+                    ),
+                )
+            earlier, later_point = pair
+            step = delta_pp(later_point.probability, earlier.probability)
+            return ForecastCompare(
+                goal_id=goal_id,
+                status="COMPARED",
+                latest=point_view(latest),
+                as_of_point=point_view(earlier),
+                delta_pp=step,
+                delta_basis="largest_consecutive_published_step",
+                timestamps={
+                    **base_times,
+                    "step_earlier_published_at": point_view(earlier)["published_at"],
+                    "step_later_published_at": point_view(later_point)["published_at"],
+                },
+                evidence_changes=self._changes_between(
+                    stamps, publication_time(earlier), publication_time(later_point)
+                ),
+                extremum={
+                    "direction": direction,
+                    "earlier": point_view(earlier),
+                    "later": point_view(later_point),
+                    "delta_pp": step,
+                },
+                message=(
+                    "delta_pp is the largest step between two successive published receipts, "
+                    "in percentage points. It is not the change versus the current odds unless "
+                    "that step ends on the latest receipt. No probability was interpolated."
+                ),
+            )
         try:
             bound = parse_when(as_of)
             selected, reason = select_as_of(
@@ -1450,18 +1662,12 @@ class RemoteMcpTools:
             )
         except ValueError as error:
             raise ToolFailure("invalid_argument", str(error)) from None
-        latest = history[-1]
         if selected is None:
             return ForecastCompare(
                 goal_id=goal_id,
                 status="NO_EARLIER_RECEIPT",
                 latest=point_view(latest),
-                timestamps={
-                    "as_of": as_of,
-                    "event_observed_at": observed_at.isoformat() if observed_at else None,
-                    "ingested_at": ingested_at.isoformat() if ingested_at else None,
-                    "latest_published_at": point_view(latest)["published_at"],
-                },
+                timestamps=base_times,
                 message=reason,
             )
         return ForecastCompare(
@@ -1470,16 +1676,17 @@ class RemoteMcpTools:
             latest=point_view(latest),
             as_of_point=point_view(selected),
             delta_pp=delta_pp(latest.probability, selected.probability),
+            delta_basis="latest_minus_selected_receipt",
             timestamps={
-                "as_of": as_of,
-                "event_observed_at": observed_at.isoformat() if observed_at else None,
-                "ingested_at": ingested_at.isoformat() if ingested_at else None,
+                **base_times,
                 "as_of_published_at": point_view(selected)["published_at"],
-                "latest_published_at": point_view(latest)["published_at"],
             },
+            evidence_changes=self._changes_between(
+                stamps, publication_time(selected), publication_time(latest)
+            ),
             message=(
                 "Delta is percentage points between published receipts, not a relative "
-                "percent change."
+                "percent change. Evidence changes use observation time, not ingestion time."
             ),
         )
 

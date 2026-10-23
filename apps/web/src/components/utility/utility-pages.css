@@ -494,6 +494,13 @@
   font-size: 11px;
   line-height: 1.6;
 }
+.agent-client-label {
+  margin: 14px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text, inherit);
+}
+.agent-scope-name { color: var(--app-text, inherit); font-weight: 600; }
 .agent-revoked { min-height: 56px; }
 .agent-revoked strong { color: var(--app-muted); font-weight: 600; }
 
