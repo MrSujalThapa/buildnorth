@@ -563,6 +563,17 @@ async def test_resource_discovery_prefers_authenticated_github_repositories() ->
     assert [item.name for item in resources] == ["owner/repo"]
 
 
+def test_gateway_availability_does_not_construct_composio_client() -> None:
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(
+        environment="test", composio_enabled=True, composio_api_key="test-key",
+    ))
+    assert gateway.available
+    assert "_client" not in gateway.__dict__
+
+
 @pytest.mark.asyncio
 async def test_notion_picker_omits_untitled_id_only_results() -> None:
     from uuid import uuid4
@@ -586,6 +597,101 @@ async def test_notion_picker_omits_untitled_id_only_results() -> None:
     assert [item.name for item in resources] == ["Oct 20th book report"]
     assert resources[0].metadata["url"] == "https://www.notion.so/3ffaf8d137de8050bea2e9a62716f138"
     assert resources[0].metadata["connected_account_id"] == "account-1"
+
+
+@pytest.mark.asyncio
+async def test_notion_picker_follows_schema_validated_cursor_with_bounded_reads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typing import Any
+    from uuid import UUID, uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+    calls: list[dict[str, object]] = []
+
+    async def execute(
+        _user_id: UUID, _tool_name: str, arguments: dict[str, Any], **_kwargs: Any,
+    ) -> dict[str, Any]:
+        calls.append(arguments)
+        if not arguments:
+            return {"results": [{"id": "page-1", "title": [{"plain_text": "First"}]}],
+                    "next_cursor": "cursor-2"}
+        return {"results": [{"id": "page-2", "title": [{"plain_text": "Book Reports"}]}]}
+
+    async def tools(*_args: Any, **_kwargs: Any) -> list[MCPToolDescriptor]:
+        return [MCPToolDescriptor(
+            name="NOTION_SEARCH_NOTION_PAGE", description="Search pages",
+            input_schema={"properties": {"start_cursor": {}, "page_size": {}}},
+        )]
+
+    monkeypatch.setattr(gateway, "execute_tool", execute)
+    monkeypatch.setattr(gateway, "list_tools", tools)
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == ["First", "Book Reports"]
+    assert calls == [{}, {"start_cursor": "cursor-2", "page_size": 100}]
+
+
+@pytest.mark.asyncio
+async def test_notion_picker_does_not_guess_unsupported_cursor_argument(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typing import Any
+    from uuid import UUID, uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+    calls: list[dict[str, object]] = []
+
+    async def execute(
+        _user_id: UUID, _tool_name: str, arguments: dict[str, Any], **_kwargs: Any,
+    ) -> dict[str, Any]:
+        calls.append(arguments)
+        return {"results": [{"id": "page-1", "title": [{"plain_text": "First"}]}],
+                "next_cursor": "cursor-2"}
+
+    async def tools(*_args: Any, **_kwargs: Any) -> list[MCPToolDescriptor]:
+        return []
+
+    monkeypatch.setattr(gateway, "execute_tool", execute)
+    monkeypatch.setattr(gateway, "list_tools", tools)
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == ["First"]
+    assert calls == [{}]
+
+
+@pytest.mark.asyncio
+async def test_notion_picker_keeps_first_page_when_schema_lookup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from typing import Any
+    from uuid import UUID, uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+
+    async def execute(
+        _user_id: UUID, _tool_name: str, _arguments: dict[str, Any], **_kwargs: Any,
+    ) -> dict[str, Any]:
+        return {"results": [{"id": "page-1", "title": [{"plain_text": "First"}]}],
+                "next_cursor": "cursor-2"}
+
+    async def unavailable(*_args: Any, **_kwargs: Any) -> list[MCPToolDescriptor]:
+        raise RuntimeError("metadata offline")
+
+    monkeypatch.setattr(gateway, "execute_tool", execute)
+    monkeypatch.setattr(gateway, "list_tools", unavailable)
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == ["First"]
 
 
 @pytest.mark.asyncio
