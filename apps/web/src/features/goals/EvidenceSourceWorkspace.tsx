@@ -378,6 +378,7 @@ export function EvidenceSourceWorkspace({
                       const selected = resourceIds.map((resourceId) => watches.data?.find((item) => item.plugin_id === recipe.plugin_id && item.resource_id === resourceId));
                       const active = selected.filter((watch) => watch?.status === "active") as SourceWatchRecord[];
                       const paused = selected.filter((watch) => watch?.status === "paused") as SourceWatchRecord[];
+                      const revoked = selected.filter((watch) => watch?.status === "revoked") as SourceWatchRecord[];
                       const existing = selected.filter((watch): watch is SourceWatchRecord => Boolean(watch));
                       const disconnected = plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin));
                       return <span className="evidence-watch-actions">
@@ -389,7 +390,7 @@ export function EvidenceSourceWorkspace({
                             const missing = resourceIds.filter((resourceId) => !selected.some((watch) => watch?.resource_id === resourceId && watch.status !== "revoked"));
                             updateWatches.mutate({ recipe, resourceIds: missing, selected: paused, status: "active" });
                           }
-                        }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : recipe.plugin_id === "notion" ? `Watch ${resourceIds.length === 1 ? "area" : `${resourceIds.length} areas`}` : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
+                        }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : revoked.length === resourceIds.length ? "Restart" : recipe.plugin_id === "notion" ? `Watch ${resourceIds.length === 1 ? "area" : `${resourceIds.length} areas`}` : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
                         {existing.some((watch) => watch.status !== "revoked") ? <button type="button" disabled={updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, selected: existing.filter((watch) => watch.status !== "revoked"), status: "revoked" })}>Stop</button> : null}
                       </span>;
                     })() : null}

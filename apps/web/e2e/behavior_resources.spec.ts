@@ -408,32 +408,38 @@ test.describe("Resource-specific evidence", () => {
   });
 
   test("approved source watch can be paused, stopped, and restarted", async ({ page }, testInfo) => {
-    let watchStatus: "active" | "paused" | "revoked" | null = null;
-    const watch = () => ({
-      id: "40000000-0000-0000-0000-000000000001", goal_id: CAREER,
-      plugin_id: "notion", resource_id: "12345678-1234-1234-1234-123456789abc",
-      scope: "parent", status: watchStatus, last_success_at: null, last_error: null,
+    const resourceIds = ["12345678-1234-1234-1234-123456789abc", "12345678-1234-1234-1234-123456789abd"];
+    const statuses = new Map<string, "active" | "paused" | "revoked">();
+    const watch = (resourceId: string) => ({
+      id: resourceId, goal_id: CAREER,
+      plugin_id: "notion", resource_id: resourceId,
+      scope: "parent", status: statuses.get(resourceId), last_success_at: null, last_error: null,
     });
     await page.route("**/api/v1/goals/*/evidence/sources/recipes", (route) => route.fulfill({ json: [
       { goal_id: CAREER, plugin_id: "notion", label: "Book Reports", approved: true, steps: [
         { capability_id: "notion.page.read", resource_uri: "composio://notion/12345678-1234-1234-1234-123456789abc", arguments: {} },
+        { capability_id: "notion.page.read", resource_uri: "composio://notion/12345678-1234-1234-1234-123456789abd", arguments: {} },
       ] },
     ] }));
     await page.route("**/api/v1/goals/*/evidence/sources/watches", (route) => {
       if (route.request().method() === "POST") {
         expect(route.request().postDataJSON()).toMatchObject({ plugin_id: "notion", scope: "parent" });
-        watchStatus = "active";
-        return route.fulfill({ json: watch() });
+        const resourceId = route.request().postDataJSON().resource_id as string;
+        expect(resourceIds).toContain(resourceId);
+        statuses.set(resourceId, "active");
+        return route.fulfill({ json: watch(resourceId) });
       }
-      return route.fulfill({ json: watchStatus ? [watch()] : [] });
+      return route.fulfill({ json: [...statuses.keys()].map(watch) });
     });
     await page.route("**/api/v1/goals/*/evidence/sources/watches/*", (route) => {
-      watchStatus = route.request().postDataJSON().status;
-      return route.fulfill({ json: watch() });
+      const resourceId = route.request().url().split("/").at(-1)!;
+      statuses.set(resourceId, route.request().postDataJSON().status);
+      return route.fulfill({ json: watch(resourceId) });
     });
     await page.goto(`/goals/${CAREER}/evidence`);
-    await page.getByRole("button", { name: "Watch area" }).click();
+    await page.getByRole("button", { name: "Watch 2 areas" }).click();
     await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+    expect([...statuses.values()]).toEqual(["active", "active"]);
     await page.getByRole("button", { name: "Pause" }).click();
     await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
     await page.getByRole("button", { name: "Stop" }).click();
