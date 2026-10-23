@@ -3,7 +3,8 @@ import type { CourseGradeResult, Goal } from "../api/client";
 const COURSE_TOKENS = /\b(grade|exam|course|syllabus|gpa|midterm|academic|assignment)\b/i;
 
 export function isCourseStandingGoal(goal: Pick<Goal, "title" | "state_dimensions" | "success_definition">): boolean {
-  const metric = String(goal.success_definition?.metric ?? "").replace(/_/g, " ");
+  const rawMetric = goal.success_definition?.metric;
+  const metric = typeof rawMetric === "string" ? rawMetric.replace(/_/g, " ") : "";
   const blob = [goal.title, metric, ...(goal.state_dimensions ?? [])].join(" ");
   return COURSE_TOKENS.test(blob);
 }
