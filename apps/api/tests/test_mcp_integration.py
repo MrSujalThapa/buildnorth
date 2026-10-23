@@ -656,6 +656,28 @@ async def test_notion_picker_does_not_guess_unsupported_cursor_argument() -> Non
 
 
 @pytest.mark.asyncio
+async def test_notion_picker_keeps_first_page_when_schema_lookup_fails() -> None:
+    from uuid import uuid4
+
+    from personal_markets.core.config import Settings
+    from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
+
+    gateway = ComposioIntegrationGateway(Settings(environment="test"))
+
+    async def execute(_user_id, _tool_name, _arguments, **_kwargs):
+        return {"results": [{"id": "page-1", "title": [{"plain_text": "First"}]}],
+                "next_cursor": "cursor-2"}
+
+    async def unavailable(*_args, **_kwargs):
+        raise RuntimeError("metadata offline")
+
+    gateway.execute_tool = execute  # type: ignore[method-assign]
+    gateway.list_tools = unavailable  # type: ignore[method-assign]
+    resources = await gateway.list_resources(uuid4(), "notion", connected_account_id="account-1")
+    assert [item.name for item in resources] == ["First"]
+
+
+@pytest.mark.asyncio
 async def test_notion_picker_renders_date_mentions_without_rewriting_text_titles(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

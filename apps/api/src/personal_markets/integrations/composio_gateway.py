@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -425,7 +426,13 @@ class ComposioIntegrationGateway:
         # Notion search commonly returns a short first page. Consult the actual
         # action schema before passing a cursor; never guess provider arguments.
         if toolkit_slug == "notion" and payload.get("next_cursor"):
-            tools = await self.list_tools(user_id, toolkit_slug, limit=100)
+            try:
+                tools = await self.list_tools(user_id, toolkit_slug, limit=100)
+            except Exception as error:  # A valid first page remains usable.
+                logging.getLogger(__name__).warning(
+                    "notion_resource_schema_unavailable error_type=%s", type(error).__name__,
+                )
+                tools = []
             tool = next((item for item in tools if item.name == tool_name), None)
             schema = tool.input_schema if tool else {}
             if isinstance(schema.get("parameters"), dict):
