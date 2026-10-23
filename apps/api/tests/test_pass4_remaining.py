@@ -23,7 +23,17 @@ from personal_markets.what_if.domain import (
 )
 from personal_markets.what_if.optimizer import ActionOptimizer, ResourceLimits
 from personal_markets.what_if.repository import InMemorySimulationRepository
-from personal_markets.what_if.service import WhatIfService
+from personal_markets.what_if.service import WhatIfService, _target_lever_label
+
+
+def test_reverse_labels_use_action_and_observation_units() -> None:
+    flow = make_assumptions()[0]
+    assert _target_lever_label(flow.model_copy(update={"unit": "currency/month"}), 927.2) == (
+        "Contribute 927 each month"
+    )
+    assert _target_lever_label(flow.model_copy(update={"unit": "seconds/week"}), -3.5) == (
+        "Change weekly pace trend to -3.5 seconds"
+    )
 
 
 def make_goal() -> GoalContract:

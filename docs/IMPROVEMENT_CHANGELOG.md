@@ -861,3 +861,8 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Confirmed goal contracts with explicit current state now pass the original user statement to the Evidence Agent. Target-only statements still skip evidence extraction. The Evidence Agent prompt excludes targets, deadlines and hypothetical plans from observed evidence.
 - Two focused workflow tests pass. Production goal creation and repricing remain unverified pending deployment and authenticated E2E.
 
+
+### 2026-10-22 — Live financial What If acceptance and Reverse copy
+
+- Production emergency-fund manual evidence (current balance 6,500 and current monthly contribution 600, as supplied in the product brief) produced two self-reported events and a 3.9% published forecast after previously withheld odds. Change returned 66% execution-adjusted and 83% conditional for 1,000 monthly; Futures showed target reached 61%, Compare kept 800/1,000 paths distinct at 30%/68%. Reverse returned raw flow/currency-month and algorithm text; backend labels and reasons now use human-readable action wording, and UI no longer calls the highest-odds path most realistic. These copy changes await production deploy verification.
+
