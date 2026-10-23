@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type PluginCatalogResponse, type PluginConnectResponse, type PluginView } from "../api/client";
 import PluginsPage from "../components/plugins/PluginsPage";
 import { isPluginConnected, pluginViewToDisplay } from "../components/plugins/pluginPresentation";
+import { canonicalCatalog } from "../components/plugins/canonicalCatalog";
 import {
   composioAuthChannelName,
   composioAuthLauncherPath,
@@ -143,9 +144,8 @@ export function PluginsRoute() {
 
   const pluginViews = useMemo(() => {
     const base = plugins.data?.items ?? [];
-    if (debouncedQuery) return base;
-    const seen = new Set(base.map((item) => item.definition.id));
-    return [...base, ...catalogExtras.filter((item) => !seen.has(item.definition.id))];
+    if (debouncedQuery) return canonicalCatalog(base);
+    return canonicalCatalog([...base, ...catalogExtras]);
   }, [catalogExtras, debouncedQuery, plugins.data?.items]);
   const providerMessage = plugins.data?.provider_message ?? (plugins.isError ? "Plugins could not be loaded. Retry in a moment." : null);
 

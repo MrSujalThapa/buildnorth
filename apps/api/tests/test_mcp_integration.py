@@ -616,7 +616,7 @@ async def test_default_plugin_directory_skips_remote_catalog() -> None:
     service._composio = RemoteCatalog()  # type: ignore[assignment]
     catalog = await service.search_catalog(user_id=uuid4())
     ids = {item["definition"]["id"] for item in catalog["items"]}
-    assert {"manual", "csv", "github", "notion"} <= ids
+    assert not ids
 
 
 @pytest.mark.asyncio

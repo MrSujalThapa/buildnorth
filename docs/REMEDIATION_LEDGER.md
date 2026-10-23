@@ -145,3 +145,8 @@ If interrupted: create a Vercel Deployment Protection **Shareable Link** (not te
 - **Latency defect found:** warm `/health` 110 ms but `/api/v1/me` 2.4–3.0 s, `/api/v1/goals` ~1.27 s, `/api/v1/profile` 4.0–4.9 s. Each authenticated request constructed a new `PyJWKClient`, fetching Clerk JWKS synchronously and blocking the event loop. Fixed by caching the client per JWKS URL (PR #2); after-deploy timings to be appended.
 - **What If Change failure found:** "What if I study LeetCode 2 hours a day?" returned 422 after ~30 s — the user's BYOK Claude Sonnet 5.5 hit the 1200-token default output limit on the intervention schema. The page showed no error and no busy state. Fixed: named `intervention_max_output_tokens = 4096` for the intervention agent (BYOK application limits still enforced), busy state covers parse/persist, and failures render an alert.
 - Remaining console noise: `/api/v1/profile/photo` 404 when no photo exists; Clerk development keys warning in production (switching to a production Clerk instance is an account-level change not made here).
+
+### 2026-10-22 — final product continuation branch
+
+- Started from merged main 3766b37 on codex/final-product-remediation. New Plugins duplicate/search, Notion picker and chart-direction changes are implemented locally. Production at 3766b37 was inspected: 406 displayed Plugins rows, duplicate Google Calendar/Sheets, visible search label, linked GitHub/Notion. No deployment acceptance is claimed yet.
+- Local focus checks: frontend chart/catalog tests 4 passed; backend integration tests 25 passed; Notion resource picker mocked desktop browser tests 2 passed. Full gates are running. Production A–L remains open.

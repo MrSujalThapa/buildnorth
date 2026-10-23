@@ -21,6 +21,7 @@ import type {
 } from "../../adapters/templateTypes";
 
 import "./wealthsimple-chart.css";
+import { chartTrend } from "./chartTrend";
 
 export type ChartSelection = {
   start: ChartPoint;
@@ -378,7 +379,8 @@ export default function WealthsimpleAreaChart({
   return (
     <div
       ref={wrapperRef}
-      className="ws-chart"
+      className={`ws-chart trend-${chartTrend(data)}`}
+      data-trend={chartTrend(data)}
     >
       <ResponsiveContainer
         width="100%"

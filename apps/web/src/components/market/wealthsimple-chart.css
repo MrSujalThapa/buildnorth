@@ -26,3 +26,9 @@
   */
   touch-action: pan-y;
 }
+.ws-chart.trend-positive { --market-chart-accent: #188453; }
+.ws-chart.trend-negative { --market-chart-accent: #c44745; }
+.ws-chart.trend-neutral { --market-chart-accent: #777b78; }
+.theme-dark .ws-chart.trend-positive { --market-chart-accent: #68cfa0; }
+.theme-dark .ws-chart.trend-negative { --market-chart-accent: #f0837c; }
+.theme-dark .ws-chart.trend-neutral { --market-chart-accent: #a6aaa8; }

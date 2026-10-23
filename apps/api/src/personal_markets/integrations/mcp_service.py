@@ -176,12 +176,15 @@ class IntegrationGatewayService:
             await self._reconcile_connections(owner)
         stored_connections = await self._repository.list_connections(owner)
         connections = {item.plugin_id: item for item in stored_connections}
-        local_views = await self._local_plugin_views(connections)
+        local_views = [
+            view for view in await self._local_plugin_views(connections)
+            if view.definition.id in connections and view.definition.id not in {"manual", "csv"}
+        ]
         provider_status = "available" if self._composio.available else "unavailable"
         provider_message = None
         if not self._composio.available:
             provider_message = (
-                "Connected-app catalog is unavailable. Manual and CSV evidence still work."
+                "Connected-app catalog is unavailable. Saved connections remain visible."
             )
             filtered = [
                 view
@@ -209,7 +212,7 @@ class IntegrationGatewayService:
         except Exception:
             provider_status = "error"
             provider_message = (
-                "The integration catalog could not be loaded. Retry, or use Manual / CSV evidence."
+                "The integration catalog could not be loaded. Retry in a moment."
             )
             return {
                 "items": [item.model_dump(mode="json") for item in local_views],
@@ -268,8 +271,13 @@ class IntegrationGatewayService:
     async def views(
         self, user_id: UUID | None = None, *, reconcile: bool = False
     ) -> list[PluginView]:
-        catalog = await self.search_catalog(limit=50, user_id=user_id, reconcile=reconcile)
-        return [PluginView.model_validate(item) for item in catalog["items"]]
+        owner = self._owner(user_id)
+        if reconcile:
+            await self._reconcile_connections(owner)
+        connections = {
+            item.plugin_id: item for item in await self._repository.list_connections(owner)
+        }
+        return await self._local_plugin_views(connections)
 
     async def connected_views(self, user_id: UUID | None = None) -> list[PluginView]:
         """Return stored connections without waiting for the remote toolkit catalog."""

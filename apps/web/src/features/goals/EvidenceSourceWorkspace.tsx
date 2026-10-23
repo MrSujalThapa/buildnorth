@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ExternalLink, FileText } from "lucide-react";
 import {
   api,
   type PluginView,
@@ -586,6 +587,7 @@ function SourceResourcePanel({
   approvePending: boolean;
 }) {
   const [resourceQuery, setResourceQuery] = useState("");
+  const [visibleLimit, setVisibleLimit] = useState(50);
   const resources = useQuery({
     queryKey: ["plugin-resources", source.pluginId],
     queryFn: ({ signal }) => api.pluginResources(source.pluginId, signal),
@@ -636,26 +638,38 @@ function SourceResourcePanel({
       {options.length ? <input className="evidence-resource-search ui-field" type="search" aria-label={`Search ${source.name} sources`} name={`search_${source.pluginId}_sources`} autoComplete="off" placeholder={source.pluginId === "github" ? "Search repositories" : "Search pages"} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
       {options.length ? (
         <ul className="evidence-resource-list">
-          {visibleOptions.map((resource) => {
+          {visibleOptions.slice(0, visibleLimit).map((resource) => {
             const checked = selectedResources.includes(resource.resource_id);
             return (
-              <li key={resource.resource_id}>
-                <label className="ui-choice">
+              <li key={resource.resource_id} className={checked ? "evidence-resource-row selected" : "evidence-resource-row"}>
+                <label className="evidence-resource-choice">
                   <input
                     type={source.pluginId === "github" ? "radio" : "checkbox"}
                     checked={checked}
                     onChange={() => onToggleResource(resource.resource_id)}
                   />
-                  <strong>{resource.label}</strong>
-                  {resource.url ? <a href={resource.url} target="_blank" rel="noreferrer">Open</a> : null}
-                  <span>
-                    {resource.resource_type === "private" ? "Private" : resource.resource_type === "public" ? "Public" : ""}
+                  {source.pluginId === "notion" ? <FileText size={19} aria-hidden="true" /> : null}
+                  <span className="evidence-resource-copy">
+                    <strong>{resource.label}</strong>
+                    {resource.resource_type === "private" || resource.resource_type === "public"
+                      ? <small>{resource.resource_type === "private" ? "Private" : "Public"}</small>
+                      : null}
                   </span>
                 </label>
+                {resource.url ? (
+                  <a className="evidence-resource-open" href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${resource.label} in ${source.name}`}>
+                    <ExternalLink size={17} aria-hidden="true" />
+                  </a>
+                ) : null}
               </li>
             );
           })}
         </ul>
+      ) : null}
+      {visibleOptions.length > visibleLimit ? (
+        <button type="button" className="evidence-resource-more" onClick={() => setVisibleLimit((current) => current + 50)}>
+          Show more pages
+        </button>
       ) : null}
       {source.pluginId === "github" || source.pluginId === "google_sheets" ? (
         <label className="evidence-ref-field">
@@ -698,7 +712,7 @@ function SourceResourcePanel({
       {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
       {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
       <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={() => onApprove(options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", "))}>
-        {approvePending ? "Saving…" : "Save source"}
+        {approvePending ? "Saving…" : `Save ${selectedResources.length === 1 ? "source" : `${selectedResources.length} sources`}`}
       </button>
     </div>
   );
