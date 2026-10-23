@@ -168,8 +168,14 @@ export default function ImpactWorkspace({
         error={stateError}
       />
     );
+  } else if (preview.scenarioOdds !== null) {
+    unpricedPanel = (
+      <div className="empty-state">
+        <strong>Outcome range unavailable</strong>
+        <span>The scenario odds were computed, but this result has no simulated outcome distribution.</span>
+      </div>
+    );
   } else if (preview.currentOdds !== null) {
-    // The baseline priced; there is simply no scenario to draw yet.
     unpricedPanel = (
       <div className="empty-state">
         <strong>Your baseline odds are priced</strong>
@@ -247,7 +253,7 @@ export default function ImpactWorkspace({
             <div className="panel-head tight">
               <div>
                 <p className="section-label">Where you could finish</p>
-                <h2>Simulated results across {impact.drawCount?.toLocaleString() ?? "simulated"} futures</h2>
+                <h2>{bins.length ? `Simulated results across ${impact.drawCount?.toLocaleString() ?? "simulated"} futures` : "Outcome range"}</h2>
               </div>
             </div>
 
