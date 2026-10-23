@@ -71,6 +71,7 @@ async def request_context_middleware(
                     db_queries=db.queries,
                     db_checkouts=db.checkouts,
                     db_ms=round(db.query_ms),
+                    db_connection_ms=round(db.connection_ms),
                 )
             raise
         finally:
@@ -85,6 +86,7 @@ async def request_context_middleware(
             db_queries=db.queries,
             db_checkouts=db.checkouts,
             db_ms=round(db.query_ms),
+            db_connection_ms=round(db.connection_ms),
         )
         response.headers["server-timing"] = db.server_timing()
     response.headers["x-request-id"] = request_id

@@ -22,10 +22,12 @@ class QueryStats:
     queries: int = 0
     checkouts: int = 0
     query_ms: float = 0.0
+    connection_ms: float = 0.0
 
     def server_timing(self) -> str:
         return (
-            f'db;dur={self.query_ms:.1f};desc="{self.queries} queries, {self.checkouts} checkouts"'
+            f'db;dur={self.query_ms:.1f};desc="{self.queries} queries, {self.checkouts} checkouts", '
+            f'db-acquire;dur={self.connection_ms:.1f}'
         )
 
 
@@ -41,6 +43,12 @@ def track_queries() -> Iterator[QueryStats]:
         yield stats
     finally:
         _current.reset(token)
+
+
+def record_connection_acquire(duration_ms: float) -> None:
+    stats = _current.get()
+    if stats is not None:
+        stats.connection_ms += duration_ms
 
 
 def instrument(engine: Engine) -> None:

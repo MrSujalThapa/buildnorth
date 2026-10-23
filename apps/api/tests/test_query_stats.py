@@ -3,7 +3,11 @@ import asyncio
 import pytest
 from sqlalchemy import Engine, create_engine, text
 
-from personal_markets.persistence.query_stats import instrument, track_queries
+from personal_markets.persistence.query_stats import (
+    instrument,
+    record_connection_acquire,
+    track_queries,
+)
 
 
 def _engine() -> Engine:
@@ -23,6 +27,13 @@ def test_counts_queries_and_checkouts_inside_a_request_scope() -> None:
     assert stats.query_ms >= 0
     assert stats.server_timing().startswith("db;dur=")
     assert "2 queries, 1 checkouts" in stats.server_timing()
+
+
+def test_connection_acquisition_is_measured_separately_from_query_time() -> None:
+    with track_queries() as stats:
+        record_connection_acquire(125.4)
+    assert stats.connection_ms == 125.4
+    assert "db-acquire;dur=125.4" in stats.server_timing()
 
 
 def test_queries_outside_a_request_scope_are_not_counted() -> None:
