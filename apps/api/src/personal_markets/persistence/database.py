@@ -1,14 +1,14 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import lru_cache
-from time import monotonic
+from time import monotonic, perf_counter
 from typing import Any
 
 from sqlalchemy import Engine, event
 from sqlalchemy.exc import DisconnectionError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, create_async_engine
 
-from personal_markets.persistence.query_stats import instrument
+from personal_markets.persistence.query_stats import instrument, record_connection_acquire
 
 # Pooled connections idle at least this long are pinged before reuse; a failed ping makes the pool
 # discard the connection and retry checkout. Warm reuse skips the ping round trip.
@@ -70,7 +70,9 @@ def install_idle_ping(sync_engine: Engine, idle_seconds: float) -> None:
 
 @asynccontextmanager
 async def transaction(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    started = perf_counter()
     async with engine.begin() as connection:
+        record_connection_acquire((perf_counter() - started) * 1000)
         yield connection
 
 
@@ -81,6 +83,8 @@ async def autocommit_connection(engine: AsyncEngine) -> AsyncIterator[AsyncConne
     Use for reads and for single atomic statements. Anything that must hold across more than one
     statement belongs in ``transaction``.
     """
+    started = perf_counter()
     async with engine.connect() as connection:
+        record_connection_acquire((perf_counter() - started) * 1000)
         await connection.execution_options(isolation_level="AUTOCOMMIT")
         yield connection
