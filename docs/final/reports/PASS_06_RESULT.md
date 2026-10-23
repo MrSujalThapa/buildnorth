@@ -68,7 +68,9 @@ None on the open remediation PR #17 or on the stashed Codex working tree (`feat/
 
 ## Commits and PR
 
-Recorded after the draft PR is opened.
+- `6438320` — Let personal agents read forecast readiness and published odds history.
+- Draft PR: https://github.com/MrSujalThapa/buildnorth/pull/18
+- Not merged. Not deployed.
 
 ---
 
