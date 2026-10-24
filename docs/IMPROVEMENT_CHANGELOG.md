@@ -978,3 +978,9 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - **Observed:** production API responded 200 in 981ms (seven database queries, 911ms database time), but the page stayed in “Searching backend paths…” because undefined result paths were treated as pending. No feasible path was verified.
 - **Change:** render loading only while the actual request is pending, then show the backend reason or no-feasible-path state. A focused component regression test and TypeScript pass. Production visual recheck remains open.
 
+## 2026-10-24 — Isolate synthetic workspace behavior
+
+- **Finding:** Profile collected commitment and evidence rows from every owned goal. The production workspace seed labels goals with `model_requirements.workspace_seed`, but Profile did not exclude those goals, so its 106-observation radar could reflect fixture commitments. What If also pooled those commitments into the person-level execution estimate for authentic goals.
+- **Change:** select authentic goals for Profile traits and keep authentic and fixture goal cohorts separate when What If pools explicit commitments. Seed fixtures remain available for isolated scenario demonstrations; no stored records were deleted or rewritten.
+- **Verification:** 33 focused behavior, seed and What If tests passed; Ruff passed on the changed files. This is code-level prevention. A signed-in deployment check must confirm the live radar's observations and What If follow-through after release. The previous live 106-observation profile is not accepted as authentic behavioral evidence.
+

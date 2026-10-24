@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 
+from personal_markets.behavior.cohort import behavior_cohort_goals
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.domain import CommitmentTrial
 from personal_markets.behavior.features import trials_from_evidence
@@ -109,8 +110,9 @@ async def get_profile(
         collections.list_for(principal.user_id),
     )
     account = await identity.account_view(principal, usage, profile)
+    authentic_goals = behavior_cohort_goals(owned)
     trials, rows = await owner_trials_and_evidence(
-        principal.user_id, [goal.goal_id for goal in owned], evidence
+        principal.user_id, [goal.goal_id for goal in authentic_goals], evidence
     )
     custom = _custom_definitions(account.profile)
     selected = selected_trait_ids(account.profile)

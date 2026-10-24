@@ -6,6 +6,7 @@ from uuid import UUID
 
 import numpy as np
 
+from personal_markets.behavior.cohort import behavior_cohort_goals
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
@@ -310,8 +311,11 @@ class WhatIfService:
                 # Every owned goal's commitments form the person-level (global) level of
                 # the hierarchical execution model; this goal's actions refine it.
                 owned = await self._goals.list_goals(owner_id=self._owner_id)
+                cohort = behavior_cohort_goals(
+                    owned, synthetic=bool(goal.model_requirements.get("workspace_seed"))
+                )
                 plans, observations = await get_commitment_store().list_for_goals(
-                    self._owner_id, [item.goal_id for item in owned] or [goal.goal_id]
+                    self._owner_id, [item.goal_id for item in cohort]
                 )
                 explicit_trials = trials_from_commitments(plans, observations)
             request = self._apply_behavior_execution(
