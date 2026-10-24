@@ -2,6 +2,11 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — Route recovery during Vercel deployment
+
+- Signed-in production navigation to Profile and Settings twice failed to fetch an old lazy route chunk while Vercel replaced the deployment. A manual reload restored both routes without changing forecast data.
+- The existing error boundary now offers an accessible Reload page button so a demo viewer can recover in place. One focused component test and web typecheck pass. This does not prevent a chunk from becoming stale during a deployment.
+
 ## 2026-10-23 — Composio provider adapter contract
 
 **Hypothesis:** GitHub and Notion evidence reads can move onto one adapter contract without a second integration stack, and connectable catalogs can stop looking like working evidence sources.

@@ -13,7 +13,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   render() {
     if (this.state.hasError) {
-      return <main className="fatal-error"><h1>Something went wrong</h1><p>Reload the page. No forecast data was changed.</p></main>;
+      return <main className="fatal-error"><h1>Something went wrong</h1><p>Reload the page to continue. No forecast data was changed.</p><button className="ui-button" type="button" onClick={() => window.location.reload()}>Reload page</button></main>;
     }
     return this.props.children;
   }
