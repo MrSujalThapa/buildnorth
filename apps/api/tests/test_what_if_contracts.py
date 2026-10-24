@@ -337,6 +337,54 @@ def test_finance_deeper_compare_and_reverse_http_journey() -> None:
                 include_sensitivity=True,
             ),
         )
+        changed = client.post(
+            "/api/v1/what-if/simulate",
+            json=base.model_copy(
+                update={
+                    "parsed_changes": [
+                        InterventionChangeInput(
+                            metric="monthly_contribution",
+                            operation="set",
+                            value=6000,
+                            unit="CAD/month",
+                            provenance="USER_ASSUMPTION",
+                        )
+                    ]
+                }
+            ).model_dump(mode="json"),
+        )
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["priced"] is True
+        assert changed.json()["scenario_probability"] is not None
+        assert changed.json()["run_id"]
+
+        outcomes = [
+            ScenarioDefinition(label="Target reached"),
+            ScenarioDefinition(label="Meaningful progress"),
+            ScenarioDefinition(label="Current trajectory"),
+            ScenarioDefinition(label="Downside outcome", downside=True),
+        ]
+        futures = client.post(
+            "/api/v1/what-if/possible-futures",
+            json=PossibleFuturesRequest(
+                goal_id=str(goal.goal_id),
+                name="Higher contribution",
+                outcomes=outcomes,
+                include_other=True,
+                parsed_changes=[
+                    InterventionChangeInput(
+                        metric="monthly_contribution",
+                        operation="set",
+                        value=12000,
+                        unit="CAD/month",
+                        provenance="USER_ASSUMPTION",
+                    )
+                ],
+            ).model_dump(mode="json"),
+        )
+        assert futures.status_code == 200, futures.text
+        assert futures.json()["priced"] is True
+        assert futures.json()["run_id"]
         paths = [
             PathDefinition(
                 id=f"save-{amount}",
@@ -390,9 +438,11 @@ def test_finance_deeper_compare_and_reverse_http_journey() -> None:
         assert search["paths"]
         assert all(path["resulting_probability"] is not None for path in search["paths"])
 
+    impact_runs = asyncio.run(simulations.list_runs(goal.goal_id, run_kind="impact"))
+    future_runs = asyncio.run(simulations.list_runs(goal.goal_id, run_kind="possible_futures"))
     comparison_runs = asyncio.run(simulations.list_runs(goal.goal_id, run_kind="path_comparison"))
     search_runs = asyncio.run(simulations.list_runs(goal.goal_id, run_kind="target_search"))
-    assert comparison_runs and search_runs
+    assert impact_runs and future_runs and comparison_runs and search_runs
     assert comparison_runs[0].receipt["paths"]
     assert search_runs[0].receipt["paths"]
 

@@ -8,6 +8,8 @@ The previous #23 Overall/area trait radar was the wrong product model. The main 
 
 **Other fixture path:** the older `seeds/demo.json` path was found to lack an explicit goal cohort marker. Its seed writes now tag goals and evidence. No live rows were changed and existing seeded records need an isolated Postgres verification. This closes an identified future-ingest contamination path in code, without raising production Profile acceptance to PASS.
 
+The isolated HTTP finance journey also exercised priced Change and Futures, with separate persisted impact and futures receipts. All four modes now have one supported in-process numerical path; signed-in deployment across the requested goal families remains NOT VERIFIED.
+
 ## 2026-10-24 continuation on `feat/playitout-next-pass`
 
 This section supersedes the older branch/deployment pointers below; it does not rewrite their historical observations. Production main includes #21 (`64ea6ee`) and #22 (`f12a153`). PR #23 is open at `841f12b`; Cursor PRs #18–20 and #24 remain separate and unmerged.
