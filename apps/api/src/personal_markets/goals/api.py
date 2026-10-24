@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from personal_markets.collections.service import CollectionService
 from personal_markets.goals.domain import GoalContract
+from personal_markets.goals.publication import blocks_current_forecast
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
@@ -54,8 +55,10 @@ async def dashboard(
     )
     reads_ms = round((time.perf_counter() - parallel_started) * 1000)
     views = []
+    blocked = {goal_id for goal_id, snapshot in creations.items()
+               if blocks_current_forecast(snapshot)}
     for row in rows:
-        views.append(await collections.view(row, goals, histories))
+        views.append(await collections.view(row, goals, histories, blocked))
     structlog.get_logger(__name__).info(
         "dashboard_timing", goals_ms=goals_ms, reads_ms=reads_ms,
         total_ms=round((time.perf_counter() - started) * 1000),
