@@ -508,6 +508,7 @@ async def test_composio_failed_read_is_not_treated_as_evidence() -> None:
     from uuid import uuid4
 
     from personal_markets.core.config import Settings
+    from personal_markets.core.errors import IntegrationProviderError
     from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
 
     gateway = ComposioIntegrationGateway(Settings(environment="test"))
@@ -530,13 +531,14 @@ async def test_composio_failed_read_is_not_treated_as_evidence() -> None:
             )(),
         },
     )()
-    with pytest.raises(RuntimeError, match="Access denied"):
+    with pytest.raises(IntegrationProviderError) as raised:
         await gateway.execute_tool(
             uuid4(),
             "NOTION_FETCH_ALL_BLOCK_CONTENTS",
             {"block_id": "page-1"},
             connected_account_id="account-1",
         )
+    assert raised.value.kind == "permission_denied"
 
 
 @pytest.mark.asyncio

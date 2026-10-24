@@ -17,6 +17,7 @@ from personal_markets.core.errors import (
     ConflictError,
     DomainError,
     ForbiddenError,
+    IntegrationProviderError,
     PermanentProviderError,
     ProviderBudgetExceededError,
     ProviderNotConfiguredError,
@@ -86,6 +87,18 @@ def _status_for(error: DomainError) -> int:
         return 503
     if isinstance(error, PermanentProviderError):
         return 502
+    if isinstance(error, IntegrationProviderError):
+        if error.kind == "authentication_expired":
+            return 401
+        if error.kind in {"permission_denied", "resource_not_shared"}:
+            return 403
+        if error.kind == "resource_not_found":
+            return 404
+        if error.kind == "rate_limited":
+            return 429
+        if error.kind in {"provider_timeout", "temporary_upstream_failure"}:
+            return 503
+        return 422
     return 422
 
 
@@ -221,9 +234,13 @@ def create_app() -> FastAPI:
 
     @application.exception_handler(DomainError)
     async def handle_domain_error(request: Request, error: DomainError) -> JSONResponse:
+        body: dict[str, object] = {"type": type(error).__name__, "message": str(error)}
+        if isinstance(error, IntegrationProviderError):
+            body["kind"] = error.kind
+            body["retryable"] = error.retryable
         return JSONResponse(
             status_code=_status_for(error),
-            content={"error": {"type": type(error).__name__, "message": str(error)}},
+            content={"error": body},
             headers={"x-request-id": request.headers.get("x-request-id", "")},
         )
 

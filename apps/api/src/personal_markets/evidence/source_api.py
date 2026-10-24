@@ -187,7 +187,9 @@ async def save_source_watch(
             "Select an approved source resource before enabling monitoring."
         )
     if body.scope == "parent":
-        if body.plugin_id != "notion":
+        from personal_markets.integrations.provider_contract import get_adapter
+
+        if not get_adapter(body.plugin_id).supports_parent_watch:
             raise SemanticProviderError("Parent monitoring is available for Notion pages.")
         try:
             UUID(body.resource_id)

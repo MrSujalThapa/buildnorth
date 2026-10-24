@@ -193,6 +193,7 @@ class SourcePlannerProposal(BaseModel):
     recommended: list[SourceRecommendation] = Field(default_factory=list)
     irrelevant: list[SourceRecommendation] = Field(default_factory=list)
     manual_fallback_note: str = ""
+    discovery_issues: list[dict[str, str]] = Field(default_factory=list)
 
 
 class PricingResult(BaseModel):
