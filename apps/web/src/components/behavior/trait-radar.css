@@ -238,10 +238,10 @@
     width: calc(100% - 56px);
   }
   .trait-axis-name {
-    font-size: 17px;
+    font-size: 20px;
   }
   .trait-axis-value {
-    font-size: 16px;
+    font-size: 19px;
   }
 }
 

@@ -964,6 +964,7 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - **Change:** preserve Overall as the default trait series, expose sufficiently observed domains as an accessible area filter, and leave missing axes blank. Default Notion watches to the approved resource; descendants require a separate explicit choice. This changes only presentation and watch consent, not forecasting math, source authorization, or historical evidence.
 - **Evidence:** 16 backend trait tests, 3 radar component tests, 2 resource-scope tests, Ruff and TypeScript passed locally. The Impeccable mechanical detector returned no findings. PR #23 CI and live desktop/mobile acceptance are still pending. No measured forecasting result is claimed.
 - **Limit:** existing Chrome tabs stopped responding during authenticated follow-up; a fresh production tab restored access, but PR preview and local origins failed session verification. Render Cron has proven scheduled repeats with zero new records, not the new-record to published-forecast path. No production user data was seeded or altered in this experiment.
+- **Rendered check:** updated the stale Profile browser fixture to the current trait response and exercised the area selector, editor Cancel, name/bio Save/reload, photo upload/remove, and horizontal overflow at desktop and 390px mobile. Both Playwright runs passed. Screenshots were inspected; mobile SVG axis text was enlarged and rerendered. This is fixture evidence, not a signed-in production PASS.
 
 ## 2026-10-24 — real What If mode follow-up
 
