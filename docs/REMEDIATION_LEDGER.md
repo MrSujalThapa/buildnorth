@@ -1,5 +1,17 @@
 # PlayItOut remediation ledger
 
+## 2026-10-24 continuation on `feat/playitout-next-pass`
+
+This section supersedes the older branch/deployment pointers below; it does not rewrite their historical observations. Production main includes #21 (`64ea6ee`) and #22 (`f12a153`). PR #23 is open at `841f12b`; Cursor PRs #18–20 and #24 remain separate and unmerged.
+
+- **Cron:** a 15-minute Render job independently processed due authorized Notion watches at 20:45 and 22:00 UTC on October 23. Each run read one existing record and added zero. The new-source → normalized evidence → repricing → published-history chain remains **NOT VERIFIED**. A missing Notion parent affects only descendant discovery, not monitoring an already authorized page.
+- **What If:** production reading Change produced a persisted hypothetical 13% scenario baseline → 93% outcome, separate from the published goal odds of 15.1%. Reading Futures returned unpriced structural outcomes. #22 withholds pseudo-result cards; a fresh signed-in deployed recheck remains **NOT VERIFIED**. Compare, Reverse and Simple/Deeper still require real numerical acceptance.
+- **Course grade:** deterministic implementation and regression checks merged in #21. No signed-in course goal creation and course What If journey has been verified.
+- **Profile/source UI:** #23 makes Overall the default radar and offers one measured area at a time. It changes Notion monitoring to exact selected resources by default with explicit accessible-subpage opt-in. Unit tests and frontend typecheck passed; current Chrome computer-use connection stopped responding before a new signed-in visual check, so deployment remains open.
+- **Source and performance:** existing exact-page watches remain active. No new production source, goal, or evidence was created. Cold Render navigation and warm authenticated p95 remain unresolved.
+
+Next: restore signed-in browser control, visually accept #23 at desktop/mobile, then merge/deploy if sound. Run Compare, Reverse, Simple/Deeper and new goal/course journeys; prove a real new authorized provider observation through Cron without fabricating personal data.
+
 Source of truth for the 2026-10-22 complete-product pass. Do not treat a passing test count as completion.
 
 Branch: `ux/consumer-profile-whatif`  
