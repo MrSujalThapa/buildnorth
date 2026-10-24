@@ -534,7 +534,7 @@ export interface MarketHistoryPoint {
 }
 
 export interface PluginView {
-  definition: { id: string; name: string; description: string; category: string; provider_type: string; logo_url?: string | null; capabilities: { id: string; label: string; operation: string }[]; used_for: string[] };
+  definition: { id: string; name: string; description: string; category: string; provider_type: string; logo_url?: string | null; capabilities: { id: string; label: string; operation: string }[]; used_for: string[]; evidence_readiness?: string; readiness_detail?: string };
   connection: { plugin_id: string; status: "connected" | "not_connected" | "pending_auth" | "syncing" | "error" | "unavailable"; connected_at: string | null; last_sync_at: string | null; permissions: string[]; account_metadata: Record<string, string>; error: string | null };
 }
 

@@ -42,6 +42,15 @@ class SemanticProviderError(DomainError):
     pass
 
 
+class IntegrationProviderError(DomainError):
+    """Actionable provider failure. The message is safe to show; raw payloads are not."""
+
+    def __init__(self, kind: str, message: str, *, retryable: bool = False) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.retryable = retryable
+
+
 class InferenceOutputError(SemanticProviderError):
     """Safe validation reason with usage retained from a completed provider response."""
 

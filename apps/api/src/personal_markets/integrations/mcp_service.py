@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from personal_markets.core.config import DEFAULT_USER_ID, Settings, get_settings
-from personal_markets.core.errors import UnauthorizedError
+from personal_markets.core.errors import IntegrationProviderError, UnauthorizedError
 from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
 from personal_markets.integrations.composio_normalizer import normalize_tool_result
 from personal_markets.integrations.composio_transport import ComposioTransport
@@ -35,6 +35,13 @@ from personal_markets.integrations.plugins import (
 _MCP_DEFAULT_USER_ID = DEFAULT_USER_ID
 _SYNC_TOOL_TIMEOUT_SECONDS = 30
 _log = logging.getLogger(__name__)
+
+
+def _with_readiness(definition: PluginDefinition) -> PluginDefinition:
+    from personal_markets.integrations.provider_contract import readiness_for
+
+    level, detail = readiness_for(definition.id)
+    return definition.model_copy(update={"evidence_readiness": level, "readiness_detail": detail})
 
 
 class IntegrationGatewayService:
@@ -302,17 +309,20 @@ class IntegrationGatewayService:
                 )
             else:
                 connection = self._connection_view(stored)
-            views.append(PluginView(definition=definition, connection=connection))
+            views.append(PluginView(
+                definition=_with_readiness(definition),
+                connection=connection,
+            ))
         known = {item.definition.id for item in views}
         for plugin_id, stored in connections.items():
             if plugin_id in known:
                 continue
             views.append(PluginView(
-                definition=PluginDefinition(
+                definition=_with_readiness(PluginDefinition(
                     id=plugin_id, name=plugin_id.replace("_", " ").title(),
                     description="Connected source", category="integration",
                     provider_type="composio",
-                ),
+                )),
                 connection=self._connection_view(stored),
             ))
         return views
@@ -347,7 +357,10 @@ class IntegrationGatewayService:
                 [f"{row.get('tools_count')} tools available"] if row.get("tools_count") else []
             ),
         )
-        return PluginView(definition=definition, connection=connection)
+        return PluginView(
+            definition=_with_readiness(definition),
+            connection=connection,
+        )
 
     async def connect_managed(
         self,
@@ -627,6 +640,22 @@ class IntegrationGatewayService:
                 }
                 if cursor and cursor.cursor_value:
                     arguments["since"] = cursor.cursor_value
+                capabilities = await self._repository.list_capabilities(connection.id)
+                matched = next(
+                    (item for item in capabilities if item.tool_name == step.tool_name),
+                    None,
+                )
+                schema = matched.input_schema if matched is not None else {}
+                from personal_markets.integrations.provider_contract import (
+                    get_adapter,
+                    prepare_call_arguments,
+                )
+
+                arguments = prepare_call_arguments(
+                    arguments,
+                    schema,
+                    incremental_argument=get_adapter(plugin_id).incremental_argument,
+                )
                 argument_keys = sorted(arguments)
                 if not step.tool_name:
                     raise ValueError("Saved source has no supported read action. Select a source again.")
@@ -654,9 +683,13 @@ class IntegrationGatewayService:
                     or raw_payload.get("isError") is True
                     or (raw_payload.get("error") and not raw_payload.get("results"))
                 ):
-                    raise RuntimeError(
-                        f"{plugin_id} read failed: "
-                        f"{raw_payload.get('message') or raw_payload.get('error') or 'permission or provider error'}"
+                    from personal_markets.integrations.provider_contract import (
+                        classify_provider_failure,
+                    )
+
+                    raise classify_provider_failure(
+                        str(raw_payload.get("message") or raw_payload.get("error") or ""),
+                        raw_payload,
                     )
                 tool_rows = payload.get("records")
                 if tool_rows is None:
@@ -730,6 +763,24 @@ class IntegrationGatewayService:
                 "records_new": records_new,
                 "new_records": [item.model_dump(mode="json") for item in inserted_rows],
             }
+        except IntegrationProviderError as exc:
+            _log.warning(
+                "source_sync_read_failed provider=%s tool=%s argument_keys=%s kind=%s",
+                plugin_id,
+                last_tool,
+                argument_keys,
+                exc.kind,
+            )
+            await self._repository.finish_run(
+                run.id,
+                status="failed",
+                records_read=records_read,
+                records_new=0,
+                error=exc.kind,
+            )
+            if not exc.retryable:
+                await self._repository.update_connection(connection.id, status="error")
+            raise
         except Exception as exc:  # noqa: BLE001
             if plugin_id == "notion":
                 _log.warning(

@@ -20,6 +20,10 @@ def normalize_tool_result(
     """Map generic Composio tool payloads into RawSourceRecords with optional nested events."""
     rows = _extract_rows(payload)
     records: list[RawSourceRecord] = []
+    from personal_markets.integrations.mcp_repository import payload_hash
+    from personal_markets.integrations.provider_contract import get_adapter
+
+    adapter = get_adapter(plugin_id)
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             continue
@@ -27,7 +31,9 @@ def normalize_tool_result(
             (row.get("sha") if plugin_id == "github" else None)
             or row.get("id") or row.get("node_id") or f"{tool_name}:{index}"
         )
-        events = _infer_events(plugin_id, tool_name, row, recipe_step)
+        events = adapter.observations(tool_name, row, recipe_step)
+        if not events:
+            events = _generic_status_events(plugin_id, row)
         body = {
             **row,
             "summary": _summary_for_row(plugin_id, tool_name, row),
@@ -35,22 +41,33 @@ def normalize_tool_result(
             "tool_name": tool_name,
             "provider": plugin_id,
             "observed_at": _observed_at(row),
+            "evidence_classification": (
+                events[0].get("classification") if events else "raw_content"
+            ),
+            "validation_status": "unverified",
+            "promotes_to_verified_outcome": False,
         }
-        from personal_markets.integrations.mcp_repository import payload_hash
-
-        if plugin_id == "notion" and isinstance(row.get("markdown"), str):
-            fingerprint = payload_hash({
-                "id": row.get("id") or (recipe_step.arguments.get("page_id") if recipe_step else None),
-                "markdown": row["markdown"],
-            })
+        adapter_fingerprint = adapter.fingerprint(tool_name, row, recipe_step)
+        if adapter_fingerprint is not None:
+            fingerprint = payload_hash(adapter_fingerprint)
         elif plugin_id == "github" and row.get("sha"):
             # A commit SHA identifies immutable content; provider request IDs do not.
             fingerprint = payload_hash({"sha": row["sha"]})
         else:
-            fingerprint = payload_hash({
+            hash_body = {
                 key: value for key, value in body.items()
-                if key not in {"request_id", "response_id", "trace_id", "retrieved_at"}
-            })
+                if key not in {
+                    "request_id", "response_id", "trace_id", "retrieved_at", "ingested_at",
+                }
+            }
+            raw_events = hash_body.get("events")
+            if isinstance(raw_events, list):
+                hash_body["events"] = [
+                    {key: value for key, value in event.items() if key != "ingested_at"}
+                    if isinstance(event, dict) else event
+                    for event in raw_events
+                ]
+            fingerprint = payload_hash(hash_body)
         if plugin_id == "notion":
             external_id = f"{external_id}:{fingerprint[:16]}"
         records.append(
@@ -113,12 +130,8 @@ def _summary_for_row(plugin_id: str, tool_name: str, row: dict[str, Any]) -> str
     return f"{plugin_id} observation via {tool_name}"
 
 
-def _infer_events(
-    plugin_id: str,
-    tool_name: str,
-    row: dict[str, Any],
-    recipe_step: SyncRecipeStep | None,
-) -> list[dict[str, Any]]:
+def _generic_status_events(plugin_id: str, row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Status and duration hints only. They are activity, never a verified outcome."""
     events: list[dict[str, Any]] = []
     observed = _observed_at(row)
     status = str(row.get("status") or row.get("state") or row.get("outcome") or "").lower()
@@ -129,8 +142,6 @@ def _infer_events(
     }:
         events.append(
             {
-                # Provider task status is activity evidence, not proof that the
-                # user previously committed to a matching action window.
                 "event_type": "source_activity",
                 "domain": str(row.get("domain") or plugin_id),
                 "metric": str(row.get("metric") or "activity_status"),
@@ -139,6 +150,9 @@ def _infer_events(
                 "unit": str(row.get("unit") or "hours") if actual is not None else None,
                 "observed_at": observed,
                 "summary": str(row.get("title") or row.get("name") or "Source activity"),
+                "classification": "observed_activity",
+                "validation_status": "unverified",
+                "provenance": {"promotes_to_verified_outcome": False},
             }
         )
     elif planned is not None:
@@ -152,40 +166,9 @@ def _infer_events(
                 "unit": str(row.get("unit") or "hours"),
                 "observed_at": observed,
                 "summary": str(row.get("title") or row.get("name") or "Source plan"),
-            }
-        )
-    if plugin_id == "github" and ("commit" in tool_name.lower() or "commit" in row):
-        message = (
-            row.get("commit", {}).get("message")
-            if isinstance(row.get("commit"), dict)
-            else row.get("message")
-        )
-        events.append(
-            {
-                "event_type": "repository_activity",
-                "domain": "software",
-                "metric": "commits_pushed",
-                "numeric_value": 1,
-                "unit": "count",
-                "observed_at": observed,
-                "summary": f"Commit: {str(message or row.get('sha') or 'activity')[:160]}",
-            }
-        )
-    elif (
-        plugin_id == "github"
-        and row.get("state")
-        and row.get("title")
-        and ("issue" in tool_name.lower() or "pull_request" in tool_name.lower())
-    ):
-        is_pull_request = "pull_request" in tool_name.lower()
-        events.append(
-            {
-                "event_type": "pull_request_activity" if is_pull_request else "issue_activity",
-                "domain": "software",
-                "metric": "pull_request_update" if is_pull_request else "issue_update",
-                "categorical_value": str(row.get("state")),
-                "observed_at": observed,
-                "summary": f"{'Pull request' if is_pull_request else 'Issue'}: {row.get('title')}",
+                "classification": "observed_activity",
+                "validation_status": "unverified",
+                "provenance": {"promotes_to_verified_outcome": False},
             }
         )
     return events

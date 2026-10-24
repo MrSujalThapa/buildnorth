@@ -9,6 +9,7 @@ import structlog
 
 from personal_markets.core.errors import SemanticProviderError
 from personal_markets.integrations.mcp_domain import RawSourceRecord
+from personal_markets.integrations.provider_contract import get_adapter
 from personal_markets.integrations.source_watches import get_source_watch_store
 from personal_markets.ports import WorkflowRequest
 
@@ -74,21 +75,26 @@ class GoalSyncService:
                 self._owner_id, goal.goal_id
             )
             parent_ids = {
-                watch.resource_id
+                (watch.plugin_id, watch.resource_id)
                 for watch in watches
                 if watch.status == "active"
                 and watch.scope == "parent"
-                and watch.plugin_id == "notion"
-                and f"composio://notion/{watch.resource_id}" in self._watch_resource_uris
+                and get_adapter(watch.plugin_id).supports_parent_watch
+                and (
+                    f"composio://{watch.plugin_id}/{watch.resource_id}"
+                    in self._watch_resource_uris
+                )
             }
             if parent_ids:
                 expanded = []
                 for recipe in approved:
                     steps = list(recipe.steps)
-                    if recipe.plugin_id == "notion":
+                    if get_adapter(recipe.plugin_id).supports_parent_watch:
                         for step in recipe.steps:
-                            parent_id = step.resource_uri.removeprefix("composio://notion/")
-                            if parent_id not in parent_ids:
+                            parent_id = step.resource_uri.removeprefix(
+                                f"composio://{recipe.plugin_id}/"
+                            )
+                            if (recipe.plugin_id, parent_id) not in parent_ids:
                                 continue
                             argument_key = next(
                                 (key for key in ("block_id", "page_id") if key in step.arguments),
@@ -98,10 +104,12 @@ class GoalSyncService:
                                 raise SemanticProviderError(
                                     "This Notion read action cannot monitor child pages."
                                 )
-                            children = await self._gateway.list_descendants("notion", parent_id)
+                            children = await self._gateway.list_descendants(
+                                recipe.plugin_id, parent_id
+                            )
                             for child_id in children:
                                 steps.append(step.model_copy(update={
-                                    "resource_uri": f"composio://notion/{child_id}",
+                                    "resource_uri": f"composio://{recipe.plugin_id}/{child_id}",
                                     "arguments": {**step.arguments, argument_key: child_id},
                                 }))
                     expanded.append(recipe.model_copy(update={"steps": steps}))
@@ -212,20 +220,4 @@ class GoalSyncService:
 
 
 def _supported_goal_step(plugin_id: str, tool_name: str | None) -> bool:
-    if not tool_name:
-        return False
-    if plugin_id == "notion":
-        return tool_name in {
-            "NOTION_GET_PAGE_MARKDOWN",
-            "NOTION_FETCH_ALL_BLOCK_CONTENTS",
-            "NOTION_FETCH_BLOCK_CONTENTS",
-        }
-    if plugin_id == "github":
-        return tool_name in {
-            "GITHUB_LIST_COMMITS",
-            "GITHUB_GET_PULL_REQUESTS",
-            "GITHUB_LIST_PULL_REQUESTS",
-            "GITHUB_LIST_ISSUES_FOR_A_REPOSITORY",
-            "GITHUB_LIST_REPOSITORY_ISSUES",
-        }
-    return True
+    return get_adapter(plugin_id).is_supported_goal_read(tool_name)

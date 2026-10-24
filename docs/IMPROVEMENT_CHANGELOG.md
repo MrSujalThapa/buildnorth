@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-23 — Composio provider adapter contract
+
+**Hypothesis:** GitHub and Notion evidence reads can move onto one adapter contract without a second integration stack, and connectable catalogs can stop looking like working evidence sources.
+
+**Changes:** `ProviderAdapter` for GitHub, Notion, and a fixture-only Google Calendar reader. Shared discovery, recipe selection, argument checks, fingerprints, and `IntegrationProviderError` kinds. Plugin JSON exposes `evidence_readiness`. Gmail, Drive, Strava, Slack, Sheets, and Figma stay `connectable`. Calendar stays `connectable` until a real account is acceptance-tested. No provider is `autonomous_verified`. Cron, forecasts, and production credentials were not changed. No new measured probability.
+
+**Measured result:** No forecast number was recomputed. Historical changelog probabilities were not rewritten. Backend contract tests and the isolated Postgres suite are recorded in `docs/final/reports/COMPOSIO_SCALABILITY_IMPLEMENTATION.md`.
+
 ## 2026-10-22 — Goal-family Futures, Reverse levers, Deeper sensitivity
 
 **Hypothesis:** Parsing a decision is not the same as conditioning the model. Reverse filling from compare-catalog chips is not discovery. Simple/Deeper need different analysis, not only more draws. Radar axes must be user-selected parameters. Demo market histories must stay isolated.
