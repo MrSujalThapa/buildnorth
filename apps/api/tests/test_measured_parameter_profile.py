@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 from personal_markets.evidence.domain import NormalizedEvidence, Provenance
@@ -7,7 +8,13 @@ from personal_markets.profile.parameters import parameter_profile
 NOW = datetime(2026, 10, 24, tzinfo=UTC)
 
 
-def observation(metric: str, value: float, kind: str, unit: str, days_ago: int = 1):
+def observation(
+    metric: str,
+    value: float,
+    kind: Literal["snapshot", "increment", "period", "event", "uncertain"],
+    unit: str,
+    days_ago: int = 1,
+) -> NormalizedEvidence:
     return NormalizedEvidence(
         evidence_id=uuid4(),
         event_type="observation",

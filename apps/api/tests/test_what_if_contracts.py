@@ -238,8 +238,10 @@ async def test_deeper_compare_prices_two_measured_finance_paths_and_persists() -
     ]
     result = await service.compare_paths(PathComparisonRequest(base=base, paths=paths))
     assert len(result.paths) == 2
-    assert all(item.primary_goal_probability is not None for item in result.paths)
-    assert result.paths[1].primary_goal_probability > result.paths[0].primary_goal_probability
+    low = result.paths[0].primary_goal_probability
+    high = result.paths[1].primary_goal_probability
+    assert low is not None and high is not None
+    assert high > low
     assert result.run_id is not None
 
 
