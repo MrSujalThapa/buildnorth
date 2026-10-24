@@ -14,6 +14,8 @@ The isolated HTTP finance journey also exercised priced Change and Futures, with
 
 The branch now recovers the latest committed-goal checkpoint on a transient confirmation timeout, stores a failed thread state, and offers “Open saved goal” in New Goal only when the backend confirms a commit. Authenticated in-process HTTP and component tests pass. This addresses the duplicate-goal retry risk in code but does not prove the Spur workflow completes or the production UI renders correctly.
 
+An actual local LangGraph regression now confirms a user-confirmed goal is stored before a downstream evidence-provider timeout, and that the failed API response and later poll carry the same saved goal ID. The earlier paid Spur runs were in-memory and exited before their post-error repositories were inspected, so their individual goal persistence remains unknown.
+
 ## 2026-10-24 continuation on `feat/playitout-next-pass`
 
 This section supersedes the older branch/deployment pointers below; it does not rewrite their historical observations. Production main includes #21 (`64ea6ee`) and #22 (`f12a153`). PR #23 is open at `841f12b`; Cursor PRs #18–20 and #24 remain separate and unmerged.

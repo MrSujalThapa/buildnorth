@@ -1,6 +1,12 @@
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
+from personal_markets.core.errors import TransientProviderError
+from personal_markets.integrations.fake_inference import (
+    ScriptedInferenceProvider,
+    default_agent_script,
+)
+from personal_markets.ports import InferenceRequest
 
 
 def test_create_goal_and_resume_confirmation() -> None:
@@ -43,3 +49,37 @@ def test_clarification_cancel() -> None:
         )
         assert cancelled.status_code == 200
         assert cancelled.json()["status"] == "cancelled"
+
+
+def test_confirmed_goal_survives_downstream_provider_timeout() -> None:
+    def script(request: InferenceRequest) -> dict[str, object]:
+        if request.agent_name == "evidence":
+            raise TransientProviderError("provider timed out")
+        output = default_agent_script(request)
+        if request.agent_name == "goal_architect":
+            output["current_state_known"] = {"phone_screen_result": "completed"}
+        return output
+
+    with TestClient(isolated_app(inference=ScriptedInferenceProvider(script))) as client:
+        created = client.post(
+            "/api/v1/agent/threads",
+            json={
+                "kind": "create_goal",
+                "intent": "Receive an SWE offer by August 2027 after a phone screen this month.",
+            },
+        )
+        assert created.status_code == 200, created.text
+        assert created.json()["status"] == "needs_input"
+        thread_id = created.json()["thread_id"]
+        resumed = client.post(
+            f"/api/v1/agent/threads/{thread_id}/resume", json={"confirmed": True}
+        )
+        assert resumed.status_code == 200, resumed.text
+        body = resumed.json()
+        assert body["status"] == "failed"
+        assert body["debug"]["goal_committed"] is True
+        assert body["goal"] and body["goal"]["goal_id"]
+        goal_id = body["goal"]["goal_id"]
+        assert any(item["goal_id"] == goal_id for item in client.get("/api/v1/goals").json())
+        polled = client.get(f"/api/v1/agent/threads/{thread_id}")
+        assert polled.json()["goal"]["goal_id"] == goal_id
