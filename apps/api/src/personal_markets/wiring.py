@@ -150,14 +150,18 @@ class PersistingWorkflow:
     async def resume(self, thread_id: Any, payload: Any) -> Any:
         try:
             snapshot = await self._inner.resume(thread_id, payload)
-        except (TransientProviderError, TimeoutError):
-            structlog.get_logger("personal_markets.agents").exception(
-                "agent_workflow_resume_provider_failed", thread_id=str(thread_id)
-            )
+        except (TransientProviderError, TimeoutError) as error:
             stored = await self._threads.get(thread_id)
             if stored is None:
                 raise
-            return await self._persist_failed_snapshot(thread_id, stored)
+            failed = await self._persist_failed_snapshot(thread_id, stored)
+            structlog.get_logger("personal_markets.agents").warning(
+                "agent_workflow_resume_provider_failed",
+                thread_id=str(thread_id),
+                error_type=type(error).__name__,
+                goal_committed=failed.debug.get("goal_committed") is True,
+            )
+            return failed
         await self._threads.upsert(snapshot)
         await self._maybe_review(snapshot)
         return snapshot
