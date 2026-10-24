@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from personal_markets.agents.completion import complete_validated
@@ -15,13 +16,18 @@ from personal_markets.core.errors import IntegrationProviderError, SemanticProvi
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.gateway import UnifiedIntegrationGateway
+from personal_markets.integrations.generic_reads import (
+    arguments_for_selection,
+    bound_page_arguments,
+)
 from personal_markets.integrations.mcp_domain import (
     GoalSyncRecipeRecord,
+    MCPToolDescriptor,
     ReadCapabilityRecord,
     SyncRecipeStep,
 )
 from personal_markets.integrations.plugins import PLUGIN_DEFINITIONS, PluginStatus
-from personal_markets.integrations.provider_contract import get_adapter, required_argument_names
+from personal_markets.integrations.provider_contract import required_argument_names
 from personal_markets.integrations.resource_ranker import rank_resources
 from personal_markets.ports import (
     InferenceProvider,
@@ -66,9 +72,10 @@ class SourcePlannerService:
             plugin_id: str,
         ) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, str] | None]:
             async with semaphore:
-                async def resources_or_empty() -> (
-                    tuple[list[dict[str, object]], dict[str, str] | None]
-                ):
+
+                async def resources_or_empty() -> tuple[
+                    list[dict[str, object]], dict[str, str] | None
+                ]:
                     try:
                         return await self._gateway.list_resources(plugin_id), None
                     except IntegrationProviderError as error:
@@ -80,7 +87,8 @@ class SourcePlannerService:
                     except Exception:
                         logger.warning(
                             "source_resource_discovery_failed plugin_id=%s error_type=%s",
-                            plugin_id, "Exception",
+                            plugin_id,
+                            "Exception",
                         )
                         return [], {
                             "plugin_id": plugin_id,
@@ -98,11 +106,13 @@ class SourcePlannerService:
             if view.connection.status == PluginStatus.CONNECTED
         ]
         discovery_issues: list[dict[str, str]] = []
-        connected_results = dict(zip(
-            connected_ids,
-            await asyncio.gather(*(load_connected(plugin_id) for plugin_id in connected_ids)),
-            strict=True,
-        ))
+        connected_results = dict(
+            zip(
+                connected_ids,
+                await asyncio.gather(*(load_connected(plugin_id) for plugin_id in connected_ids)),
+                strict=True,
+            )
+        )
         catalog = []
         available_resources: list[dict[str, object]] = []
         for view in plugin_views:
@@ -196,11 +206,15 @@ class SourcePlannerService:
             user_id=self._owner_id,
         )
         proposal, response = await complete_validated(
-            self._inference, request, SourcePlannerProposal,
+            self._inference,
+            request,
+            SourcePlannerProposal,
             timeout_seconds=self._settings.inference_run_timeout_seconds,
         )
         proposal = self._validate_plan(proposal)
-        proposal = self._attach_ranked_resources(proposal, available_resources, goal.model_dump(mode="json"))
+        proposal = self._attach_ranked_resources(
+            proposal, available_resources, goal.model_dump(mode="json")
+        )
         if discovery_issues:
             proposal = proposal.model_copy(update={"discovery_issues": discovery_issues})
         await self._run_store.record(  # type: ignore[attr-defined]
@@ -239,6 +253,7 @@ class SourcePlannerService:
         resource_ids: list[str] | None = None,
         approved: bool = True,
         activity_types: list[str] | None = None,
+        read_arguments: dict[str, Any] | None = None,
     ) -> GoalSyncRecipeRecord:
         goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         owner = self._owner_id or getattr(self._gateway, "_user_id", None)
@@ -251,6 +266,7 @@ class SourcePlannerService:
             label,
             connection.id,
             activity_types=activity_types,
+            read_arguments=read_arguments,
         )
         now = datetime.now(UTC)
         recipe = GoalSyncRecipeRecord(
@@ -261,7 +277,10 @@ class SourcePlannerService:
             steps=recipe_steps,
             approved=approved,
             user_approved_at=now if approved else None,
-            provenance={"approved_via": "goal_evidence_workspace"},
+            provenance={
+                "approved_via": "goal_evidence_workspace",
+                "connected_account_id": connection.account_metadata.get("connected_account_id", ""),
+            },
         )
         return await self._repository.save_goal_recipe(recipe)  # type: ignore[attr-defined]
 
@@ -272,24 +291,50 @@ class SourcePlannerService:
         label: str,
         connection_id: UUID,
         activity_types: list[str] | None = None,
+        read_arguments: dict[str, Any] | None = None,
     ) -> list[SyncRecipeStep]:
-        if get_adapter(plugin_id).requires_resource and not resource_ids:
+        if not resource_ids:
             raise SemanticProviderError(
-                "Choose a page, repository, or calendar before saving this source."
+                "Choose an accessible resource or bounded query before saving this source."
             )
-        capabilities: list[ReadCapabilityRecord] = await self._repository.list_capabilities(connection_id)  # type: ignore[attr-defined]
-        selected = _select_capabilities(capabilities, activity_types)
+        capabilities: list[ReadCapabilityRecord] = await self._repository.list_capabilities(  # type: ignore[attr-defined]
+            connection_id
+        )
+        selected = _select_capabilities(capabilities, activity_types, plugin_id=plugin_id)
         if activity_types and not selected:
             raise SemanticProviderError("No supported read action matches the selected activity.")
         if not selected:
-            raise SemanticProviderError("This connection has no supported read action. Reconnect it and try again.")
+            raise SemanticProviderError(
+                "This connection has no supported read action. Reconnect it and try again."
+            )
         targets = resource_ids or [label]
         steps: list[SyncRecipeStep] = []
         for capability in selected:
             for target in targets:
                 arguments = _arguments_for_resource(target, label, capability)
+                if plugin_id not in {"github", "notion", "calendar"}:
+                    tool = MCPToolDescriptor(
+                        name=capability.tool_name or "", input_schema=capability.input_schema
+                    )
+                    generic_arguments = arguments_for_selection(tool, target, read_arguments)
+                    if generic_arguments is None:
+                        raise SemanticProviderError(
+                            "This read cannot be scoped safely to the selected resource or query."
+                        )
+                    arguments = bound_page_arguments(tool, generic_arguments)
+                    from jsonschema import Draft202012Validator, SchemaError, ValidationError
+
+                    body = capability.input_schema.get("parameters", capability.input_schema)
+                    try:
+                        Draft202012Validator.check_schema(body)
+                        Draft202012Validator(body).validate(arguments)
+                    except (SchemaError, ValidationError) as error:
+                        raise SemanticProviderError(
+                            "The selected values do not match this read action's schema."
+                        ) from error
                 missing = [
-                    name for name in required_argument_names(capability.input_schema)
+                    name
+                    for name in required_argument_names(capability.input_schema)
                     if name not in arguments or arguments[name] in ("", None)
                 ]
                 if missing:
@@ -330,7 +375,8 @@ class SourcePlannerService:
                     item.model_copy(
                         update={
                             "why": item.why or item.rationale,
-                            "recommended": item.recommended or item.goal_relevance in {"high", "medium"},
+                            "recommended": item.recommended
+                            or item.goal_relevance in {"high", "medium"},
                         }
                     )
                     for item in rec.resources
@@ -365,11 +411,15 @@ class SourcePlannerService:
             seen.add(rec.plugin_id)
             resources = by_plugin.get(rec.plugin_id) or rec.resources
             if any(item.recommended for item in resources):
-                recommended.append(rec.model_copy(update={
-                    "relevance": "recommended",
-                    "rationale": "An accessible page may relate to this goal.",
-                    "resources": resources,
-                }))
+                recommended.append(
+                    rec.model_copy(
+                        update={
+                            "relevance": "recommended",
+                            "rationale": "An accessible page may relate to this goal.",
+                            "resources": resources,
+                        }
+                    )
+                )
             else:
                 irrelevant.append(rec.model_copy(update={"resources": resources}))
         for plugin_id, resources in by_plugin.items():
@@ -399,20 +449,44 @@ class SourcePlannerService:
 def _select_capabilities(
     capabilities: list[ReadCapabilityRecord],
     activity_types: list[str] | None,
+    *,
+    plugin_id: str | None = None,
 ) -> list[ReadCapabilityRecord]:
     from personal_markets.integrations.provider_contract import adapter_for_tool_names
 
     capabilities = [
-        cap for cap in capabilities
+        cap
+        for cap in capabilities
         if cap.approved and (cap.operation == "read" or cap.operation.endswith(".read"))
     ]
     if not capabilities:
         return []
     names = [cap.tool_name or "" for cap in capabilities]
-    selected_names = adapter_for_tool_names(names).select_tool_names(
-        [name for name in names if name],
-        activity_types,
-    )
+    if plugin_id is None:
+        from personal_markets.integrations.provider_contract import adapter_for_tool_names
+
+        plugin_id = adapter_for_tool_names(names).plugin_id
+    if plugin_id not in {"github", "notion", "calendar"}:
+        from personal_markets.integrations.generic_reads import goal_read_tools
+
+        available = goal_read_tools(
+            plugin_id,
+            [
+                MCPToolDescriptor(name=cap.tool_name or "", input_schema=cap.input_schema)
+                for cap in capabilities
+                if cap.tool_name
+            ],
+        )
+        selected_names: list[str] | None = [
+            name for name in (activity_types or []) if name in {tool.name for tool in available}
+        ]
+        if selected_names is None or len(selected_names) != 1:
+            return []
+    else:
+        selected_names = adapter_for_tool_names(names).select_tool_names(
+            [name for name in names if name],
+            activity_types,
+        )
     if not selected_names:
         return []
     chosen: list[ReadCapabilityRecord] = []
@@ -423,7 +497,9 @@ def _select_capabilities(
     return chosen if len(chosen) == len(selected_names) else []
 
 
-def _arguments_for_resource(target: str, label: str, capability: ReadCapabilityRecord) -> dict[str, object]:
+def _arguments_for_resource(
+    target: str, label: str, capability: ReadCapabilityRecord
+) -> dict[str, object]:
     schema = capability.input_schema or {}
     properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
     arguments: dict[str, object] = {"resource_id": target, "label": label}

@@ -156,7 +156,7 @@ def prepare_call_arguments(
     cleaned = {
         key: value
         for key, value in arguments.items()
-        if key not in {"resource_id", "label"} and value is not None
+        if key != "label" and (key != "resource_id" or key in properties) and value is not None
     }
     if properties:
         cleaned = {key: value for key, value in cleaned.items() if key in properties}

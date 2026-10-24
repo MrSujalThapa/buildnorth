@@ -118,8 +118,20 @@ class GoalSyncService:
             return {"status": "no_recipes", "message": "No approved goal-specific sync recipes."}
 
         for recipe in approved:
+            if recipe.plugin_id not in {"github", "notion", "calendar"}:
+                connection = await self._repository.get_connection(
+                    self._owner_id, recipe.plugin_id
+                )
+                account_id = recipe.provenance.get("connected_account_id")
+                if (connection is None or not account_id or
+                    account_id != connection.account_metadata.get("connected_account_id")):
+                    raise SemanticProviderError(
+                        "The connected account changed. Select this source again."
+                    )
             if not recipe.steps or not all(
-                _supported_goal_step(recipe.plugin_id, step.tool_name) for step in recipe.steps
+                _supported_goal_step(recipe.plugin_id, step.tool_name)
+                or recipe.plugin_id not in {"github", "notion", "calendar"}
+                for step in recipe.steps
             ):
                 raise SemanticProviderError(
                     f"Select the {recipe.plugin_id} source again to choose a supported activity."
@@ -221,3 +233,5 @@ class GoalSyncService:
 
 def _supported_goal_step(plugin_id: str, tool_name: str | None) -> bool:
     return get_adapter(plugin_id).is_supported_goal_read(tool_name)
+
+\n

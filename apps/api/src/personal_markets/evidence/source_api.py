@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -41,6 +41,7 @@ class SaveRecipeBody(BaseModel):
     resource_ids: list[str] = Field(default_factory=list)
     approved: bool = True
     activity_types: list[str] = Field(default_factory=list)
+    read_arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class SaveWatchBody(BaseModel):
@@ -249,6 +250,7 @@ async def save_goal_recipe(
         resource_ids=body.resource_ids,
         approved=body.approved,
         activity_types=body.activity_types or None,
+        read_arguments=body.read_arguments,
     )
     return recipe.model_dump(mode="json")
 

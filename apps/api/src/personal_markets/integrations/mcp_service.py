@@ -30,6 +30,7 @@ from personal_markets.integrations.plugins import (
     PluginDefinition,
     PluginStatus,
     PluginView,
+    ReadCapability,
 )
 
 _MCP_DEFAULT_USER_ID = DEFAULT_USER_ID
@@ -60,6 +61,7 @@ class IntegrationGatewayService:
         self._settings = settings or get_settings()
         self._composio = ComposioIntegrationGateway(self._settings)
         self._definitions = {item.id: item for item in PLUGIN_DEFINITIONS}
+        self._discovery_locks: dict[UUID, asyncio.Lock] = {}
 
     def _owner(self, user_id: UUID | None) -> UUID:
         if user_id is not None:
@@ -120,7 +122,6 @@ class IntegrationGatewayService:
             previous_account_id = (
                 existing.account_metadata.get("connected_account_id") if existing else None
             )
-            became_connected = existing is None or existing.status != "connected"
             account_changed = previous_account_id != selected.connected_account_id
 
             if existing is None:
@@ -140,8 +141,8 @@ class IntegrationGatewayService:
                 await self._repository.upsert_connection(record)
                 stored = await self._repository.get_connection(user_id, toolkit_slug)
                 assert stored is not None
-                if became_connected or account_changed:
-                    await self._discover_and_persist(stored)
+                # Tool schemas are resolved when this connection's evidence UI is used.
+                # Listing connections must not block unrelated navigation.
                 continue
 
             updated = existing.model_copy(
@@ -154,8 +155,9 @@ class IntegrationGatewayService:
                 }
             )
             await self._repository.upsert_connection(updated)
-            if became_connected or account_changed:
-                await self._discover_and_persist(updated)
+            if account_changed:
+                self._composio.invalidate_tool_cache(user_id, toolkit_slug)
+                await self._repository.save_capabilities(updated.id, [])
 
         for plugin_id, connection in local_connections.items():
             if connection.connection_type != ConnectionType.MANAGED_GATEWAY:
@@ -167,6 +169,8 @@ class IntegrationGatewayService:
             # its outcome; demoting it here stops the client's pending poll.
             if connection.status == "connected":
                 await self._repository.update_connection(connection.id, status="not_connected")
+                self._composio.invalidate_tool_cache(user_id, plugin_id)
+                await self._repository.save_capabilities(connection.id, [])
 
     async def search_catalog(
         self,
@@ -184,7 +188,8 @@ class IntegrationGatewayService:
         stored_connections = await self._repository.list_connections(owner)
         connections = {item.plugin_id: item for item in stored_connections}
         local_views = [
-            view for view in await self._local_plugin_views(connections)
+            view
+            for view in await self._local_plugin_views(connections)
             if view.definition.id in connections and view.definition.id not in {"manual", "csv"}
         ]
         provider_status = "available" if self._composio.available else "unavailable"
@@ -218,9 +223,7 @@ class IntegrationGatewayService:
             page = await self._composio.search_toolkits(search=search, cursor=cursor, limit=limit)
         except Exception:
             provider_status = "error"
-            provider_message = (
-                "The integration catalog could not be loaded. Retry in a moment."
-            )
+            provider_message = "The integration catalog could not be loaded. Retry in a moment."
             return {
                 "items": [item.model_dump(mode="json") for item in local_views],
                 "next_cursor": None,
@@ -236,7 +239,10 @@ class IntegrationGatewayService:
         if not search and not cursor:
             remote = [item for item in items if item.definition.id not in {"manual", "csv"}]
             local_ids = {item.definition.id for item in local_views}
-            items = [*local_views, *(item for item in remote if item.definition.id not in local_ids)]
+            items = [
+                *local_views,
+                *(item for item in remote if item.definition.id not in local_ids),
+            ]
         elif search:
             extra = [
                 view
@@ -293,13 +299,65 @@ class IntegrationGatewayService:
             item.plugin_id: item for item in await self._repository.list_connections(owner)
         }
         return [
-            view for view in await self._local_plugin_views(connections)
+            view
+            for view in await self._local_plugin_views(connections)
             if view.definition.id in connections
         ]
 
     async def _local_plugin_views(
         self, connections: dict[str, PluginConnectionRecord]
     ) -> list[PluginView]:
+        from personal_markets.integrations.generic_reads import goal_read_tools
+        from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+        from personal_markets.integrations.provider_contract import get_adapter
+
+        async def definition_for(
+            base: PluginDefinition, stored: PluginConnectionRecord | None
+        ) -> PluginDefinition:
+            definition = _with_readiness(base)
+            if stored is None or stored.status != "connected":
+                return definition.model_copy(update={"capabilities": []})
+            rows = await self._repository.list_capabilities(stored.id)
+            if base.id in {"github", "notion", "calendar"}:
+                supported = [
+                    row
+                    for row in rows
+                    if get_adapter(base.id).is_supported_goal_read(row.tool_name)
+                ]
+            else:
+                candidates = goal_read_tools(
+                    base.id,
+                    [
+                        MCPToolDescriptor(name=row.tool_name or "", input_schema=row.input_schema)
+                        for row in rows
+                        if row.approved and row.tool_name
+                    ],
+                )
+                selected = {tool.name for tool in candidates}
+                supported = [row for row in rows if row.tool_name in selected]
+            return definition.model_copy(
+                update={
+                    "capabilities": [
+                        ReadCapability(
+                            id=row.capability_id, label=row.label, operation=row.operation
+                        )
+                        for row in supported[:20]
+                    ],
+                    "evidence_readiness": "evidence_capable" if supported else "connectable",
+                    "readiness_detail": (
+                        "Choose a specific resource or bounded query in Evidence. "
+                        "Records remain unverified until evidence processing succeeds."
+                        if supported
+                        else "No safely scoped read action has been confirmed for this connection."
+                    ),
+                    "description": (
+                        "Selected authorized records can be used as unverified goal evidence."
+                        if supported
+                        else definition.description
+                    ),
+                }
+            )
+
         views: list[PluginView] = []
         for definition in PLUGIN_DEFINITIONS:
             stored = connections.get(definition.id)
@@ -309,22 +367,31 @@ class IntegrationGatewayService:
                 )
             else:
                 connection = self._connection_view(stored)
-            views.append(PluginView(
-                definition=_with_readiness(definition),
-                connection=connection,
-            ))
+            views.append(
+                PluginView(
+                    definition=await definition_for(definition, stored),
+                    connection=connection,
+                )
+            )
         known = {item.definition.id for item in views}
         for plugin_id, stored in connections.items():
             if plugin_id in known:
                 continue
-            views.append(PluginView(
-                definition=_with_readiness(PluginDefinition(
-                    id=plugin_id, name=plugin_id.replace("_", " ").title(),
-                    description="Connected source", category="integration",
-                    provider_type="composio",
-                )),
-                connection=self._connection_view(stored),
-            ))
+            views.append(
+                PluginView(
+                    definition=await definition_for(
+                        PluginDefinition(
+                            id=plugin_id,
+                            name=plugin_id.replace("_", " ").title(),
+                            description="Connected source",
+                            category="integration",
+                            provider_type="composio",
+                        ),
+                        stored,
+                    ),
+                    connection=self._connection_view(stored),
+                )
+            )
         return views
 
     def _toolkit_view(
@@ -454,19 +521,30 @@ class IntegrationGatewayService:
             "auth_url": init.redirect_url,
         }
 
-    async def list_capabilities(self, plugin_id: str, *, user_id: UUID | None = None) -> list[dict[str, object]]:
+    async def list_capabilities(
+        self, plugin_id: str, *, user_id: UUID | None = None
+    ) -> list[dict[str, object]]:
         owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
             return []
         rows = await self._repository.list_capabilities(connection.id)
+        if not rows and connection.status == "connected":
+            await self._discover_and_persist(connection)
+            rows = await self._repository.list_capabilities(connection.id)
         return [row.model_dump(mode="json") for row in rows]
 
-    async def list_resources(self, plugin_id: str, *, user_id: UUID | None = None) -> list[dict[str, object]]:
+    async def list_resources(
+        self, plugin_id: str, *, user_id: UUID | None = None
+    ) -> list[dict[str, object]]:
         owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None:
             return []
+        if connection.status != "connected":
+            raise ValueError("Reconnect this integration before reading sources.")
+        if not await self._repository.list_capabilities(connection.id):
+            await self._discover_and_persist(connection)
         transport = self._transport_for(connection)
         resources = await transport.list_resources()
         return [item.model_dump(mode="json") for item in resources]
@@ -483,7 +561,9 @@ class IntegrationGatewayService:
             raise ValueError(f"{plugin_id} does not support descendant discovery")
         return await transport.list_descendants(parent_id)
 
-    async def refresh_connection(self, plugin_id: str, *, user_id: UUID | None = None) -> dict[str, object]:
+    async def refresh_connection(
+        self, plugin_id: str, *, user_id: UUID | None = None
+    ) -> dict[str, object]:
         owner = self._owner(user_id)
         await self._reconcile_connections(owner)
         connection = await self._repository.get_connection(owner, plugin_id)
@@ -512,14 +592,23 @@ class IntegrationGatewayService:
                 }
             )
             await self._repository.upsert_connection(updated)
-            await self._discover_and_persist(updated)
+            if (
+                connection.account_metadata.get("connected_account_id")
+                != status.connected_account_id
+            ):
+                self._composio.invalidate_tool_cache(owner, plugin_id)
+            await self._discover_and_persist(updated, force=True)
             return {
                 "plugin_id": plugin_id,
                 "status": next_status,
                 "connected_account_id": status.connected_account_id,
                 "account_label": status.account_label,
             }
-        return {"plugin_id": plugin_id, "status": connection.status, "auth_url": metadata.get("auth_url")}
+        return {
+            "plugin_id": plugin_id,
+            "status": connection.status,
+            "auth_url": metadata.get("auth_url"),
+        }
 
     async def connect_custom_mcp(
         self,
@@ -553,7 +642,16 @@ class IntegrationGatewayService:
         await self._discover_and_persist(stored)
         return stored
 
-    async def _discover_and_persist(self, connection: PluginConnectionRecord) -> None:
+    async def _discover_and_persist(
+        self, connection: PluginConnectionRecord, *, force: bool = False
+    ) -> None:
+        lock = self._discovery_locks.setdefault(connection.id, asyncio.Lock())
+        async with lock:
+            if not force and await self._repository.list_capabilities(connection.id):
+                return
+            await self._discover_and_persist_locked(connection)
+
+    async def _discover_and_persist_locked(self, connection: PluginConnectionRecord) -> None:
         transport = self._transport_for(connection)
         tools = await transport.list_tools()
         capabilities: list[ReadCapabilityRecord] = []
@@ -577,6 +675,13 @@ class IntegrationGatewayService:
                 )
             )
         await self._repository.save_capabilities(connection.id, capabilities)
+        if (
+            connection.connection_type == ConnectionType.MANAGED_GATEWAY
+            and connection.account_metadata.get("gateway") != "mock"
+        ):
+            # Discovery is metadata only; connected accounts are never swept
+            # until a person saves a goal-specific, scoped recipe.
+            return
         steps = [
             SyncRecipeStep(
                 capability_id=cap.capability_id,
@@ -619,11 +724,27 @@ class IntegrationGatewayService:
             refreshed = await self._repository.get_connection(owner, plugin_id)
             if refreshed is not None:
                 connection = refreshed
+        if connection.status != "connected":
+            raise ValueError("Reconnect this integration before reading sources.")
         recipe = await self._repository.get_recipe(connection.id)
+        if (
+            connection.connection_type == ConnectionType.MANAGED_GATEWAY
+            and connection.account_metadata.get("gateway") != "mock"
+            and steps is None
+        ):
+            return {
+                "status": "noop",
+                "records_new": 0,
+                "message": "Choose and approve a goal-specific source before reading.",
+            }
         steps_to_run = steps or (recipe.steps if recipe else [])
         if not steps_to_run:
             return {"status": "noop", "records_new": 0, "message": "No approved read recipe"}
         transport = self._transport_for(connection)
+        legacy_mock = not hasattr(transport, "list_tools") and not self._composio.available
+        live_tools = (
+            {tool.name: tool for tool in await transport.list_tools()} if not legacy_mock else {}
+        )
         run = await self._repository.start_run(connection.id)
         records_read = 0
         raw_rows: list[RawSourceRecord] = []
@@ -633,10 +754,14 @@ class IntegrationGatewayService:
             for step in steps_to_run:
                 last_tool = step.tool_name
                 cursor = await self._repository.get_cursor(connection.id, step.capability_id)
+                from personal_markets.integrations.provider_contract import schema_properties
+
+                live_tool = live_tools.get(step.tool_name or "")
+                declared = schema_properties(live_tool.input_schema) if live_tool else {}
                 arguments = {
                     key: value
                     for key, value in dict(step.arguments).items()
-                    if key not in {"resource_id", "label"}
+                    if key != "label" and (key != "resource_id" or key in declared)
                 }
                 if cursor and cursor.cursor_value:
                     arguments["since"] = cursor.cursor_value
@@ -645,20 +770,67 @@ class IntegrationGatewayService:
                     (item for item in capabilities if item.tool_name == step.tool_name),
                     None,
                 )
-                schema = matched.input_schema if matched is not None else {}
+                if not legacy_mock and (
+                    matched is None
+                    or not matched.approved
+                    or not (matched.operation == "read" or matched.operation.endswith(".read"))
+                    or matched.capability_id != step.capability_id
+                ):
+                    raise ValueError("Saved source is no longer an approved read. Select it again.")
+                if not legacy_mock and (
+                    live_tool is None or self._policy.classify_tool(plugin_id, live_tool) is None
+                ):
+                    raise ValueError("Provider read permission changed. Select this source again.")
+                schema = (
+                    live_tool.input_schema if live_tool else matched.input_schema if matched else {}
+                )
+                from personal_markets.integrations.generic_reads import (
+                    incremental_key,
+                    safe_read_tool,
+                )
                 from personal_markets.integrations.provider_contract import (
                     get_adapter,
                     prepare_call_arguments,
                 )
 
+                if plugin_id not in {"github", "notion", "calendar"}:
+                    if live_tool is None or not safe_read_tool(plugin_id, live_tool):
+                        raise ValueError(
+                            "Provider read permission changed. Select this source again."
+                        )
+                    undeclared = set(arguments) - set(
+                        schema.get("parameters", schema).get("properties", {})
+                    )
+                    if undeclared:
+                        raise ValueError("Provider read schema changed. Select this source again.")
+
                 arguments = prepare_call_arguments(
                     arguments,
                     schema,
-                    incremental_argument=get_adapter(plugin_id).incremental_argument,
+                    incremental_argument=(
+                        get_adapter(plugin_id).incremental_argument
+                        if plugin_id in {"github", "notion", "calendar"}
+                        else incremental_key(live_tool)
+                        if live_tool
+                        else None
+                    ),
                 )
+                if plugin_id not in {"github", "notion", "calendar"}:
+                    from jsonschema import Draft202012Validator, SchemaError, ValidationError
+
+                    try:
+                        body = schema.get("parameters", schema)
+                        Draft202012Validator.check_schema(body)
+                        Draft202012Validator(body).validate(arguments)
+                    except (SchemaError, ValidationError) as error:
+                        raise ValueError(
+                            "Provider read arguments no longer match its schema."
+                        ) from error
                 argument_keys = sorted(arguments)
                 if not step.tool_name:
-                    raise ValueError("Saved source has no supported read action. Select a source again.")
+                    raise ValueError(
+                        "Saved source has no supported read action. Select a source again."
+                    )
                 started = time.perf_counter()
                 try:
                     payload = await asyncio.wait_for(
@@ -725,7 +897,11 @@ class IntegrationGatewayService:
                         update={
                             "cursor_context": {
                                 **row.cursor_context,
-                                **({"goal_sync_job_id": str(goal_sync_job_id)} if goal_sync_job_id else {}),
+                                **(
+                                    {"goal_sync_job_id": str(goal_sync_job_id)}
+                                    if goal_sync_job_id
+                                    else {}
+                                ),
                             }
                         }
                     )
@@ -733,8 +909,58 @@ class IntegrationGatewayService:
                 ]
                 records_read += len(rows)
                 raw_rows.extend(rows)
+                if plugin_id not in {"github", "notion", "calendar"}:
+                    from personal_markets.integrations.generic_reads import bound_page_arguments
+                    from personal_markets.integrations.provider_contract import schema_properties
+
+                    seen_pages: set[str] = set()
+                    for _ in range(2):
+                        page_payload = payload.get("raw") or payload
+                        if not isinstance(page_payload, dict):
+                            break
+                        cursor_value = (
+                            page_payload.get("next_cursor")
+                            or page_payload.get("next_page_token")
+                            or page_payload.get("nextPageToken")
+                        )
+                        if cursor_value and live_tool is not None:
+                            next_arguments = bound_page_arguments(
+                                live_tool, arguments, cursor=str(cursor_value)
+                            )
+                            if next_arguments == arguments:
+                                break
+                        elif page_payload.get("has_more") and "page" in schema_properties(schema):
+                            next_arguments = {
+                                **arguments,
+                                "page": int(arguments.get("page", 1)) + 1,
+                            }
+                        else:
+                            break
+                        marker = str(sorted(next_arguments.items()))
+                        if marker in seen_pages or records_read >= 100:
+                            break
+                        seen_pages.add(marker)
+                        payload = await asyncio.wait_for(
+                            transport.call_tool(step.tool_name, next_arguments),
+                            timeout=_SYNC_TOOL_TIMEOUT_SECONDS,
+                        )
+                        page_payload = payload.get("raw") or payload
+                        if not isinstance(page_payload, dict):
+                            break
+                        page_rows = normalize_tool_result(
+                            plugin_id=plugin_id,
+                            plugin_connection_id=connection.id,
+                            sync_run_id=run.id,
+                            tool_name=step.tool_name,
+                            payload=page_payload,
+                            user_id=str(owner),
+                            recipe_step=step,
+                        )
+                        raw_rows.extend(page_rows[: max(0, 100 - records_read)])
+                        records_read = len(raw_rows)
+                        arguments = next_arguments
                 next_cursor = payload.get("next_cursor")
-                if next_cursor:
+                if next_cursor and plugin_id in {"github", "notion", "calendar"}:
                     await self._repository.put_cursor(
                         SyncCursorRecord(
                             plugin_connection_id=connection.id,

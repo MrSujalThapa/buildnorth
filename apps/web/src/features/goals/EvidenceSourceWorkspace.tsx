@@ -125,6 +125,7 @@ export function EvidenceSourceWorkspace({
   const [selectedResources, setSelectedResources] = useState<Record<string, string[]>>({});
   const [resourceRefs, setResourceRefs] = useState<Record<string, string>>({});
   const [activityTypes, setActivityTypes] = useState<Record<string, string[]>>({});
+  const [readArguments, setReadArguments] = useState<Record<string, Record<string, string>>>({});
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -191,12 +192,14 @@ export function EvidenceSourceWorkspace({
       label: string;
       resourceIds: string[];
       activityTypes?: string[];
+      readArguments?: Record<string, string>;
     }) =>
       api.saveEvidenceSourceRecipe(goalId, body.pluginId, {
         label: body.label,
         resource_ids: body.resourceIds,
         approved: true,
         activity_types: body.activityTypes,
+        read_arguments: body.readArguments,
       }),
     onSuccess: () => {
       setSyncMessage("Source saved");
@@ -211,6 +214,7 @@ export function EvidenceSourceWorkspace({
 
   const toggleActivity = (pluginId: string, activity: string) => {
     setActivityTypes((current) => {
+      if (pluginId !== "github") return { ...current, [pluginId]: [activity] };
       const existing = new Set(current[pluginId] ?? []);
       if (existing.has(activity)) existing.delete(activity);
       else existing.add(activity);
@@ -226,14 +230,12 @@ export function EvidenceSourceWorkspace({
     }
     const base = selectedResources[pluginId] ?? [];
     if (pluginId === "notion") return base;
-    const ref = (resourceRefs[pluginId] ?? "").trim();
-    if (!ref) return base;
-    return base.map((resourceId) => (resourceId.includes("@") ? resourceId : `${resourceId}@${ref}`));
+    return (resourceRefs[pluginId] ?? "").trim() ? [(resourceRefs[pluginId] ?? "").trim()] : base;
   };
 
   const toggleResource = (pluginId: string, resourceId: string) => {
     setSelectedResources((current) => {
-      if (pluginId === "github") return { ...current, [pluginId]: [resourceId] };
+      if (pluginId !== "notion" && pluginId !== "calendar") return { ...current, [pluginId]: [resourceId] };
       const existing = new Set(current[pluginId] ?? []);
       if (existing.has(resourceId)) existing.delete(resourceId);
       else existing.add(resourceId);
@@ -349,17 +351,23 @@ export function EvidenceSourceWorkspace({
                           selectedResources={selectedResources[card.pluginId] ?? []}
                           resourceRef={resourceRefs[card.pluginId] ?? ""}
                           selectedActivities={activityTypes[card.pluginId] ?? []}
+                          readArguments={readArguments[card.pluginId] ?? {}}
                           onResourceRefChange={(value) =>
                             setResourceRefs((current) => ({ ...current, [card.pluginId]: value }))
                           }
                           onToggleActivity={(activity) => toggleActivity(card.pluginId, activity)}
+                          onArgumentChange={(key, value) => setReadArguments((current) => ({
+                            ...current,
+                            [card.pluginId]: { ...current[card.pluginId], [key]: value },
+                          }))}
                           onToggleResource={(resourceId) => toggleResource(card.pluginId, resourceId)}
-                          onApprove={(label) =>
+                          onApprove={(label, argumentsForRead) =>
                             saveRecipe.mutate({
                               pluginId: card.pluginId,
                               label: label || card.name,
                               resourceIds: buildResourceIds(card.pluginId),
                               activityTypes: activityTypes[card.pluginId],
+                              readArguments: argumentsForRead,
                             })
                           }
                           approvePending={saveRecipe.isPending}
@@ -589,8 +597,10 @@ function SourceResourcePanel({
   selectedResources,
   resourceRef,
   selectedActivities,
+  readArguments,
   onResourceRefChange,
   onToggleActivity,
+  onArgumentChange,
   onToggleResource,
   onApprove,
   approvePending,
@@ -599,10 +609,12 @@ function SourceResourcePanel({
   selectedResources: string[];
   resourceRef: string;
   selectedActivities: string[];
+  readArguments: Record<string, string>;
   onResourceRefChange: (value: string) => void;
   onToggleActivity: (activity: string) => void;
+  onArgumentChange: (key: string, value: string) => void;
   onToggleResource: (resourceId: string) => void;
-  onApprove: (label: string) => void;
+  onApprove: (label: string, readArguments: Record<string, string>) => void;
   approvePending: boolean;
 }) {
   const [resourceQuery, setResourceQuery] = useState("");
@@ -626,7 +638,18 @@ function SourceResourcePanel({
   ];
   const activityOptions = source.pluginId === "github"
     ? githubActivities.filter((activity) => (capabilities.data ?? []).some((item) => activity.tools.includes(item.tool_name ?? "")))
-    : [];
+    : ["notion", "calendar"].includes(source.pluginId) ? []
+    : (capabilities.data ?? []).filter((item) => {
+      const properties = item.input_schema?.parameters?.properties ?? item.input_schema?.properties ?? {};
+      return item.tool_name && (item.operation === "read" || item.operation.endsWith(".read"))
+        && Object.keys(properties).some((key) => /(^|_)(id|query|channel|q)$|calendarId|spreadsheetId/.test(key));
+    }).map((item) => ({ value: item.tool_name!, label: item.label, tools: [item.tool_name!] }));
+  const generic = !["github", "notion", "calendar"].includes(source.pluginId);
+  const selectedCapability = (capabilities.data ?? []).find((item) => item.tool_name === selectedActivities[0]);
+  const selectedSchema = selectedCapability?.input_schema?.parameters ?? selectedCapability?.input_schema;
+  const requiredFields = generic ? (selectedSchema?.required ?? []).filter((key) =>
+    !["page", "limit", "page_size", "per_page", "max_results", "maxResults"].includes(key)
+  ) : [];
   const options = (resources.data ?? [])
           .map((item) => {
             const resourceId = item.uri.replace(/^composio:\/\/[^/]+\//, "") || item.name;
@@ -690,14 +713,10 @@ function SourceResourcePanel({
           Show more pages
         </button>
       ) : null}
-      {source.pluginId === "github" || source.pluginId === "google_sheets" ? (
+      {source.pluginId === "github" ? (
         <label className="evidence-ref-field">
           <span>
-            {source.pluginId === "github"
-              ? "Branch (optional)"
-              : source.pluginId === "google_sheets"
-                ? "Tab or range (optional)"
-                : "Range (optional)"}
+            Branch (optional)
           </span>
           <input
             className="ui-field"
@@ -711,6 +730,23 @@ function SourceResourcePanel({
           />
         </label>
       ) : null}
+      {generic ? (
+        <label className="evidence-ref-field">
+          <span>Authorized resource ID or bounded query</span>
+          <input className="ui-field" value={resourceRef} maxLength={500}
+            onChange={(event) => onResourceRefChange(event.target.value)}
+            placeholder="Enter the exact resource ID or search query" />
+          <small>An exact value here takes precedence over a selected resource. Only the chosen read action and this resource or query will be saved.</small>
+        </label>
+      ) : null}
+      {requiredFields.map((key) => (
+        <label key={key} className="evidence-ref-field">
+          <span>{key.replaceAll("_", " ")}</span>
+          <input className="ui-field" value={readArguments[key] ?? ""} maxLength={500}
+            onChange={(event) => onArgumentChange(key, event.target.value)}
+            placeholder="Use the selected resource if this field identifies it" />
+        </label>
+      ))}
       {activityOptions.length ? (
         <fieldset className="evidence-activity-fieldset">
           <legend>Read activity</legend>
@@ -718,7 +754,7 @@ function SourceResourcePanel({
             {activityOptions.map((activity) => (
               <label key={activity.value} className="ui-choice">
                 <input
-                  type="checkbox"
+                  type={generic ? "radio" : "checkbox"}
                   checked={selectedActivities.includes(activity.value)}
                   onChange={() => onToggleActivity(activity.value)}
                 />
@@ -728,9 +764,11 @@ function SourceResourcePanel({
           </div>
         </fieldset>
       ) : null}
-      {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
-      {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
-      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={() => onApprove(options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", "))}>
+      {resources.isError && !generic ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
+      {generic && resources.isError ? <p className="field-hint" role="status">This connection has no safe resource listing. Enter an exact resource ID or bounded query for a compatible read action.</p> : null}
+      {source.connected && resources.isSuccess && !options.length && !generic ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
+      {generic && capabilities.isSuccess && !activityOptions.length ? <p className="field-hint" role="status">No safely scoped read action is available for this connection and its current permissions.</p> : null}
+      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length) || (generic && (selectedActivities.length !== 1 || (!selectedResources.length && !resourceRef.trim())))} onClick={() => onApprove(options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", ") || resourceRef.trim(), Object.fromEntries(Object.entries(readArguments).filter(([key, value]) => key in (selectedSchema?.properties ?? {}) && value.trim())))}>
         {approvePending ? "Saving…" : `Save ${selectedResources.length === 1 ? "source" : `${selectedResources.length} sources`}`}
       </button>
     </div>

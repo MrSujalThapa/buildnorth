@@ -1004,7 +1004,7 @@ export const api = {
   refreshPluginConnection: (pluginId: string) =>
     request<PluginConnectResponse>(`/api/v1/plugins/${pluginId}/connect/refresh`, { method: "POST" }),
   pluginCapabilities: (pluginId: string, signal?: AbortSignal) =>
-    request<{ capability_id: string; label: string; operation: string; tool_name?: string | null }[]>(
+    request<{ capability_id: string; label: string; operation: string; tool_name?: string | null; input_schema?: { properties?: Record<string, { type?: string }>; required?: string[]; parameters?: { properties?: Record<string, { type?: string }>; required?: string[] } } }[]>(
       `/api/v1/plugins/${pluginId}/capabilities`,
       undefined,
       signal,
@@ -1036,7 +1036,7 @@ export const api = {
   saveEvidenceSourceRecipe: (
     goalId: string,
     pluginId: string,
-    body: { label: string; resource_ids: string[]; approved?: boolean; activity_types?: string[] },
+    body: { label: string; resource_ids: string[]; approved?: boolean; activity_types?: string[]; read_arguments?: Record<string, string> },
   ) =>
     request<SourceRecipeRecord>(`/api/v1/goals/${goalId}/evidence/sources/${pluginId}/recipe`, {
       method: "POST",

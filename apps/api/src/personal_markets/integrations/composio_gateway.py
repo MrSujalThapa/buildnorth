@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 from dataclasses import dataclass
@@ -15,20 +16,41 @@ from personal_markets.integrations.mcp_domain import MCPResourceDescriptor, MCPT
 _TOOLKIT_CACHE_TTL_SECONDS = 600.0
 _RESOURCE_DISCOVERY_PAGE_LIMIT = 5
 _RESOURCE_DISCOVERY_RESULT_LIMIT = 100
+_TOOL_CACHE_TTL_SECONDS = 120.0
+_tool_cache: dict[tuple[str, str, str, str], tuple[float, list[MCPToolDescriptor]]] = {}
+_tool_locks: dict[tuple[str, str, str, str], asyncio.Lock] = {}
 
 
 def _resource_rows(payload: dict[str, Any]) -> list[Any]:
     rows = (
-        payload.get("records") or payload.get("items") or payload.get("results")
-        or payload.get("repositories") or payload.get("pages")
-        or payload.get("data") or []
+        payload.get("records")
+        or payload.get("items")
+        or payload.get("results")
+        or payload.get("repositories")
+        or payload.get("pages")
+        or payload.get("messages")
+        or payload.get("activities")
+        or payload.get("events")
+        or payload.get("files")
+        or payload.get("data")
+        or []
     )
     if isinstance(rows, dict):
         rows = (
-            rows.get("items") or rows.get("repositories") or rows.get("results")
-            or rows.get("pages") or rows.get("data") or []
+            rows.get("items")
+            or rows.get("repositories")
+            or rows.get("results")
+            or rows.get("pages")
+            or rows.get("messages")
+            or rows.get("activities")
+            or rows.get("events")
+            or rows.get("files")
+            or rows.get("data")
+            or []
         )
     return rows if isinstance(rows, list) else []
+
+
 _toolkit_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
 
@@ -175,9 +197,7 @@ class ComposioIntegrationGateway:
                         if isinstance(meta, dict)
                         else getattr(meta, "logo", None),
                         "categories": meta.get("categories") if isinstance(meta, dict) else [],
-                        "tools_count": meta.get("tools_count")
-                        if isinstance(meta, dict)
-                        else None,
+                        "tools_count": meta.get("tools_count") if isinstance(meta, dict) else None,
                         "auth_schemes": list(getattr(item, "auth_schemes", []) or []),
                     }
                 )
@@ -264,7 +284,9 @@ class ComposioIntegrationGateway:
             created_at=self._created_at(item),
         )
 
-    async def list_active_connected_accounts(self, user_id: UUID) -> dict[str, list[ComposioConnectedAccount]]:
+    async def list_active_connected_accounts(
+        self, user_id: UUID
+    ) -> dict[str, list[ComposioConnectedAccount]]:
         if self._client is None:
             return {}
 
@@ -359,35 +381,60 @@ class ComposioIntegrationGateway:
             reverse=True,
         )[0]
 
-    async def list_tools(self, user_id: UUID, toolkit_slug: str, *, limit: int = 200) -> list[MCPToolDescriptor]:
+    async def list_tools(
+        self,
+        user_id: UUID,
+        toolkit_slug: str,
+        *,
+        limit: int = 200,
+        connected_account_id: str | None = None,
+    ) -> list[MCPToolDescriptor]:
         if self._client is None:
             return []
 
-        def _call() -> list[MCPToolDescriptor]:
-            assert self._client is not None
-            tools = self._client.tools.get(str(user_id), toolkits=[toolkit_slug], limit=limit)
-            rows: list[MCPToolDescriptor] = []
-            for item in tools:
-                if isinstance(item, dict):
-                    fn = item.get("function") or {}
-                    name = str(fn.get("name") or "")
-                    description = str(fn.get("description") or "")
-                    schema = fn.get("parameters") or {}
-                else:
-                    name = str(getattr(item, "slug", getattr(item, "name", "")))
-                    description = str(getattr(item, "description", ""))
-                    schema = getattr(item, "input_parameters", {}) or {}
-                rows.append(
-                    MCPToolDescriptor(
-                        name=name,
-                        description=description,
-                        input_schema=schema if isinstance(schema, dict) else {},
-                        read_only_hint=None,
-                    )
-                )
-            return rows
+        project = hashlib.sha256((self._settings.composio_api_key or "").encode()).hexdigest()[:16]
+        key = (project, str(user_id), toolkit_slug, connected_account_id or "")
+        cached = _tool_cache.get(key)
+        if cached and cached[0] > time.monotonic():
+            return cached[1][:limit]
+        lock = _tool_locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            cached = _tool_cache.get(key)
+            if cached and cached[0] > time.monotonic():
+                return cached[1][:limit]
 
-        return await asyncio.to_thread(_call)
+            def _call() -> list[MCPToolDescriptor]:
+                assert self._client is not None
+                tools = self._client.tools.get(str(user_id), toolkits=[toolkit_slug], limit=500)
+                rows: list[MCPToolDescriptor] = []
+                for item in tools:
+                    if isinstance(item, dict):
+                        fn = item.get("function") or {}
+                        name = str(fn.get("name") or "")
+                        description = str(fn.get("description") or "")
+                        schema = fn.get("parameters") or {}
+                    else:
+                        name = str(getattr(item, "slug", getattr(item, "name", "")))
+                        description = str(getattr(item, "description", ""))
+                        schema = getattr(item, "input_parameters", {}) or {}
+                    rows.append(
+                        MCPToolDescriptor(
+                            name=name,
+                            description=description,
+                            input_schema=schema if isinstance(schema, dict) else {},
+                            read_only_hint=None,
+                        )
+                    )
+                return rows
+
+            rows = await asyncio.wait_for(asyncio.to_thread(_call), timeout=20)
+            _tool_cache[key] = (time.monotonic() + _TOOL_CACHE_TTL_SECONDS, rows)
+            return rows[:limit]
+
+    def invalidate_tool_cache(self, user_id: UUID, toolkit_slug: str) -> None:
+        for key in list(_tool_cache):
+            if key[1:3] == (str(user_id), toolkit_slug):
+                _tool_cache.pop(key, None)
 
     async def list_resources(
         self,
@@ -398,6 +445,10 @@ class ComposioIntegrationGateway:
     ) -> list[MCPResourceDescriptor]:
         """Discover selectable resources via the provider adapter's validated read tool."""
         from personal_markets.core.errors import IntegrationProviderError
+        from personal_markets.integrations.generic_reads import (
+            bound_page_arguments,
+            discovery_tool,
+        )
         from personal_markets.integrations.provider_contract import (
             ProviderErrorKind,
             get_adapter,
@@ -405,30 +456,53 @@ class ComposioIntegrationGateway:
 
         adapter = get_adapter(toolkit_slug)
         tool_name = adapter.discovery_tool
+        discovered_tool: MCPToolDescriptor | None = None
         if not tool_name:
-            tools = await self.list_tools(user_id, toolkit_slug)
+            tools = await self.list_tools(
+                user_id, toolkit_slug, connected_account_id=connected_account_id
+            )
             tool_name = adapter.choose_discovery_tool(tools)
+            if not tool_name:
+                discovered_tool = discovery_tool(toolkit_slug, tools)
+                tool_name = discovered_tool.name if discovered_tool else None
         if not tool_name:
             raise IntegrationProviderError(
                 ProviderErrorKind.UNSUPPORTED_CAPABILITY,
                 f"{toolkit_slug} has no supported resource discovery read.",
                 retryable=False,
             )
+        discovery_arguments = bound_page_arguments(discovered_tool, {}) if discovered_tool else {}
+        if discovered_tool:
+            from jsonschema import Draft202012Validator, SchemaError, ValidationError
+
+            body = discovered_tool.input_schema.get("parameters", discovered_tool.input_schema)
+            try:
+                Draft202012Validator.check_schema(body)
+                Draft202012Validator(body).validate(discovery_arguments)
+            except (SchemaError, ValidationError) as error:
+                raise IntegrationProviderError(
+                    ProviderErrorKind.SCHEMA_INCOMPATIBILITY,
+                    "This connection's resource listing schema is incompatible.",
+                    retryable=False,
+                ) from error
         payload = await self.execute_tool(
             user_id,
             tool_name,
-            {},
+            discovery_arguments,
             connected_account_id=connected_account_id,
         )
         pages = [payload]
         # Notion search commonly returns a short first page. Consult the actual
         # action schema before passing a cursor; never guess provider arguments.
-        if toolkit_slug == "notion" and payload.get("next_cursor"):
+        if (toolkit_slug == "notion" or discovered_tool is not None) and payload.get("next_cursor"):
             try:
-                tools = await self.list_tools(user_id, toolkit_slug, limit=100)
+                tools = await self.list_tools(
+                    user_id, toolkit_slug, limit=500, connected_account_id=connected_account_id
+                )
             except Exception as error:  # A valid first page remains usable.
                 logging.getLogger(__name__).warning(
-                    "notion_resource_schema_unavailable error_type=%s", type(error).__name__,
+                    "notion_resource_schema_unavailable error_type=%s",
+                    type(error).__name__,
                 )
                 tools = []
             tool = next((item for item in tools if item.name == tool_name), None)
@@ -443,11 +517,19 @@ class ComposioIntegrationGateway:
                     if cursor in seen_cursors:
                         break
                     seen_cursors.add(cursor)
-                    arguments = adapter.next_page_arguments(properties, cursor)
+                    arguments = (
+                        bound_page_arguments(discovered_tool, {}, cursor=cursor)
+                        if discovered_tool
+                        else adapter.next_page_arguments(properties, cursor)
+                    )
+                    if discovered_tool and arguments == discovery_arguments:
+                        break
                     if arguments is None:
                         break
                     page = await self.execute_tool(
-                        user_id, tool_name, arguments,
+                        user_id,
+                        tool_name,
+                        arguments,
                         connected_account_id=connected_account_id,
                     )
                     pages.append(page)
@@ -459,7 +541,11 @@ class ComposioIntegrationGateway:
                         break
         resources: list[MCPResourceDescriptor] = []
         seen_resource_ids: set[str] = set()
-        result_limit = _RESOURCE_DISCOVERY_RESULT_LIMIT if toolkit_slug == "notion" else 50
+        result_limit = (
+            _RESOURCE_DISCOVERY_RESULT_LIMIT
+            if (toolkit_slug == "notion" or discovered_tool)
+            else 50
+        )
         rows: list[Any] = []
         for page in pages:
             rows.extend(_resource_rows(page))
@@ -472,14 +558,16 @@ class ComposioIntegrationGateway:
             if isinstance(title, list):
                 title = "".join(
                     _resource_title_part(part, toolkit_slug)
-                    for part in title if isinstance(part, dict)
+                    for part in title
+                    if isinstance(part, dict)
                 )
             if not title and isinstance(row.get("properties"), dict):
                 for prop in row["properties"].values():
                     if isinstance(prop, dict) and prop.get("type") == "title":
                         title = "".join(
                             _resource_title_part(part, toolkit_slug)
-                            for part in prop.get("title", []) if isinstance(part, dict)
+                            for part in prop.get("title", [])
+                            if isinstance(part, dict)
                         )
                         break
             candidate_title = str(title or row.get("name") or "").strip()
@@ -576,7 +664,9 @@ class ComposioIntegrationGateway:
                     raise RuntimeError("Notion child-page pagination is unavailable")
                 arguments["start_cursor"] = cursor
             return await self.execute_tool(
-                user_id, tool_name, arguments,
+                user_id,
+                tool_name,
+                arguments,
                 connected_account_id=connected_account_id,
             )
 
@@ -595,7 +685,10 @@ class ComposioIntegrationGateway:
 
         def _call() -> dict[str, Any]:
             assert self._client is not None
-            kwargs: dict[str, Any] = {"arguments": arguments, "dangerously_skip_version_check": True}
+            kwargs: dict[str, Any] = {
+                "arguments": arguments,
+                "dangerously_skip_version_check": True,
+            }
             if connected_account_id:
                 kwargs["connected_account_id"] = connected_account_id
             result = self._client.tools.execute(tool_slug, user_id=str(user_id), **kwargs)

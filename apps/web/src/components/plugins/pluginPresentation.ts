@@ -58,7 +58,9 @@ export function pluginViewToDisplay(plugin: PluginView): PluginDisplay {
   const reads =
     plugin.definition.capabilities.length > 0
       ? plugin.definition.capabilities.map((capability) => capability.label)
-      : readsById[id] ?? ["Selected read activity"];
+      : isPluginConnected(plugin)
+        ? ["No compatible read action confirmed yet. Check Evidence to discover this connection's tools."]
+        : readsById[id] ?? ["Selected read activity"];
   const usedFor =
     plugin.definition.used_for.length > 0
       ? plugin.definition.used_for

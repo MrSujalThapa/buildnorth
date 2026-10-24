@@ -16,6 +16,12 @@ _WRITE_PATTERN = re.compile(
     r")\b",
     re.I,
 )
+_WRITE_TOKENS = frozenset({
+    "send", "create", "update", "delete", "remove", "post", "publish", "write",
+    "edit", "modify", "insert", "upsert", "patch", "put", "destroy", "archive",
+    "invite", "assign", "close", "merge", "comment", "reply", "react",
+    "upload", "share", "grant", "revoke", "subscribe", "unsubscribe",
+})
 
 
 class DiscoveredCapability(BaseModel):
@@ -37,7 +43,8 @@ class MCPReadPolicy:
         name = tool.name.lower()
         description = tool.description.lower()
         blob = f"{name} {description}"
-        if _WRITE_PATTERN.search(blob):
+        name_tokens = set(re.split(r"[_\.\-]", name))
+        if _WRITE_PATTERN.search(blob) or name_tokens & _WRITE_TOKENS:
             return None
         if tool.read_only_hint is False:
             return None
