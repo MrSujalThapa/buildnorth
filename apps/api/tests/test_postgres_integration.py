@@ -2,7 +2,7 @@ import asyncio
 import hashlib
 import json
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 import pytest
 from sqlalchemy import bindparam, text
@@ -28,6 +28,15 @@ async def test_seed_is_transactional_idempotent_and_persists_raw_events() -> Non
         repository = PostgresSeedRepository(engine)
         await repository.seed(payload)
         await repository.seed(payload)
+        fresh_id = uuid5(NAMESPACE_URL, "playitout:demo-seed-provenance-contract")
+        fresh = {
+            **payload["evidence_events"][0],
+            "id": str(fresh_id),
+            "fingerprint": "demo-seed-provenance-contract",
+        }
+        await repository.seed(
+            {"goals": [], "raw_source_events": [], "evidence_events": [fresh]}
+        )
         goal_ids = [UUID(goal["goal_id"]) for goal in payload["goals"]]
         event_ids = [UUID(event["id"]) for event in payload["raw_source_events"]]
         async with engine.connect() as connection:
@@ -47,10 +56,34 @@ async def test_seed_is_transactional_idempotent_and_persists_raw_events() -> Non
                 text("select raw_payload_json from raw_source_events where id = :id"),
                 {"id": event_ids[0]},
             )
+            seeded_goals = (
+                await connection.execute(
+                    text("select model_requirements_json from goals where id in :ids").bindparams(
+                        bindparam("ids", expanding=True)
+                    ),
+                    {"ids": goal_ids},
+                )
+            ).scalars().all()
+            seeded_evidence = (
+                await connection.execute(
+                    text(
+                        "select source_quality, provenance_json from evidence_events "
+                        "where id = :id"
+                    ),
+                    {"id": UUID(fresh["id"])},
+                )
+            ).all()
         assert goals == len(goal_ids)
         assert events == len(event_ids)
         assert isinstance(raw, dict)
         assert json.dumps(raw)
+        assert len(seeded_goals) == len(goal_ids)
+        assert all(item["demo_seed"] == "seeds/demo.json" for item in seeded_goals)
+        assert len(seeded_evidence) == 1
+        assert all(
+            quality == "demo_fixture" and provenance["event_identity"].startswith("seed:demo:")
+            for quality, provenance in seeded_evidence
+        )
     finally:
         await engine.dispose()
 
