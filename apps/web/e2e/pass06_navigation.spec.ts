@@ -1,5 +1,27 @@
 import { expect, test } from "@playwright/test";
 
+test("a failed follow-up keeps the saved goal reachable", async ({ page }, testInfo) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("playitout:pending-goal-thread", "saved-thread");
+  });
+  await page.route("**/api/v1/**", (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/agent/threads/saved-thread") return route.fulfill({ json: {
+      thread_id: "saved-thread", kind: "create_goal", status: "failed", current_step: "failed",
+      progress: ["A provider request failed. Review the saved goal before retrying."],
+      debug: { goal_committed: true },
+      goal: { goal_id: "saved-goal", title: "Pass a course", goal_type: "threshold",
+        success_definition: { target: 80 }, deadline: "2026-12-31T00:00:00Z", state_dimensions: ["course_grade"] },
+    } });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/new");
+  await expect(page.getByRole("alert")).toContainText("Your goal was saved");
+  await expect(page.getByRole("link", { name: "Open saved goal" })).toHaveAttribute("href", "/goals/saved-goal");
+  await expect(page.getByRole("button", { name: "Create market" })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("saved-goal-after-provider-failure.png"), fullPage: true });
+});
+
 // Isolated UI regression only. These fixtures are never live-production evidence.
 test("empty catalog leads to goal creation and an actionable provider failure", async ({ page }, testInfo) => {
   const errors: string[] = [];

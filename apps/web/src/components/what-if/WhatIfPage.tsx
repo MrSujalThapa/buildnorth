@@ -72,13 +72,19 @@ type Props = {
 
   compareLoading?: boolean;
 
+  compareError?: string | null;
+
   futuresDistribution?: ScenarioDistribution;
 
   futuresLoading?: boolean;
 
+  futuresError?: string | null;
+
   pathStrategies?: PathStrategy[];
 
   pathsLoading?: boolean;
+
+  pathsError?: string | null;
 
   pathsMessage?: string | null;
 
@@ -211,13 +217,19 @@ export default function WhatIfPage({
 
   compareLoading = false,
 
+  compareError,
+
   futuresDistribution,
 
   futuresLoading = false,
 
+  futuresError,
+
   pathStrategies,
 
   pathsLoading = false,
+
+  pathsError,
 
   pathsMessage,
 
@@ -370,12 +382,16 @@ export default function WhatIfPage({
     });
   }, [catalog]);
 
-  // Price the suggested candidates once. Re-running after any result would drop
-  // user-described paths, because a bare run only carries the baseline candidates.
+  // Suggested allocations without a measured effect cannot be priced. In
+  // particular, do not race an unpriceable automatic run against custom paths
+  // after changing analysis depth.
   useEffect(() => {
     if (mode !== "compare" || compareResult) return;
-    if (catalog.length >= 2) compareRef.current?.();
-  }, [catalog.length, compareResult, mode]);
+    const priceableSuggestions = baseline?.compare_candidates.filter(
+      (item) => item.intervention?.effect_per_unit != null,
+    ) ?? [];
+    if (priceableSuggestions.length >= 2) compareRef.current?.();
+  }, [baseline, compareResult, mode]);
 
 
 
@@ -614,9 +630,9 @@ export default function WhatIfPage({
 
               loading={futuresLoading}
 
-              priced={baselinePriced && futuresDistribution?.priced !== false}
+              priced={baselinePriced && !futuresError && futuresDistribution?.priced !== false}
 
-              message={futuresDistribution?.message ?? null}
+              message={futuresError ?? futuresDistribution?.message ?? null}
 
               selectedClusterId={selectedClusterId}
 
@@ -646,9 +662,9 @@ export default function WhatIfPage({
 
               loading={compareLoading}
 
-              priced={baselinePriced}
+              priced={baselinePriced && !compareError}
 
-              message={priceabilityMessage}
+              message={compareError ?? priceabilityMessage}
 
               selectedIds={compareIds.length >= 2 ? compareIds : catalog.slice(0, 2).map((item) => item.id)}
 
@@ -678,9 +694,9 @@ export default function WhatIfPage({
 
               loading={pathsLoading}
 
-              priced={baselinePriced}
+              priced={baselinePriced && !pathsError}
 
-              message={pathsMessage ?? priceabilityMessage}
+              message={pathsError ?? pathsMessage ?? priceabilityMessage}
 
               selectedPathId={selectedPathId}
 

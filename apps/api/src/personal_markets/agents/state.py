@@ -1,6 +1,10 @@
+import json
 import re
+from time import perf_counter
 from typing import Any, TypedDict
 from uuid import NAMESPACE_URL, UUID, uuid5
+
+import structlog
 
 from personal_markets.agents.completion import MAX_SEMANTIC_RETRIES as MAX_SEMANTIC_RETRIES
 from personal_markets.agents.completion import complete_validated
@@ -159,27 +163,84 @@ async def complete_agent(
         user_id=UUID(state["user_id"]) if state.get("user_id") else None,
         client_ip=client_ip_var.get(),
     )
+    started = perf_counter()
+    log = structlog.get_logger("personal_markets.agents")
+    sizes = {
+        "instruction_chars": len(request.instructions),
+        "input_chars": len(json.dumps(request.input, sort_keys=True, default=str)),
+        "schema_chars": len(json.dumps(request.output_schema, sort_keys=True)),
+    }
+    log.info("agent_stage_started", thread_id=state["thread_id"], agent=agent, **sizes)
+
     async def failed(error: Exception, semantic_attempt: int) -> None:
         usage = getattr(error, "usage", None)
         model = getattr(error, "model", "see_inference_ledger")
-        await deps.run_store.record({
-            "id": stable_run_id(state["thread_id"], agent, attempt * 10 + semantic_attempt + 1),
-            "thread_id": state["thread_id"], "agent_type": agent,
-            "agent_version": prompt.version,
-            "model_provider": getattr(error, "provider", "resolved_by_router"),
-            "model_name": model, "prompt_version": prompt.version,
-            "prompt_checksum": prompt.checksum, "input_refs": list(payload), "output": {},
-            "validation_status": "rejected", "retry_count": semantic_attempt,
-            "duration_ms": 0, "token_usage": usage or {},
-            "estimated_cost": estimate_cost_usd(model, usage.get("input_tokens", 0),
-                usage.get("output_tokens", 0)) if usage else None,
-            "tool_trace": [], "status": "failed",
-        })
+        await deps.run_store.record(
+            {
+                "id": stable_run_id(state["thread_id"], agent, attempt * 10 + semantic_attempt + 1),
+                "thread_id": state["thread_id"],
+                "agent_type": agent,
+                "agent_version": prompt.version,
+                "model_provider": getattr(error, "provider", "resolved_by_router"),
+                "model_name": model,
+                "prompt_version": prompt.version,
+                "prompt_checksum": prompt.checksum,
+                "input_refs": list(payload),
+                "output": {},
+                "validation_status": "rejected",
+                "retry_count": semantic_attempt,
+                "duration_ms": round((perf_counter() - started) * 1000, 2),
+                "token_usage": usage or {},
+                "estimated_cost": estimate_cost_usd(
+                    model, usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+                )
+                if usage
+                else None,
+                "tool_trace": [],
+                "status": "failed",
+            }
+        )
 
-    parsed, response = await complete_validated(
-        deps.inference, request, model_cls, failed,
-        timeout_seconds=deps.settings.inference_run_timeout_seconds,
-    )
+    try:
+        parsed, response = await complete_validated(
+            deps.inference,
+            request,
+            model_cls,
+            failed,
+            timeout_seconds=deps.settings.inference_run_timeout_seconds,
+        )
+    except Exception as error:
+        elapsed_ms = round((perf_counter() - started) * 1000, 2)
+        await deps.run_store.record(
+            {
+                "id": stable_run_id(state["thread_id"], agent, attempt * 10 + 9),
+                "thread_id": state["thread_id"],
+                "agent_type": agent,
+                "agent_version": prompt.version,
+                "model_provider": getattr(error, "provider", "resolved_by_router"),
+                "model_name": getattr(error, "model", "see_inference_ledger"),
+                "prompt_version": prompt.version,
+                "prompt_checksum": prompt.checksum,
+                "input_refs": list(payload),
+                "output": {},
+                "validation_status": "rejected",
+                "retry_count": 0,
+                "duration_ms": elapsed_ms,
+                "token_usage": {},
+                "estimated_cost": None,
+                "tool_trace": [],
+                "status": "failed",
+            }
+        )
+        log.warning(
+            "agent_stage_failed",
+            thread_id=state["thread_id"],
+            agent=agent,
+            duration_ms=elapsed_ms,
+            error_type=type(error).__name__,
+            **sizes,
+        )
+        raise
     input_tokens = int(response.usage.get("input_tokens", 0))
     output_tokens = int(response.usage.get("output_tokens", 0))
     await deps.run_store.record(
@@ -202,6 +263,16 @@ async def complete_agent(
             "tool_trace": [],
             "status": "completed",
         }
+    )
+    log.info(
+        "agent_stage_completed",
+        thread_id=state["thread_id"],
+        agent=agent,
+        duration_ms=round((perf_counter() - started) * 1000, 2),
+        provider=response.provider,
+        model=response.model,
+        retries=response.retries,
+        **sizes,
     )
     ids = dict(state.get("agent_run_ids") or {})
     ids[agent] = str(run_id)

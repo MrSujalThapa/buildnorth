@@ -61,3 +61,21 @@ test("expired goal thread reports a timeout after reload", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("This attempt timed out");
   expect(sessionStorage.getItem("playitout:pending-goal-thread")).toBeNull();
 });
+
+test("provider timeout after commit links to the saved goal", async () => {
+  sessionStorage.setItem("playitout:pending-goal-thread", "saved-thread");
+  const failed = {
+    thread_id: "saved-thread", status: "failed", progress: [],
+    goal: { goal_id: "saved-goal", title: "Pass a course" },
+    debug: { goal_committed: true },
+  } as unknown as WorkflowSnapshot;
+  vi.spyOn(api, "getThread").mockResolvedValue(failed);
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><NewGoalPage /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("alert")).toHaveTextContent("Your goal was saved");
+  expect(screen.getByRole("link", { name: "Open saved goal" })).toHaveAttribute("href", "/goals/saved-goal");
+  expect(screen.queryByRole("button", { name: "Create market" })).not.toBeInTheDocument();
+});

@@ -30,6 +30,10 @@ class TransientProviderError(DomainError):
     pass
 
 
+class ProviderRateLimitedError(TransientProviderError):
+    """Provider rejected a request before inference with an explicit rate limit."""
+
+
 class PermanentProviderError(DomainError):
     pass
 
@@ -45,7 +49,9 @@ class SemanticProviderError(DomainError):
 class InferenceOutputError(SemanticProviderError):
     """Safe validation reason with usage retained from a completed provider response."""
 
-    def __init__(self, message: str, usage: dict[str, int] | None, provider: str, model: str) -> None:
+    def __init__(
+        self, message: str, usage: dict[str, int] | None, provider: str, model: str
+    ) -> None:
         super().__init__(message)
         self.usage = usage
         self.provider = provider

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { SourceRecipeRecord } from "../../api/client";
-import { watchedResourceIds } from "./EvidenceSourceWorkspace";
+import { watchedResourceIds, watchScope } from "./EvidenceSourceWorkspace";
 
 it("watches every approved resource once even when a recipe has multiple read actions", () => {
   const recipe: SourceRecipeRecord = {
@@ -16,4 +16,10 @@ it("watches every approved resource once even when a recipe has multiple read ac
     ],
   };
   expect(watchedResourceIds(recipe)).toEqual(["page-a", "page-b"]);
+});
+
+it("monitors an exact Notion page by default and requires explicit descendant consent", () => {
+  expect(watchScope("notion", false)).toBe("resource");
+  expect(watchScope("notion", true)).toBe("parent");
+  expect(watchScope("github", true)).toBe("resource");
 });

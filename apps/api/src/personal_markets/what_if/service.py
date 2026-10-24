@@ -6,6 +6,11 @@ from uuid import UUID
 
 import numpy as np
 
+from personal_markets.behavior.cohort import (
+    authentic_evidence,
+    behavior_cohort_goals,
+    is_synthetic_goal,
+)
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
@@ -103,6 +108,8 @@ class WhatIfService:
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
+            if not is_synthetic_goal(goal):
+                evidence = authentic_evidence(evidence)
         state = build_baseline_state(goal, evidence)
         return await self._overlay_published_baseline(UUID(goal_id), state)
 
@@ -302,6 +309,8 @@ class WhatIfService:
 
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
+            if not is_synthetic_goal(goal):
+                evidence = authentic_evidence(evidence)
             composed = await self._simulate_composition(goal, request, evidence, persist=persist)
             if composed is not None:
                 return composed
@@ -310,8 +319,11 @@ class WhatIfService:
                 # Every owned goal's commitments form the person-level (global) level of
                 # the hierarchical execution model; this goal's actions refine it.
                 owned = await self._goals.list_goals(owner_id=self._owner_id)
+                cohort = behavior_cohort_goals(
+                    owned, synthetic=is_synthetic_goal(goal)
+                )
                 plans, observations = await get_commitment_store().list_for_goals(
-                    self._owner_id, [item.goal_id for item in owned] or [goal.goal_id]
+                    self._owner_id, [item.goal_id for item in cohort]
                 )
                 explicit_trials = trials_from_commitments(plans, observations)
             request = self._apply_behavior_execution(
@@ -877,6 +889,29 @@ class WhatIfService:
                 ],
                 search_method="already_satisfied",
             )
+        supported_candidates = [
+            candidate for candidate in request.candidates if candidate.effect_per_unit is not None
+        ]
+        supported_assumptions = {
+            item.name
+            for item in request.base.assumptions
+            if item.name in {"flow", "weekly_application_rate"} and item.maximum > item.value
+        }
+        if not supported_candidates and not supported_assumptions:
+            result = TargetSearchResult(
+                target_probability=request.target_probability,
+                current_probability=current,
+                gap_pp=gap,
+                feasible=False,
+                message=(
+                    "This goal has no supported numerical lever to search yet. "
+                    "Add a measured rate or a model-backed action before searching for a path."
+                ),
+                paths=[],
+                search_method="no_supported_levers",
+            )
+            return await self._persist_target_search(request, result)
+        request = request.model_copy(update={"candidates": supported_candidates})
         paths = await self._discrete_target_paths(request, current)
         paths.extend(await self._assumption_setpoint_paths(request, current))
         if request.continuous_variable is not None:
@@ -1489,6 +1524,8 @@ class WhatIfService:
             return None
         goal = await self._require_goal(request.goal_id)
         evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
+        if not is_synthetic_goal(goal):
+            evidence = authentic_evidence(evidence)
         labels = [item.label for item in request.outcomes]
         resolved = resolve_futures_weights(
             goal,

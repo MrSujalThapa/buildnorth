@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from PIL import Image, ImageOps, UnidentifiedImageError  # type: ignore[import-not-found]
 from pydantic import BaseModel, Field
 
+from personal_markets.behavior.cohort import authentic_evidence, behavior_cohort_goals
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.domain import CommitmentTrial
 from personal_markets.behavior.features import trials_from_evidence
@@ -15,7 +16,6 @@ from personal_markets.behavior.traits import (
     BUILT_IN_BY_ID,
     DEFAULT_TRAIT_IDS,
     CustomTraitDefinition,
-    available_traits,
     custom_trait_from_name,
     estimate_traits,
 )
@@ -35,6 +35,7 @@ from personal_markets.identity.domain import (
 )
 from personal_markets.identity.factory import get_identity_service, get_inference_budget_service
 from personal_markets.identity.service import IdentityService
+from personal_markets.profile.parameters import BY_ID, DEFAULT_IDS, PRESETS, parameter_profile
 from personal_markets.profile.photo_store import get_photo_store
 from personal_markets.wiring import get_collection_service, get_evidence_service, get_goal_service
 
@@ -73,8 +74,13 @@ def selected_trait_ids(profile: UserProfile) -> list[str]:
     return selected if len(selected) >= MIN_RADAR_AXES else list(DEFAULT_TRAIT_IDS)
 
 
+def selected_parameter_ids(profile: UserProfile) -> list[str]:
+    chosen = [item for item in profile.parameter_ids if item in BY_ID]
+    return chosen if len(chosen) >= MIN_RADAR_AXES else list(DEFAULT_IDS)
+
+
 async def owner_trials_and_evidence(
-    owner_id: UUID, goal_ids: list[UUID], evidence: EvidenceService
+    owner_id: UUID, goal_ids: list[UUID], evidence: EvidenceService, *, synthetic: bool = False
 ) -> tuple[list[CommitmentTrial], list[NormalizedEvidence]]:
     """All of an owner's planned-versus-observed trials plus goal evidence."""
     by_goal, (plans, observations) = await asyncio.gather(
@@ -84,7 +90,9 @@ async def owner_trials_and_evidence(
     trials = trials_from_commitments(plans, observations)
     rows: list[NormalizedEvidence] = []
     for goal_id in goal_ids:
-        items = by_goal.get(goal_id, [])
+        items = (
+            by_goal.get(goal_id, []) if synthetic else authentic_evidence(by_goal.get(goal_id, []))
+        )
         rows.extend(items)
         trials.extend(
             trial.model_copy(update={"trial_id": f"{goal_id}:{trial.trial_id}"})
@@ -109,20 +117,54 @@ async def get_profile(
         collections.list_for(principal.user_id),
     )
     account = await identity.account_view(principal, usage, profile)
+    authentic_goals = behavior_cohort_goals(owned)
     trials, rows = await owner_trials_and_evidence(
-        principal.user_id, [goal.goal_id for goal in owned], evidence
+        principal.user_id, [goal.goal_id for goal in authentic_goals], evidence
     )
     custom = _custom_definitions(account.profile)
-    selected = selected_trait_ids(account.profile)
+    # Behavior estimation remains a separate analytical contract. Parameter
+    # choices do not change execution dimensions or What If follow-through.
+    selected = list(DEFAULT_TRAIT_IDS)
     traits = estimate_traits(trials, rows, selected=selected, custom=custom)
+    measured = parameter_profile(rows, selected_ids=selected_parameter_ids(account.profile))
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),
         "collection_count": len(collection_rows),
         "traits": traits.model_dump(mode="json"),
-        "selected_parameters": selected,
-        "available_parameters": available_traits(custom),
+        "radar": measured.model_dump(mode="json"),
+        "selected_parameters": selected_parameter_ids(account.profile),
+        "available_parameters": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "description": f"{item.unit} · last {item.window_days} days",
+                "custom": False,
+            }
+            for item in PRESETS
+        ],
         "privacy": "private",
+    }
+
+
+@router.get("/demo-radar")
+async def get_demo_radar(
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+    goals: Annotated[GoalService, Depends(get_goal_service)],
+    evidence: Annotated[EvidenceService, Depends(get_evidence_service)],
+) -> dict[str, Any]:
+    """Owner-scoped fixture preview; never merges synthetic rows into Profile."""
+    owned = await goals.list_goals(owner_id=principal.user_id)
+    fixture_ids = [goal.goal_id for goal in behavior_cohort_goals(owned, synthetic=True)]
+    trials, rows = await owner_trials_and_evidence(
+        principal.user_id, fixture_ids, evidence, synthetic=True
+    )
+    return {
+        "synthetic": True,
+        "fixture_goal_count": len(fixture_ids),
+        "commitment_count": len(trials),
+        "radar": parameter_profile(rows, synthetic=True).model_dump(mode="json"),
+        "behavior_analysis": estimate_traits(trials, rows).model_dump(mode="json"),
     }
 
 
@@ -161,7 +203,9 @@ async def patch_profile(
         else:
             current = await identity.account_view(principal, await budget.usage_for(principal))
             custom_ids = {item.id for item in current.profile.custom_parameters}
-        known = set(BUILT_IN_BY_ID) | custom_ids
+        # Existing trait selections remain accepted for older clients. The main
+        # Profile radar displays measured parameters only.
+        known = set(BY_ID) | set(BUILT_IN_BY_ID) | custom_ids
         unknown = [item for item in body.parameter_ids if item not in known]
         if unknown:
             raise HTTPException(

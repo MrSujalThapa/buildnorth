@@ -3,37 +3,31 @@ import { readFileSync } from "node:fs";
 
 const goal = { goal_id: "20000000-0000-0000-0000-000000000001", title: "Read 20 books", goal_type: "continuous_target", deadline: "2026-12-31T23:59:59Z", forecast_status: "ANCHORED", state_dimensions: ["books_read"] };
 const avatar = readFileSync("e2e/fixtures/avatar.png");
-const parameterKeys = ["Weekly applications", "Focused hours", "Monthly savings", "Weekly running"];
-const parameterValues = [0.7, 0.42, 0.28, 0.61];
-const parameterRadar = {
-  estimator_version: "parameter_profile@1.0.0",
-  execution: { probability: 0, n_eff: 12, confidence: "medium", source: "FITTED", usable: true, notes: [] },
-  dimensions: parameterKeys.map((label, index) => ({
-    key: ["weekly_applications", "weekly_focus_hours", "monthly_savings", "weekly_running_km"][index],
-    label,
-    value: parameterValues[index],
-    display_percent: Math.round((parameterValues[index] ?? 0) * 100),
-    limited_evidence: false,
-    confidence: "medium",
-    provenance: {
-      comparable_commitments: 6,
-      completed: 6,
-      sources: ["manual"],
-      n_eff: 6,
-      formula: "Average over the selected window",
-      details: [`Current average ${parameterValues[index]} in range`],
-    },
-  })),
-  disclaimer: "Axes are measurable parameters you selected, not personality traits or goal names.",
-  evidence_sufficiency: "medium",
-  n_raw: 24,
-  n_eff: 24,
+const axes = ["weekly_applications", "monthly_savings", "weekly_running_km", "reading_minutes"];
+const parameterNames = ["Applications / week", "Monthly savings", "Running / week", "Reading time"];
+const parameterValues = [12, 900, null, 45];
+const parameterUnits = ["applications/week", "CAD/month", "km/week", "minutes/30 days"];
+const traits = axes.map((id, index) => ({
+  id, name: ["Discipline", "Goal realism", "Focus", "Consistency"][index],
+  description: "Observed behavior.", measurement: "Based on recorded commitments.",
+  evidence: ["manual"], custom: false, forecast_use: id === "discipline" ? "execution_probability" : "exploratory",
+  value: [0.81, 0.7, null, 0.62][index], interval: index === 2 ? null : [0.5, 0.9],
+  n_eff: 12, observations: 16, confidence: "moderate", previous_value: null, sources: ["manual"], window_days: 28,
+}));
+const traitProfile = {
+  estimator_version: "behavior_traits_v1", as_of: "2026-10-24T00:00:00Z", traits,
+  series: [
+    { id: "overall", label: "Overall", values: { discipline: 0.81, realism: 0.7, focus: null, consistency: 0.62 } },
+    { id: "coding", label: "Coding", values: { discipline: 0.61, realism: 0.65, focus: null, consistency: 0.5 } },
+  ],
+  trial_count: 16, evidence_count: 0,
 };
 
-test("profile editing and custom dimensions work at desktop and mobile widths", async ({ page }, testInfo) => {
+test("profile editing, photo, and execution areas work at desktop and mobile widths", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  let dimensions: { label: string; goal_ids: string[] }[] = [];
+  let fields = { display_name: "Reader", username: "reader", bio: "" };
+  let selectedParameters = axes;
   let uploadedPhoto: Buffer | null = null;
   await page.route("**/health", (route) => route.fulfill({ json: { status: "ok" } }));
   await page.route("**/api/v1/profile/photo", async (route) => {
@@ -53,30 +47,63 @@ test("profile editing and custom dimensions work at desktop and mobile widths", 
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [goal] }));
   await page.route("**/api/v1/profile", async (route) => {
     if (route.request().method() === "PATCH") {
-      const body = route.request().postDataJSON() as { dimensions?: typeof dimensions };
-      if (body.dimensions) dimensions = body.dimensions;
+      const body = route.request().postDataJSON() as Partial<typeof fields> & { parameter_ids?: string[] };
+      fields = { ...fields, ...Object.fromEntries(Object.entries(body).filter(([key]) => key in fields)) } as typeof fields;
+      if (body.parameter_ids) selectedParameters = body.parameter_ids;
     }
     return route.fulfill({ json: {
-      account: { user_id: "10000000-0000-0000-0000-000000000001", email: "reader@example.com", profile: { display_name: "Reader", username: "reader", bio: "", avatar_value: null, dimensions } },
+      account: { user_id: "10000000-0000-0000-0000-000000000001", email: "reader@example.com", profile: { ...fields, avatar_value: null, dimensions: [] } },
       goal_count: 1, collection_count: 0, privacy: "private",
-      radar: parameterRadar, radar_kind: "parameters",
+      traits: traitProfile, selected_parameters: selectedParameters,
+      radar: { version: "measured_parameters@2.0.0", as_of: "2026-10-24T00:00:00Z", evidence_count: 3, synthetic: false,
+        parameters: selectedParameters.map((id) => {
+          const index = axes.indexOf(id);
+          const raw = parameterValues[index];
+          return { id, name: parameterNames[index], metric: id, unit: parameterUnits[index], window_days: 56,
+            aggregation: id === "reading_minutes" ? "sum_increments" : "latest_period",
+            normalization: "fixture display scale", raw_value: raw, value: raw == null ? null : raw / 1000,
+            observation_count: raw == null ? 0 : 1, source_types: raw == null ? [] : ["manual"],
+            evidence_ids: raw == null ? [] : [`fixture-${id}`], status: raw == null ? "insufficient" : "measured" };
+        }) },
+      available_parameters: axes.map((id, index) => ({ id, name: parameterNames[index], description: `${parameterUnits[index]} · last 56 days`, custom: false })),
     } });
   });
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
   await expect(page.getByText("@reader")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add photo" })).toHaveCount(0);
-  await expect(page.getByText("Weekly applications")).toBeVisible();
-  await expect(page.getByText("Current average 0.7 in range")).toBeVisible();
-  await expect(page.getByText("hierarchical shrinkage")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "View demonstration" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your parameters" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Parameter radar/ })).toBeVisible();
+  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).click();
+  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
+  await page.getByRole("button", { name: /Applications \/ week, 12 applications/ }).click();
+  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
   await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
-  await page.getByRole("button", { name: "Edit areas" }).click();
-  await page.getByRole("button", { name: "Add Reading" }).click();
-  await page.getByRole("dialog", { name: "Your areas" }).getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => dimensions).toEqual([{ label: "Reading", goal_ids: [goal.goal_id] }]);
+  await page.getByRole("button", { name: "Edit parameters" }).click();
+  await expect(page.getByRole("dialog", { name: "Edit parameters" })).toBeVisible();
+  await page.getByRole("button", { name: "Remove Monthly savings" }).click();
+  await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("img", { name: /Parameter radar/ })).not.toContainText("Monthly savings");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Edit parameters" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit parameters" }).click();
+  await expect(page.getByRole("button", { name: "Remove Monthly savings" })).toHaveCount(0);
+  await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Display name" }).fill("Unsaved name");
+  await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("textbox", { name: "Display name" }).fill("Reader Two");
+  await page.getByRole("textbox", { name: "Bio" }).fill("Reading and coding.");
+  await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Reader Two" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Reading and coding.")).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
   await page.locator("#profile-photo-input").setInputFiles({
     name: "avatar.png", mimeType: "image/png",
     buffer: avatar,

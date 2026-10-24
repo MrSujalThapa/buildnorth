@@ -1,11 +1,16 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
+from helpers import isolated_app
+from personal_markets.core.errors import TransientProviderError
+from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.persistence.agent_store import InMemoryThreadStore, running_thread_expired
-from personal_markets.ports import WorkflowSnapshot
-from personal_markets.wiring import PersistingWorkflow
+from personal_markets.ports import ResumePayload, WorkflowSnapshot
+from personal_markets.wiring import PersistingWorkflow, get_agent_workflow
 
 
 def test_running_thread_expires_only_after_inference_timeout_and_grace() -> None:
@@ -22,6 +27,45 @@ class StaleInnerWorkflow:
     async def snapshot(self, thread_id):  # type: ignore[no-untyped-def]
         self.calls += 1
         return self.snapshot_value
+
+
+class FailingInnerWorkflow(StaleInnerWorkflow):
+    async def resume(self, thread_id: UUID, payload: ResumePayload) -> WorkflowSnapshot:
+        del thread_id, payload
+        raise TransientProviderError("provider timed out")
+
+
+class RoutingFailingInnerWorkflow(FailingInnerWorkflow):
+    def __init__(self, before: WorkflowSnapshot, after: WorkflowSnapshot) -> None:
+        super().__init__(before)
+        self.after = after
+
+    async def resume(self, thread_id: UUID, payload: ResumePayload) -> WorkflowSnapshot:
+        self.snapshot_value = self.after
+        return await super().resume(thread_id, payload)
+
+
+class InterruptedEvidenceWorkflow(StaleInnerWorkflow):
+    def __init__(self, snapshot: WorkflowSnapshot) -> None:
+        super().__init__(snapshot)
+        self.started = asyncio.Event()
+
+    async def continue_evidence(self, thread_id: UUID) -> WorkflowSnapshot:
+        del thread_id
+        self.started.set()
+        await asyncio.Event().wait()
+        return self.snapshot_value
+
+
+def _saved_goal() -> GoalContract:
+    return GoalContract(
+        goal_id=uuid4(),
+        title="Earn 80% in a course",
+        goal_type=GoalType.THRESHOLD,
+        success_definition={"target": 80},
+        deadline=datetime.now(UTC) + timedelta(days=60),
+        state_dimensions=["course_grade"],
+    )
 
 
 @pytest.mark.asyncio
@@ -58,3 +102,135 @@ async def test_poll_does_not_write_running_checkpoint() -> None:
 
     assert result.current_step == "interpret_goal"
     assert (await threads.get(thread_id)) == running
+
+
+@pytest.mark.asyncio
+async def test_evidence_claim_is_single_winner_and_requires_explicit_failure_retry() -> None:
+    thread_id = uuid4()
+    threads = InMemoryThreadStore()
+    await threads.upsert(WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_pending",
+        current_step="commit_goal",
+    ))
+    claimed = await asyncio.gather(
+        threads.claim_evidence(thread_id), threads.claim_evidence(thread_id)
+    )
+    assert sorted(claimed) == [False, True]
+    running = await threads.get(thread_id)
+    assert running is not None and running.status == "evidence_running"
+    await threads.upsert(WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_failed",
+        current_step="failed",
+    ))
+    assert await threads.claim_evidence(thread_id)
+
+
+@pytest.mark.asyncio
+async def test_interrupted_evidence_task_does_not_claim_automatic_recovery() -> None:
+    thread_id = uuid4()
+    pending = WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_pending",
+        current_step="await_evidence",
+    )
+    threads = InMemoryThreadStore()
+    await threads.upsert(pending)
+    inner = InterruptedEvidenceWorkflow(pending)
+    workflow = PersistingWorkflow(inner, threads)  # type: ignore[arg-type]
+
+    task = asyncio.create_task(workflow.continue_evidence_later(thread_id))
+    await inner.started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    stored = await workflow.snapshot(thread_id)
+    assert stored.status == "evidence_running"
+    assert not await threads.claim_evidence(thread_id)
+
+
+@pytest.mark.asyncio
+async def test_sync_provider_timeout_returns_saved_goal_and_persists_failed_state() -> None:
+    thread_id = uuid4()
+    goal = _saved_goal()
+    proposal = WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="needs_input", current_step="confirm_goal"
+    )
+    committed = proposal.model_copy(
+        update={
+            "status": "running", "current_step": "normalize_evidence", "goal": goal,
+            "debug": {"goal_committed": True},
+        }
+    )
+    threads = InMemoryThreadStore()
+    await threads.upsert(proposal)
+    workflow = PersistingWorkflow(FailingInnerWorkflow(committed), threads)  # type: ignore[arg-type]
+
+    result = await workflow.resume(thread_id, ResumePayload(confirmed=True))
+
+    assert result.status == "failed"
+    assert result.goal == goal
+    assert result.interrupt is None
+    assert "Review the saved goal" in result.progress[-1]
+    assert (await workflow.snapshot(thread_id)) == result
+
+
+@pytest.mark.asyncio
+async def test_background_provider_failure_keeps_latest_committed_goal() -> None:
+    thread_id = uuid4()
+    goal = _saved_goal()
+    proposal = WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="needs_input", current_step="confirm_goal"
+    )
+    committed = proposal.model_copy(
+        update={
+            "status": "running", "current_step": "normalize_evidence", "goal": goal,
+            "debug": {"goal_committed": True},
+        }
+    )
+    threads = InMemoryThreadStore()
+    await threads.upsert(proposal)
+    workflow = PersistingWorkflow(FailingInnerWorkflow(committed), threads)  # type: ignore[arg-type]
+    await workflow.mark_running(thread_id)
+
+    await workflow.resume_later(thread_id, ResumePayload(confirmed=True))
+
+    result = await workflow.snapshot(thread_id)
+    assert result.status == "failed"
+    assert result.goal == goal
+
+
+def test_resume_http_returns_failed_snapshot_with_saved_goal() -> None:
+    app = isolated_app()
+    principal = app.state.auth_bypass_principal
+    thread_id = uuid4()
+    goal = _saved_goal()
+    proposal = WorkflowSnapshot(
+        thread_id=thread_id,
+        kind="create_goal",
+        status="needs_input",
+        current_step="confirm_goal",
+        debug={"user_id": str(principal.user_id)},
+    )
+    committed = proposal.model_copy(
+        update={
+            "status": "running", "current_step": "normalize_evidence", "goal": goal,
+            "debug": {"user_id": str(principal.user_id), "goal_committed": True},
+        }
+    )
+    threads = InMemoryThreadStore()
+    asyncio.run(threads.upsert(proposal))
+    workflow = PersistingWorkflow(
+        RoutingFailingInnerWorkflow(proposal, committed), threads  # type: ignore[arg-type]
+    )
+    app.dependency_overrides[get_agent_workflow] = lambda: workflow
+
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/v1/agent/threads/{thread_id}/resume", json={"confirmed": True}
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "failed"
+        assert response.json()["goal"]["goal_id"] == str(goal.goal_id)
+        polled = client.get(f"/api/v1/agent/threads/{thread_id}")
+        assert polled.status_code == 200
+        assert polled.json()["goal"]["goal_id"] == str(goal.goal_id)

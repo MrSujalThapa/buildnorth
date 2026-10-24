@@ -1,12 +1,12 @@
 from datetime import UTC, datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from personal_markets.core.config import get_settings
-from personal_markets.core.errors import ForbiddenError, ResourceNotFoundError
+from personal_markets.core.errors import ConflictError, ForbiddenError, ResourceNotFoundError
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
 from personal_markets.integrations.csv_import import (
@@ -84,7 +84,10 @@ async def _resume_workflow(
         running = await mark_running(thread_id)
         background.add_task(resume_later, thread_id, payload)
         return running
-    return await workflow.resume(thread_id, payload)
+    snapshot = await workflow.resume(thread_id, payload)
+    if snapshot.status == "evidence_pending":
+        background.add_task(cast(Any, workflow).continue_evidence_later, thread_id)
+    return snapshot
 
 
 @router.post("/agent/threads", response_model=WorkflowSnapshot)
@@ -133,6 +136,8 @@ async def resume_thread(
 ) -> WorkflowSnapshot:
     snapshot = await workflow.snapshot(thread_id)
     _assert_thread_owner(snapshot, principal)
+    if snapshot.status != "needs_input":
+        raise ConflictError("This workflow is not awaiting an answer")
     return await _resume_workflow(
         workflow,
         thread_id,
@@ -140,6 +145,37 @@ async def resume_thread(
         http,
         background,
     )
+
+
+@router.post("/agent/threads/{thread_id}/evidence/retry", response_model=WorkflowSnapshot)
+async def retry_goal_evidence(
+    thread_id: UUID,
+    workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+    background: BackgroundTasks,
+) -> WorkflowSnapshot:
+    snapshot = await workflow.snapshot(thread_id)
+    _assert_thread_owner(snapshot, principal)
+    if snapshot.kind != "create_goal" or snapshot.status not in {
+        "evidence_pending", "evidence_failed"
+    } or not snapshot.goal or snapshot.debug.get("goal_committed") is not True:
+        raise ConflictError("This goal has no pending evidence continuation")
+    background.add_task(cast(Any, workflow).continue_evidence_later, thread_id)
+    return snapshot
+
+
+@router.get("/goals/{goal_id}/evidence/continuation", response_model=WorkflowSnapshot)
+async def goal_evidence_continuation(
+    goal_id: UUID,
+    workflow: Annotated[AgentWorkflow, Depends(get_agent_workflow)],
+    goals: Annotated[Any, Depends(get_goal_service)],
+    principal: Annotated[Principal, Depends(get_invited_principal)],
+) -> WorkflowSnapshot:
+    await goals.get_goal(goal_id, owner_id=principal.user_id)
+    snapshot = await cast(Any, workflow).creation_for_goal(goal_id, principal.user_id)
+    if snapshot is None:
+        raise ResourceNotFoundError("No creation workflow for this goal")
+    return await workflow.snapshot(snapshot.thread_id)
 
 
 @router.get("/goals/{goal_id}/evidence")

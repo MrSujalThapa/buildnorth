@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ParameterEditor } from "../components/behavior/ParameterEditor";
-import { TraitRadar } from "../components/behavior/TraitRadar";
+import { ParameterRadar } from "../components/behavior/ParameterRadar";
 import { api } from "../api/client";
 import { useRefreshAccount } from "../auth/AuthGate";
 import { saveProfileWithPhoto } from "./profileSave";
@@ -66,7 +66,7 @@ export function ProfileRoute() {
     },
   });
   const saveParameters = useMutation({
-    mutationFn: (body: { parameter_ids: string[]; custom_parameters: { name: string; description: string }[] }) => api.patchProfile(body),
+    mutationFn: (body: { parameter_ids: string[] }) => api.patchProfile(body),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
       setEditingParameters(false);
@@ -114,17 +114,17 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="profile-radar-heading">
-          <h2>Behavior profile</h2>
-          {profile.data.traits ? (
+          <h2>Your parameters</h2>
+          {profile.data.radar ? (
             <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
               Edit parameters
             </button>
           ) : null}
         </div>
-        {profile.data.traits ? (
-          <TraitRadar traits={profile.data.traits.traits} series={profile.data.traits.series} />
+        {profile.data.radar ? (
+          <ParameterRadar profile={profile.data.radar} />
         ) : (
-          <p className="profile-radar-pending" role="status">The behavior profile is updating. Reload in a few minutes.</p>
+          <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
         )}
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">

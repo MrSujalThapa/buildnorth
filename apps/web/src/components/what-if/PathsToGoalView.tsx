@@ -43,7 +43,7 @@ export default function PathsToGoalView({
   onFind,
 }: Props) {
   const paths = pathsProp ?? [];
-  const loadingPaths = loading || pathsProp === undefined;
+  const loadingPaths = loading;
   const axes = pathAxes(market);
   const selected = paths.find((path) => path.id === selectedPathId) ?? paths[0];
   const [finding, setFinding] = useState(false);

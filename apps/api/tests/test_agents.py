@@ -324,6 +324,10 @@ async def test_clear_goal_interrupts_for_confirmation_then_completes() -> None:
     assert first.interrupt.type == "confirm_contract"
     assert "Researching reference class" not in first.progress
     second = await runtime.resume(first.thread_id, ResumePayload(confirmed=True))
+    assert second.status == "evidence_pending"
+    assert second.goal is not None
+    assert second.pricing is None
+    second = await runtime.continue_evidence(first.thread_id)
     assert second.status in {"limited", "completed", "withheld"}
     assert second.goal is not None
     assert second.pricing is not None

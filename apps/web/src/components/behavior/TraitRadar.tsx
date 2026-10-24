@@ -51,38 +51,29 @@ function percent(value: number | null | undefined): string {
   return value == null ? "—" : `${Math.round(value * 100)}%`;
 }
 
-function Readout({ item, series }: { item: TraitEstimate; series: TraitSeries[] }) {
+function Readout({ item, selected }: { item: TraitEstimate; selected: TraitSeries }) {
   const change = pointsChange(item);
-  const contexts = series.filter((row) => row.id !== "overall");
+  const selectedValue = selected.values[item.id] ?? null;
+  const isOverall = selected.id === "overall";
   return (
     <div className="trait-readout" aria-live="polite">
       <div className="trait-readout-head">
         <strong>{item.name}</strong>
-        <span className="trait-readout-value">{percent(item.value)}</span>
+        <span className="trait-readout-value">{percent(selectedValue)}</span>
       </div>
-      {item.value != null && item.interval ? (
+      {isOverall && item.value != null && item.interval ? (
         <p className="trait-readout-meta">
           Likely {percent(item.interval[0])}–{percent(item.interval[1])}
           {change != null && change !== 0 ? ` · ${change > 0 ? "+" : "−"}${Math.abs(change)} pts over ${Math.round(item.window_days ?? 28)} days` : null}
           {` · ${item.observations} observation${item.observations === 1 ? "" : "s"}`}
         </p>
-      ) : (
+      ) : isOverall ? (
         <p className="trait-readout-meta">
           Not enough evidence yet · {item.observations} observation{item.observations === 1 ? "" : "s"}
         </p>
-      )}
-      {contexts.length ? (
-        <p className="trait-readout-contexts">
-          {contexts.map((row) => (
-            <span key={row.id}>
-              <i style={{ background: seriesColor(row.id) }} aria-hidden="true" />
-              {row.label} {percent(row.values[item.id])}
-            </span>
-          ))}
-        </p>
-      ) : null}
+      ) : <p className="trait-readout-meta">{selected.label} · {selectedValue == null ? "Not enough evidence" : "Observed behavior"}</p>}
       <p className="trait-readout-copy">{item.description} {item.measurement}</p>
-      {item.forecast_use === "execution_probability" ? (
+      {isOverall && item.forecast_use === "execution_probability" ? (
         <p className="trait-readout-copy">Used in forecasts as your probability of carrying out planned actions.</p>
       ) : null}
     </div>
@@ -93,15 +84,26 @@ export function TraitRadar({ traits, series }: Props) {
   const total = traits.length;
   const firstMeasured = traits.find((item) => item.value != null)?.id ?? traits[0]?.id ?? null;
   const [focused, setFocused] = useState<string | null>(null);
+  const [selectedArea, setSelectedArea] = useState("overall");
+  const options = series.some((row) => row.id === "overall")
+    ? series
+    : [{ id: "overall", label: "Overall", values: Object.fromEntries(traits.map((item) => [item.id, item.value])) }, ...series];
+  const selected = options.find((row) => row.id === selectedArea) ?? options[0]!;
   const activeId = focused && traits.some((item) => item.id === focused) ? focused : firstMeasured;
   const active = traits.find((item) => item.id === activeId) ?? null;
-  const overlay = series.length > 1;
   if (total < 3) return null;
 
   return (
     <section className="trait-radar" aria-label="Behavior profile">
+      {options.length > 1 ? (
+        <div className="trait-area-filter" role="group" aria-label="Execution area">
+          {options.map((row) => (
+            <button key={row.id} type="button" aria-pressed={selected.id === row.id} onClick={() => setSelectedArea(row.id)}>{row.label}</button>
+          ))}
+        </div>
+      ) : null}
       <div className="trait-radar-stage">
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`Radar of ${traits.map((item) => `${item.name} ${percent(item.value)}`).join(", ")}`}>
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`${selected.label} execution radar: ${traits.map((item) => `${item.name} ${percent(selected.values[item.id])}`).join(", ")}`}>
           {RINGS.map((ring) => (
             <polygon
               key={ring}
@@ -117,7 +119,7 @@ export function TraitRadar({ traits, series }: Props) {
             return (
               <line
                 key={`spoke-${item.id}`}
-                className={item.value == null ? "trait-spoke is-empty" : "trait-spoke"}
+                className={selected.values[item.id] == null ? "trait-spoke is-empty" : "trait-spoke"}
                 x1={CENTER}
                 y1={CENTER}
                 x2={edge.x}
@@ -125,7 +127,7 @@ export function TraitRadar({ traits, series }: Props) {
               />
             );
           })}
-          {!overlay
+          {selected.id === "overall"
             ? traits.map((item, index) => {
                 if (item.value == null || !item.interval) return null;
                 const low = at(index, total, item.interval[0]);
@@ -133,7 +135,7 @@ export function TraitRadar({ traits, series }: Props) {
                 return <line key={`band-${item.id}`} className="trait-band" x1={low.x} y1={low.y} x2={high.x} y2={high.y} />;
               })
             : null}
-          {series.map((row) => {
+          {[selected].map((row) => {
             const values = traits.map((item) => row.values[item.id] ?? null);
             const complete = values.every((value) => value != null);
             const color = seriesColor(row.id);
@@ -142,7 +144,7 @@ export function TraitRadar({ traits, series }: Props) {
               <g key={row.id} className="trait-series" style={{ color }}>
                 {complete ? (
                   <polygon
-                    className={overlay ? "trait-shape is-overlay" : "trait-shape"}
+                    className="trait-shape"
                     points={points.map((pt) => `${pt.x},${pt.y}`).join(" ")}
                   />
                 ) : (
@@ -183,31 +185,27 @@ export function TraitRadar({ traits, series }: Props) {
                 role="button"
                 tabIndex={0}
                 aria-pressed={item.id === activeId}
-                aria-label={`${item.name}, ${item.value == null ? "not enough evidence" : percent(item.value)}`}
+                aria-label={`${item.name}, ${selected.values[item.id] == null ? "not enough evidence" : percent(selected.values[item.id])}`}
                 onMouseEnter={() => setFocused(item.id)}
                 onFocus={() => setFocused(item.id)}
                 onClick={() => setFocused(item.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setFocused(item.id);
+                  }
+                }}
               >
                 <text x={pt.x} y={pt.y + place.dy} textAnchor={place.textAnchor}>
                   <tspan className="trait-axis-name">{item.name}</tspan>
-                  <tspan className="trait-axis-value" x={pt.x} dy={17}>{percent(item.value)}</tspan>
+                  <tspan className="trait-axis-value" x={pt.x} dy={17}>{percent(selected.values[item.id])}</tspan>
                 </text>
               </g>
             );
           })}
         </svg>
       </div>
-      {overlay ? (
-        <ul className="trait-legend" aria-label="Contexts">
-          {series.map((row) => (
-            <li key={row.id}>
-              <i style={{ background: seriesColor(row.id) }} aria-hidden="true" />
-              {row.label}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {active ? <Readout item={active} series={series} /> : null}
+      {active ? <Readout item={active} selected={selected} /> : null}
     </section>
   );
 }

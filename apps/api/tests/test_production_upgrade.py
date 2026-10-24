@@ -191,6 +191,19 @@ def test_profile_username_is_unique_and_private() -> None:
             for value in series["values"].values()
         )
         assert len(profile["selected_parameters"]) >= 3
+        assert profile["radar"]["parameters"]
+        assert all(item["value"] is None for item in profile["radar"]["parameters"])
+        selected = ["reading_minutes", "monthly_savings", "weekly_running_km"]
+        changed = client.patch("/api/v1/profile", json={"parameter_ids": selected})
+        assert changed.status_code == 200, changed.text
+        persisted = client.get("/api/v1/profile").json()
+        assert persisted["selected_parameters"] == selected
+        assert [item["id"] for item in persisted["radar"]["parameters"]] == selected
+        demo = client.get("/api/v1/profile/demo-radar")
+        assert demo.status_code == 200
+        assert demo.json()["synthetic"] is True
+        assert demo.json()["fixture_goal_count"] == 0
+        assert demo.json()["commitment_count"] == 0
         client.app.state.auth_bypass_principal = make_principal("second-judge", invited=True)
         taken = client.patch("/api/v1/profile", json={"username": "judge_one"})
         assert taken.status_code == 409

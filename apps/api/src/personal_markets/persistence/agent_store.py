@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -89,12 +90,29 @@ class InMemoryEvidenceRepository:
 class InMemoryThreadStore:
     def __init__(self) -> None:
         self._rows: dict[UUID, WorkflowSnapshot] = {}
+        self._lock = asyncio.Lock()
 
     async def upsert(self, snapshot: WorkflowSnapshot) -> None:
         self._rows[snapshot.thread_id] = snapshot
 
     async def get(self, thread_id: UUID) -> WorkflowSnapshot | None:
         return self._rows.get(thread_id)
+
+    async def claim_evidence(self, thread_id: UUID) -> bool:
+        async with self._lock:
+            snapshot = self._rows.get(thread_id)
+            if snapshot is None or snapshot.status not in {"evidence_pending", "evidence_failed"}:
+                return False
+            self._rows[thread_id] = snapshot.model_copy(update={"status": "evidence_running"})
+            return True
+
+    async def latest_creation_for_goal(self, goal_id: UUID, owner_id: UUID) -> WorkflowSnapshot | None:
+        for snapshot in reversed(list(self._rows.values())):
+            if (snapshot.kind == "create_goal" and snapshot.goal is not None
+                and snapshot.goal.goal_id == goal_id
+                and snapshot.debug.get("user_id") == str(owner_id)):
+                return snapshot
+        return None
 
 
 class InMemoryAgentRunStore:
@@ -379,6 +397,32 @@ class PostgresThreadStore:
                 },
             )
 
+    async def claim_evidence(self, thread_id: UUID) -> bool:
+        async with transaction(self._engine) as connection:
+            row = await connection.execute(
+                text("""
+                update workflow_threads set status = 'evidence_running',
+                  result_json = jsonb_set(result_json, '{status}', '"evidence_running"'::jsonb),
+                  updated_at = now()
+                where id = :id and status in ('evidence_pending', 'evidence_failed')
+                returning id
+                """),
+                {"id": thread_id},
+            )
+            return row.first() is not None
+
+    async def latest_creation_for_goal(self, goal_id: UUID, owner_id: UUID) -> WorkflowSnapshot | None:
+        async with autocommit_connection(self._engine) as connection:
+            row = (await connection.execute(
+                text("""
+                select result_json from workflow_threads
+                where goal_id = :goal_id and user_id = :owner_id and kind = 'create_goal'
+                order by updated_at desc limit 1
+                """),
+                {"goal_id": goal_id, "owner_id": owner_id},
+            )).mappings().one_or_none()
+        return WorkflowSnapshot.model_validate(row["result_json"]) if row else None
+
     async def get(self, thread_id: UUID) -> WorkflowSnapshot | None:
         async with autocommit_connection(self._engine) as connection:
             row = (
@@ -393,7 +437,7 @@ class PostgresThreadStore:
             )
         if row is None:
             return None
-        if row["status"] == "running" and running_thread_expired(
+        if row["status"] in {"running", "evidence_running"} and running_thread_expired(
             row["updated_at"],
             timeout_seconds=get_settings().inference_run_timeout_seconds,
             now=datetime.now(UTC),
@@ -403,16 +447,21 @@ class PostgresThreadStore:
                         (
                             await connection.execute(
                                 text("""
-                                update workflow_threads set status = 'failed',
+                                update workflow_threads set status = case
+                                    when status = 'evidence_running' then 'evidence_failed'
+                                    else 'failed' end,
                                   current_step = 'failed',
                                   result_json = jsonb_set(
-                                    result_json || '{"status":"failed","current_step":"failed"}'::jsonb,
+                                    result_json || jsonb_build_object(
+                                      'status', case when status = 'evidence_running'
+                                        then 'evidence_failed' else 'failed' end,
+                                      'current_step', 'failed'),
                                     '{debug}',
                                     coalesce(result_json->'debug', '{}'::jsonb) ||
                                       '{"failure_code":"workflow_timeout"}'::jsonb
                                   ),
                                   updated_at = now()
-                                where id = :id and status = 'running'
+                                where id = :id and status in ('running', 'evidence_running')
                                   and updated_at = :previous_update
                                 returning result_json
                                 """),

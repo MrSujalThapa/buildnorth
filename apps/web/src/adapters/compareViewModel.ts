@@ -48,7 +48,9 @@ export function toCompareOptions(
     });
   }
 
-  return (baseline?.compare_candidates ?? []).map((candidate) => ({
+  return (baseline?.compare_candidates ?? []).filter(
+    (candidate) => candidate.intervention?.effect_per_unit != null,
+  ).map((candidate) => ({
     id: candidate.id,
     label: candidate.title,
     odds: null,

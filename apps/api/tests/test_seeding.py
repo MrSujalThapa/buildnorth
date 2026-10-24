@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from personal_markets.behavior.cohort import behavior_cohort_goals
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.seeding import load_seed, seed_goals
 
@@ -23,7 +24,10 @@ async def test_seed_is_idempotent() -> None:
     repository = InMemoryGoalRepository()
     assert await seed_goals(repository, payload) == (5, 0)
     assert await seed_goals(repository, payload) == (0, 5)
-    assert len(await repository.list()) == 5
+    seeded = await repository.list()
+    assert len(seeded) == 5
+    assert behavior_cohort_goals(seeded) == []
+    assert len(behavior_cohort_goals(seeded, synthetic=True)) == 5
 
 
 def test_seed_contains_no_forbidden_probability_fields() -> None:

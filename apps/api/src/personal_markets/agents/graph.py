@@ -52,6 +52,7 @@ class LangGraphAgentWorkflow:
         graph.add_node("interrupt_goal", self._interrupt_goal)
         graph.add_node("confirm_goal", self._confirm_goal)
         graph.add_node("commit_goal", self._commit_goal)
+        graph.add_node("await_evidence", self._await_evidence)
         graph.add_node("collect_evidence", self._collect_evidence)
         graph.add_node("normalize_evidence", self._normalize_evidence)
         graph.add_node("validate_evidence", self._validate_evidence)
@@ -68,7 +69,8 @@ class LangGraphAgentWorkflow:
         graph.add_conditional_edges("validate_goal", self._after_validate_goal)
         graph.add_conditional_edges("interrupt_goal", self._after_interrupt_goal)
         graph.add_conditional_edges("confirm_goal", self._after_confirm_goal)
-        graph.add_edge("commit_goal", "collect_evidence")
+        graph.add_edge("commit_goal", "await_evidence")
+        graph.add_edge("await_evidence", "collect_evidence")
         graph.add_conditional_edges("collect_evidence", self._after_collect_evidence)
         graph.add_edge("normalize_evidence", "validate_evidence")
         graph.add_conditional_edges("validate_evidence", self._after_validate_evidence)
@@ -157,6 +159,22 @@ class LangGraphAgentWorkflow:
             )
         return await self._to_snapshot(thread_id, result)
 
+    async def continue_evidence(self, thread_id: UUID) -> WorkflowSnapshot:
+        state = await self._graph.aget_state(self._config(thread_id))
+        if not state.values or not state.values.get("committed_goal_id"):
+            raise ResourceNotFoundError("No committed goal is awaiting evidence")
+        if state.interrupts:
+            command: Any = Command(resume={"continue": True})
+        elif state.next and "await_evidence" not in state.next:
+            # A failed node resumes from its checkpoint. Replaying the confirmation
+            # would run goal creation again and could repeat provider spending.
+            command = None
+        else:
+            raise ResourceNotFoundError("No evidence continuation is available")
+        async with asyncio.timeout(self._deps.settings.inference_run_timeout_seconds):
+            result = await self._graph.ainvoke(command, self._config(thread_id))
+        return await self._to_snapshot(thread_id, result)
+
     async def snapshot(self, thread_id: UUID) -> WorkflowSnapshot:
         state = await self._graph.aget_state(self._config(thread_id))
         if not state.values:
@@ -175,7 +193,8 @@ class LangGraphAgentWorkflow:
         interrupts = getattr(graph_state, "interrupts", ()) or ()
         if interrupts:
             payload = interrupts[0].value
-            interrupt_payload = InterruptPayload.model_validate(payload)
+            if payload.get("type") != "evidence_pending":
+                interrupt_payload = InterruptPayload.model_validate(payload)
         goal = None
         goal_id = state.get("committed_goal_id") or state.get("goal_id")
         if goal_id:
@@ -198,10 +217,13 @@ class LangGraphAgentWorkflow:
                 except Exception:
                     goal = None
         snapshot = snapshot_from_state(state, interrupt_payload, goal)
+        if interrupts and interrupts[0].value.get("type") == "evidence_pending":
+            snapshot.status = "evidence_pending"
         snapshot.debug = {
             **snapshot.debug,
             "user_id": state.get("user_id"),
             "steps": list(state.get("progress") or []),
+            "goal_committed": bool(state.get("committed_goal_id")),
         }
         return snapshot
 
@@ -330,14 +352,19 @@ class LangGraphAgentWorkflow:
         goal_id = stable_goal_id(state["thread_id"])
         contract = proposal_to_contract(proposal, goal_id)
         created = await self._deps.goals.create_goal(contract, UUID(state["user_id"]))
-        await self._deps.evidence.watch_goal(created.goal_id)
         return {
             "committed_goal_id": str(created.goal_id),
             "goal_id": str(created.goal_id),
             "current_step": "commit_goal",
         }
 
+    async def _await_evidence(self, state: AgentGraphState) -> dict[str, Any]:
+        interrupt({"type": "evidence_pending"})
+        return {"status": "running", "current_step": "await_evidence"}
+
     async def _collect_evidence(self, state: AgentGraphState) -> dict[str, Any]:
+        if state.get("kind") == "create_goal" and state.get("goal_id"):
+            await self._deps.evidence.watch_goal(UUID(state["goal_id"]))
         text = (state.get("evidence_text") or "").strip()
         if not text and state.get("kind") == "create_goal" and state.get("goal_proposal"):
             proposal = GoalArchitectProposal.model_validate(state["goal_proposal"])

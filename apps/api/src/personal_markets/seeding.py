@@ -22,6 +22,15 @@ def seed_checksum(payload: dict[str, Any]) -> str:
 async def seed_goals(repository: GoalRepository, payload: dict[str, Any]) -> tuple[int, int]:
     created = 0
     for record in payload["goals"]:
-        if await repository.upsert_seed(GoalContract.model_validate(record)):
+        goal = GoalContract.model_validate(record)
+        goal = goal.model_copy(
+            update={
+                "model_requirements": {
+                    **goal.model_requirements,
+                    "demo_seed": "seeds/demo.json",
+                }
+            }
+        )
+        if await repository.upsert_seed(goal):
             created += 1
     return created, len(payload["goals"]) - created
