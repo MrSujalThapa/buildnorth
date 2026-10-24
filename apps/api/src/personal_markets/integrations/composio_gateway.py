@@ -396,26 +396,24 @@ class ComposioIntegrationGateway:
         *,
         connected_account_id: str | None,
     ) -> list[MCPResourceDescriptor]:
-        """Discover selectable resources via approved read tools where available."""
-        preferred = {
-            "github": "GITHUB_LIST_REPOSITORIES_FOR_THE_AUTHENTICATED_USER",
-            "notion": "NOTION_SEARCH_NOTION_PAGE",
-        }.get(toolkit_slug)
-        if preferred:
-            tool_name = preferred
-        else:
+        """Discover selectable resources via the provider adapter's validated read tool."""
+        from personal_markets.core.errors import IntegrationProviderError
+        from personal_markets.integrations.provider_contract import (
+            ProviderErrorKind,
+            get_adapter,
+        )
+
+        adapter = get_adapter(toolkit_slug)
+        tool_name = adapter.discovery_tool
+        if not tool_name:
             tools = await self.list_tools(user_id, toolkit_slug)
-            resource_tools = [
-                tool for tool in tools
-                if any(token in tool.name.lower() for token in (
-                    "list_repositories", "list_repos", "list_pages", "list_databases",
-                    "list_spreadsheets", "list_sheets", "list_calendars", "list_files",
-                    "list_folders", "list_labels", "list_threads",
-                ))
-            ]
-            if not resource_tools:
-                return []
-            tool_name = resource_tools[0].name
+            tool_name = adapter.choose_discovery_tool(tools)
+        if not tool_name:
+            raise IntegrationProviderError(
+                ProviderErrorKind.UNSUPPORTED_CAPABILITY,
+                f"{toolkit_slug} has no supported resource discovery read.",
+                retryable=False,
+            )
         payload = await self.execute_tool(
             user_id,
             tool_name,
@@ -438,16 +436,16 @@ class ComposioIntegrationGateway:
             if isinstance(schema.get("parameters"), dict):
                 schema = schema["parameters"]
             properties = schema.get("properties") or {}
-            if isinstance(properties, dict) and "start_cursor" in properties:
+            if isinstance(properties, dict):
                 cursor = str(payload["next_cursor"])
                 seen_cursors: set[str] = set()
                 for _ in range(_RESOURCE_DISCOVERY_PAGE_LIMIT - 1):
                     if cursor in seen_cursors:
                         break
                     seen_cursors.add(cursor)
-                    arguments: dict[str, Any] = {"start_cursor": cursor}
-                    if "page_size" in properties:
-                        arguments["page_size"] = 100
+                    arguments = adapter.next_page_arguments(properties, cursor)
+                    if arguments is None:
+                        break
                     page = await self.execute_tool(
                         user_id, tool_name, arguments,
                         connected_account_id=connected_account_id,
@@ -485,11 +483,7 @@ class ComposioIntegrationGateway:
                         )
                         break
             candidate_title = str(title or row.get("name") or "").strip()
-            try:
-                opaque_title = UUID(candidate_title)
-            except ValueError:
-                opaque_title = None
-            if toolkit_slug == "notion" and (not candidate_title or opaque_title is not None):
+            if toolkit_slug == "notion" and not adapter.include_untitled(candidate_title):
                 # Notion search can return untitled blocks. An opaque page ID is
                 # not a usable selection label for a consumer evidence source.
                 continue
@@ -605,16 +599,26 @@ class ComposioIntegrationGateway:
             if connected_account_id:
                 kwargs["connected_account_id"] = connected_account_id
             result = self._client.tools.execute(tool_slug, user_id=str(user_id), **kwargs)
+            from personal_markets.integrations.provider_contract import classify_provider_failure
+
             if isinstance(result, dict):
-                if result.get("successful") is False or result.get("success") is False or result.get("isError") is True:
-                    raise RuntimeError(str(result.get("error") or result.get("message") or "Provider read failed"))
+                failed = (
+                    result.get("successful") is False
+                    or result.get("success") is False
+                    or result.get("isError") is True
+                )
+                if failed:
+                    raise classify_provider_failure(
+                        str(result.get("error") or result.get("message") or ""),
+                        result,
+                    )
                 data = result.get("data") or result.get("response_data") or result
                 if isinstance(data, dict):
                     return data
                 return {"records": data}
             data = getattr(result, "data", result)
             if getattr(result, "successful", True) is False:
-                raise RuntimeError(str(getattr(result, "error", None) or "Provider read failed"))
+                raise classify_provider_failure(str(getattr(result, "error", None) or ""), None)
             if isinstance(data, dict):
                 return data
             return {"records": data}

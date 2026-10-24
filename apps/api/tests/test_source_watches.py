@@ -175,3 +175,43 @@ async def test_parent_watch_reads_only_discovered_children_and_rechecks_revocati
     gateway.sync.reset_mock()
     assert (await service.sync_goal_sources(str(goal_id)))["status"] == "no_recipes"
     gateway.sync.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_resource_watch_does_not_require_a_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = InMemorySourceWatchStore()
+    monkeypatch.setattr(
+        "personal_markets.integrations.goal_sync_service.get_source_watch_store",
+        lambda: store,
+    )
+    owner_id, goal_id, connection_id = uuid4(), uuid4(), uuid4()
+    page_id = str(uuid4())
+    await store.save(SourceWatch(
+        owner_id=owner_id, goal_id=goal_id, plugin_connection_id=connection_id,
+        plugin_id="notion", resource_id=page_id, scope="resource",
+    ))
+    recipe = GoalSyncRecipeRecord(
+        goal_id=goal_id, plugin_connection_id=connection_id, plugin_id="notion",
+        label="Oct 20th book report", approved=True, steps=[SyncRecipeStep(
+            capability_id="read-page", tool_name="NOTION_FETCH_ALL_BLOCK_CONTENTS",
+            resource_uri=f"composio://notion/{page_id}",
+            arguments={"block_id": page_id},
+        )],
+    )
+    gateway = SimpleNamespace(
+        list_descendants=AsyncMock(return_value=["should-not-be-read"]),
+        sync=AsyncMock(return_value={"records_read": 1, "new_records": []}),
+    )
+    service = GoalSyncService(
+        settings=None, gateway=gateway,
+        repository=SimpleNamespace(list_goal_recipes=AsyncMock(return_value=[recipe])),
+        goals=SimpleNamespace(get_goal_by_string=AsyncMock(return_value=SimpleNamespace(goal_id=goal_id))),
+        workflow=None, evidence=None, owner_id=owner_id,
+        watch_resource_uris=[f"composio://notion/{page_id}"],
+    )
+    assert (await service.sync_goal_sources(str(goal_id)))["status"] == "no_new_records"
+    gateway.list_descendants.assert_not_awaited()
+    steps = gateway.sync.await_args.kwargs["steps"]
+    assert [step.resource_uri for step in steps] == [f"composio://notion/{page_id}"]

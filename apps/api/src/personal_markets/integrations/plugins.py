@@ -30,6 +30,8 @@ class PluginDefinition(BaseModel):
     logo_url: str | None = None
     capabilities: list[ReadCapability] = Field(default_factory=list)
     used_for: list[str] = Field(default_factory=list)
+    evidence_readiness: str = "connectable"
+    readiness_detail: str = ""
 
 
 class PluginConnection(BaseModel):
@@ -129,7 +131,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "gmail",
         "Gmail",
-        "Applications, interviews and recruiter messages",
+        "Connectable only. PlayItOut does not yet turn mail into goal evidence.",
         "gmail.messages.selected.read",
         ["Selected recruiter mail"],
         ["Career goals", "Application progress"],
@@ -137,7 +139,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "calendar",
         "Google Calendar",
-        "Interviews, habits and scheduled activity",
+        "Connectable. Event reads are fixture-tested only and are not proof an event occurred.",
         "calendar.events.selected.read",
         ["Selected events"],
         ["Career goals", "Habit goals"],
@@ -145,7 +147,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "drive",
         "Google Drive",
-        "Selected files and documents",
+        "Connectable only. File contents are not an evidence-ready integration.",
         "drive.files.selected.read",
         ["Selected files"],
         ["Project progress"],
@@ -153,7 +155,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "strava",
         "Strava",
-        "Runs, workouts and training history",
+        "Connectable only. Workouts are not an evidence-ready integration.",
         "strava.activities.read",
         ["Training activity"],
         ["Fitness goals"],
@@ -169,7 +171,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "slack",
         "Slack",
-        "Work and team activity",
+        "Connectable only. Channel activity is not an evidence-ready integration.",
         "slack.channels.selected.read",
         ["Selected channels"],
         ["Work goals"],
@@ -177,7 +179,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "sheets",
         "Google Sheets",
-        "Trackers, logs and structured metrics",
+        "Connectable only. Spreadsheets are not an evidence-ready integration.",
         "sheets.spreadsheets.selected.read",
         ["Selected spreadsheets"],
         ["Financial goals", "Habit goals"],
@@ -185,7 +187,7 @@ PLUGIN_DEFINITIONS = [
     _definition(
         "figma",
         "Figma",
-        "Design and prototype activity",
+        "Connectable only. Design files are not an evidence-ready integration.",
         "figma.files.selected.read",
         ["Selected files"],
         ["Project progress", "Portfolio goals"],
@@ -216,7 +218,15 @@ class DirectIntegrationGateway:
         return definition.capabilities
 
     async def views(self) -> list[PluginView]:
-        return [
-            PluginView(definition=item, connection=await self.connection_status(item.id))
-            for item in await self.discover_plugins()
-        ]
+        from personal_markets.integrations.provider_contract import readiness_for
+
+        views: list[PluginView] = []
+        for item in await self.discover_plugins():
+            level, detail = readiness_for(item.id)
+            definition = item.model_copy(
+                update={"evidence_readiness": level, "readiness_detail": detail}
+            )
+            views.append(
+                PluginView(definition=definition, connection=await self.connection_status(item.id))
+            )
+        return views

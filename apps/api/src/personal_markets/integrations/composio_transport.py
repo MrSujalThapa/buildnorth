@@ -42,7 +42,9 @@ class ComposioTransport:
         )
 
     async def list_descendants(self, parent_id: str) -> list[str]:
-        if self._plugin_id != "notion" or not self._gateway.available:
+        from personal_markets.integrations.provider_contract import get_adapter
+
+        if not get_adapter(self._plugin_id).supports_parent_watch or not self._gateway.available:
             return []
         return await self._gateway.list_notion_child_pages(
             self._user_id,

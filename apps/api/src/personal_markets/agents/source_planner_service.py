@@ -11,7 +11,7 @@ from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
 from personal_markets.core.config import Settings
-from personal_markets.core.errors import SemanticProviderError
+from personal_markets.core.errors import IntegrationProviderError, SemanticProviderError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.gateway import UnifiedIntegrationGateway
@@ -21,6 +21,7 @@ from personal_markets.integrations.mcp_domain import (
     SyncRecipeStep,
 )
 from personal_markets.integrations.plugins import PLUGIN_DEFINITIONS, PluginStatus
+from personal_markets.integrations.provider_contract import get_adapter, required_argument_names
 from personal_markets.integrations.resource_ranker import rank_resources
 from personal_markets.ports import (
     InferenceProvider,
@@ -61,27 +62,42 @@ class SourcePlannerService:
         plugin_views = await self._gateway.views()
         semaphore = asyncio.Semaphore(4)
 
-        async def load_connected(plugin_id: str) -> tuple[list[dict], list[dict]]:
+        async def load_connected(
+            plugin_id: str,
+        ) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, str] | None]:
             async with semaphore:
-                async def resources_or_empty() -> list[dict]:
+                async def resources_or_empty() -> (
+                    tuple[list[dict[str, object]], dict[str, str] | None]
+                ):
                     try:
-                        return await self._gateway.list_resources(plugin_id)
-                    except Exception as error:
+                        return await self._gateway.list_resources(plugin_id), None
+                    except IntegrationProviderError as error:
+                        return [], {
+                            "plugin_id": plugin_id,
+                            "kind": error.kind,
+                            "message": str(error),
+                        }
+                    except Exception:
                         logger.warning(
                             "source_resource_discovery_failed plugin_id=%s error_type=%s",
-                            plugin_id, type(error).__name__,
+                            plugin_id, "Exception",
                         )
-                        return []
+                        return [], {
+                            "plugin_id": plugin_id,
+                            "kind": "temporary_upstream_failure",
+                            "message": "Resource discovery failed.",
+                        }
 
-                return await asyncio.gather(
-                    self._gateway.list_capabilities(plugin_id), resources_or_empty()
-                )
+                resources, issue = await resources_or_empty()
+                capabilities = await self._gateway.list_capabilities(plugin_id)
+                return capabilities, resources, issue
 
         connected_ids = [
             view.definition.id
             for view in plugin_views
             if view.connection.status == PluginStatus.CONNECTED
         ]
+        discovery_issues: list[dict[str, str]] = []
         connected_results = dict(zip(
             connected_ids,
             await asyncio.gather(*(load_connected(plugin_id) for plugin_id in connected_ids)),
@@ -90,10 +106,12 @@ class SourcePlannerService:
         catalog = []
         available_resources: list[dict[str, object]] = []
         for view in plugin_views:
-            capabilities = view.definition.capabilities
+            reported_capabilities: object = view.definition.capabilities
             if view.connection.status == PluginStatus.CONNECTED:
-                discovered, resources = connected_results[view.definition.id]
-                capabilities = [
+                discovered, resources, issue = connected_results[view.definition.id]
+                if issue is not None:
+                    discovery_issues.append(issue)
+                reported_capabilities = [
                     {
                         "capability_id": item.get("capability_id"),
                         "label": item.get("label"),
@@ -123,7 +141,7 @@ class SourcePlannerService:
                     "name": view.definition.name,
                     "description": view.definition.description,
                     "used_for": view.definition.used_for,
-                    "capabilities": capabilities,
+                    "capabilities": reported_capabilities,
                     "connection_status": view.connection.status.value,
                 }
             )
@@ -151,6 +169,7 @@ class SourcePlannerService:
                     goal_title=goal.title,
                     goal_type=str(goal.goal_type),
                     state_dimensions=goal.state_dimensions,
+                    discovery_issues=discovery_issues,
                 ),
                 available_resources,
                 goal_payload,
@@ -182,6 +201,8 @@ class SourcePlannerService:
         )
         proposal = self._validate_plan(proposal)
         proposal = self._attach_ranked_resources(proposal, available_resources, goal.model_dump(mode="json"))
+        if discovery_issues:
+            proposal = proposal.model_copy(update={"discovery_issues": discovery_issues})
         await self._run_store.record(  # type: ignore[attr-defined]
             {
                 "id": run_id,
@@ -252,8 +273,10 @@ class SourcePlannerService:
         connection_id: UUID,
         activity_types: list[str] | None = None,
     ) -> list[SyncRecipeStep]:
-        if plugin_id in {"notion", "github"} and not resource_ids:
-            raise SemanticProviderError("Choose a page or repository before saving this source.")
+        if get_adapter(plugin_id).requires_resource and not resource_ids:
+            raise SemanticProviderError(
+                "Choose a page, repository, or calendar before saving this source."
+            )
         capabilities: list[ReadCapabilityRecord] = await self._repository.list_capabilities(connection_id)  # type: ignore[attr-defined]
         selected = _select_capabilities(capabilities, activity_types)
         if activity_types and not selected:
@@ -264,12 +287,22 @@ class SourcePlannerService:
         steps: list[SyncRecipeStep] = []
         for capability in selected:
             for target in targets:
+                arguments = _arguments_for_resource(target, label, capability)
+                missing = [
+                    name for name in required_argument_names(capability.input_schema)
+                    if name not in arguments or arguments[name] in ("", None)
+                ]
+                if missing:
+                    raise SemanticProviderError(
+                        "The provider tool schema requires arguments this source cannot fill. "
+                        "Select the source again."
+                    )
                 steps.append(
                     SyncRecipeStep(
                         capability_id=capability.capability_id,
                         tool_name=capability.tool_name,
                         resource_uri=f"composio://{plugin_id}/{target}",
-                        arguments=_arguments_for_resource(target, label, capability),
+                        arguments=arguments,
                     )
                 )
         return steps
@@ -367,48 +400,27 @@ def _select_capabilities(
     capabilities: list[ReadCapabilityRecord],
     activity_types: list[str] | None,
 ) -> list[ReadCapabilityRecord]:
+    from personal_markets.integrations.provider_contract import adapter_for_tool_names
+
     capabilities = [
         cap for cap in capabilities
         if cap.approved and (cap.operation == "read" or cap.operation.endswith(".read"))
     ]
     if not capabilities:
         return []
-    if activity_types:
-        if any((cap.tool_name or "").startswith("GITHUB_") for cap in capabilities):
-            preferred = {
-                "commits": ("GITHUB_LIST_COMMITS",),
-                "pull_requests": ("GITHUB_GET_PULL_REQUESTS", "GITHUB_LIST_PULL_REQUESTS"),
-                "issues": ("GITHUB_LIST_ISSUES_FOR_A_REPOSITORY", "GITHUB_LIST_REPOSITORY_ISSUES"),
-            }
-            selected: list[ReadCapabilityRecord] = []
-            for activity in activity_types:
-                for tool_name in preferred.get(activity, ()):
-                    match = next((cap for cap in capabilities if cap.tool_name == tool_name), None)
-                    if match is not None:
-                        selected.append(match)
-                        break
-            return selected if len(selected) == len(activity_types) else []
-        wanted = {item.lower() for item in activity_types}
-        matched = [
-            cap
-            for cap in capabilities
-            if any(token in (cap.tool_name or cap.label or "").lower() for token in wanted)
-        ]
-        if matched:
-            return matched
+    names = [cap.tool_name or "" for cap in capabilities]
+    selected_names = adapter_for_tool_names(names).select_tool_names(
+        [name for name in names if name],
+        activity_types,
+    )
+    if not selected_names:
         return []
-    if any((cap.tool_name or "").startswith("NOTION_") for cap in capabilities):
-        for name in ("NOTION_GET_PAGE_MARKDOWN", "NOTION_FETCH_ALL_BLOCK_CONTENTS", "NOTION_FETCH_BLOCK_CONTENTS"):
-            match = next((cap for cap in capabilities if cap.tool_name == name), None)
-            if match is not None:
-                return [match]
-        return []
-    return [
-        min(
-            capabilities,
-            key=lambda cap: (0 if (cap.tool_name or "").lower().startswith("list") else 1, cap.label),
-        )
-    ]
+    chosen: list[ReadCapabilityRecord] = []
+    for tool_name in selected_names:
+        match = next((cap for cap in capabilities if cap.tool_name == tool_name), None)
+        if match is not None:
+            chosen.append(match)
+    return chosen if len(chosen) == len(selected_names) else []
 
 
 def _arguments_for_resource(target: str, label: str, capability: ReadCapabilityRecord) -> dict[str, object]:
