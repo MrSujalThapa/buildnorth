@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 
 from helpers import isolated_app
 from personal_markets.core.errors import TransientProviderError
+from personal_markets.identity.testing import invited_principal
 from personal_markets.integrations.fake_inference import (
     ScriptedInferenceProvider,
     default_agent_script,
@@ -133,3 +134,20 @@ def test_evidence_failure_explicit_retry_completes_without_duplicate_goal() -> N
         assert len([goal for goal in client.get("/api/v1/goals").json()
                     if goal["goal_id"] == goal_id]) == 1
         assert client.post(f"/api/v1/agent/threads/{thread_id}/evidence/retry").status_code == 409
+
+
+def test_evidence_continuation_and_retry_are_owner_scoped() -> None:
+    app = isolated_app()
+    with TestClient(app) as client:
+        created = client.post("/api/v1/agent/threads", json={
+            "kind": "create_goal", "intent": "Read 20 books by December 2027",
+        }).json()
+        thread_id = created["thread_id"]
+        confirmed = client.post(
+            f"/api/v1/agent/threads/{thread_id}/resume", json={"confirmed": True}
+        ).json()
+        goal_id = confirmed["goal"]["goal_id"]
+        app.state.auth_bypass_principal = invited_principal("another-user")
+        assert client.get(f"/api/v1/agent/threads/{thread_id}").status_code == 404
+        assert client.post(f"/api/v1/agent/threads/{thread_id}/evidence/retry").status_code == 404
+        assert client.get(f"/api/v1/goals/{goal_id}/evidence/continuation").status_code == 404

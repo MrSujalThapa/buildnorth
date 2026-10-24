@@ -76,6 +76,10 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
   await expect(page.getByRole("img", { name: /Parameter radar/ })).toBeVisible();
   await page.getByRole("button", { name: /Reading time, 45 minutes/ }).click();
   await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
+  await page.getByRole("button", { name: /Applications \/ week, 12 applications/ }).click();
+  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
   await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Edit parameters" }).click();
   await expect(page.getByRole("dialog", { name: "Edit parameters" })).toBeVisible();

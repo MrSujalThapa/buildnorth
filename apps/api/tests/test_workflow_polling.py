@@ -45,6 +45,18 @@ class RoutingFailingInnerWorkflow(FailingInnerWorkflow):
         return await super().resume(thread_id, payload)
 
 
+class InterruptedEvidenceWorkflow(StaleInnerWorkflow):
+    def __init__(self, snapshot: WorkflowSnapshot) -> None:
+        super().__init__(snapshot)
+        self.started = asyncio.Event()
+
+    async def continue_evidence(self, thread_id: UUID) -> WorkflowSnapshot:
+        del thread_id
+        self.started.set()
+        await asyncio.Event().wait()
+        return self.snapshot_value
+
+
 def _saved_goal() -> GoalContract:
     return GoalContract(
         goal_id=uuid4(),
@@ -111,6 +123,29 @@ async def test_evidence_claim_is_single_winner_and_requires_explicit_failure_ret
         current_step="failed",
     ))
     assert await threads.claim_evidence(thread_id)
+
+
+@pytest.mark.asyncio
+async def test_interrupted_evidence_task_does_not_claim_automatic_recovery() -> None:
+    thread_id = uuid4()
+    pending = WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_pending",
+        current_step="await_evidence",
+    )
+    threads = InMemoryThreadStore()
+    await threads.upsert(pending)
+    inner = InterruptedEvidenceWorkflow(pending)
+    workflow = PersistingWorkflow(inner, threads)  # type: ignore[arg-type]
+
+    task = asyncio.create_task(workflow.continue_evidence_later(thread_id))
+    await inner.started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    stored = await workflow.snapshot(thread_id)
+    assert stored.status == "evidence_running"
+    assert not await threads.claim_evidence(thread_id)
 
 
 @pytest.mark.asyncio

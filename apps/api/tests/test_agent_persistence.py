@@ -19,12 +19,50 @@ from personal_markets.integrations.research import (
 from personal_markets.persistence.agent_store import (
     InMemoryAgentRunStore,
     PostgresEvidenceRepository,
+    PostgresThreadStore,
 )
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresGoalRepository
-from personal_markets.ports import ResumePayload, WorkflowRequest
+from personal_markets.ports import ResumePayload, WorkflowRequest, WorkflowSnapshot
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.mark.asyncio
+async def test_interrupted_evidence_claim_expires_to_manual_retry() -> None:
+    url = isolated_postgres_url()
+    if not url:
+        pytest.skip("PM_TEST_DATABASE_URL is not configured")
+    thread_id = uuid4()
+    engine = create_engine(url)
+    try:
+        store = PostgresThreadStore(engine)
+        await store.upsert(WorkflowSnapshot(
+            thread_id=thread_id, kind="create_goal", status="evidence_pending",
+            current_step="await_evidence", debug={"user_id": str(uuid4())},
+        ))
+        assert await store.claim_evidence(thread_id)
+        assert not await store.claim_evidence(thread_id)
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "update workflow_threads set updated_at = now() - interval '1 day' "
+                    "where id = :id"
+                ),
+                {"id": thread_id},
+            )
+        expired = await store.get(thread_id)
+        assert expired is not None and expired.status == "evidence_failed"
+        assert expired.debug["failure_code"] == "workflow_timeout"
+        # Expiration exposes a retryable state; it does not start another provider call.
+        assert await store.claim_evidence(thread_id)
+        assert not await store.claim_evidence(thread_id)
+    finally:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("delete from workflow_threads where id = :id"), {"id": thread_id}
+            )
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
