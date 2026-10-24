@@ -1402,6 +1402,10 @@ class RemoteMcpTools:
             raise ToolFailure("not_found", "Goal creation thread not found") from None
         except (ForbiddenError, SemanticProviderError, DomainError) as error:
             raise ToolFailure("inference_failed", _clip(str(error), 200)) from None
+        if snapshot.status == "evidence_pending":
+            # The contract is durable. Evidence processing continues independently;
+            # the checkpoint remains available for an explicit retry if interrupted.
+            workflow.schedule_evidence(parsed)
         return await self._creation_view(caller, snapshot, llm_calls=1)
 
     # --- history / conversational What If -----------------------------------------

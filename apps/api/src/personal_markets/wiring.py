@@ -1,5 +1,6 @@
+import asyncio
 from functools import lru_cache
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 from uuid import UUID, uuid4
 
 import structlog
@@ -11,7 +12,7 @@ from personal_markets.agents.intervention_service import InterventionAgentServic
 from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.agents.state import AgentDependencies
 from personal_markets.core.config import Settings, get_settings
-from personal_markets.core.errors import TransientProviderError
+from personal_markets.core.errors import ConflictError, TransientProviderError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.repository import (
     InMemoryBaselineForecastRepository,
@@ -69,6 +70,12 @@ class PersistingWorkflow:
         self._inner = inner
         self._threads = threads
         self._reviews = reviews
+        self._evidence_tasks: set[asyncio.Task[None]] = set()
+
+    def schedule_evidence(self, thread_id: UUID) -> None:
+        task = asyncio.create_task(self.continue_evidence_later(thread_id))
+        self._evidence_tasks.add(task)
+        task.add_done_callback(self._evidence_tasks.discard)
 
     async def start(self, request: Any) -> Any:
         snapshot = await self._inner.start(request)
@@ -90,7 +97,11 @@ class PersistingWorkflow:
         return snapshot
 
     async def mark_running(self, thread_id: UUID) -> WorkflowSnapshot:
-        stored = await self.snapshot(thread_id)
+        stored = await self._threads.get(thread_id)
+        if stored is None:
+            stored = await self.snapshot(thread_id)
+        if stored.status != "needs_input":
+            raise ConflictError("This workflow is not awaiting confirmation")
         running = stored.model_copy(
             update={
                 "status": "running",
@@ -109,9 +120,32 @@ class PersistingWorkflow:
 
     async def resume_later(self, thread_id: UUID, payload: ResumePayload) -> None:
         try:
-            await self.resume(thread_id, payload)
+            snapshot = await self.resume(thread_id, payload)
+            if snapshot.status == "evidence_pending":
+                await self.continue_evidence_later(thread_id)
         except Exception:
             await self._fail(thread_id)
+
+    async def continue_evidence_later(self, thread_id: UUID) -> None:
+        if not await self._threads.claim_evidence(thread_id):
+            return
+        try:
+            snapshot = await self._inner.continue_evidence(thread_id)
+            await self._threads.upsert(snapshot)
+            await self._maybe_review(snapshot)
+        except Exception:
+            structlog.get_logger("personal_markets.agents").exception(
+                "evidence_continuation_failed", thread_id=str(thread_id)
+            )
+            stored = await self._threads.get(thread_id)
+            if stored is not None:
+                await self._persist_failed_snapshot(thread_id, stored, evidence=True)
+
+    async def creation_for_goal(self, goal_id: UUID, owner_id: UUID) -> WorkflowSnapshot | None:
+        return cast(
+            WorkflowSnapshot | None,
+            await self._threads.latest_creation_for_goal(goal_id, owner_id),
+        )
 
     async def _fail(self, thread_id: UUID | None) -> None:
         structlog.get_logger("personal_markets.agents").exception("agent_workflow_failed")
@@ -123,7 +157,7 @@ class PersistingWorkflow:
         await self._persist_failed_snapshot(thread_id, stored)
 
     async def _persist_failed_snapshot(
-        self, thread_id: UUID, fallback: WorkflowSnapshot
+        self, thread_id: UUID, fallback: WorkflowSnapshot, *, evidence: bool = False
     ) -> WorkflowSnapshot:
         try:
             latest = await self._inner.snapshot(thread_id)
@@ -131,7 +165,7 @@ class PersistingWorkflow:
             latest = fallback
         failed = latest.model_copy(
             update={
-                "status": "failed",
+                "status": "evidence_failed" if evidence else "failed",
                 "current_step": "failed",
                 "interrupt": None,
                 "progress": [
@@ -170,7 +204,9 @@ class PersistingWorkflow:
         stored = await self._threads.get(thread_id)
         # The background runner owns terminal state. A concurrent poll must not
         # revive a failed run from an older LangGraph checkpoint.
-        if stored is not None and stored.status in {"failed", "completed", "limited", "withheld"}:
+        if stored is not None and stored.status in {
+            "failed", "evidence_failed", "evidence_running", "completed", "limited", "withheld"
+        }:
             return stored
         try:
             snapshot = await self._inner.snapshot(thread_id)
@@ -178,10 +214,8 @@ class PersistingWorkflow:
             if stored is None:
                 raise
             return stored
-        # Polling is a read. Persisting each running snapshot refreshes the
-        # checkpoint timestamp and can overwrite the runner's failure result.
-        if snapshot.status != "running":
-            await self._threads.upsert(snapshot)
+        # Polling must never overwrite a concurrent continuation claim or its
+        # terminal result. Only the runner persists state transitions.
         return snapshot
 
     async def _maybe_review(self, snapshot: Any) -> None:

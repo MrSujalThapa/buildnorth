@@ -40,7 +40,7 @@ export function NewGoalPage() {
       sessionStorage.removeItem(PENDING_GOAL_THREAD);
       setThreadId(null);
     }
-    if (data.goal && ["completed", "limited", "withheld"].includes(data.status)) {
+    if (data.goal && ["evidence_pending", "evidence_running", "completed", "limited", "withheld"].includes(data.status)) {
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
       void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
@@ -82,7 +82,7 @@ export function NewGoalPage() {
         setError(failureMessage(data));
         return;
       }
-      if (data.goal && (data.status === "completed" || data.status === "limited" || data.status === "withheld")) {
+      if (data.goal && ["evidence_pending", "evidence_running", "completed", "limited", "withheld"].includes(data.status)) {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
         void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });

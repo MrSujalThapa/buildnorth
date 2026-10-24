@@ -93,6 +93,27 @@ async def test_poll_does_not_write_running_checkpoint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_evidence_claim_is_single_winner_and_requires_explicit_failure_retry() -> None:
+    thread_id = uuid4()
+    threads = InMemoryThreadStore()
+    await threads.upsert(WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_pending",
+        current_step="commit_goal",
+    ))
+    claimed = await asyncio.gather(
+        threads.claim_evidence(thread_id), threads.claim_evidence(thread_id)
+    )
+    assert sorted(claimed) == [False, True]
+    running = await threads.get(thread_id)
+    assert running is not None and running.status == "evidence_running"
+    await threads.upsert(WorkflowSnapshot(
+        thread_id=thread_id, kind="create_goal", status="evidence_failed",
+        current_step="failed",
+    ))
+    assert await threads.claim_evidence(thread_id)
+
+
+@pytest.mark.asyncio
 async def test_sync_provider_timeout_returns_saved_goal_and_persists_failed_state() -> None:
     thread_id = uuid4()
     goal = _saved_goal()

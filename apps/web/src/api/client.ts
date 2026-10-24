@@ -865,6 +865,10 @@ export const api = {
     }),
   getThread: (threadId: string, signal?: AbortSignal) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
+  goalEvidenceContinuation: (goalId: string, signal?: AbortSignal) =>
+    request<WorkflowSnapshot | null>(`/api/v1/goals/${goalId}/evidence/continuation`, undefined, signal),
+  retryGoalEvidence: (threadId: string) =>
+    request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/evidence/retry`, { method: "POST" }),
   resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
     watchThread(
       await request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/resume`, {
