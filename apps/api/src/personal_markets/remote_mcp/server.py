@@ -58,11 +58,13 @@ from personal_markets.remote_mcp.tools import (
     EvidenceSummary,
     ForecastCompare,
     ForecastHistory,
+    ForecastReadiness,
     ForecastView,
     GoalCreationView,
     GoalDetail,
     GoalList,
     InterventionRanking,
+    MilestoneList,
     OddsChartView,
     RemoteMcpTools,
     ScenarioCompare,
@@ -77,13 +79,16 @@ _T = TypeVar("_T")
 
 INSTRUCTIONS = """PlayItOut prices personal goals with deterministic models.
 Probabilities come from the model, never from you or from PlayItOut's agents.
-Typical flow: create_goal (clarify/confirm) -> get_observation_policy ->
-submit_structured_evidence or submit_structured_rows -> get_forecast ->
-compare_forecasts -> compare_scenarios / simulate_intervention -> show_odds_chart.
-Prefer structured evidence: it needs no model call. Do not fetch Gmail attachment
-URLs. Evidence is agent-reported; you cannot mark it verified. Scenarios are
-hypothetical and never change the published forecast. Interactive charts require
-an MCP Apps host; otherwise call get_odds_chart_image for a static PNG."""
+Typical flow: create_goal (clarify/confirm) -> get_forecast_readiness ->
+get_observation_policy -> submit_structured_evidence or submit_structured_rows ->
+get_forecast -> compare_forecasts -> compare_scenarios / simulate_intervention ->
+show_odds_chart.
+Progress is evidence, not a contract edit. Title, deadline, and success definition
+cannot be rewritten here. Prefer structured evidence: it needs no model call.
+Do not fetch private URLs. Evidence is agent-reported; you cannot mark it verified.
+compare_forecasts reads published receipts only and will say when none exists.
+Scenarios are hypothetical and never change the published forecast. Interactive
+charts require an MCP Apps host; otherwise call get_odds_chart_image for a static PNG."""
 
 _READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
 _WRITE = ToolAnnotations(
@@ -445,6 +450,20 @@ def _register_tools(
         """Read one goal's contract: success definition, deadline and model family."""
         return await run("get_goal", lambda who: tools.get_goal(who, goal_id))
 
+    @server.tool(annotations=_READ, title="Get forecast readiness")
+    async def get_forecast_readiness(goal_id: GoalId) -> ForecastReadiness:
+        """Whether PlayItOut has published a forecast, which inputs are still missing,
+        and the stored spec status. Does not invent a probability."""
+        return await run(
+            "get_forecast_readiness", lambda who: tools.get_forecast_readiness(who, goal_id)
+        )
+
+    @server.tool(annotations=_READ, title="List milestones")
+    async def list_milestones(goal_id: GoalId) -> MilestoneList:
+        """Stored milestone nodes on the goal's forecast spec. Empty when the model
+        has no milestone graph. Progress is updated with evidence tools, not here."""
+        return await run("list_milestones", lambda who: tools.list_milestones(who, goal_id))
+
     @server.tool(annotations=_READ, title="Get forecast")
     async def get_forecast(goal_id: GoalId) -> ForecastView:
         """Latest published forecast with model version, assumptions, evidence watermark and
@@ -609,13 +628,21 @@ def _register_tools(
         as_of: Annotated[str | None, Field(default=None, max_length=40)] = None,
         relative: Annotated[
             str | None,
-            Field(default=None, pattern=r"^(latest|previous|last_week|before_evidence)$"),
+            Field(
+                default=None,
+                pattern=(
+                    r"^(latest|previous|last_week|this_month|since_start|"
+                    r"before_evidence|largest_increase|largest_drop)$"
+                ),
+            ),
         ] = None,
         evidence_id: Annotated[str | None, Field(default=None, max_length=64)] = None,
     ) -> ForecastCompare:
-        """Compare the latest published receipt with an earlier one. Use as_of (ISO-8601),
-        relative=last_week|previous|before_evidence, or evidence_id. Delta is percentage
-        points. Event, ingestion and publication times are reported separately."""
+        """Compare published receipts. Use as_of (ISO-8601),
+        relative=last_week|this_month|since_start|previous|before_evidence|
+        largest_increase|largest_drop, or evidence_id. Delta is percentage points.
+        Observation, ingestion and publication times stay separate. Missing history
+        is reported; it is not interpolated."""
         return await run(
             "compare_forecasts",
             lambda who: tools.compare_forecasts(who, goal_id, as_of, relative, evidence_id),
@@ -627,7 +654,11 @@ def _register_tools(
         scenarios: Annotated[list[dict[str, Any]], Field(min_length=1, max_length=5)],
         as_of: Annotated[str | None, Field(default=None, max_length=40)] = None,
         relative: Annotated[
-            str | None, Field(default=None, pattern=r"^(latest|previous|last_week)$")
+            str | None,
+            Field(
+                default=None,
+                pattern=r"^(latest|previous|last_week|this_month|since_start)$",
+            ),
         ] = None,
         weighted: dict[str, Any] | None = None,
     ) -> ScenarioCompare:

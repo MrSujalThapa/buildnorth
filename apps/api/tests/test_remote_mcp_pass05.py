@@ -150,6 +150,50 @@ async def test_compare_forecasts_uses_published_receipts_and_percentage_points()
             )
         )
         assert missing["status"] == "NO_EARLIER_RECEIPT"
+        since_start = structured(
+            await harness.call(
+                grant.access_token,
+                "compare_forecasts",
+                {"goal_id": goal_id, "relative": "since_start"},
+            )
+        )
+        assert since_start["status"] == "COMPARED"
+        assert since_start["delta_basis"] == "latest_minus_selected_receipt"
+        assert since_start["as_of_point"]["published_at"] <= since_start["latest"]["published_at"]
+        this_month = structured(
+            await harness.call(
+                grant.access_token,
+                "compare_forecasts",
+                {"goal_id": goal_id, "relative": "this_month"},
+            )
+        )
+        assert this_month["status"] == "NO_EARLIER_RECEIPT"
+        assert "invent" in this_month["message"].lower()
+        move = structured(
+            await harness.call(
+                grant.access_token,
+                "compare_forecasts",
+                {"goal_id": goal_id, "relative": "largest_increase"},
+            )
+        )
+        assert move["status"] in {"COMPARED", "NO_EARLIER_RECEIPT"}
+        if move["status"] == "COMPARED":
+            assert move["delta_basis"] == "largest_consecutive_published_step"
+            assert move["extremum"]["direction"] == "increase"
+            assert move["extremum"]["delta_pp"] == pytest.approx(move["delta_pp"])
+        readiness = structured(
+            await harness.call(
+                grant.access_token, "get_forecast_readiness", {"goal_id": goal_id}
+            )
+        )
+        assert readiness["priced"] is True
+        assert readiness["publication_status"] == "PUBLISHED"
+        assert readiness["probability"] == pytest.approx(compared["latest"]["probability"])
+        milestones = structured(
+            await harness.call(grant.access_token, "list_milestones", {"goal_id": goal_id})
+        )
+        assert isinstance(milestones["milestones"], list)
+        assert "submit_structured_evidence" in milestones["message"]
 
 
 async def test_compare_scenarios_does_not_write_history() -> None:

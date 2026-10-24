@@ -96,15 +96,60 @@ export function PersonalAgents() {
               <div className="setting-row agent-steps-row">
                 <div>
                   <strong>How to connect</strong>
+                  <span>One OAuth connection covers goals, evidence, history, What If, and charts. You never paste a token.</span>
+                  <p className="agent-client-label">ChatGPT</p>
                   <ol className="agent-steps">
-                    <li>In your agent’s connector settings, add a custom remote MCP server with the URL above.</li>
-                    <li>Choose OAuth. The agent opens Play It Out and asks for the permissions it needs.</li>
-                    <li>Review those permissions, untick any you do not want, and approve.</li>
+                    <li>In ChatGPT, add a custom MCP server. Do not publish it.</li>
+                    <li>Use the server URL above and sign in with OAuth.</li>
+                    <li>Approve only the permissions you want on the Play It Out consent screen.</li>
+                    <li>Try a normal chat, then Work separately if you use it. One surface does not prove the other.</li>
+                  </ol>
+                  <p className="agent-client-label">Grok</p>
+                  <ol className="agent-steps">
+                    <li>In Grok connectors or Grok Bot plugins, add a custom MCP server with the same URL.</li>
+                    <li>Choose OAuth and approve the same consent screen.</li>
                   </ol>
                   <span>
-                    You never paste a token. Grok supports custom connectors with OAuth but has not been tested
-                    against Play It Out; other clients are untested unless listed in the project report.
+                    If a host cannot show the interactive chart, ask for the static chart image. The same history is on this goal’s page.
                   </span>
+                </div>
+              </div>
+            ) : null}
+            {status.enabled ? (
+              <div className="setting-row agent-steps-row">
+                <div>
+                  <strong>Permissions</strong>
+                  <ul className="agent-steps">
+                    {status.scopes.map((scope) => (
+                      <li key={scope.scope}>
+                        <span className="agent-scope-name">{scope.label}</span>
+                        {" — "}
+                        {scope.writes ? "Can change your account. " : "Read only. "}
+                        {scope.description}
+                      </li>
+                    ))}
+                  </ul>
+                  <span>
+                    Creating a goal and free-text evidence use model credits and stay off until you approve them.
+                    Structured evidence does not. What If never changes the published forecast.
+                    Agents cannot mark evidence as independently verified, and they cannot edit a goal’s title, deadline, or success definition.
+                    Progress is new evidence.
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            {status.enabled ? (
+              <div className="setting-row agent-steps-row">
+                <div>
+                  <strong>What is verified</strong>
+                  <ul className="agent-steps">
+                    <li>MCP reference client: connect, read, create, evidence, history, What If, chart data, and revocation are covered by this server’s tests.</li>
+                    <li>ChatGPT Chat: not verified.</li>
+                    <li>ChatGPT Work: not verified.</li>
+                    <li>Grok Bot: not verified.</li>
+                    <li>Interactive charts inside those hosts: not verified.</li>
+                  </ul>
+                  <span>Revoke a connection below. Later protected calls from that client fail. Goals already saved stay on your account.</span>
                 </div>
               </div>
             ) : null}
