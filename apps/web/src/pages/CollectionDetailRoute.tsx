@@ -2,8 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import CollectionChart from "../components/market/CollectionChart";
-import { api } from "../api/client";
+import { api, type CollectionSeries } from "../api/client";
 import "../components/market/markets.css";
+
+export function currentCollectionGoalLabel(item: CollectionSeries): string {
+  if (item.withheld) return "Withheld";
+  const latest = item.points.at(-1);
+  return latest ? `${latest.value.toFixed(1)}%` : "—";
+}
 
 export function CollectionDetailRoute() {
   const { collectionId = "" } = useParams();
@@ -82,7 +88,7 @@ export function CollectionDetailRoute() {
               <li key={item.goal_id}>
                 <button type="button" onClick={() => { void navigate(`/goals/${item.goal_id}`); }}>
                   <i style={{ background: item.color }} />{item.title}
-                  {item.points.at(-1) ? ` · ${item.points.at(-1)!.value.toFixed(1)}%` : " · —"}
+                  {` · ${currentCollectionGoalLabel(item)}`}
                 </button>
               </li>
             ))}
