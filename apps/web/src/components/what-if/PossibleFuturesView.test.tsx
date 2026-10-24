@@ -39,4 +39,24 @@ describe("PossibleFuturesView", () => {
     renderView("simple");
     expect(screen.getByLabelText("Possible future scenarios")).toHaveTextContent("82%");
   });
+
+  it("withholds unweighted structural scenarios from the result view", () => {
+    render(
+      <PossibleFuturesView
+        view="simple"
+        decision="Read two books weekly"
+        onDecisionChange={() => {}}
+        onRun={() => {}}
+        priced={false}
+        message="Possible futures are structurally valid but unpriced."
+        selectedClusterId={null}
+        onSelectCluster={() => {}}
+        scenarios={[{ id: "upside", label: "Strong upside path", probability: null, tone: "positive", outcome: null }]}
+        outcomeScale={{ unit: "books", target: 20, direction: "at_least" }}
+      />,
+    );
+    expect(screen.getByText("Futures unavailable")).toBeVisible();
+    expect(screen.getByText("Possible futures are structurally valid but unpriced.")).toBeVisible();
+    expect(screen.queryByLabelText("Possible future scenarios")).not.toBeInTheDocument();
+  });
 });

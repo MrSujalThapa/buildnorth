@@ -43,7 +43,7 @@ export default function PossibleFuturesView({
     .filter((scenario) => scenario.tone === "positive")
     .reduce((sum, scenario) => sum + (scenario.probability ?? 0), 0);
   const selected = scenarios.find((scenario) => scenario.id === selectedClusterId);
-  const hasResults = scenarios.length > 0;
+  const hasResults = priced && scenarios.some((scenario) => scenario.probability !== null);
   const rangeFor = (scenario: FutureScenario) =>
     formatOutcomeRange(scenario.outcome?.p10 ?? null, scenario.outcome?.p90 ?? null, outcomeScale.unit);
   const intervalRows = scenarios

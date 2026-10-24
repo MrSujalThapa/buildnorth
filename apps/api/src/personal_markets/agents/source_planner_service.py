@@ -334,7 +334,7 @@ class SourcePlannerService:
             if any(item.recommended for item in resources):
                 recommended.append(rec.model_copy(update={
                     "relevance": "recommended",
-                    "rationale": "An accessible resource title matches this goal.",
+                    "rationale": "An accessible page may relate to this goal.",
                     "resources": resources,
                 }))
             else:
@@ -347,7 +347,7 @@ class SourcePlannerService:
                     SourceRecommendation(
                         plugin_id=plugin_id,
                         relevance="recommended",
-                        rationale="Discovered resources overlap the goal contract.",
+                        rationale="These accessible sources may relate to this goal.",
                         resources=resources,
                     )
                 )
@@ -356,7 +356,7 @@ class SourcePlannerService:
                     SourceRecommendation(
                         plugin_id=plugin_id,
                         relevance="irrelevant",
-                        rationale="Discovered resources do not overlap the goal contract.",
+                        rationale="No clear match among accessible sources.",
                         resources=resources,
                     )
                 )

@@ -233,7 +233,7 @@ export default function ImpactWorkspace({
           <section className="result-panel">
             <div className="result-topline">
               <div className="odds-pair">
-                <div><span>Current odds</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
+                <div><span>Scenario baseline</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
                 <div className="odds-arrow" aria-hidden="true">→</div>
                 <div><span>Scenario odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
               </div>
@@ -272,7 +272,7 @@ export default function ImpactWorkspace({
       ) : (
         <section className="deep-workspace impact-deep">
           <div className="execution-strip" aria-label="Execution comparison">
-            <div><span>Current odds</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
+            <div><span>Scenario baseline</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
             <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
             <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
             <div className="selected-metric">
