@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
@@ -111,7 +112,7 @@ class CollectionService:
         self,
         row: CollectionRecord,
         goals: list[GoalContract],
-        histories: dict[str, list[dict[str, Any]]],
+        histories: Mapping[str, Sequence[Any]],
         blocked_goal_ids: set[UUID] | None = None,
     ) -> CollectionView:
         by_id = {goal.goal_id: goal for goal in goals}
