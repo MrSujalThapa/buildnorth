@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -7,11 +8,13 @@ from personal_markets.evidence.domain import NormalizedEvidence, Provenance
 from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.forecasting.hiring import (
     HiringFunnelState,
+    _active_counts,
     _pipeline_offer_probability,
     _stage_to_offer,
     aggregate_funnel_from_evidence,
     apply_funnel_overrides,
     build_hiring_numeric_inputs,
+    fit_resolved_stage_rates,
     funnel_state_to_numeric_inputs,
     is_hiring_goal,
     load_hiring_reference,
@@ -409,10 +412,18 @@ def _snapshot(metric: str, value: float, event_type: str, summary: str) -> Norma
 def test_explicit_zero_offer_snapshot_is_not_an_offer() -> None:
     goal = _goal()
     evidence = [
-        _snapshot("applications_submitted_cumulative", 40, "internship_application_submitted",
-                  "User reports 40 internship applications submitted in total as of today."),
-        _snapshot("offers_received_cumulative", 0, "offer_update",
-                  "User reports no internship offers received yet."),
+        _snapshot(
+            "applications_submitted_cumulative",
+            40,
+            "internship_application_submitted",
+            "User reports 40 internship applications submitted in total as of today.",
+        ),
+        _snapshot(
+            "offers_received_cumulative",
+            0,
+            "offer_update",
+            "User reports no internship offers received yet.",
+        ),
     ]
     state = aggregate_funnel_from_evidence(evidence)
     assert state.offers == 0
@@ -428,11 +439,15 @@ def test_explicit_zero_offer_snapshot_is_not_an_offer() -> None:
 
 def test_first_round_interviews_do_not_become_application_stock() -> None:
     interviews = _snapshot(
-        "first_round_interviews_scheduled_cumulative", 2, "interview_scheduled",
+        "first_round_interviews_scheduled_cumulative",
+        2,
+        "interview_scheduled",
         "User reports 2 first-round interviews received.",
     )
     applications = _snapshot(
-        "applications_submitted_cumulative", 40, "internship_application_submitted",
+        "applications_submitted_cumulative",
+        40,
+        "internship_application_submitted",
         "User reports 40 internship applications submitted in total as of today.",
     )
     applications = applications.model_copy(update={"observed_at": interviews.observed_at})
@@ -440,3 +455,248 @@ def test_first_round_interviews_do_not_become_application_stock() -> None:
         state = aggregate_funnel_from_evidence(order)
         assert state.applications == 40
         assert state.technicals == 2
+
+
+def test_resolved_rejections_shrink_the_reference_rate() -> None:
+    goal = _goal()
+    proposal = _proposal(goal)
+    reference = load_hiring_reference()
+    prior = reference.stage_rates["application_to_response"]
+    pseudo = reference.resolved_outcome_pseudo_counts
+    applications = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted")
+    ]
+    resolved = [
+        *applications,
+        _evidence(metric="responses", numeric_value=2, summary="recruiter response"),
+        _evidence(
+            metric="application_rejections",
+            numeric_value=8,
+            summary="application rejected",
+        ),
+    ]
+    bare = build_hiring_numeric_inputs(goal, proposal, applications)
+    fitted = build_hiring_numeric_inputs(goal, proposal, resolved, validated_resolved_cohort=True)
+    assert bare is not None and fitted is not None
+    assert bare.assumption_sources["baseline_logits"] == "REFERENCE"
+    assert "strength" not in str(bare.state).lower()
+    assert fitted.state["prediction"]["method"] == "FITTED_STATISTICAL"
+    assert fitted.state["prediction"]["trained_classifier"] is None
+    assert fitted.state["prediction"]["calibration"]["applied"] is False
+    expected = (2 + pseudo * prior) / (10 + pseudo)
+    stage = fitted.state["prediction"]["uncertainty"]["fitted_stages"][0]
+    assert stage["fitted_rate"] == pytest.approx(expected)
+    assert stage["stage"] == "application_to_response"
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    before = service.compute(goal, proposal, ["e1"], {}, ["hiring_funnel_rates.json"], bare)
+    after = service.compute(goal, proposal, ["e1", "e2"], {}, ["hiring_funnel_rates.json"], fitted)
+    assert before.raw_probability is not None and after.raw_probability is not None
+    assert after.raw_probability != pytest.approx(before.raw_probability)
+    assert before.receipt["prediction"]["method"] == "REFERENCE_MODEL"
+    assert after.receipt["prediction"]["method"] == "FITTED_STATISTICAL"
+    assert after.receipt["calibration"]["applied"] is False
+    assert fitted.state["funnel"]["applications"] == 0
+    assert fitted.state["funnel"]["responses"] == 2
+    published = after.receipt["feature_transforms"]
+    assert published["funnel_state"]["applications"] == 0
+    assert published["funnel_state"]["responses"] == 2
+    assert published["future_application_rate"]["applications_per_week"] == 2
+    assert published["future_application_rate"]["source"] == "REFERENCE"
+    assert "current pipeline" in published["future_application_rate"]["applies_to"]
+    rejected = {item["model_id"] for item in after.receipt["prediction"]["rejected_classifiers"]}
+    assert rejected == {"jth_offer_v1"}
+    assert after.receipt["llm_used_for_probability"] is False
+
+
+def test_aggregate_resolutions_keep_live_hiring_on_reference_rates() -> None:
+    goal = _goal()
+    evidence = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted"),
+        _evidence(metric="responses", numeric_value=2, summary="recruiter response"),
+        _evidence(metric="application_rejections", numeric_value=8, summary="application rejected"),
+    ]
+    numeric = build_hiring_numeric_inputs(goal, _proposal(goal), evidence)
+    assert numeric is not None
+    assert numeric.state["prediction"]["method"] == "REFERENCE_MODEL"
+    assert numeric.assumption_sources["baseline_logits"] == "REFERENCE"
+    assert numeric.state["pricing_transforms"]["stage_rate_fits"] == []
+    assert numeric.state["funnel"]["applications"] == 8
+    assert numeric.state["pricing_transforms"]["stage_rates"] == load_hiring_reference().stage_rates
+
+
+def test_resolved_stage_prior_strength_is_explicit_and_bounded() -> None:
+    reference = load_hiring_reference()
+    state = HiringFunnelState(
+        applications=10,
+        responses=2,
+        rejections={"application": 8},
+        resolved_cohort_validated=True,
+    )
+    ordinary, _ = fit_resolved_stage_rates(state, reference)
+    stronger, _ = fit_resolved_stage_rates(
+        state, replace(reference, resolved_outcome_pseudo_counts=80)
+    )
+    prior = reference.stage_rates["application_to_response"]
+    assert abs(stronger["application_to_response"] - prior) < abs(
+        ordinary["application_to_response"] - prior
+    )
+    assert fit_resolved_stage_rates(HiringFunnelState(responses=2), reference) == ({}, [])
+
+
+def test_practice_hours_do_not_change_the_fitted_probability() -> None:
+    goal = _goal()
+    proposal = _proposal(goal)
+    base = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted"),
+        _evidence(
+            metric="application_rejections",
+            numeric_value=8,
+            summary="application rejected",
+        ),
+    ]
+    practiced = [
+        *base,
+        _evidence(metric="practice_hours", numeric_value=40, summary="interview practice hours"),
+    ]
+    without = build_hiring_numeric_inputs(goal, proposal, base)
+    with_practice = build_hiring_numeric_inputs(goal, proposal, practiced)
+    assert without is not None and with_practice is not None
+    service = BaselineForecastService(InMemoryBaselineForecastRepository())
+    first = service.compute(goal, proposal, ["e1"], {}, [], without)
+    second = service.compute(goal, proposal, ["e1", "e2"], {}, [], with_practice)
+    assert first.raw_probability == pytest.approx(second.raw_probability)
+
+
+def test_application_rejections_leave_no_active_applications() -> None:
+    goal = _goal()
+    evidence = [
+        _evidence(metric="applications_submitted", numeric_value=10, summary="submitted"),
+        _evidence(metric="responses", numeric_value=2, summary="recruiter response"),
+        _evidence(
+            metric="application_rejections",
+            numeric_value=8,
+            summary="application rejected",
+        ),
+    ]
+    numeric = build_hiring_numeric_inputs(
+        goal, _proposal(goal), evidence, validated_resolved_cohort=True
+    )
+    assert numeric is not None
+    funnel = numeric.state["funnel"]
+    assert funnel["applications"] == 0
+    assert funnel["responses"] == 2
+    transforms = numeric.state["pricing_transforms"]
+    future = transforms["future_application_rate"]
+    assert future["applications_per_week"] == 2
+    assert future["source"] == "REFERENCE"
+    assert future["reference_default_per_week"] == 2
+    assert "current pipeline" in future["applies_to"]
+    assert transforms["current_pipeline_offer_probability"] == pytest.approx(
+        transforms["pipeline_offer_probability"]
+    )
+    assert transforms["future_applications_offer_probability"] == pytest.approx(
+        transforms["expected_new_pipeline_offer_probability"]
+    )
+    prediction = numeric.state["prediction"]
+    assert prediction["calibration"]["applied"] is False
+    assert prediction["trained_classifier"] is None
+    text = " ".join(prediction["statistical_assumptions"])
+    assert "2 per week (REFERENCE)" in text
+    assert "not the current pipeline" in text
+
+
+def test_later_stage_rejections_stay_on_that_stage() -> None:
+    phone = _active_counts(
+        HiringFunnelState(
+            phone_screens=6, oas=2, rejections={"phone_screen": 3}, resolved_cohort_validated=True
+        )
+    )
+    assert phone["phone_screens"] == 1
+    assert phone["oas"] == 2
+    technical = _active_counts(
+        HiringFunnelState(
+            technicals=4, finals=1, rejections={"technical": 2}, resolved_cohort_validated=True
+        )
+    )
+    assert technical["technicals"] == 1
+    assert technical["finals"] == 1
+    final = _active_counts(
+        HiringFunnelState(
+            finals=2, offers=1, rejections={"final": 1}, resolved_cohort_validated=True
+        )
+    )
+    assert final["finals"] == 0
+    assert final["offers"] == 1
+    # A technical rejection does not remove still-active applications.
+    untouched = _active_counts(
+        HiringFunnelState(
+            applications=5, rejections={"technical": 1}, resolved_cohort_validated=True
+        )
+    )
+    assert untouched["applications"] == 5
+    assert untouched["technicals"] == 0
+    assert untouched["stage_count_inconsistencies"] == ["technicals"]
+
+
+def test_impossible_rejection_count_clamps_without_reassignment() -> None:
+    active = _active_counts(
+        HiringFunnelState(
+            applications=10,
+            responses=2,
+            rejections={"application": 12},
+            resolved_cohort_validated=True,
+        )
+    )
+    assert active["applications"] == 0
+    assert active["technicals"] == 0
+    assert active["stage_count_inconsistencies"] == ["applications"]
+    assert active["rejections"]["application"] == 12
+
+
+def test_unassigned_rejection_does_not_shrink_technicals() -> None:
+    evidence = [_evidence(metric="outcome", numeric_value=1, summary="rejected")]
+    state = aggregate_funnel_from_evidence(evidence)
+    assert state.rejections == {"unassigned": 1}
+    active = _active_counts(HiringFunnelState(technicals=2, rejections=state.rejections))
+    assert active["technicals"] == 2
+    assert active["unassigned_rejections"] == 1
+
+
+def test_recruiter_application_rejection_is_not_a_phone_screen() -> None:
+    evidence = [
+        _evidence(
+            metric="application_rejections",
+            numeric_value=4,
+            summary="recruiter rejected the application",
+        )
+    ]
+    state = aggregate_funnel_from_evidence(evidence)
+    assert state.rejections == {"application": 4}
+
+
+def test_rejection_snapshots_do_not_sum_with_each_other() -> None:
+    now = datetime.now(UTC)
+
+    def _snapshot(value: float, when: datetime) -> NormalizedEvidence:
+        item = _evidence(
+            metric="application_rejections",
+            numeric_value=value,
+            summary="application rejected",
+            observed_at=when,
+        )
+        return item.model_copy(
+            update={
+                "provenance": item.provenance.model_copy(update={"observation_kind": "snapshot"})
+            }
+        )
+
+    older = _snapshot(8, now - timedelta(days=3))
+    newer = _snapshot(3, now - timedelta(days=1))
+    extra = _evidence(
+        metric="application_rejections",
+        numeric_value=1,
+        summary="application rejected",
+        observed_at=now,
+    )
+    state = aggregate_funnel_from_evidence([older, newer, extra])
+    assert state.rejections["application"] == 4

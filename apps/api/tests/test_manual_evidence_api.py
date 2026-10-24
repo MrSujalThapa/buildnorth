@@ -140,6 +140,83 @@ def test_duplicate_manual_evidence_is_idempotent() -> None:
         assert len(history) == 1
 
 
+def test_resolved_hiring_evidence_updates_the_published_forecast() -> None:
+    """Aggregate resolutions publish on reference rates and repeated rows deduplicate."""
+    app = isolated_app()
+    with TestClient(app) as client:
+        goal_id = _create_hiring_goal(client)
+        opened = client.post(
+            f"/api/v1/goals/{goal_id}/evidence/manual",
+            json={
+                "entries": [
+                    {
+                        "key": "applications",
+                        "label": "Applications submitted so far",
+                        "value": 10,
+                        "unit": "count",
+                    }
+                ]
+            },
+        )
+        assert opened.status_code == 200, opened.text
+        resolved = client.post(
+            f"/api/v1/goals/{goal_id}/evidence/manual",
+            json={
+                "entries": [
+                    {
+                        "key": "responses",
+                        "label": "Recruiter responses",
+                        "value": 2,
+                        "unit": "count",
+                    },
+                    {
+                        "key": "application_rejections",
+                        "label": "Application rejections",
+                        "value": 8,
+                        "unit": "count",
+                    },
+                ]
+            },
+        )
+        assert resolved.status_code == 200, resolved.text
+        assert resolved.json()["priced"] is True
+        assert resolved.json()["probability"] != pytest.approx(opened.json()["probability"])
+        published = app.state.agent_workflow._inner._deps.baseline_forecasts.history(
+            UUID(goal_id)
+        )
+        assert published[-1].receipt["prediction"]["method"] == "REFERENCE_MODEL"
+        assert published[-1].receipt["prediction"]["uncertainty"]["fitted_stages"] == []
+        repeated = client.post(
+            f"/api/v1/goals/{goal_id}/evidence/manual",
+            json={
+                "entries": [
+                    {
+                        "key": "responses",
+                        "label": "Recruiter responses",
+                        "value": 2,
+                        "unit": "count",
+                    },
+                    {
+                        "key": "application_rejections",
+                        "label": "Application rejections",
+                        "value": 8,
+                        "unit": "count",
+                    },
+                ]
+            },
+        )
+        assert repeated.status_code == 200, repeated.text
+        assert repeated.json()["reprice_status"] == "unchanged"
+        assert repeated.json()["probability"] == pytest.approx(resolved.json()["probability"])
+        listed = client.get(f"/api/v1/goals/{goal_id}/evidence")
+        assert listed.status_code == 200
+        rejection_rows = [
+            item for item in listed.json() if item["metric"] == "application_rejections"
+        ]
+        assert len(rejection_rows) == 1
+        assert rejection_rows[0]["numeric_value"] == 8
+
+
 @pytest.mark.asyncio
 async def test_structured_evidence_skips_evidence_agent() -> None:
     provider = ScriptedInferenceProvider()
