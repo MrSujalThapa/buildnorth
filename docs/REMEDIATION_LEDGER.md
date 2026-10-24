@@ -181,3 +181,9 @@ If interrupted: create a Vercel Deployment Protection **Shareable Link** (not te
 
 - Started from merged main 3766b37 on codex/final-product-remediation. New Plugins duplicate/search, Notion picker and chart-direction changes are implemented locally. Production at 3766b37 was inspected: 406 displayed Plugins rows, duplicate Google Calendar/Sheets, visible search label, linked GitHub/Notion. No deployment acceptance is claimed yet.
 - Local focus checks: frontend chart/catalog tests 4 passed; backend integration tests 25 passed; Notion resource picker mocked desktop browser tests 2 passed. Full gates are running. Production A–L remains open.
+### 2026-10-24 — Pass 5 goal-confirmation timing continuation
+
+- Real Spur course goal creation remains **FAIL**: previous authorized proposals took 41.477 s and 54.576 s; downstream confirmation timed out at 45 s and 90 s. No paid call was made in this continuation.
+- Deterministic graph timing found about 75 ms to create and 13 ms to resume before the evidence inference call. Evidence prompt components measured 3,365 instruction, 1,742 input and 2,064 schema characters. This narrows the delay to inference but cannot distinguish provider queueing from generation or prove the production router latency from the direct-adapter experiment.
+- Fixed confirmed production-router risk: ambiguous read timeouts and HTTP 5xx no longer cause another potentially billed inference attempt; only explicit HTTP 429 may retry within the existing bound. Agent stage logs and failed run records now report actual duration without logging content.
+- Affected backend suite: 42 tests passed. No forecast math, published history, synthetic cohort isolation or existing four-mode What If behavior changed. Signed-in browser acceptance and Cron new-source publication remain **NOT VERIFIED**; PR #23 is not production accepted.

@@ -14,6 +14,7 @@ from personal_markets.core.errors import (
     PermanentProviderError,
     ProviderBudgetExceededError,
     ProviderNotConfiguredError,
+    ProviderRateLimitedError,
     SemanticProviderError,
     TransientProviderError,
 )
@@ -326,10 +327,20 @@ async def test_failures_account_every_attempt_without_provider_fallback() -> Non
     )
     with pytest.raises(TransientProviderError):
         await router.complete_structured(request(user_id=user.user_id))
-    assert len(calls) == len(store.ledger) == 2
+    assert len(calls) == len(store.ledger) == 1
     assert {call[0] for call in calls} == {"spur"}
     assert (await store.counters("global")).spent_tokens > 0
     assert (await store.counters("global")).reserved_tokens == 0
+
+
+async def test_explicit_rate_limit_can_retry_without_provider_fallback() -> None:
+    router, user, _, _, store, calls = setup_router(
+        hosted=True, failure=ProviderRateLimitedError("rate limited"), retries=1
+    )
+    with pytest.raises(ProviderRateLimitedError):
+        await router.complete_structured(request(user_id=user.user_id))
+    assert len(calls) == len(store.ledger) == 2
+    assert {call[0] for call in calls} == {"spur"}
 
 
 async def test_unknown_model_and_cross_owner_make_no_calls() -> None:
@@ -494,7 +505,7 @@ async def test_semantic_retries_share_one_wall_time_deadline() -> None:
     "failure,expected",
     [
         ("invalid_key", "ProviderAuthenticationError"),
-        ("rate_limit", "TransientProviderError"),
+        ("rate_limit", "ProviderRateLimitedError"),
         ("timeout", "TransientProviderError"),
         ("malformed", "InferenceOutputError"),
         ("unavailable", "TransientProviderError"),
@@ -550,6 +561,7 @@ async def test_fault_injection_keeps_provider_and_accounting(
     )
     error_type = {
         "ProviderAuthenticationError": ProviderAuthenticationError,
+        "ProviderRateLimitedError": ProviderRateLimitedError,
         "TransientProviderError": TransientProviderError,
         "InferenceOutputError": InferenceOutputError,
     }[expected]

@@ -15,6 +15,7 @@ from personal_markets.core.errors import (
     InferenceOutputError,
     ProviderAuthenticationError,
     ProviderNotConfiguredError,
+    ProviderRateLimitedError,
     SemanticProviderError,
     TransientProviderError,
     UnauthorizedError,
@@ -101,11 +102,7 @@ class InferenceRouter:
                 )
             configured_model = (
                 self._settings.inference_model
-                or (
-                    self._settings.resolved_spur_model()
-                    if provider == "spur"
-                    else None
-                )
+                or (self._settings.resolved_spur_model() if provider == "spur" else None)
                 or default_model(provider)
             )
             allowlist = hosted_allowlist(provider, configured_model)
@@ -167,7 +164,7 @@ class InferenceRouter:
                             )
                             response.retries = attempt
                             return response
-                        except TransientProviderError:
+                        except ProviderRateLimitedError:
                             if attempt >= min(self._settings.openai_max_retries, 3):
                                 raise
                             await asyncio.sleep(0.2 * (2**attempt))

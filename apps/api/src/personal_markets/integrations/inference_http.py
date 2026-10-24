@@ -18,6 +18,7 @@ from personal_markets.core.errors import (
     InferenceOutputError,
     PermanentProviderError,
     ProviderAuthenticationError,
+    ProviderRateLimitedError,
     SemanticProviderError,
     TransientProviderError,
 )
@@ -38,7 +39,7 @@ def provider_error(provider: str, status: int) -> Exception:
             f"{provider} authentication failed. Replace or validate your key."
         )
     if status == 429:
-        return TransientProviderError(
+        return ProviderRateLimitedError(
             f"{provider} quota or rate limit reached. Check provider billing."
         )
     if status >= 500 or status in {408, 409}:
@@ -369,8 +370,7 @@ def _drop_undeclared_keys(value: Any, schema: dict[str, Any]) -> Any:
         if schema.get("additionalProperties") is False:
             value = {key: item for key, item in value.items() if key in declared}
         return {
-            key: _drop_undeclared_keys(item, declared.get(key) or {})
-            for key, item in value.items()
+            key: _drop_undeclared_keys(item, declared.get(key) or {}) for key, item in value.items()
         }
     if isinstance(value, list) and isinstance(schema.get("items"), dict):
         return [_drop_undeclared_keys(item, schema["items"]) for item in value]
