@@ -250,3 +250,57 @@ def test_seed_endpoint_requires_admin_and_scopes_to_caller() -> None:
         assert dashboard.status_code == 200
         app.state.auth_bypass_principal = invited_principal("someone-else")
         assert client.get("/api/v1/goals").json() == []
+
+
+def test_authentic_profile_keeps_seed_out_and_persists_measured_preferences() -> None:
+    app = isolated_app()
+    principal = admin_principal()
+    app.state.auth_bypass_principal = principal
+    authentic = build_seed_goal(principal.user_id, SEED_GOALS[0], datetime.now(UTC)).model_copy(
+        update={
+            "goal_id": uuid4(),
+            "title": "My actual reading log",
+            "model_requirements": {},
+        }
+    )
+
+    async def prepare() -> str:
+        await app.state.goal_repository.create(authentic, principal.user_id)
+        committed = await app.state.evidence_service.commit(
+            principal.user_id,
+            authentic.goal_id,
+            [
+                EvidenceEventProposal(
+                    source_type="manual",
+                    event_type="observation",
+                    domain="learning",
+                    metric="reading_minutes",
+                    numeric_value=45,
+                    unit="minutes",
+                    observed_at=datetime.now(UTC).isoformat(),
+                    summary="Read for 45 minutes",
+                    observation_kind="increment",
+                )
+            ],
+            None,
+            [],
+        )
+        return str(committed.events[0].evidence_id)
+
+    with TestClient(app) as client:
+        evidence_id = asyncio.run(prepare())
+        seeded = client.post("/api/v1/admin/workspace-seed")
+        assert seeded.status_code == 200, seeded.text
+        selected = ["reading_minutes", "monthly_savings", "weekly_running_km"]
+        patched = client.patch("/api/v1/profile", json={"parameter_ids": selected})
+        assert patched.status_code == 200, patched.text
+        profile = client.get("/api/v1/profile")
+        assert profile.status_code == 200, profile.text
+        body = profile.json()
+        assert body["selected_parameters"] == selected
+        assert body["radar"]["evidence_count"] == 1
+        reading = body["radar"]["parameters"][0]
+        assert reading["raw_value"] == 45
+        assert reading["source_types"] == ["manual"]
+        assert reading["evidence_ids"] == [evidence_id]
+        assert all(item["value"] is None for item in body["radar"]["parameters"][1:])
