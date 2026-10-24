@@ -20,8 +20,11 @@ def _goal(*, synthetic: bool) -> GoalContract:
 
 def test_synthetic_commitments_are_separate_from_authentic_behavior() -> None:
     authentic, fixture = _goal(synthetic=False), _goal(synthetic=True)
-    assert behavior_cohort_goals([authentic, fixture]) == [authentic]
-    assert behavior_cohort_goals([authentic, fixture], synthetic=True) == [fixture]
+    demo = _goal(synthetic=False).model_copy(
+        update={"model_requirements": {"demo_seed": "seeds/demo.json"}}
+    )
+    assert behavior_cohort_goals([authentic, fixture, demo]) == [authentic]
+    assert behavior_cohort_goals([authentic, fixture, demo], synthetic=True) == [fixture, demo]
     assert behavior_cohort_goals([fixture]) == []
 
 

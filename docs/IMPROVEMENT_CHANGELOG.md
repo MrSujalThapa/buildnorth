@@ -999,3 +999,9 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - **Profile experiment:** in one isolated owner account, 7 synthetic seed goals and 106 fixture commitments coexisted with one authentic manual 45-minute reading observation. PATCH parameter choices survived GET; the authentic radar contained exactly the manual evidence ID and left unmeasured axes null. No production or external provider data was modified.
 - **Limits:** these are real HTTP and persistence paths with in-memory adapters, not signed-in production browser journeys. New goal creation, course-grade What If, broad mode coverage and automatic new-source forecast publication remain open. Browser control was stopped by a URL safety check and was not bypassed.
 
+## 2026-10-24 — Mark the older demo seed at source
+
+- **Finding:** `seeds/demo.json` used fixed demo owner IDs and synthetic market-history labels, but its goals lacked a cohort marker and its inserted evidence inherited an authentic-looking source quality. If attached to an authentic account, those rows could enter Profile or What If estimates.
+- **Change:** both in-memory and Postgres seed paths now mark goals `demo_seed`; Postgres seed evidence is marked `demo_fixture` with a `seed:demo:` identity. The shared cohort predicate recognizes this marker in Profile and What If. Existing seed history remains immutable. This does not seed any production account.
+- **Verification:** in-memory seed idempotency and cohort tests pass, alongside the Profile/What If focused tests. A migrated isolated Postgres seed run and a live account recheck are still required to verify already stored demo rows. The change is preventive for future seed inserts and updates of demo goals, not a claim that production data has been rewritten.
+

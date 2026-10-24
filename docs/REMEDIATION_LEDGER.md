@@ -6,6 +6,8 @@ The previous #23 Overall/area trait radar was the wrong product model. The main 
 
 **PR #23 follow-up at `fa5acc1`:** GitHub verify passed after correcting five test-only mypy errors from `10c2374`; Vercel preview completed. An in-process authenticated HTTP finance journey on the following working tree returned two distinct priced Deeper Compare paths and a feasible Reverse path, then found immutable `path_comparison` and `target_search` runs in the simulation repository. A second in-process account test put one authentic 45-minute reading record beside 7 seeded goals and 106 fixture commitments; saved parameter choices persisted, the authentic radar showed only that one evidence ID, and unsupported axes stayed null. These tests do not constitute a signed-in deployed browser PASS. The local HTTP Compare took 880 ms and Reverse 9.223 s in one run; they are single samples, not p50/p95. The prior Chrome browser-control URL safety stop remains in effect, so no alternate browser-control path was attempted.
 
+**Other fixture path:** the older `seeds/demo.json` path was found to lack an explicit goal cohort marker. Its seed writes now tag goals and evidence. No live rows were changed and existing seeded records need an isolated Postgres verification. This closes an identified future-ingest contamination path in code, without raising production Profile acceptance to PASS.
+
 ## 2026-10-24 continuation on `feat/playitout-next-pass`
 
 This section supersedes the older branch/deployment pointers below; it does not rewrite their historical observations. Production main includes #21 (`64ea6ee`) and #22 (`f12a153`). PR #23 is open at `841f12b`; Cursor PRs #18–20 and #24 remain separate and unmerged.

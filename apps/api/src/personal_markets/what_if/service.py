@@ -6,7 +6,11 @@ from uuid import UUID
 
 import numpy as np
 
-from personal_markets.behavior.cohort import authentic_evidence, behavior_cohort_goals
+from personal_markets.behavior.cohort import (
+    authentic_evidence,
+    behavior_cohort_goals,
+    is_synthetic_goal,
+)
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
@@ -104,7 +108,7 @@ class WhatIfService:
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
-            if not goal.model_requirements.get("workspace_seed"):
+            if not is_synthetic_goal(goal):
                 evidence = authentic_evidence(evidence)
         state = build_baseline_state(goal, evidence)
         return await self._overlay_published_baseline(UUID(goal_id), state)
@@ -305,7 +309,7 @@ class WhatIfService:
 
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
-            if not goal.model_requirements.get("workspace_seed"):
+            if not is_synthetic_goal(goal):
                 evidence = authentic_evidence(evidence)
             composed = await self._simulate_composition(goal, request, evidence, persist=persist)
             if composed is not None:
@@ -316,7 +320,7 @@ class WhatIfService:
                 # the hierarchical execution model; this goal's actions refine it.
                 owned = await self._goals.list_goals(owner_id=self._owner_id)
                 cohort = behavior_cohort_goals(
-                    owned, synthetic=bool(goal.model_requirements.get("workspace_seed"))
+                    owned, synthetic=is_synthetic_goal(goal)
                 )
                 plans, observations = await get_commitment_store().list_for_goals(
                     self._owner_id, [item.goal_id for item in cohort]
@@ -1520,7 +1524,7 @@ class WhatIfService:
             return None
         goal = await self._require_goal(request.goal_id)
         evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
-        if not goal.model_requirements.get("workspace_seed"):
+        if not is_synthetic_goal(goal):
             evidence = authentic_evidence(evidence)
         labels = [item.label for item in request.outcomes]
         resolved = resolve_futures_weights(

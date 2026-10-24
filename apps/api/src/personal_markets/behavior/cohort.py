@@ -11,8 +11,15 @@ def behavior_cohort_goals(
 ) -> list[GoalContract]:
     """Return only goals from the requested authentic or fixture cohort."""
     return [
-        goal for goal in goals if bool(goal.model_requirements.get("workspace_seed")) is synthetic
+        goal for goal in goals if is_synthetic_goal(goal) is synthetic
     ]
+
+
+def is_synthetic_goal(goal: GoalContract) -> bool:
+    return bool(
+        goal.model_requirements.get("workspace_seed")
+        or goal.model_requirements.get("demo_seed")
+    )
 
 
 def authentic_evidence(rows: Iterable[NormalizedEvidence]) -> list[NormalizedEvidence]:

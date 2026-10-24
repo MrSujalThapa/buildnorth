@@ -9,7 +9,6 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from personal_markets.evidence.domain import metadata_for
 from personal_markets.evidence.mapping import proposal_to_normalized
 from personal_markets.goals.domain import GoalContract
 from personal_markets.persistence.database import autocommit_connection, transaction
@@ -209,6 +208,10 @@ class PostgresSeedRepository:
     async def _upsert_goal(self, connection: AsyncConnection, row: dict[str, Any]) -> int:
         user_id = row["user_id"]
         values = GoalContract.model_validate(row).model_dump(mode="python")
+        values["model_requirements"] = {
+            **values["model_requirements"],
+            "demo_seed": "seeds/demo.json",
+        }
         result = await connection.execute(
             text("""
             insert into goals (
@@ -262,7 +265,6 @@ class PostgresSeedRepository:
         return result.rowcount
 
     async def _upsert_evidence(self, connection: AsyncConnection, row: dict[str, Any]) -> int:
-        meta = metadata_for(row["source_type"])
         proposal = EvidenceEventProposal.model_validate(
             {
                 "source_type": row["source_type"],
@@ -285,6 +287,7 @@ class PostgresSeedRepository:
         provenance = normalized.provenance.model_dump(mode="json")
         provenance["fingerprint"] = row["fingerprint"]
         provenance["summary"] = normalized.summary
+        provenance["event_identity"] = f"seed:demo:{row['id']}"
         result = await connection.execute(
             text("""
             insert into evidence_events (
@@ -306,7 +309,7 @@ class PostgresSeedRepository:
                 "categorical_value": row.get("categorical_value"),
                 "unit": row.get("unit"),
                 "observed_at": datetime.fromisoformat(row["observed_at"].replace("Z", "+00:00")),
-                "source_quality": meta["source_quality"],
+                "source_quality": "demo_fixture",
                 "provenance": json.dumps(provenance),
             },
         )
