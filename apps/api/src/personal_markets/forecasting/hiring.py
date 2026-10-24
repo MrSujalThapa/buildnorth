@@ -5,7 +5,7 @@ import math
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.metrics import ObservationKind, observation_kind, reduce_stock_value
@@ -43,6 +43,7 @@ class HiringFunnelState:
     rejections: dict[str, int] = field(default_factory=dict)
     practice_hours: float = 0.0
     last_activity_at: datetime | None = None
+    resolved_cohort_validated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +52,7 @@ class HiringReferenceRates:
     weekly_application_rate: float
     recency_half_life_days: float
     recency_floor: float
+    resolved_outcome_pseudo_counts: float
     reference_id: str
     version: str
     limitations: tuple[str, ...]
@@ -69,6 +71,9 @@ def load_hiring_reference(root: Path | None = None) -> HiringReferenceRates:
         weekly_application_rate=float(defaults.get("weekly_application_rate", 2.0)),
         recency_half_life_days=float(defaults.get("recency_half_life_days", 21.0)),
         recency_floor=float(defaults.get("recency_floor", 0.65)),
+        resolved_outcome_pseudo_counts=float(
+            defaults.get("resolved_outcome_pseudo_counts", 8.0)
+        ),
         reference_id=REFERENCE_ID,
         version=str(payload.get("version") or "unknown"),
         limitations=tuple(payload.get("limitations") or []),
@@ -105,9 +110,9 @@ def aggregate_funnel_from_evidence(
     now: datetime | None = None,
 ) -> HiringFunnelState:
     clock = now or datetime.now(UTC)
-    rejections: dict[str, int] = {}
     last_activity: datetime | None = None
     practice_hours = 0.0
+    rejection_rows: dict[str, list[tuple[datetime, float, ObservationKind]]] = {}
     stocks: dict[str, list[tuple[datetime, float, ObservationKind]]] = {
         "application": [],
         "response": [],
@@ -132,13 +137,19 @@ def aggregate_funnel_from_evidence(
         stage = _resolve_stage(metric, event_type, category, summary)
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)
-            rejections[rejection_stage] = rejections.get(rejection_stage, 0) + int(count)
+            rejection_rows.setdefault(rejection_stage, []).append((observed, count, kind))
             continue
         if stage == "practice":
             practice_hours += float(item.numeric_value or 0.0)
             continue
         if stage in stocks:
             stocks[stage].append((observed, count, kind))
+
+    rejections = {
+        stage: int(round(reduce_stock_value(rows)))
+        for stage, rows in rejection_rows.items()
+    }
+    rejections = {stage: count for stage, count in rejections.items() if count > 0}
 
     return HiringFunnelState(
         applications=int(round(reduce_stock_value(stocks["application"]))),
@@ -228,17 +239,35 @@ def funnel_state_to_numeric_inputs(
     logit = math.log(hazard / (1.0 - hazard))
 
     active = _active_counts(state)
+    rate_source = "REFERENCE" if weekly_application_rate is None else "USER_ASSUMPTION"
     transforms: dict[str, Any] = {
         "funnel_state": active,
         "periods_remaining": periods,
         "pipeline_offer_probability": p_current,
+        "current_pipeline_offer_probability": p_current,
         "expected_new_pipeline_offer_probability": p_new,
+        "future_applications_offer_probability": p_new,
         "combined_offer_probability": p_total,
         "weekly_application_rate": weekly_rate,
+        "future_application_rate": {
+            "applications_per_week": weekly_rate,
+            "source": rate_source,
+            "reference_default_per_week": reference.weekly_application_rate,
+            "applies_to": "expected future applications, not the current pipeline",
+        },
         "reference_version": reference.version,
         "stage_rates": stage_rates,
         "practice_hours_observed": state.practice_hours,
     }
+    inconsistent = active.get("stage_count_inconsistencies") or []
+    if inconsistent:
+        transforms["count_consistency"] = {
+            "stages": inconsistent,
+            "note": (
+                "Passes plus rejections exceed the reported stock. The active count is "
+                "zero. Extra rejections were not assigned to another stage."
+            ),
+        }
     if state.practice_hours:
         transforms["practice_note"] = (
             "Practice volume is activity evidence only; it does not map to a strength score."
@@ -261,6 +290,62 @@ def funnel_state_to_numeric_inputs(
     )
 
 
+_REJECTION_STAGE = {
+    "application": "application_to_response",
+    "response": "response_to_phone_screen",
+    "phone_screen": "phone_screen_to_oa",
+    "oa": "oa_to_technical",
+    "technical": "technical_to_final",
+    "final": "final_to_offer",
+}
+_STAGE_SUCCESS_FIELD = {
+    "application_to_response": "responses",
+    "response_to_phone_screen": "phone_screens",
+    "phone_screen_to_oa": "oas",
+    "oa_to_technical": "technicals",
+    "technical_to_final": "finals",
+    "final_to_offer": "offers",
+}
+
+
+def fit_resolved_stage_rates(
+    state: HiringFunnelState, reference: HiringReferenceRates
+) -> tuple[dict[str, float], list[dict[str, Any]]]:
+    """Shrink a stage rate toward the reference using resolved passes and rejections.
+
+    In-flight applications are not failures. A stage is fit only when that stage has
+    at least one recorded rejection. Successes are the count observed at the next
+    stage, which is a different set of people from the rejections.
+    """
+    pseudo = reference.resolved_outcome_pseudo_counts
+    if pseudo <= 0:
+        raise ValueError("resolved outcome pseudo-counts must be positive")
+    overrides: dict[str, float] = {}
+    rows: list[dict[str, Any]] = []
+    for rejection_stage, stage in _REJECTION_STAGE.items():
+        failures = float(state.rejections.get(rejection_stage, 0))
+        if failures <= 0:
+            continue
+        successes = float(getattr(state, _STAGE_SUCCESS_FIELD[stage]))
+        prior = float(reference.stage_rates[stage])
+        trials = successes + failures
+        fitted = (successes + pseudo * prior) / (trials + pseudo)
+        overrides[stage] = fitted
+        rows.append(
+            {
+                "stage": stage,
+                "successes": successes,
+                "failures": failures,
+                "trials": trials,
+                "prior_rate": prior,
+                "fitted_rate": fitted,
+                "pseudo_counts": pseudo,
+                "estimator": "resolved_outcomes_shrunk_to_reference",
+            }
+        )
+    return overrides, rows
+
+
 def build_hiring_numeric_inputs(
     goal: GoalContract,
     proposal: GoalArchitectProposal | None,
@@ -268,28 +353,112 @@ def build_hiring_numeric_inputs(
     *,
     overrides: dict[str, Any] | None = None,
     now: datetime | None = None,
+    validated_resolved_cohort: bool = False,
 ) -> NumericInputs | None:
     if not is_hiring_goal(goal, proposal):
         return None
     state = aggregate_funnel_from_evidence(evidence, now=now)
     state = apply_funnel_overrides(state, overrides)
+    state = replace(state, resolved_cohort_validated=validated_resolved_cohort)
+    reference = load_hiring_reference()
+    personal_rates, fits = (
+        fit_resolved_stage_rates(state, reference)
+        if validated_resolved_cohort else ({}, [])
+    )
     weekly_rate = None
-    stage_rate_overrides: dict[str, float] | None = None
+    explicit_rates: dict[str, float] = {}
     if overrides:
         if "weekly_application_rate" in overrides:
             weekly_rate = float(overrides["weekly_application_rate"])
-        stage_rate_overrides = {
-            key: float(value)
-            for key, value in overrides.items()
-            if key in STAGE_CHAIN
-        } or None
-    return funnel_state_to_numeric_inputs(
+        explicit_rates = {
+            key: float(value) for key, value in overrides.items() if key in STAGE_CHAIN
+        }
+    merged_rates = {**personal_rates, **explicit_rates}
+    numeric = funnel_state_to_numeric_inputs(
         goal,
         state,
+        rates=reference,
         weekly_application_rate=weekly_rate,
-        stage_rate_overrides=stage_rate_overrides,
+        stage_rate_overrides=merged_rates or None,
         now=now,
     )
+    if numeric is None:
+        return None
+    return _annotate_hiring_prediction(
+        numeric,
+        reference=reference,
+        fits=fits,
+        explicit_rates=explicit_rates,
+        weekly_rate_is_user=weekly_rate is not None,
+    )
+
+
+def _annotate_hiring_prediction(
+    numeric: NumericInputs,
+    *,
+    reference: HiringReferenceRates,
+    fits: list[dict[str, Any]],
+    explicit_rates: dict[str, float],
+    weekly_rate_is_user: bool,
+) -> NumericInputs:
+    from personal_markets.forecasting.selection import hiring_prediction_block
+
+    offer_observed = bool(
+        (numeric.state.get("pricing_transforms") or {}).get("offer_already_received")
+    )
+    method: Literal["DETERMINISTIC", "FITTED_STATISTICAL", "REFERENCE_MODEL"]
+    if offer_observed:
+        method = "DETERMINISTIC"
+        sufficiency = "observed_success"
+    elif fits:
+        method = "FITTED_STATISTICAL"
+        sufficiency = "resolved_stage_outcomes"
+    else:
+        method = "REFERENCE_MODEL"
+        sufficiency = "reference_only"
+    fitted_stages = {row["stage"] for row in fits}
+    missing = [stage for stage in STAGE_CHAIN if stage not in fitted_stages and not offer_observed]
+    updated_state = dict(numeric.state)
+    transforms = dict(updated_state.get("pricing_transforms") or {})
+    future = transforms.get("future_application_rate") or {}
+    weekly_rate = float(future.get("applications_per_week") or reference.weekly_application_rate)
+    block = hiring_prediction_block(
+        method=method,
+        sufficiency=sufficiency,
+        fits=fits,
+        missing_stages=missing,
+        reference_version=reference.version,
+        pseudo_counts=reference.resolved_outcome_pseudo_counts,
+        weekly_rate_source="USER_ASSUMPTION" if weekly_rate_is_user else "REFERENCE",
+        weekly_rate=weekly_rate,
+    )
+    notes = list(block["limitations"])
+    active = updated_state.get("funnel") or {}
+    if active.get("stage_count_inconsistencies"):
+        notes.append(
+            "Passes plus rejections exceed the reported stock. Active count is zero. "
+            "Extra rejections were not assigned to another stage."
+        )
+    if active.get("unassigned_rejections"):
+        notes.append(
+            "Rejections that named no stage stay out of every active count."
+        )
+    if not offer_observed and not fits:
+        notes.append(
+            "Resolved-stage fitting requires outcomes linked to a validated application cohort; "
+            "aggregate stage counts alone retain the reference model."
+        )
+    block["limitations"] = notes
+    transforms["prediction_method"] = method
+    transforms["stage_rate_fits"] = fits
+    updated_state["pricing_transforms"] = transforms
+    updated_state["prediction"] = block
+    sources = dict(numeric.assumption_sources)
+    if method == "FITTED_STATISTICAL" and not explicit_rates:
+        sources["baseline_logits"] = "FITTED"
+    elif explicit_rates:
+        sources["baseline_logits"] = "USER_ASSUMPTION"
+    return replace(numeric, state=updated_state, assumption_sources=sources)
 
 
 def _priced_inputs(
@@ -340,17 +509,40 @@ def _has_funnel_signal(state: HiringFunnelState) -> bool:
 
 
 def _active_counts(state: HiringFunnelState) -> dict[str, Any]:
-    return {
-        "applications": max(0, state.applications - state.responses),
-        "responses": max(0, state.responses - state.phone_screens),
-        "phone_screens": max(0, state.phone_screens - state.oas),
-        "oas": max(0, state.oas - state.technicals),
-        "technicals": max(0, state.technicals - state.finals),
-        "finals": max(0, state.finals - state.offers),
-        "offers": state.offers,
-        "rejections": dict(state.rejections),
-        "practice_hours": state.practice_hours,
-    }
+    """People still waiting at a stage.
+
+    The live path subtracts only observed advances. Rejections are subtracted
+    only for a separately validated resolved cohort; aggregate stage totals do
+    not establish that they belong to the same applications.
+    """
+    stages = (
+        ("applications", state.applications, state.responses, "application"),
+        ("responses", state.responses, state.phone_screens, "response"),
+        ("phone_screens", state.phone_screens, state.oas, "phone_screen"),
+        ("oas", state.oas, state.technicals, "oa"),
+        ("technicals", state.technicals, state.finals, "technical"),
+        ("finals", state.finals, state.offers, "final"),
+    )
+    active: dict[str, Any] = {}
+    inconsistent: list[str] = []
+    for name, stock, advanced, rejection_key in stages:
+        rejected = (
+            int(state.rejections.get(rejection_key, 0))
+            if state.resolved_cohort_validated else 0
+        )
+        remaining = stock - advanced - rejected
+        if remaining < 0:
+            inconsistent.append(name)
+        active[name] = max(0, remaining)
+    active["offers"] = state.offers
+    active["rejections"] = dict(state.rejections)
+    active["practice_hours"] = state.practice_hours
+    if inconsistent:
+        active["stage_count_inconsistencies"] = inconsistent
+    unassigned = int(state.rejections.get("unassigned", 0))
+    if unassigned:
+        active["unassigned_rejections"] = unassigned
+    return active
 
 
 def _pipeline_offer_probability(state: HiringFunnelState, rates: dict[str, float]) -> float:
@@ -468,18 +660,25 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
 
 
 def _rejection_stage(metric: str, event_type: str, category: str, summary: str) -> str:
+    """Name the stage that rejected the opportunity. Unknown text stays unassigned."""
     blob = " ".join([metric, event_type, category, summary])
     if _matches(blob, ("final", "onsite")):
         return "final"
     if _matches(blob, ("technical", "coding")):
         return "technical"
-    if _matches(blob, ("oa", "online assessment", "hackerrank")):
+    if metric.strip() in {"oa", "online_assessment", "hackerrank", "codesignal"}:
         return "oa"
-    if _matches(blob, ("phone", "recruiter")):
+    if _matches(blob, ("online assessment", "online_assessment", "hackerrank", "codesignal")):
+        return "oa"
+    if _matches(blob, ("phone screen", "phone_screen", "recruiter screen")):
         return "phone_screen"
-    if _matches(blob, ("application", "resume")):
+    if _matches(blob, ("application", "resume", "applied")):
         return "application"
-    return category or "technical"
+    if _matches(blob, ("response", "reply", "callback")):
+        return "response"
+    if _matches(blob, ("phone",)):
+        return "phone_screen"
+    return "unassigned"
 
 
 def _matches(blob: str, tokens: tuple[str, ...]) -> bool:

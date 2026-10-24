@@ -8,7 +8,8 @@
   "limitations": [
     "No frozen public dataset calibrates personal offer probability for an arbitrary target-company set.",
     "Parallel processes are treated as independent; correlated rejections are not modeled.",
-    "Practice volume is activity evidence only and does not inject a latent strength score."
+    "Practice volume is activity evidence only and does not inject a latent strength score.",
+    "Personal stage rates use only resolved passes and rejections, shrunk toward these priors. They are not a calibrated classifier and are not estimated from JTH."
   ],
   "causal_label": "associative",
   "permitted_use": "baseline hazard derivation and exploratory scenario perturbation",
@@ -24,7 +25,8 @@
   "defaults": {
     "weekly_application_rate": 2.0,
     "recency_half_life_days": 21.0,
-    "recency_floor": 0.65
+    "recency_floor": 0.65,
+    "resolved_outcome_pseudo_counts": 8.0
   },
   "claims": [
     {
