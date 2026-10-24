@@ -1,0 +1,919 @@
+{
+  "benchmark": "oulad_completion_v1",
+  "experiment": "evidence_learning_v1",
+  "seed": 20260828,
+  "model_version": "evidence-learning-v1",
+  "domain": "oulad_module_completion",
+  "not_applicable_to": [
+    "hiring",
+    "running",
+    "finance",
+    "startup"
+  ],
+  "half_life_days": 14,
+  "half_life_source": "reused from oulad_completion_v1 selection; not re-tuned on test",
+  "prior_strength": 1.0,
+  "prior_strength_selection": "minimum validation Brier of shrunk calibrated logistic",
+  "validation_strength_brier": [
+    {
+      "prior_strength": 1.0,
+      "validation_brier": 0.18479220581120825
+    },
+    {
+      "prior_strength": 2.0,
+      "validation_brier": 0.1901222494334165
+    },
+    {
+      "prior_strength": 4.0,
+      "validation_brier": 0.19907349303448152
+    },
+    {
+      "prior_strength": 8.0,
+      "validation_brier": 0.2109564547768348
+    },
+    {
+      "prior_strength": 16.0,
+      "validation_brier": 0.2233241619394412
+    },
+    {
+      "prior_strength": 32.0,
+      "validation_brier": 0.23353302341915724
+    }
+  ],
+  "calibration_methods": {
+    "static_covariates": "isotonic",
+    "evidence_logistic": "isotonic",
+    "hist_gradient_boosting": "platt"
+  },
+  "train_positive_rate": 0.47009728622631847,
+  "n_train_rows": 78120,
+  "n_validation_rows": 19604,
+  "n_calibration_rows": 19396,
+  "n_test_rows": 13252,
+  "n_test_students": 2922,
+  "checkpoints": [
+    {
+      "checkpoint_day": 14,
+      "models": {
+        "population_prior": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.24933269644350678,
+          "log_loss": 0.6918120479832405,
+          "roc_auc": null,
+          "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+          "ece_10": 0.0037934472478741155,
+          "brier_improvement_vs_prior": 0.0
+        },
+        "static_covariates": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.23785770255253996,
+          "log_loss": 0.6682498979813721,
+          "roc_auc": 0.6199454779993495,
+          "roc_auc_note": null,
+          "ece_10": 0.008585272372919556,
+          "brier_improvement_vs_prior": 0.011474993890966817
+        },
+        "evidence_logistic": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.20309810215815924,
+          "log_loss": 0.5938602644518186,
+          "roc_auc": 0.7503107973294453,
+          "roc_auc_note": null,
+          "ece_10": 0.03905375351998577,
+          "brier_improvement_vs_prior": 0.04623459428534754
+        },
+        "shrunk_evidence": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.22162425981347064,
+          "log_loss": 0.6341165803514783,
+          "roc_auc": 0.6980785745347177,
+          "roc_auc_note": null,
+          "ece_10": 0.0961283318642899,
+          "brier_improvement_vs_prior": 0.027708436630036137
+        },
+        "hist_gradient_boosting": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.18654097811548798,
+          "log_loss": 0.5507980408535907,
+          "roc_auc": 0.7892488973181169,
+          "roc_auc_note": null,
+          "ece_10": 0.018833711632912947,
+          "brier_improvement_vs_prior": 0.0627917183280188
+        }
+      },
+      "by_sufficiency": {
+        "population_only": {
+          "n": 635,
+          "models": {
+            "population_prior": {
+              "n": 635,
+              "positive_rate": 0.11653543307086614,
+              "brier": 0.22796090991656948,
+              "log_loss": 0.6490174051298129,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.3535618531554523
+            },
+            "evidence_logistic": {
+              "n": 635,
+              "positive_rate": 0.11653543307086614,
+              "brier": 0.12964061389874282,
+              "log_loss": 0.41738203102650373,
+              "roc_auc": 0.7076167076167076,
+              "roc_auc_note": null,
+              "ece_10": 0.15897403783218714
+            },
+            "shrunk_evidence": {
+              "n": 635,
+              "positive_rate": 0.11653543307086614,
+              "brier": 0.22796090991656948,
+              "log_loss": 0.6490174051298129,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.3535618531554523
+            }
+          }
+        },
+        "sparse": {
+          "n": 1484,
+          "models": {
+            "population_prior": {
+              "n": 1484,
+              "positive_rate": 0.4454177897574124,
+              "brier": 0.24762985987099276,
+              "log_loss": 0.6884023057575896,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.024679496468905993
+            },
+            "evidence_logistic": {
+              "n": 1484,
+              "positive_rate": 0.4454177897574124,
+              "brier": 0.23156233418388447,
+              "log_loss": 0.664091856904809,
+              "roc_auc": 0.6736571305672948,
+              "roc_auc_note": null,
+              "ece_10": 0.07400000536296479
+            },
+            "shrunk_evidence": {
+              "n": 1484,
+              "positive_rate": 0.4454177897574124,
+              "brier": 0.22712414928775193,
+              "log_loss": 0.6462072308427251,
+              "roc_auc": 0.6690542147745508,
+              "roc_auc_note": null,
+              "ece_10": 0.040541128247587634
+            }
+          }
+        },
+        "adequate": {
+          "n": 1194,
+          "models": {
+            "population_prior": {
+              "n": 1194,
+              "positive_rate": 0.6993299832495813,
+              "brier": 0.2628151871622807,
+              "log_loss": 0.7188092470408556,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.22923269702326282
+            },
+            "evidence_logistic": {
+              "n": 1194,
+              "positive_rate": 0.6993299832495813,
+              "brier": 0.2067870340832456,
+              "log_loss": 0.6004264244391195,
+              "roc_auc": 0.6505262455590213,
+              "roc_auc_note": null,
+              "ece_10": 0.08548313235872244
+            },
+            "shrunk_evidence": {
+              "n": 1194,
+              "positive_rate": 0.6993299832495813,
+              "brier": 0.21141855730484316,
+              "log_loss": 0.6111646967139135,
+              "roc_auc": 0.6511250479542309,
+              "roc_auc_note": null,
+              "ece_10": 0.1207749698203179
+            }
+          }
+        }
+      },
+      "mean_effective_sample_size": 1.539674136249556,
+      "fraction_population_only": 0.1916691820102626
+    },
+    {
+      "checkpoint_day": 35,
+      "models": {
+        "population_prior": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.24933269644350678,
+          "log_loss": 0.6918120479832405,
+          "roc_auc": null,
+          "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+          "ece_10": 0.0037934472478741155,
+          "brier_improvement_vs_prior": 0.0
+        },
+        "static_covariates": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.23785770255253996,
+          "log_loss": 0.6682498979813721,
+          "roc_auc": 0.6199454779993495,
+          "roc_auc_note": null,
+          "ece_10": 0.008585272372919556,
+          "brier_improvement_vs_prior": 0.011474993890966817
+        },
+        "evidence_logistic": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.16527228983739992,
+          "log_loss": 0.4964951684815795,
+          "roc_auc": 0.8406181596266777,
+          "roc_auc_note": null,
+          "ece_10": 0.05581678307130382,
+          "brier_improvement_vs_prior": 0.08406040660610686
+        },
+        "shrunk_evidence": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.19513946102648932,
+          "log_loss": 0.5761325297826995,
+          "roc_auc": 0.8235626765478657,
+          "roc_auc_note": null,
+          "ece_10": 0.12356314287378985,
+          "brier_improvement_vs_prior": 0.054193235417017455
+        },
+        "hist_gradient_boosting": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.15313495184315976,
+          "log_loss": 0.4581553458473777,
+          "roc_auc": 0.8559855436303905,
+          "roc_auc_note": null,
+          "ece_10": 0.018179672153832073,
+          "brier_improvement_vs_prior": 0.09619774460034702
+        }
+      },
+      "by_sufficiency": {
+        "population_only": {
+          "n": 482,
+          "models": {
+            "population_prior": {
+              "n": 482,
+              "positive_rate": 0.04149377593360996,
+              "brier": 0.22347301152761323,
+              "log_loss": 0.6400308841164299,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.4286035102927085
+            },
+            "evidence_logistic": {
+              "n": 482,
+              "positive_rate": 0.04149377593360996,
+              "brier": 0.05207798965209431,
+              "log_loss": 0.20679578067567483,
+              "roc_auc": 0.9178571428571429,
+              "roc_auc_note": null,
+              "ece_10": 0.1272074328935836
+            },
+            "shrunk_evidence": {
+              "n": 482,
+              "positive_rate": 0.04149377593360996,
+              "brier": 0.22347301152761323,
+              "log_loss": 0.6400308841164299,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.4286035102927085
+            }
+          }
+        },
+        "sparse": {
+          "n": 425,
+          "models": {
+            "population_prior": {
+              "n": 425,
+              "positive_rate": 0.2376470588235294,
+              "brier": 0.23520404247566373,
+              "log_loss": 0.663520978362485,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.23245022740278906
+            },
+            "evidence_logistic": {
+              "n": 425,
+              "positive_rate": 0.2376470588235294,
+              "brier": 0.13011854327241903,
+              "log_loss": 0.39864862995486133,
+              "roc_auc": 0.8495446766898912,
+              "roc_auc_note": null,
+              "ece_10": 0.043402544813632794
+            },
+            "shrunk_evidence": {
+              "n": 425,
+              "positive_rate": 0.2376470588235294,
+              "brier": 0.15492668019449982,
+              "log_loss": 0.48885267325996284,
+              "roc_auc": 0.8356710671067107,
+              "roc_auc_note": null,
+              "ece_10": 0.13643600981827622
+            }
+          }
+        },
+        "adequate": {
+          "n": 2406,
+          "models": {
+            "population_prior": {
+              "n": 2406,
+              "positive_rate": 0.6022443890274314,
+              "brier": 0.2570089416911352,
+              "log_loss": 0.7071828815545721,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.13214710280111291
+            },
+            "evidence_logistic": {
+              "n": 2406,
+              "positive_rate": 0.6022443890274314,
+              "brier": 0.1941584057889519,
+              "log_loss": 0.5718151534343231,
+              "roc_auc": 0.7613621039408147,
+              "roc_auc_note": null,
+              "ece_10": 0.04989908530065525
+            },
+            "shrunk_evidence": {
+              "n": 2406,
+              "positive_rate": 0.6022443890274314,
+              "brier": 0.19656658509633712,
+              "log_loss": 0.578748877344339,
+              "roc_auc": 0.7593901461967428,
+              "roc_auc_note": null,
+              "ece_10": 0.06097674969774879
+            }
+          }
+        }
+      },
+      "mean_effective_sample_size": 2.952565610621359,
+      "fraction_population_only": 0.14548747358889225
+    },
+    {
+      "checkpoint_day": 70,
+      "models": {
+        "population_prior": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.24933269644350678,
+          "log_loss": 0.6918120479832405,
+          "roc_auc": null,
+          "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+          "ece_10": 0.0037934472478741155,
+          "brier_improvement_vs_prior": 0.0
+        },
+        "static_covariates": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.23785770255253996,
+          "log_loss": 0.6682498979813721,
+          "roc_auc": 0.6199454779993495,
+          "roc_auc_note": null,
+          "ece_10": 0.008585272372919556,
+          "brier_improvement_vs_prior": 0.011474993890966817
+        },
+        "evidence_logistic": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.12662908808482518,
+          "log_loss": 0.3934335096561171,
+          "roc_auc": 0.8989380634457759,
+          "roc_auc_note": null,
+          "ece_10": 0.034843537721053086,
+          "brier_improvement_vs_prior": 0.1227036083586816
+        },
+        "shrunk_evidence": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.16120278915169514,
+          "log_loss": 0.4968794902597126,
+          "roc_auc": 0.8833813872414132,
+          "roc_auc_note": null,
+          "ece_10": 0.13395164673999574,
+          "brier_improvement_vs_prior": 0.08812990729181164
+        },
+        "hist_gradient_boosting": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.11810828777859483,
+          "log_loss": 0.36475484432788646,
+          "roc_auc": 0.9092722116856873,
+          "roc_auc_note": null,
+          "ece_10": 0.013444918991334577,
+          "brier_improvement_vs_prior": 0.13122440866491195
+        }
+      },
+      "by_sufficiency": {
+        "population_only": {
+          "n": 447,
+          "models": {
+            "population_prior": {
+              "n": 447,
+              "positive_rate": 0.011185682326621925,
+              "brier": 0.22166042303130182,
+              "log_loss": 0.6364013757811249,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.45891160389969654
+            },
+            "evidence_logistic": {
+              "n": 447,
+              "positive_rate": 0.011185682326621925,
+              "brier": 0.01755410254177308,
+              "log_loss": 0.08670157794103503,
+              "roc_auc": 0.78710407239819,
+              "roc_auc_note": null,
+              "ece_10": 0.049510606028390115
+            },
+            "shrunk_evidence": {
+              "n": 447,
+              "positive_rate": 0.011185682326621925,
+              "brier": 0.22166042303130182,
+              "log_loss": 0.6364013757811249,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.45891160389969654
+            }
+          }
+        },
+        "sparse": {
+          "n": 269,
+          "models": {
+            "population_prior": {
+              "n": 269,
+              "positive_rate": 0.048327137546468404,
+              "brier": 0.22388168364045596,
+              "log_loss": 0.6408492049007601,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.4217701486798501
+            },
+            "evidence_logistic": {
+              "n": 269,
+              "positive_rate": 0.048327137546468404,
+              "brier": 0.03245578355736261,
+              "log_loss": 0.12241214934375351,
+              "roc_auc": 0.9015925480769231,
+              "roc_auc_note": null,
+              "ece_10": 0.018727468078340505
+            },
+            "shrunk_evidence": {
+              "n": 269,
+              "positive_rate": 0.048327137546468404,
+              "brier": 0.0766303561057159,
+              "log_loss": 0.31201039640103906,
+              "roc_auc": 0.8662860576923077,
+              "roc_auc_note": null,
+              "ece_10": 0.21429710405700747
+            }
+          }
+        },
+        "adequate": {
+          "n": 2597,
+          "models": {
+            "population_prior": {
+              "n": 2597,
+              "positive_rate": 0.5976126299576434,
+              "brier": 0.25673193735967015,
+              "log_loss": 0.7066282109649628,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.1275153437313249
+            },
+            "evidence_logistic": {
+              "n": 2597,
+              "positive_rate": 0.5976126299576434,
+              "brier": 0.15515782795992403,
+              "log_loss": 0.4743014031488655,
+              "roc_auc": 0.8401932373107088,
+              "roc_auc_note": null,
+              "ece_10": 0.03549798697110121
+            },
+            "shrunk_evidence": {
+              "n": 2597,
+              "positive_rate": 0.5976126299576434,
+              "brier": 0.1595568215526132,
+              "log_loss": 0.4920136848765443,
+              "roc_auc": 0.8393435850638781,
+              "roc_auc_note": null,
+              "ece_10": 0.07078892731458959
+            }
+          }
+        }
+      },
+      "mean_effective_sample_size": 4.319618986068929,
+      "fraction_population_only": 0.13492303048596438
+    },
+    {
+      "checkpoint_day": 105,
+      "models": {
+        "population_prior": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.24933269644350678,
+          "log_loss": 0.6918120479832405,
+          "roc_auc": null,
+          "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+          "ece_10": 0.0037934472478741155,
+          "brier_improvement_vs_prior": 0.0
+        },
+        "static_covariates": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.23785770255253996,
+          "log_loss": 0.6682498979813721,
+          "roc_auc": 0.6199454779993495,
+          "roc_auc_note": null,
+          "ece_10": 0.008585272372919556,
+          "brier_improvement_vs_prior": 0.011474993890966817
+        },
+        "evidence_logistic": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.10583726394969431,
+          "log_loss": 0.33703193779326074,
+          "roc_auc": 0.9276783201961623,
+          "roc_auc_note": null,
+          "ece_10": 0.03349311861306689,
+          "brier_improvement_vs_prior": 0.14349543249381247
+        },
+        "shrunk_evidence": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.14065934837283214,
+          "log_loss": 0.445511540377805,
+          "roc_auc": 0.8997202641320513,
+          "roc_auc_note": null,
+          "ece_10": 0.12997686062373404,
+          "brier_improvement_vs_prior": 0.10867334807067464
+        },
+        "hist_gradient_boosting": {
+          "n": 3313,
+          "positive_rate": 0.4738907334741926,
+          "brier": 0.09636473643006872,
+          "log_loss": 0.30282770822289967,
+          "roc_auc": 0.9373084695469778,
+          "roc_auc_note": null,
+          "ece_10": 0.010299817095062997,
+          "brier_improvement_vs_prior": 0.15296796001343804
+        }
+      },
+      "by_sufficiency": {
+        "population_only": {
+          "n": 441,
+          "models": {
+            "population_prior": {
+              "n": 441,
+              "positive_rate": 0.009070294784580499,
+              "brier": 0.22153391137492165,
+              "log_loss": 0.6361480501574219,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.461026991441738
+            },
+            "evidence_logistic": {
+              "n": 441,
+              "positive_rate": 0.009070294784580499,
+              "brier": 0.009583723784317967,
+              "log_loss": 0.0534010373994182,
+              "roc_auc": 0.6298627002288331,
+              "roc_auc_note": null,
+              "ece_10": 0.01681020867448966
+            },
+            "shrunk_evidence": {
+              "n": 441,
+              "positive_rate": 0.009070294784580499,
+              "brier": 0.22153391137492165,
+              "log_loss": 0.6361480501574219,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.461026991441738
+            }
+          }
+        },
+        "sparse": {
+          "n": 248,
+          "models": {
+            "population_prior": {
+              "n": 248,
+              "positive_rate": 0.016129032258064516,
+              "brier": 0.22195606218746797,
+              "log_loss": 0.6369933605497203,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.45396825396825397
+            },
+            "evidence_logistic": {
+              "n": 248,
+              "positive_rate": 0.016129032258064516,
+              "brier": 0.014722838256740917,
+              "log_loss": 0.06298972147852258,
+              "roc_auc": 0.8898565573770492,
+              "roc_auc_note": null,
+              "ece_10": 0.013233431850452611
+            },
+            "shrunk_evidence": {
+              "n": 248,
+              "positive_rate": 0.016129032258064516,
+              "brier": 0.060839379430357644,
+              "log_loss": 0.2748719561748863,
+              "roc_auc": 0.6198770491803278,
+              "roc_auc_note": null,
+              "ece_10": 0.20973089490784727
+            }
+          }
+        },
+        "adequate": {
+          "n": 2624,
+          "models": {
+            "population_prior": {
+              "n": 2624,
+              "positive_rate": 0.5952743902439024,
+              "brier": 0.25659209793388166,
+              "log_loss": 0.7063481979545434,
+              "roc_auc": null,
+              "roc_auc_note": "AUC is undefined when the score or the outcome does not vary",
+              "ece_10": 0.12517710401758392
+            },
+            "evidence_logistic": {
+              "n": 2624,
+              "positive_rate": 0.5952743902439024,
+              "brier": 0.1306254456512124,
+              "log_loss": 0.41060041977486883,
+              "roc_auc": 0.8863470585540292,
+              "roc_auc_note": null,
+              "ece_10": 0.04410950690979958
+            },
+            "shrunk_evidence": {
+              "n": 2624,
+              "positive_rate": 0.5952743902439024,
+              "brier": 0.13461120432321788,
+              "log_loss": 0.42959992302624733,
+              "roc_auc": 0.8832292246890002,
+              "roc_auc_note": null,
+              "ece_10": 0.0735813186464153
+            }
+          }
+        }
+      },
+      "mean_effective_sample_size": 5.10453809384723,
+      "fraction_population_only": 0.13311198309689104
+    }
+  ],
+  "example_explanation": {
+    "id_student": "redacted",
+    "snapshots": [
+      {
+        "checkpoint_day": 14,
+        "domain": "oulad_module_completion",
+        "applies_outside_domain": false,
+        "population_prior": 0.47009728622631847,
+        "evidence_model_probability": 0.6326002587322123,
+        "shrunk_probability": 0.5847756616038662,
+        "prior_weight": 0.2942998296638024,
+        "evidence_weight": 0.7057001703361976,
+        "n_observations": 10,
+        "effective_sample_size": 2.3978952727983707,
+        "prior_strength": 1.0,
+        "data_sufficiency": "adequate",
+        "calibration_status": "calibration_split",
+        "model_version": "evidence-learning-v1",
+        "training_dataset": "oulad_completion_v1",
+        "top_log_odds": [
+          {
+            "feature": "numeric__assessment_weighted_score_sum",
+            "transformed_value": -0.7293686138668094,
+            "coefficient": 2.4276520665677888,
+            "log_odds_contribution": -1.7706532227434435
+          },
+          {
+            "feature": "numeric__assessment_weight_submitted",
+            "transformed_value": -0.7603556449309182,
+            "coefficient": -1.8686393411198072,
+            "log_odds_contribution": 1.4208304713604372
+          },
+          {
+            "feature": "numeric__checkpoint_day",
+            "transformed_value": -1.2121830534626528,
+            "coefficient": -0.8472847506711517,
+            "log_odds_contribution": 1.0270642162208992
+          },
+          {
+            "feature": "numeric__vle_clicks_7d",
+            "transformed_value": 1.4754350294767349,
+            "coefficient": 0.6615962091813835,
+            "log_odds_contribution": 0.9761422223952306
+          },
+          {
+            "feature": "categorical__code_module_DDD",
+            "transformed_value": 1.0,
+            "coefficient": -0.726320335249742,
+            "log_odds_contribution": -0.726320335249742
+          }
+        ],
+        "causal_claim": null,
+        "limitations": [
+          "Click and assessment associations are not effects of an intervention.",
+          "A forecast from this fit applies only to OULAD module completion.",
+          "Zero activity is still a model input. It is not automatically the population prior.",
+          "Listed log-odds are pre-calibration contributions, not the calibrated probability."
+        ],
+        "log_odds_basis": "pre_calibration_logistic"
+      },
+      {
+        "checkpoint_day": 35,
+        "domain": "oulad_module_completion",
+        "applies_outside_domain": false,
+        "population_prior": 0.47009728622631847,
+        "evidence_model_probability": 0.7686139747995419,
+        "shrunk_probability": 0.70885963404884,
+        "prior_weight": 0.200170854890227,
+        "evidence_weight": 0.799829145109773,
+        "n_observations": 20,
+        "effective_sample_size": 3.995732273553991,
+        "prior_strength": 1.0,
+        "data_sufficiency": "adequate",
+        "calibration_status": "calibration_split",
+        "model_version": "evidence-learning-v1",
+        "training_dataset": "oulad_completion_v1",
+        "top_log_odds": [
+          {
+            "feature": "categorical__code_module_DDD",
+            "transformed_value": 1.0,
+            "coefficient": -0.726320335249742,
+            "log_odds_contribution": -0.726320335249742
+          },
+          {
+            "feature": "numeric__vle_unique_sites",
+            "transformed_value": 2.0273021825028885,
+            "coefficient": 0.26760812555379093,
+            "log_odds_contribution": 0.5425225369907074
+          },
+          {
+            "feature": "numeric__checkpoint_day",
+            "transformed_value": -0.6060915267313264,
+            "coefficient": -0.8472847506711517,
+            "log_odds_contribution": 0.5135321081104496
+          },
+          {
+            "feature": "categorical__code_presentation_2013J",
+            "transformed_value": 1.0,
+            "coefficient": 0.43947389981773993,
+            "log_odds_contribution": 0.43947389981773993
+          },
+          {
+            "feature": "numeric__assessment_mean_score",
+            "transformed_value": 1.2563410512356727,
+            "coefficient": 0.2351422999815679,
+            "log_odds_contribution": 0.29541892434881695
+          }
+        ],
+        "causal_claim": null,
+        "limitations": [
+          "Click and assessment associations are not effects of an intervention.",
+          "A forecast from this fit applies only to OULAD module completion.",
+          "Zero activity is still a model input. It is not automatically the population prior.",
+          "Listed log-odds are pre-calibration contributions, not the calibrated probability."
+        ],
+        "log_odds_basis": "pre_calibration_logistic"
+      },
+      {
+        "checkpoint_day": 70,
+        "domain": "oulad_module_completion",
+        "applies_outside_domain": false,
+        "population_prior": 0.47009728622631847,
+        "evidence_model_probability": 0.7912885662431942,
+        "shrunk_probability": 0.7420741106817209,
+        "prior_weight": 0.1532247561605269,
+        "evidence_weight": 0.8467752438394731,
+        "n_observations": 35,
+        "effective_sample_size": 5.526360524616162,
+        "prior_strength": 1.0,
+        "data_sufficiency": "adequate",
+        "calibration_status": "calibration_split",
+        "model_version": "evidence-learning-v1",
+        "training_dataset": "oulad_completion_v1",
+        "top_log_odds": [
+          {
+            "feature": "numeric__assessment_weighted_score_sum",
+            "transformed_value": 0.9551424296862964,
+            "coefficient": 2.4276520665677888,
+            "log_odds_contribution": 2.3187534932945164
+          },
+          {
+            "feature": "numeric__assessment_weight_submitted",
+            "transformed_value": 0.7625867290824141,
+            "coefficient": -1.8686393411198072,
+            "log_odds_contribution": -1.424999562979271
+          },
+          {
+            "feature": "categorical__code_module_DDD",
+            "transformed_value": 1.0,
+            "coefficient": -0.726320335249742,
+            "log_odds_contribution": -0.726320335249742
+          },
+          {
+            "feature": "numeric__vle_unique_sites",
+            "transformed_value": 2.4162021129778712,
+            "coefficient": 0.26760812555379093,
+            "log_odds_contribution": 0.6465953184131171
+          },
+          {
+            "feature": "numeric__vle_active_days",
+            "transformed_value": 0.9457675226606364,
+            "coefficient": 0.6377836318933668,
+            "log_odds_contribution": 0.6031950455292928
+          }
+        ],
+        "causal_claim": null,
+        "limitations": [
+          "Click and assessment associations are not effects of an intervention.",
+          "A forecast from this fit applies only to OULAD module completion.",
+          "Zero activity is still a model input. It is not automatically the population prior.",
+          "Listed log-odds are pre-calibration contributions, not the calibrated probability."
+        ],
+        "log_odds_basis": "pre_calibration_logistic"
+      },
+      {
+        "checkpoint_day": 105,
+        "domain": "oulad_module_completion",
+        "applies_outside_domain": false,
+        "population_prior": 0.47009728622631847,
+        "evidence_model_probability": 0.9111111111111111,
+        "shrunk_probability": 0.8547777318503655,
+        "prior_weight": 0.1277360846351283,
+        "evidence_weight": 0.8722639153648717,
+        "n_observations": 48,
+        "effective_sample_size": 6.828641396489095,
+        "prior_strength": 1.0,
+        "data_sufficiency": "adequate",
+        "calibration_status": "calibration_split",
+        "model_version": "evidence-learning-v1",
+        "training_dataset": "oulad_completion_v1",
+        "top_log_odds": [
+          {
+            "feature": "numeric__assessment_weighted_score_sum",
+            "transformed_value": 2.2586585993481023,
+            "coefficient": 2.4276520665677888,
+            "log_odds_contribution": 5.4832372163785275
+          },
+          {
+            "feature": "numeric__assessment_weight_submitted",
+            "transformed_value": 1.947097464426117,
+            "coefficient": -1.8686393411198072,
+            "log_odds_contribution": -3.6384229230212664
+          },
+          {
+            "feature": "numeric__checkpoint_day",
+            "transformed_value": 1.414213562373095,
+            "coefficient": -0.8472847506711517,
+            "log_odds_contribution": -1.198241585591049
+          },
+          {
+            "feature": "numeric__vle_active_days",
+            "transformed_value": 1.613680950415109,
+            "coefficient": 0.6377836318933668,
+            "log_odds_contribution": 1.0291792972728884
+          },
+          {
+            "feature": "numeric__vle_unique_sites",
+            "transformed_value": 3.6606818904978167,
+            "coefficient": 0.26760812555379093,
+            "log_odds_contribution": 0.9796282189648284
+          }
+        ],
+        "causal_claim": null,
+        "limitations": [
+          "Click and assessment associations are not effects of an intervention.",
+          "A forecast from this fit applies only to OULAD module completion.",
+          "Zero activity is still a model input. It is not automatically the population prior.",
+          "Listed log-odds are pre-calibration contributions, not the calibrated probability."
+        ],
+        "log_odds_basis": "pre_calibration_logistic"
+      }
+    ],
+    "note": "Student id is omitted. These probabilities are not a published goal."
+  },
+  "limitations": [
+    "One completion label is shared across checkpoints; later rows are not new outcomes.",
+    "Test students are held out. Training still sees other students' later checkpoints.",
+    "Shrinkage is a regularizer, not a posterior from a fully specified Bayesian model.",
+    "Pulling a zero-activity row to the base rate can drop a real association.",
+    "Pooled OULAD Brier numbers are a different experiment and are not this result."
+  ],
+  "feature_source": "data/oulad/raw",
+  "status": "measured"
+}
