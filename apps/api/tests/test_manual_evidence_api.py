@@ -141,8 +141,9 @@ def test_duplicate_manual_evidence_is_idempotent() -> None:
 
 
 def test_resolved_hiring_evidence_updates_the_published_forecast() -> None:
-    """Applications use the reference funnel; resolved rejections refit a stage rate."""
-    with TestClient(isolated_app()) as client:
+    """Aggregate resolutions publish on reference rates and repeated rows deduplicate."""
+    app = isolated_app()
+    with TestClient(app) as client:
         goal_id = _create_hiring_goal(client)
         opened = client.post(
             f"/api/v1/goals/{goal_id}/evidence/manual",
@@ -180,7 +181,7 @@ def test_resolved_hiring_evidence_updates_the_published_forecast() -> None:
         assert resolved.status_code == 200, resolved.text
         assert resolved.json()["priced"] is True
         assert resolved.json()["probability"] != pytest.approx(opened.json()["probability"])
-        published = client.app.state.agent_workflow._inner._deps.baseline_forecasts.history(
+        published = app.state.agent_workflow._inner._deps.baseline_forecasts.history(
             UUID(goal_id)
         )
         assert published[-1].receipt["prediction"]["method"] == "REFERENCE_MODEL"
