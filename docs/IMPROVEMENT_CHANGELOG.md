@@ -971,3 +971,9 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - **Observed:** Futures withheld unsupported weights correctly. Simple Compare priced 12% versus 92%. Deeper reused stale Simple output until rerun; the rerun returned no visible options despite HTTP 200 (609ms, seven database queries, 538ms database time) and no error message. The missing terminal outcome range showed misleading “No simulated outcomes yet.”
 - **Change:** clear view-specific Compare/Futures/Reverse results when changing depth; surface mutation failures and empty/unpriced comparisons; label absent outcome ranges accurately. Two focused Compare component tests and TypeScript pass. Deeper numerical correctness is still unverified and is not claimed as an improvement result.
 
+## 2026-10-24 — Reverse empty-result recovery
+
+- **Input:** signed-in reading Reverse search at 70% target.
+- **Observed:** production API responded 200 in 981ms (seven database queries, 911ms database time), but the page stayed in “Searching backend paths…” because undefined result paths were treated as pending. No feasible path was verified.
+- **Change:** render loading only while the actual request is pending, then show the backend reason or no-feasible-path state. A focused component regression test and TypeScript pass. Production visual recheck remains open.
+
