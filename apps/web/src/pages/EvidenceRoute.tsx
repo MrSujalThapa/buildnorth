@@ -20,10 +20,15 @@ export function EvidenceRoute() {
     queryFn: ({ signal }) => api.marketHistory(goalId, signal),
     enabled: Boolean(goalId),
   });
+  const continuation = useQuery({
+    queryKey: ["goal-evidence-continuation", goalId],
+    queryFn: ({ signal }) => api.goalEvidenceContinuation(goalId, signal),
+    enabled: Boolean(goalId),
+  });
 
   const latestProbability = publishedHistoryPoints(history.data ?? []).at(-1)?.probability ?? null;
 
-  if (goal.isLoading || history.isLoading) {
+  if (goal.isLoading || history.isLoading || continuation.isLoading) {
     return (
       <main className="evidence-page">
         <div className="evidence-shell">
@@ -60,12 +65,20 @@ export function EvidenceRoute() {
   }
 
   const publication = toMarketDetail(goal.data, history.data ?? [], []).publication;
+  const latestWorkflow = continuation.data ?? initialSnapshot;
+  const withheld = publication?.status === "withheld" || latestWorkflow?.critic?.decision === "withhold" || latestWorkflow?.status === "withheld";
+  const evidenceStatus = latestWorkflow?.status;
+  const forecastLabel = withheld ? "Withheld"
+    : continuation.isError ? "Status unavailable"
+    : evidenceStatus === "evidence_failed" ? "Evidence failed"
+    : evidenceStatus === "evidence_pending" || evidenceStatus === "evidence_running" ? "Evidence pending"
+    : formatProbability(latestProbability);
 
   return (
     <EvidenceSourceWorkspace
       goalId={goalId}
       goalTitle={goal.data.title}
-      forecastLabel={publication?.status === "withheld" ? "Withheld" : formatProbability(latestProbability)}
+      forecastLabel={forecastLabel}
       onBack={() => {
         void navigate(`/goals/${goalId}`);
       }}
