@@ -60,6 +60,14 @@ describe("market card daily change", () => {
     expect(card.history).toHaveLength(1);
   });
 
+  it("honors a withheld publication even without a creation snapshot", () => {
+    const withheldGoal = {
+      ...goal, model_requirements: { last_publication: { status: "withheld" } },
+    } as Goal;
+    const points = [{ probability: 0.15, created_at: "2026-10-20T12:00:00Z" }] as MarketHistoryPoint[];
+    expect(toMarketCard(withheldGoal, points).odds).toBeNull();
+  });
+
   it.each(["evidence_pending", "evidence_running", "evidence_failed"])(
     "does not show old odds while %s",
     (status) => {
