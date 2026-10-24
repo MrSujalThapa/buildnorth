@@ -34,6 +34,10 @@ export function watchedResourceIds(recipe: SourceRecipeRecord): string[] {
   return uris.map((uri) => uri!.slice(prefix.length));
 }
 
+export function watchScope(pluginId: string, includeDescendants: boolean): "resource" | "parent" {
+  return pluginId === "notion" && includeDescendants ? "parent" : "resource";
+}
+
 type SourceCardModel = {
   pluginId: string;
   name: string;
@@ -146,15 +150,16 @@ export function EvidenceSourceWorkspace({
     enabled: Boolean(goalId) && monitoringEnabled,
   });
   const updateWatches = useMutation({
-    mutationFn: ({ recipe, resourceIds = [], selected = [], status }: {
+    mutationFn: ({ recipe, resourceIds = [], selected = [], status, scope = "resource" }: {
       recipe: SourceRecipeRecord;
       resourceIds?: string[];
       selected?: SourceWatchRecord[];
       status: "active" | "paused" | "revoked";
+      scope?: "resource" | "parent";
     }) => Promise.all([
       ...resourceIds.map((resourceId) => api.saveSourceWatch(goalId, {
         plugin_id: recipe.plugin_id, resource_id: resourceId,
-        scope: recipe.plugin_id === "notion" ? "parent" : "resource",
+        scope: watchScope(recipe.plugin_id, scope === "parent"),
       })),
       ...selected.map((watch) => api.updateSourceWatch(goalId, watch.id, status)),
     ]),
@@ -378,7 +383,8 @@ export function EvidenceSourceWorkspace({
                     <span>{recipe.label}{plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin)) ? " · Reconnect source" : ""}</span>
                     {monitoringEnabled && watchedResourceIds(recipe).length ? (() => {
                       const resourceIds = watchedResourceIds(recipe);
-                      const selected = resourceIds.map((resourceId) => watches.data?.find((item) => item.plugin_id === recipe.plugin_id && item.resource_id === resourceId));
+                      const selected = resourceIds.map((resourceId) => watches.data?.filter((item) => item.plugin_id === recipe.plugin_id && item.resource_id === resourceId)
+                        .sort((a, b) => ({ active: 0, paused: 1, revoked: 2 })[a.status] - ({ active: 0, paused: 1, revoked: 2 })[b.status])[0]);
                       const active = selected.filter((watch) => watch?.status === "active") as SourceWatchRecord[];
                       const paused = selected.filter((watch) => watch?.status === "paused") as SourceWatchRecord[];
                       const revoked = selected.filter((watch) => watch?.status === "revoked") as SourceWatchRecord[];
@@ -386,14 +392,15 @@ export function EvidenceSourceWorkspace({
                       const disconnected = plugins.data?.some((plugin) => plugin.definition.id === recipe.plugin_id && !isPluginConnected(plugin));
                       return <span className="evidence-watch-actions">
                         {active.some((watch) => watch.last_error) ? <span role="status" className="evidence-watch-error">Monitoring needs attention</span> : null}
-                        {active.length ? <span className="evidence-watch-state">Monitoring {active.length} of {resourceIds.length}</span> : null}
+                        {active.length ? <span className="evidence-watch-state">Monitoring {active.length} of {resourceIds.length}{active.some((watch) => watch.scope === "parent") ? " · accessible subpages included" : ""}</span> : null}
                         <button type="button" disabled={Boolean(disconnected) || updateWatches.isPending} onClick={() => {
                           if (active.length === resourceIds.length) updateWatches.mutate({ recipe, selected: active, status: "paused" });
                           else {
                             const missing = resourceIds.filter((resourceId) => !selected.some((watch) => watch?.resource_id === resourceId && watch.status !== "revoked"));
                             updateWatches.mutate({ recipe, resourceIds: missing, selected: paused, status: "active" });
                           }
-                        }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : revoked.length === resourceIds.length ? "Restart" : recipe.plugin_id === "notion" ? `Watch ${resourceIds.length === 1 ? "area" : `${resourceIds.length} areas`}` : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
+                        }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : revoked.length === resourceIds.length ? "Restart" : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
+                        {recipe.plugin_id === "notion" && !active.length && !paused.length ? <button type="button" disabled={Boolean(disconnected) || updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, resourceIds, status: "active", scope: "parent" })}>Include accessible subpages</button> : null}
                         {existing.some((watch) => watch.status !== "revoked") ? <button type="button" disabled={updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, selected: existing.filter((watch) => watch.status !== "revoked"), status: "revoked" })}>Stop</button> : null}
                       </span>;
                     })() : null}
