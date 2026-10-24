@@ -114,7 +114,7 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="profile-radar-heading">
-          <h2>Behavior profile</h2>
+          <h2>Execution profile</h2>
           {profile.data.traits ? (
             <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
               Edit parameters

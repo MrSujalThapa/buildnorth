@@ -173,16 +173,18 @@ def test_recovery_scores_what_happens_after_misses() -> None:
 
 def test_context_series_only_appear_when_contexts_have_real_trials() -> None:
     career_only = estimate_traits([_trial(day, 1.0) for day in range(1, 15)], [], as_of=NOW)
-    assert [series.id for series in career_only.series] == ["overall"]
+    assert [series.id for series in career_only.series] == ["overall", "career"]
     mixed = [
         *(_trial(day, 1.0, domain="hiring") for day in range(1, 15)),
         *(_trial(day, 0.0 if day % 2 else 1.0, domain="running") for day in range(1, 15)),
     ]
     profile = estimate_traits(mixed, [], as_of=NOW)
-    assert [series.id for series in profile.series] == ["career", "personal"]
-    career, personal = profile.series
-    assert (career.values["discipline"] or 0) > (personal.values["discipline"] or 1)
+    assert [series.id for series in profile.series] == ["overall", "fitness", "work"]
+    _, fitness, work = profile.series
+    assert (work.values["discipline"] or 0) > (fitness.values["discipline"] or 1)
     assert context_for_domain("family_dinner") == "relationships"
+    assert context_for_domain("leetcode_practice") == "coding"
+    assert context_for_domain("book_reports") == "reading"
 
 
 def test_custom_trait_scores_only_its_own_metric() -> None:

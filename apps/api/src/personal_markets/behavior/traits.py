@@ -41,16 +41,33 @@ ON_TIME_TOLERANCE_DAYS = 1.0
 MIN_CONTEXT_TRIALS = 6
 
 ForecastUse = Literal["execution_probability", "exploratory"]
-Context = Literal["career", "personal", "relationships"]
+Context = Literal[
+    "coding", "fitness", "reading", "sports", "music", "school", "work",
+    "career", "personal", "relationships",
+]
 
 CONTEXT_LABELS: dict[str, str] = {
     "overall": "Overall",
+    "coding": "Coding",
+    "fitness": "Fitness",
+    "reading": "Reading",
+    "sports": "Sports",
+    "music": "Music",
+    "school": "School",
+    "work": "Work",
     "career": "Career",
     "personal": "Personal",
     "relationships": "Relationships",
 }
 
 _CONTEXT_DOMAINS: dict[str, frozenset[str]] = {
+    "coding": frozenset({"coding", "engineering", "leetcode", "programming", "technical"}),
+    "fitness": frozenset({"fitness", "gym", "running", "health", "workout"}),
+    "reading": frozenset({"reading", "books", "book"}),
+    "sports": frozenset({"sports", "sport", "soccer", "basketball", "tennis"}),
+    "music": frozenset({"music", "piano", "guitar", "singing"}),
+    "school": frozenset({"school", "education", "study", "course"}),
+    "work": frozenset({"work", "job", "hiring", "interview"}),
     "career": frozenset(
         {
             "career",
@@ -605,7 +622,7 @@ def estimate_traits(
         if evidence_context is not None:
             evidence_by_context[evidence_context].append(observation)
     contextual: list[TraitSeries] = []
-    for context in ("career", "personal", "relationships"):
+    for context in _CONTEXT_DOMAINS:
         rows = by_context.get(context, [])
         if len(rows) < MIN_CONTEXT_TRIALS:
             continue
@@ -618,8 +635,9 @@ def estimate_traits(
         if sum(value is not None for value in values.values()) < 3:
             continue
         contextual.append(TraitSeries(id=context, label=CONTEXT_LABELS[context], values=values))
-    if len(contextual) >= 2:
-        series = contextual
+    # The person-wide estimate is always the default. Area estimates are
+    # alternatives, never a replacement or an average of goal progress.
+    series.extend(contextual)
 
     return TraitProfile(
         as_of=stamp,
