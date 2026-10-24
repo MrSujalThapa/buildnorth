@@ -110,6 +110,36 @@ def test_goals_dashboard_returns_histories_in_one_payload() -> None:
         assert "collections" in body
 
 
+def test_dashboard_batches_owner_scoped_creation_status() -> None:
+    import asyncio
+    from uuid import uuid4
+
+    from personal_markets.ports import WorkflowSnapshot
+
+    app = isolated_app()
+    principal = app.state.auth_bypass_principal
+    goal = _sample_goal()
+    asyncio.run(app.state.goal_repository.create(goal, principal.user_id))
+    threads = app.state.agent_workflow._threads
+    foreign = WorkflowSnapshot(
+        thread_id=uuid4(), kind="create_goal", status="withheld", current_step="complete",
+        goal=goal, debug={"user_id": str(uuid4())},
+    )
+    asyncio.run(threads.upsert(foreign))
+    with TestClient(app) as client:
+        assert client.get("/api/v1/goals/dashboard").json()["creation_states"] == {}
+        own = foreign.model_copy(update={
+            "thread_id": uuid4(), "status": "evidence_pending",
+            "debug": {"user_id": str(principal.user_id)},
+        })
+        asyncio.run(threads.upsert(own))
+        response = client.get("/api/v1/goals/dashboard")
+        assert response.status_code == 200, response.text
+        assert response.json()["creation_states"] == {
+            str(goal.goal_id): {"status": "evidence_pending", "critic_decision": None},
+        }
+
+
 def _sample_goal(title: str = "Read twenty books this year", current: int | None = 4):
     from datetime import UTC, datetime, timedelta
     from uuid import uuid4

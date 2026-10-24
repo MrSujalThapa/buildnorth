@@ -27,6 +27,7 @@ export type Market = {
   createdAt: number;
   deadlineAt: number;
   odds: number | null;
+  currentForecastStatus?: "withheld" | "evidence_pending" | "evidence_failed" | "published" | "unavailable";
   todayReturn: number | null;
   lastRevision?: { change: number; at: number } | null;
   totalReturn: number | null;

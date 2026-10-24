@@ -20,7 +20,7 @@ export function MarketsRoute() {
     const goals = source?.goals ?? [];
     const histories = source?.histories ?? {};
     return goals.map((goal) => ({
-      ...toMarketCard(goal, histories[goal.goal_id] ?? []),
+      ...toMarketCard(goal, histories[goal.goal_id] ?? [], source?.creation_states?.[goal.goal_id]),
       historyUnavailable: false,
     }));
   }, [source]);

@@ -147,6 +147,14 @@ class PersistingWorkflow:
             await self._threads.latest_creation_for_goal(goal_id, owner_id),
         )
 
+    async def creations_for_goals(
+        self, goal_ids: list[UUID], owner_id: UUID,
+    ) -> dict[UUID, WorkflowSnapshot]:
+        return cast(
+            dict[UUID, WorkflowSnapshot],
+            await self._threads.latest_creations_for_goals(goal_ids, owner_id),
+        )
+
     async def _fail(self, thread_id: UUID | None) -> None:
         structlog.get_logger("personal_markets.agents").exception("agent_workflow_failed")
         if thread_id is None:

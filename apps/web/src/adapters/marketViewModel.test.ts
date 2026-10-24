@@ -51,6 +51,24 @@ describe("market card daily change", () => {
     ] as MarketHistoryPoint[];
     expect(toMarketCard(goal, points).history).toEqual([]);
   });
+
+  it("keeps historical points but withholds stale current odds", () => {
+    const points = [{ probability: 0.15, created_at: "2026-10-20T12:00:00Z" }] as MarketHistoryPoint[];
+    const card = toMarketCard(goal, points, { status: "withheld", critic_decision: "withhold" });
+    expect(card.currentForecastStatus).toBe("withheld");
+    expect(card.odds).toBeNull();
+    expect(card.history).toHaveLength(1);
+  });
+
+  it.each(["evidence_pending", "evidence_running", "evidence_failed"])(
+    "does not show old odds while %s",
+    (status) => {
+      const points = [{ probability: 0.15, created_at: "2026-10-20T12:00:00Z" }] as MarketHistoryPoint[];
+      const card = toMarketCard(goal, points, { status, critic_decision: null });
+      expect(card.odds).toBeNull();
+      expect(card.currentForecastStatus).toBe(status === "evidence_running" ? "evidence_pending" : status);
+    },
+  );
 });
 
 it("shows extracted reading values without assigning unsupported event-level odds", () => {

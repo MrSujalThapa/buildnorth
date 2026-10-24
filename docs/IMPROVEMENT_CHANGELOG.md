@@ -1085,3 +1085,7 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 ## 2026-10-24 — Pass 7B integration gate
 
 - Aggregate hiring stage totals do not establish that recorded passes and rejections resolve the same application cohort. The resolved-stage estimator and same-stage rejection subtraction are retained and tested behind an explicit validated-cohort argument; no live caller supplies it. Production hiring forecasts therefore continue using the reference stage rates and prior active-count semantics. Receipts say why personal fitting remains inactive. The pseudo-count of eight is an assumption, not empirical calibration.
+
+## 2026-10-24 — Current forecast status across Markets and goal views
+
+- Dashboard now batch-reads the owner's latest creation workflow states and returns their status and critic decision alongside goal histories. Cards retain immutable historical chart points but suppress stale current odds during withheld, pending, or failed evidence interpretation. Goal Detail and Evidence use the same status precedence. This changes presentation only; no forecasts or evidence were written. Isolated dashboard owner-isolation and web adapter regression tests cover the old 15% versus Withheld mismatch.
