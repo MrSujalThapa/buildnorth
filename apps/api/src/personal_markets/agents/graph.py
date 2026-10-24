@@ -363,7 +363,7 @@ class LangGraphAgentWorkflow:
         return {"status": "running", "current_step": "await_evidence"}
 
     async def _collect_evidence(self, state: AgentGraphState) -> dict[str, Any]:
-        if state.get("kind") == "create_goal":
+        if state.get("kind") == "create_goal" and state.get("goal_id"):
             await self._deps.evidence.watch_goal(UUID(state["goal_id"]))
         text = (state.get("evidence_text") or "").strip()
         if not text and state.get("kind") == "create_goal" and state.get("goal_proposal"):
