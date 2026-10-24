@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { publishedHistoryPoints } from "../adapters/marketViewModel";
+import { publishedHistoryPoints, toMarketDetail } from "../adapters/marketViewModel";
 import { api, type WorkflowSnapshot } from "../api/client";
 import { EvidenceSourceWorkspace, formatProbability } from "../features/goals/EvidenceSourceWorkspace";
 
@@ -59,11 +59,13 @@ export function EvidenceRoute() {
     );
   }
 
+  const publication = toMarketDetail(goal.data, history.data ?? [], []).publication;
+
   return (
     <EvidenceSourceWorkspace
       goalId={goalId}
       goalTitle={goal.data.title}
-      forecastLabel={formatProbability(latestProbability)}
+      forecastLabel={publication?.status === "withheld" ? "Withheld" : formatProbability(latestProbability)}
       onBack={() => {
         void navigate(`/goals/${goalId}`);
       }}
