@@ -28,7 +28,7 @@ export default function OutcomeDistribution({ ariaLabel, bins, scale, median = n
   if (!bins.length) {
     return (
       <div className="probability-distribution is-empty" role="note">
-        No simulated outcomes yet.
+        Outcome range unavailable for this scenario.
       </div>
     );
   }

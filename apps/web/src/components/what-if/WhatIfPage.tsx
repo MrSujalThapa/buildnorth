@@ -72,13 +72,19 @@ type Props = {
 
   compareLoading?: boolean;
 
+  compareError?: string | null;
+
   futuresDistribution?: ScenarioDistribution;
 
   futuresLoading?: boolean;
 
+  futuresError?: string | null;
+
   pathStrategies?: PathStrategy[];
 
   pathsLoading?: boolean;
+
+  pathsError?: string | null;
 
   pathsMessage?: string | null;
 
@@ -211,13 +217,19 @@ export default function WhatIfPage({
 
   compareLoading = false,
 
+  compareError,
+
   futuresDistribution,
 
   futuresLoading = false,
 
+  futuresError,
+
   pathStrategies,
 
   pathsLoading = false,
+
+  pathsError,
 
   pathsMessage,
 
@@ -614,9 +626,9 @@ export default function WhatIfPage({
 
               loading={futuresLoading}
 
-              priced={baselinePriced && futuresDistribution?.priced !== false}
+              priced={baselinePriced && !futuresError && futuresDistribution?.priced !== false}
 
-              message={futuresDistribution?.message ?? null}
+              message={futuresError ?? futuresDistribution?.message ?? null}
 
               selectedClusterId={selectedClusterId}
 
@@ -646,9 +658,9 @@ export default function WhatIfPage({
 
               loading={compareLoading}
 
-              priced={baselinePriced}
+              priced={baselinePriced && !compareError}
 
-              message={priceabilityMessage}
+              message={compareError ?? priceabilityMessage}
 
               selectedIds={compareIds.length >= 2 ? compareIds : catalog.slice(0, 2).map((item) => item.id)}
 
@@ -678,9 +690,9 @@ export default function WhatIfPage({
 
               loading={pathsLoading}
 
-              priced={baselinePriced}
+              priced={baselinePriced && !pathsError}
 
-              message={pathsMessage ?? priceabilityMessage}
+              message={pathsError ?? pathsMessage ?? priceabilityMessage}
 
               selectedPathId={selectedPathId}
 

@@ -963,5 +963,11 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - **Hypothesis:** a single selected execution area is easier to read than overlapping contextual polygons, and monitoring one selected Notion page should not silently request descendant traversal.
 - **Change:** preserve Overall as the default trait series, expose sufficiently observed domains as an accessible area filter, and leave missing axes blank. Default Notion watches to the approved resource; descendants require a separate explicit choice. This changes only presentation and watch consent, not forecasting math, source authorization, or historical evidence.
 - **Evidence:** 16 backend trait tests, 3 radar component tests, 2 resource-scope tests, Ruff and TypeScript passed locally. The Impeccable mechanical detector returned no findings. PR #23 CI and live desktop/mobile acceptance are still pending. No measured forecasting result is claimed.
-- **Limit:** current Chrome computer-use connection stopped responding during authenticated follow-up. Render Cron has proven scheduled repeats with zero new records, not the new-record to published-forecast path. No production user data was seeded or altered in this experiment.
+- **Limit:** existing Chrome tabs stopped responding during authenticated follow-up; a fresh production tab restored access, but PR preview and local origins failed session verification. Render Cron has proven scheduled repeats with zero new records, not the new-record to published-forecast path. No production user data was seeded or altered in this experiment.
+
+## 2026-10-24 — real What If mode follow-up
+
+- **Input:** signed-in reading Futures for two books per week, then Compare one versus two books per week; switch Simple to Deeper and rerun.
+- **Observed:** Futures withheld unsupported weights correctly. Simple Compare priced 12% versus 92%. Deeper reused stale Simple output until rerun; the rerun returned no visible options despite HTTP 200 (609ms, seven database queries, 538ms database time) and no error message. The missing terminal outcome range showed misleading “No simulated outcomes yet.”
+- **Change:** clear view-specific Compare/Futures/Reverse results when changing depth; surface mutation failures and empty/unpriced comparisons; label absent outcome ranges accurately. Two focused Compare component tests and TypeScript pass. Deeper numerical correctness is still unverified and is not claimed as an improvement result.
 

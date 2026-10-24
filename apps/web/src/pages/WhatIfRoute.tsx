@@ -161,6 +161,12 @@ export function WhatIfRoute() {
     [futures.data],
   );
 
+  const compareIssue = compare.isError
+    ? `Could not compare these paths: ${compare.error instanceof Error ? compare.error.message : "try again"}`
+    : compare.data && (compare.data.paths.length === 0 || compare.data.paths.every((path) => path.primary_goal_probability == null))
+      ? "These paths could not be priced from the current goal state. Try a measurable action or add evidence."
+      : null;
+
   const onRunCompare = useCallback(
     (extra?: { id: string; label: string }[]) => {
       compare.mutate(extra);
@@ -210,7 +216,15 @@ export function WhatIfRoute() {
       mode={mode}
       view={view}
       onModeChange={setMode}
-      onViewChange={setView}
+      onViewChange={(nextView) => {
+        if (nextView === view) return;
+        // Results carry the draw count and sensitivity settings from the view
+        // in which they ran. Never present a Simple result as Deeper analysis.
+        compare.reset();
+        futures.reset();
+        paths.reset();
+        setView(nextView);
+      }}
       baseline={baseline.data}
       explorations={explorations.data ?? []}
       onExplorationsRefresh={() => {
@@ -219,10 +233,13 @@ export function WhatIfRoute() {
       compareOptions={compareOptions}
       compareResult={compare.data ?? undefined}
       compareLoading={compare.isPending}
+      compareError={compareIssue}
       futuresDistribution={futuresDistribution}
       futuresLoading={futures.isPending}
+      futuresError={futures.isError ? `Could not map futures: ${futures.error instanceof Error ? futures.error.message : "try again"}` : null}
       pathStrategies={pathStrategies}
       pathsLoading={paths.isPending}
+      pathsError={paths.isError ? `Could not search for paths: ${paths.error instanceof Error ? paths.error.message : "try again"}` : null}
       pathsMessage={paths.data?.message ?? null}
       onRunCompare={onRunCompare}
       onRunFutures={onRunFutures}

@@ -23,7 +23,7 @@ export default function OutcomeIntervals({ ariaLabel, rows, scale }: Props) {
   if (!values.length) {
     return (
       <div className="outcome-intervals is-empty" role="note">
-        No simulated outcomes yet.
+        Outcome range unavailable for these options.
       </div>
     );
   }

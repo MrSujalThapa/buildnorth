@@ -29,3 +29,22 @@ it("shows each option's simulated result in the goal's unit, not as odds", () =>
   expect(figure.textContent).toContain("Target ≤ 45:00");
   expect(figure.textContent).not.toMatch(/\d{4,}%/);
 });
+
+it("shows a failed comparison without stale odds", () => {
+  render(
+    <CompareOptionsView
+      market={{ id: "g", title: "Read 20 books" } as Market}
+      view="deep"
+      options={[option("old", "Old run", 92, null)]}
+      outcomeScale={{ unit: "books", target: 20, direction: "at_least" }}
+      priced={false}
+      message="Could not compare these paths. Try again."
+      selectedIds={["old"]}
+      onSelectedIdsChange={() => {}}
+      isolatedId={null}
+      onIsolate={() => {}}
+    />,
+  );
+  expect(screen.getByText("Could not compare these paths. Try again.")).toBeInTheDocument();
+  expect(screen.queryByText("92%")).not.toBeInTheDocument();
+});
