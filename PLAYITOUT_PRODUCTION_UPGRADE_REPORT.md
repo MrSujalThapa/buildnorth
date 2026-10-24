@@ -551,3 +551,39 @@ The Cron evidence boundary is unchanged: real scheduled repeats prove authorized
 **Provider inventory and finance check.** The signed-in GitHub picker listed actual accessible repositories including `MrSujalThapa/neetcode-submissions`, `ecc`, `30Seconds`, `hackathonFinder`, `roadstar` and `buildnorth`. The reading goal has an approved GitHub recipe but no active GitHub watch; enabling it for reading would create irrelevant recurring reads, so no new production association was made. The existing finance goal showed a persisted What If exploration from October 22: increasing an emergency-fund contribution from $600 to $1,000 monthly, 3.9% scenario baseline → 66% hypothetical odds. That history was read, not rerun or promoted to a causal claim.
 
 **Synthetic behavior contamination found in code.** The production workspace seed creates explicitly marked goals and commitment histories. The Profile endpoint fed all owned goals, including those fixtures, into its person-wide execution radar; authentic What If estimates also pooled their commitments. The signed-in Profile's 106 observations cannot be accepted as genuine follow-through without a source breakdown. PR #23 now excludes `model_requirements.workspace_seed` goals from authentic Profile traits and separates authentic and fixture commitment cohorts in What If. Thirty-three focused tests pass. No stored production data or historical receipt was altered. Outcome 10 is **FAIL** on the deployed version and remains **NOT VERIFIED** after this code fix until signed-in deployment checks confirm honest values and visual behavior; What If execution adjustment also needs a real retest. This correction does not claim that the original 19-point pass is complete.
+
+### 2026-10-24 parameter-radar and numerical follow-up (unreleased branch)
+
+The user rejected #23's trait radar as a regression against the original measurable-parameter specification. The branch now computes the main Profile radar from typed, dated evidence for selectable applications/week, study hours/week, monthly savings, running distance/week and reading minutes. Each axis carries its metric, unit, window, aggregation, fixed display normalization and source evidence IDs. Missing observations remain null; cumulative completed-book counts cannot become reading minutes, and mixed savings currencies are withheld. Execution traits remain a separate analytical response for follow-through and What If. The user can save and reorder selected axes. This code is **not deployed**; production still shows the rejected trait radar and its 106 fixture observations.
+
+In an isolated seeded-account integration test, the synthetic cohort contains **7 goals, 106 planned commitments, 106 outcomes and 106 trials**. The authentic Profile returns **zero** seed radar observations while the owner-scoped demo route retains 106 commitments and measured fixture observations. After adding one authentic reading goal and one manual 45-minute increment in memory, the authentic cohort still has zero commitment outcomes and exactly one radar evidence record, with `manual` provenance and that record's ID. No live personal data or published forecast was changed.
+
+Deeper Compare previously raced an automatic request built from null-effect catalog candidates. The branch prevents that unpriceable auto-run and excludes null-effect suggestions. A numerical finance regression now prices two distinct measured contribution paths at deeper draw counts and verifies a persisted run. Reverse now distinguishes absent supported levers from a mathematically infeasible target; a measured finance reverse regression finds a feasible contribution path. These local results do **not** prove the deployed reading Deeper or Reverse journeys. Unpriceable results remain null.
+
+Verification on this working tree: 45 focused backend tests passed (measured radar, seed isolation, behavior cohort, What If contracts, Profile, course grade); Ruff passed on affected Python files; frontend production build passed. The desktop and 390px mobile Profile Playwright fixture passed after an axis-label visual adjustment, and screenshots were inspected at `apps/web/test-results/remediation-profile-desktop.png` and `apps/web/test-results/remediation-profile-mobile-chromium.png`. The Chrome signed-in production session timed out during further navigation. The scheduled Cron remains on a 15-minute cadence; the observed 03:45 EDT run completed in 40.0 seconds with zero watches due, zero records and 2.838 seconds in the app. Earlier due-watch read/dedup proof stands; **new source → evidence → forecast → published history remains NOT VERIFIED**. No new external source content was created.
+
+Current 19-point acceptance after these changes (PASS means previously observed production behavior with no newly found regression; unshipped fixes cannot be PASS):
+
+| # | Status | Evidence or gap |
+| --- | --- | --- |
+| 1 | PASS | Earlier signed-in Markets odds/daily-change check; fresh release regression pending. |
+| 2 | PASS | Earlier signed-in Markets alignment check; fresh release regression pending. |
+| 3 | PASS | Earlier signed-in collection-card check; fresh release regression pending. |
+| 4 | PASS | Earlier weighted progress calculation and signed-in collection check. |
+| 5 | PASS | Earlier multiline/sparse chart browser check. |
+| 6 | PASS | Earlier rename/membership/safe deletion browser check. |
+| 7 | PASS | Earlier Select controls browser check; fresh release regression pending. |
+| 8 | PASS | Earlier Profile editor fixture/browser work; new radar release check pending. |
+| 9 | NOT VERIFIED | Production image upload/owner persistence was not exercised. |
+| 10 | FAIL | Production displays rejected trait radar and contaminated 106-observation fixture series. Branch correction is local only. |
+| 11 | PASS | Signed-in GitHub picker showed actual named repositories. |
+| 12 | PASS | Authorized Notion content read and deduplicated in scheduled Cron. |
+| 13 | NOT VERIFIED | Relevance suggestion exists; automatic newly relevant resource ingestion lacks live proof. |
+| 14 | PASS | Earlier authentic manual and Notion evidence/receipt checks; new-event automatic receipt pending. |
+| 15 | FAIL | 8–9 second authenticated requests observed; warm page p50/p95 target and asleep-web new-event completion unproven. |
+| 16 | NOT VERIFIED | Fresh OAuth Pending → Connected transition not repeated. |
+| 17 | FAIL | Production Profile concept and What If empty/spinner behavior violate consumer acceptance. |
+| 18 | NOT VERIFIED | Broad new-goal/multi-domain What If and release regression suite incomplete. |
+| 19 | NOT VERIFIED | Fixture desktop/mobile pass exists; signed-in release desktop/mobile matrix incomplete. |
+
+No deployment, migration, merge, additional hosting purchase or measured provider charge is claimed for this branch correction. Commit SHA and deployed verification will be recorded only after they exist.

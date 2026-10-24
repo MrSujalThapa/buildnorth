@@ -402,9 +402,34 @@ export interface ProfilePayload {
   goal_count: number;
   collection_count: number;
   traits: TraitProfile;
+  radar: ParameterProfile;
   selected_parameters: string[];
   available_parameters: TraitOption[];
   privacy: string;
+}
+
+export interface ParameterEstimate {
+  id: string;
+  name: string;
+  metric: string;
+  unit: string;
+  window_days: number;
+  aggregation: "latest_period" | "sum_increments";
+  normalization: string;
+  raw_value: number | null;
+  value: number | null;
+  observation_count: number;
+  source_types: string[];
+  evidence_ids: string[];
+  status: "measured" | "insufficient";
+}
+
+export interface ParameterProfile {
+  version: string;
+  as_of: string;
+  parameters: ParameterEstimate[];
+  evidence_count: number;
+  synthetic: boolean;
 }
 
 export interface PluginConnectResponse {

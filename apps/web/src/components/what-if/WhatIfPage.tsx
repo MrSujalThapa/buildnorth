@@ -382,12 +382,16 @@ export default function WhatIfPage({
     });
   }, [catalog]);
 
-  // Price the suggested candidates once. Re-running after any result would drop
-  // user-described paths, because a bare run only carries the baseline candidates.
+  // Suggested allocations without a measured effect cannot be priced. In
+  // particular, do not race an unpriceable automatic run against custom paths
+  // after changing analysis depth.
   useEffect(() => {
     if (mode !== "compare" || compareResult) return;
-    if (catalog.length >= 2) compareRef.current?.();
-  }, [catalog.length, compareResult, mode]);
+    const priceableSuggestions = baseline?.compare_candidates.filter(
+      (item) => item.intervention?.effect_per_unit != null,
+    ) ?? [];
+    if (priceableSuggestions.length >= 2) compareRef.current?.();
+  }, [baseline, compareResult, mode]);
 
 
 

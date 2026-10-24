@@ -50,6 +50,5 @@ export function customDraftError(name: string, description: string, rows: Parame
 export function selectionPayload(rows: ParameterRow[]) {
   return {
     parameter_ids: rows.map((row) => row.id),
-    custom_parameters: rows.filter((row) => row.custom).map((row) => ({ name: row.name, description: row.description })),
   };
 }

@@ -1,5 +1,9 @@
 # PlayItOut remediation ledger
 
+## 2026-10-24 parameter-radar correction (working tree)
+
+The previous #23 Overall/area trait radar was the wrong product model. The main Profile radar now uses selectable measured parameters with explicit units, windows, provenance and null axes for missing records. Behavioral execution traits remain separate for forecasting. Production still shows the rejected trait radar; the corrected branch has passed a desktop/mobile fixture browser check, not signed-in release acceptance. The isolated workspace seed has 7 goals and 106 commitment/outcome pairs; authentic Profile and What If exclude those rows while an owner-scoped demo endpoint retains them. Deeper Compare's null-effect auto-run race and Reverse's no-lever classification have code and numerical finance regression coverage. Reading Deeper/Reverse, new goals, course-grade live flow, performance p95 and automatic new-source forecast publication remain open. See the latest addendum in `PLAYITOUT_PRODUCTION_UPGRADE_REPORT.md` for the full 19-item matrix.
+
 ## 2026-10-24 continuation on `feat/playitout-next-pass`
 
 This section supersedes the older branch/deployment pointers below; it does not rewrite their historical observations. Production main includes #21 (`64ea6ee`) and #22 (`f12a153`). PR #23 is open at `841f12b`; Cursor PRs #18–20 and #24 remain separate and unmerged.

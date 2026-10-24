@@ -15,9 +15,12 @@ from personal_markets.what_if.domain import (
     PathComparisonRequest,
     PathDefinition,
     PossibleFuturesRequest,
+    ResourceCost,
     ResourceLimitsInput,
     ScenarioDefinition,
     ScenarioDistribution,
+    SimulationConfig,
+    StructuredIntervention,
     TargetSearchRequest,
     WhatIfBaselineState,
     WhatIfRequest,
@@ -182,6 +185,128 @@ async def test_compare_unpriced_path_stays_null() -> None:
     assert unpriced.primary_goal_probability is None
     assert unpriced.median is None
     assert priced.primary_goal_probability == 0.55
+
+
+@pytest.mark.asyncio
+async def test_deeper_compare_prices_two_measured_finance_paths_and_persists() -> None:
+    goal = _finance_goal()
+    service = await _finance_service(goal)
+    state = await service.baseline_state(str(goal.goal_id))
+    assert state.priced
+    base = WhatIfRequest(
+        goal_id=str(goal.goal_id),
+        current_value=state.current_value or 0,
+        target_value=state.target_value or 1,
+        periods=state.periods or 8,
+        direction=state.direction,
+        assumptions=state.assumptions,
+        intervention=None,
+        config=SimulationConfig(
+            seed=state.config.seed,
+            minimum_draws=8000,
+            batch_draws=4000,
+            maximum_draws=20000,
+            include_sensitivity=True,
+        ),
+    )
+    paths = [
+        PathDefinition(
+            id=f"path-{contribution}",
+            label=f"Save {contribution} each month",
+            intervention=StructuredIntervention(
+                id=f"path-{contribution}",
+                title="Monthly contribution",
+                action_type="flow_change",
+                target_dimension="net_worth",
+                amount=1,
+                unit="currency/month",
+                duration_periods=base.periods,
+                effect_per_unit=None,
+                cost=ResourceCost(),
+            ),
+            parsed_changes=[
+                InterventionChangeInput(
+                    metric="monthly_contribution",
+                    operation="set",
+                    value=contribution,
+                    unit="CAD/month",
+                    provenance="USER_ASSUMPTION",
+                )
+            ],
+        )
+        for contribution in (3000.0, 6000.0)
+    ]
+    result = await service.compare_paths(PathComparisonRequest(base=base, paths=paths))
+    assert len(result.paths) == 2
+    assert all(item.primary_goal_probability is not None for item in result.paths)
+    assert result.paths[1].primary_goal_probability > result.paths[0].primary_goal_probability
+    assert result.run_id is not None
+
+
+@pytest.mark.asyncio
+async def test_reverse_finance_finds_feasible_measured_flow_without_catalog() -> None:
+    goal = _finance_goal()
+    service = await _finance_service(goal)
+    state = await service.baseline_state(str(goal.goal_id))
+    assert state.priced
+    request = TargetSearchRequest(
+        base=WhatIfRequest(
+            goal_id=str(goal.goal_id),
+            current_value=state.current_value or 0,
+            target_value=state.target_value or 1,
+            periods=state.periods or 8,
+            direction=state.direction,
+            assumptions=state.assumptions,
+            intervention=None,
+            config=state.config,
+        ),
+        target_probability=0.7,
+        candidates=[],
+        limits=ResourceLimitsInput(hours_per_week=20, money=20000, energy=20),
+    )
+    result = await service.target_search(request)
+    assert result.feasible, result.message
+    assert result.paths
+    assert all(path.resulting_probability is not None for path in result.paths)
+
+
+@pytest.mark.asyncio
+async def test_reverse_reports_missing_levers_instead_of_false_infeasibility() -> None:
+    goal = make_goal()
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, uuid4())
+
+    class NoLeverService(WhatIfService):
+        async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
+            del request, persist
+            return WhatIfResult(
+                priced=True,
+                status="EXPLORATORY",
+                baseline_probability=0.2,
+                scenario_probability=0.2,
+            )
+
+    unsupported = StructuredIntervention(
+        id="unknown",
+        title="Unknown effect",
+        action_type="resource_allocation",
+        target_dimension="target",
+        amount=1,
+        unit="units/period",
+        duration_periods=8,
+        effect_per_unit=None,
+    )
+    result = await NoLeverService(GoalService(repo)).target_search(
+        TargetSearchRequest(
+            base=make_base(str(goal.goal_id)).model_copy(update={"assumptions": []}),
+            target_probability=0.7,
+            candidates=[unsupported],
+            limits=ResourceLimitsInput(hours_per_week=5, money=0, energy=5),
+        )
+    )
+    assert result.feasible is False
+    assert result.search_method == "no_supported_levers"
+    assert result.paths == []
 
 
 @pytest.mark.asyncio

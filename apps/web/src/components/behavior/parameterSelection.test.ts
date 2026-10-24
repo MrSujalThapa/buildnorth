@@ -35,11 +35,10 @@ describe("parameter selection", () => {
     expect(customDraftError("Mood", "Daily self-rated mood", rows, options)).toBeNull();
   });
 
-  it("sends order plus custom definitions", () => {
+  it("sends only parameter order, without changing stored behavioral definitions", () => {
     const rows = rowsFromSelection(["custom:sleep", "discipline", "focus"], options);
     expect(selectionPayload(rows)).toEqual({
       parameter_ids: ["custom:sleep", "discipline", "focus"],
-      custom_parameters: [{ name: "Sleep", description: "Sleep description" }],
     });
   });
 });

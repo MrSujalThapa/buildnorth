@@ -4,6 +4,12 @@ import { toCompareOptions } from "../adapters/compareViewModel";
 import type { WhatIfBaselineState } from "../api/client";
 
 describe("toCompareOptions", () => {
+  it("does not present unsupported suggested allocations as priceable options", () => {
+    const baseline = { compare_candidates: [
+      { id: "focused", title: "Focused allocation", intervention: { effect_per_unit: null }, provenance: [] },
+    ] } as unknown as WhatIfBaselineState;
+    expect(toCompareOptions(baseline, undefined)).toEqual([]);
+  });
   it("keeps outcome quantiles in the goal's unit, separate from the odds", () => {
     const options = toCompareOptions({ target_unit: "USD" } as WhatIfBaselineState, {
       paths: [

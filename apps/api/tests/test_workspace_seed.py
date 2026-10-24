@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
+from personal_markets.behavior.cohort import behavior_cohort_goals
 from personal_markets.behavior.commitments import InMemoryCommitmentStore, trials_from_commitments
 from personal_markets.behavior.traits import estimate_traits
 from personal_markets.collections.repository import InMemoryCollectionRepository
@@ -19,6 +20,8 @@ from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.testing import admin_principal, invited_principal
 from personal_markets.persistence.agent_store import InMemoryEvidenceRepository
+from personal_markets.ports import EvidenceEventProposal
+from personal_markets.profile.parameters import parameter_profile
 from personal_markets.workspace_seed.fixtures import SEED_GOALS
 from personal_markets.workspace_seed.registry import InMemorySeedRegistry
 from personal_markets.workspace_seed.service import WorkspaceSeedService, build_seed_goal
@@ -112,6 +115,66 @@ def test_seed_feeds_context_trait_series() -> None:
     asyncio.run(run())
 
 
+def test_seed_is_excluded_from_authentic_profile_but_retained_in_fixture_cohort() -> None:
+    async def run() -> None:
+        service, parts = _service()
+        owner = uuid4()
+        await service.seed(owner)
+        goals = parts["goals"]
+        evidence = parts["evidence"]
+        commitments = parts["commitments"]
+        assert isinstance(goals, GoalService)
+        assert isinstance(evidence, EvidenceService)
+        assert isinstance(commitments, InMemoryCommitmentStore)
+        fixture_goals = await goals.list_goals(owner_id=owner)
+        assert behavior_cohort_goals(fixture_goals) == []
+        fixture_ids = [
+            item.goal_id for item in behavior_cohort_goals(fixture_goals, synthetic=True)
+        ]
+        fixture_plans, fixture_outcomes = await commitments.list_for_goals(owner, fixture_ids)
+        assert (len(fixture_ids), len(fixture_plans), len(fixture_outcomes)) == (7, 106, 106)
+        assert len(trials_from_commitments(fixture_plans, fixture_outcomes)) == 106
+
+        authentic = build_seed_goal(owner, SEED_GOALS[3], datetime.now(UTC)).model_copy(
+            update={"goal_id": uuid4(), "model_requirements": {}}
+        )
+        await goals.create_goal(authentic, owner)
+        await evidence.commit(
+            owner,
+            authentic.goal_id,
+            [
+                EvidenceEventProposal(
+                    event_type="observation",
+                    domain="learning",
+                    metric="reading_minutes",
+                    numeric_value=45,
+                    unit="minutes",
+                    observed_at=datetime.now(UTC).isoformat(),
+                    source_type="manual",
+                    summary="Read for 45 minutes",
+                    observation_kind="increment",
+                )
+            ],
+            None,
+            [],
+        )
+        authentic_ids = [
+            item.goal_id for item in behavior_cohort_goals(await goals.list_goals(owner_id=owner))
+        ]
+        plans, outcomes = await commitments.list_for_goals(owner, authentic_ids)
+        rows = await evidence.list_for_goals(authentic_ids)
+        selected = [row for items in rows.values() for row in items]
+        radar = parameter_profile(selected)
+        assert authentic_ids == [authentic.goal_id]
+        assert len(plans) == len(outcomes) == 0
+        assert len(selected) == radar.evidence_count == 1
+        assert radar.parameters[-1].raw_value == 45
+        assert radar.parameters[-1].source_types == ["manual"]
+        assert radar.parameters[-1].evidence_ids == [str(selected[0].evidence_id)]
+
+    asyncio.run(run())
+
+
 def test_remove_archives_only_seeded_records() -> None:
     async def run() -> None:
         service, parts = _service()
@@ -173,6 +236,16 @@ def test_seed_endpoint_requires_admin_and_scopes_to_caller() -> None:
         assert seeded.status_code == 200, seeded.text
         status = client.get("/api/v1/admin/workspace-seed").json()
         assert status["records"]["goal"] == len(SEED_GOALS)
+        authentic_profile = client.get("/api/v1/profile")
+        assert authentic_profile.status_code == 200
+        assert authentic_profile.json()["radar"]["evidence_count"] == 0
+        demo_profile = client.get("/api/v1/profile/demo-radar")
+        assert demo_profile.status_code == 200
+        assert demo_profile.json()["synthetic"] is True
+        assert demo_profile.json()["fixture_goal_count"] == len(SEED_GOALS)
+        assert demo_profile.json()["commitment_count"] == 106
+        assert demo_profile.json()["radar"]["synthetic"] is True
+        assert demo_profile.json()["radar"]["evidence_count"] > 0
         dashboard = client.get("/api/v1/goals/dashboard")
         assert dashboard.status_code == 200
         app.state.auth_bypass_principal = invited_principal("someone-else")

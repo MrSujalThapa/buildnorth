@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 
 const goal = { goal_id: "20000000-0000-0000-0000-000000000001", title: "Read 20 books", goal_type: "continuous_target", deadline: "2026-12-31T23:59:59Z", forecast_status: "ANCHORED", state_dimensions: ["books_read"] };
 const avatar = readFileSync("e2e/fixtures/avatar.png");
-const axes = ["discipline", "realism", "focus", "consistency"];
+const axes = ["weekly_applications", "monthly_savings", "weekly_running_km", "reading_minutes"];
+const parameterNames = ["Applications / week", "Monthly savings", "Running / week", "Reading time"];
+const parameterValues = [12, 900, null, 45];
+const parameterUnits = ["applications/week", "CAD/month", "km/week", "minutes/30 days"];
 const traits = axes.map((id, index) => ({
   id, name: ["Discipline", "Goal realism", "Focus", "Consistency"][index],
   description: "Observed behavior.", measurement: "Based on recorded commitments.",
@@ -52,22 +55,37 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
       account: { user_id: "10000000-0000-0000-0000-000000000001", email: "reader@example.com", profile: { ...fields, avatar_value: null, dimensions: [] } },
       goal_count: 1, collection_count: 0, privacy: "private",
       traits: traitProfile, selected_parameters: selectedParameters,
-      available_parameters: traits.map((item) => ({ id: item.id, name: item.name, description: item.description, custom: false })),
+      radar: { version: "measured_parameters@2.0.0", as_of: "2026-10-24T00:00:00Z", evidence_count: 3, synthetic: false,
+        parameters: selectedParameters.map((id) => {
+          const index = axes.indexOf(id);
+          const raw = parameterValues[index];
+          return { id, name: parameterNames[index], metric: id, unit: parameterUnits[index], window_days: 56,
+            aggregation: id === "reading_minutes" ? "sum_increments" : "latest_period",
+            normalization: "fixture display scale", raw_value: raw, value: raw == null ? null : raw / 1000,
+            observation_count: raw == null ? 0 : 1, source_types: raw == null ? [] : ["manual"],
+            evidence_ids: raw == null ? [] : [`fixture-${id}`], status: raw == null ? "insufficient" : "measured" };
+        }) },
+      available_parameters: axes.map((id, index) => ({ id, name: parameterNames[index], description: `${parameterUnits[index]} · last 56 days`, custom: false })),
     } });
   });
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
   await expect(page.getByText("@reader")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add photo" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Execution profile" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Overall" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("img", { name: /Overall execution radar/ })).toBeVisible();
-  await page.getByRole("button", { name: "Coding" }).click();
-  await expect(page.getByRole("img", { name: /Coding execution radar/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Coding" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: "Your parameters" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Parameter radar/ })).toBeVisible();
+  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).click();
+  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
   await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Edit parameters" }).click();
   await expect(page.getByRole("dialog", { name: "Edit parameters" })).toBeVisible();
+  await page.getByRole("button", { name: "Remove Monthly savings" }).click();
+  await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("img", { name: /Parameter radar/ })).not.toContainText("Monthly savings");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Edit parameters" })).toBeVisible();
+  await page.getByRole("button", { name: "Edit parameters" }).click();
+  await expect(page.getByRole("button", { name: "Remove Monthly savings" })).toHaveCount(0);
   await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeVisible();

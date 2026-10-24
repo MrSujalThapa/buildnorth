@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from personal_markets.behavior.cohort import behavior_cohort_goals
+from personal_markets.behavior.cohort import authentic_evidence, behavior_cohort_goals
+from personal_markets.evidence.domain import NormalizedEvidence, Provenance
 from personal_markets.goals.domain import GoalContract, GoalType
 
 
@@ -22,3 +23,36 @@ def test_synthetic_commitments_are_separate_from_authentic_behavior() -> None:
     assert behavior_cohort_goals([authentic, fixture]) == [authentic]
     assert behavior_cohort_goals([authentic, fixture], synthetic=True) == [fixture]
     assert behavior_cohort_goals([fixture]) == []
+
+
+def test_seed_identity_and_demo_quality_cannot_enter_authentic_evidence() -> None:
+    def row(*, identity: str | None, quality: str) -> NormalizedEvidence:
+        return NormalizedEvidence(
+            event_type="observation",
+            domain="reading",
+            metric="reading_minutes",
+            numeric_value=45,
+            observed_at=datetime.now(UTC),
+            source_quality=quality,
+            provenance=Provenance(
+                source_type="manual",
+                source_authority="self_report",
+                observed_vs_entered="user_entered",
+                parsing_status="ok",
+                completeness="complete",
+                conflict_status="none",
+                event_identity=identity,
+            ),
+            summary="Read",
+            fingerprint=str(uuid4()),
+        )
+
+    real = row(identity="report:abc", quality="user_entered")
+    assert authentic_evidence(
+        [
+            row(identity="seed:v1:goal:event", quality="user_entered"),
+            row(identity=None, quality="demo_fixture"),
+            row(identity=None, quality="synthetic_demo"),
+            real,
+        ]
+    ) == [real]

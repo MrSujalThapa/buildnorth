@@ -3,8 +3,6 @@ import type { TraitOption } from "../../api/client";
 import {
   MAX_PARAMETERS,
   MIN_PARAMETERS,
-  customDraftError,
-  customParameterId,
   moveRow,
   rowsFromSelection,
   selectionPayload,
@@ -22,22 +20,9 @@ type Props = {
 
 export function ParameterEditor({ selected, options, saving, error, onSave, onCancel }: Props) {
   const [rows, setRows] = useState<ParameterRow[]>(() => rowsFromSelection(selected, options));
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [draftTouched, setDraftTouched] = useState(false);
   const chosen = new Set(rows.map((row) => row.id));
   const addable = options.filter((item) => !chosen.has(item.id));
-  const draftError = customDraftError(name, description, rows, options);
   const tooFew = rows.length < MIN_PARAMETERS;
-
-  function addCustom() {
-    setDraftTouched(true);
-    if (draftError) return;
-    setRows((current) => [...current, { id: customParameterId(name), name: name.trim(), description: description.trim(), custom: true }]);
-    setName("");
-    setDescription("");
-    setDraftTouched(false);
-  }
 
   return (
     <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-parameters-title">
@@ -74,23 +59,6 @@ export function ParameterEditor({ selected, options, saving, error, onSave, onCa
             ))}
           </div>
         ) : null}
-        <form
-          className="parameter-custom"
-          onSubmit={(event) => {
-            event.preventDefault();
-            addCustom();
-          }}
-        >
-          <label htmlFor="custom-parameter-name">Custom parameter</label>
-          <input id="custom-parameter-name" className="ui-field" placeholder="e.g. Sleep regularity" value={name} maxLength={32} onChange={(event) => setName(event.target.value)} />
-          <label htmlFor="custom-parameter-description">What it measures</label>
-          <input id="custom-parameter-description" className="ui-field" placeholder="e.g. Nights in bed within 30 minutes of target" value={description} maxLength={160} onChange={(event) => setDescription(event.target.value)} />
-          {name.trim() ? (
-            <p className="parameter-hint">Scored only from observations recorded as <code>{customParameterId(name).replace("custom:", "trait_")}</code>, on a 0–1 scale. It stays empty until those exist.</p>
-          ) : null}
-          {draftTouched && draftError ? <p role="alert">{draftError}</p> : null}
-          <button type="submit" className="markets-select" disabled={!name.trim()}>Add custom parameter</button>
-        </form>
         {tooFew ? <p className="parameter-hint" role="status">Keep at least {MIN_PARAMETERS} parameters.</p> : null}
         {error ? <p role="alert">{error}</p> : null}
         <div className="composer-actions">
