@@ -515,7 +515,7 @@ PR #21 merged as `64ea6ee`; Render API and Vercel production reached that commit
 | 7 | Photos-style selection | PASS | Earlier live desktop/mobile Select, count, cancel, move, disabled Share and archive confirmation. |
 | 8 | Profile composition and editor | PASS | Earlier signed-in desktop/mobile edit and save/reload; no new Profile layout change in #21. |
 | 9 | Private persistent profile photo | NOT VERIFIED | Local upload/reload/remove tests; actual owner-scoped production upload remains blocked by Chrome extension file access. |
-| 10 | Behavioral radar | NOT VERIFIED | Unknown axes remain honest and area assignment persisted, but full behavioral demonstration and live measured radar remain absent. |
+| 10 | Behavioral radar | FAIL | The deployed Profile includes synthetic workspace-seed commitments in the person-wide estimate. Unknown axes and area assignment were checked previously, but the displayed 106 observations are not accepted as authentic behavior. PR #23 separates cohorts; signed-in post-deployment verification remains required. |
 | 11 | GitHub discovery and real records | PASS | Earlier production `buildnorth` commit read and owner/repository selection; this does not prove the proposed LeetCode watch. |
 | 12 | Notion discovery and content | PASS | Earlier real Oct 20 report fetched, normalized and source linked; it does not prove parent-child monitoring. |
 | 13 | Automatic goal-aware relevance | NOT VERIFIED | #21 changed connected-source planning from HTTP 422 to a successful production response: Notion suggested for reading, GitHub left unranked. The picker exposes ten pages but no `Book Reports` parent; title match alone is not evidence. |
