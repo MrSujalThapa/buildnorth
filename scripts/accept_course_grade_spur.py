@@ -48,6 +48,7 @@ def main() -> None:
     )
     app = isolated_app(inference=provider)
     goal_created = False
+    workflow_finished = False
     grade_ok = False
     with TestClient(app) as client:
         created = client.post(
@@ -79,6 +80,15 @@ def main() -> None:
                 print("resume_error", str(body.get("detail") or body.get("message"))[:250])
         goal = body.get("goal") or {}
         goal_created = bool(goal.get("goal_id"))
+        workflow_finished = body.get("status") in {"completed", "limited", "withheld"}
+        if not goal_created and created.status_code == 200:
+            snapshot = client.get(f"/api/v1/agent/threads/{created.json()['thread_id']}")
+            if snapshot.status_code == 200:
+                snap = snapshot.json()
+                print("thread_status_after_error", snap.get("status"))
+                print("thread_step_after_error", snap.get("current_step"))
+                goal = snap.get("goal") or {}
+                goal_created = bool(goal.get("goal_id"))
         print("goal_created", goal_created)
         if goal.get("goal_id"):
             listed = client.get("/api/v1/goals").json()
@@ -107,7 +117,7 @@ def main() -> None:
             item["remaining_score"]: item["average"] for item in result.get("scenarios", [])
         }, sort_keys=True))
     print("estimated_usage", json.dumps(asyncio.run(usage.totals(date.today())), sort_keys=True))
-    if not goal_created or not grade_ok:
+    if not goal_created or not workflow_finished or not grade_ok:
         raise SystemExit(1)
 
 

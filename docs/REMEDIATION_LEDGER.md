@@ -10,7 +10,9 @@ The previous #23 Overall/area trait radar was the wrong product model. The main 
 
 The isolated HTTP finance journey also exercised priced Change and Futures, with separate persisted impact and futures receipts. All four modes now have one supported in-process numerical path; signed-in deployment across the requested goal families remains NOT VERIFIED.
 
-**Local real-inference course attempt:** Spur returned a goal proposal twice (41.5 s and 54.6 s), but confirmation timed out with HTTP 503 at 45 s and 90 s. No goal was created. Successful replies logged about $0.0153 combined estimated usage; timed-out call charges could not be measured. The course-grade endpoint itself returned 62% and 83% exact hypothetical averages without evidence writes. Goal creation and course-grade consumer acceptance remain FAIL/NOT VERIFIED; no further paid retry was run.
+**Local real-inference course attempt:** Spur returned a goal proposal twice (41.5 s and 54.6 s), but confirmation timed out with HTTP 503 at 45 s and 90 s. The graph commits the goal before later inference, but the script did not inspect the repository after the error; goal persistence is therefore unknown, and workflow completion failed. Successful replies logged about $0.0153 combined estimated usage; timed-out call charges could not be measured. The course-grade endpoint itself returned 62% and 83% exact hypothetical averages without evidence writes. Goal creation and course-grade consumer acceptance remain FAIL/NOT VERIFIED; no further paid retry was run.
+
+The branch now recovers the latest committed-goal checkpoint on a transient confirmation timeout, stores a failed thread state, and offers “Open saved goal” in New Goal only when the backend confirms a commit. Authenticated in-process HTTP and component tests pass. This addresses the duplicate-goal retry risk in code but does not prove the Spur workflow completes or the production UI renders correctly.
 
 ## 2026-10-24 continuation on `feat/playitout-next-pass`
 

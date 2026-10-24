@@ -11,6 +11,7 @@ from personal_markets.agents.intervention_service import InterventionAgentServic
 from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.agents.state import AgentDependencies
 from personal_markets.core.config import Settings, get_settings
+from personal_markets.core.errors import TransientProviderError
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.repository import (
     InMemoryBaselineForecastRepository,
@@ -119,12 +120,44 @@ class PersistingWorkflow:
         stored = await self._threads.get(thread_id)
         if stored is None or stored.status != "running":
             return
-        await self._threads.upsert(
-            stored.model_copy(update={"status": "failed", "current_step": "failed"})
+        await self._persist_failed_snapshot(thread_id, stored)
+
+    async def _persist_failed_snapshot(
+        self, thread_id: UUID, fallback: WorkflowSnapshot
+    ) -> WorkflowSnapshot:
+        try:
+            latest = await self._inner.snapshot(thread_id)
+        except Exception:
+            latest = fallback
+        failed = latest.model_copy(
+            update={
+                "status": "failed",
+                "current_step": "failed",
+                "interrupt": None,
+                "progress": [
+                    *list(latest.progress or []),
+                    (
+                        "A provider request failed. Review the saved goal before retrying."
+                        if latest.debug.get("goal_committed") is True
+                        else "A provider request failed. You can try again."
+                    ),
+                ],
+            }
         )
+        await self._threads.upsert(failed)
+        return failed
 
     async def resume(self, thread_id: Any, payload: Any) -> Any:
-        snapshot = await self._inner.resume(thread_id, payload)
+        try:
+            snapshot = await self._inner.resume(thread_id, payload)
+        except (TransientProviderError, TimeoutError):
+            structlog.get_logger("personal_markets.agents").exception(
+                "agent_workflow_resume_provider_failed", thread_id=str(thread_id)
+            )
+            stored = await self._threads.get(thread_id)
+            if stored is None:
+                raise
+            return await self._persist_failed_snapshot(thread_id, stored)
         await self._threads.upsert(snapshot)
         await self._maybe_review(snapshot)
         return snapshot

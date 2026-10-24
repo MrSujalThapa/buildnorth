@@ -8,6 +8,9 @@ import "./new-goal.css";
 const PENDING_GOAL_THREAD = "playitout:pending-goal-thread";
 
 function failureMessage(snapshot: WorkflowSnapshot): string {
+  if (snapshot.goal && snapshot.debug?.goal_committed === true) {
+    return "Your goal was saved, but evidence processing stopped. You can open the goal and try updating it later.";
+  }
   return snapshot.debug?.failure_code === "workflow_timeout"
     ? "This attempt timed out. Check your inference settings, then try again."
     : "The agent workflow failed. Check inference settings and try again.";
@@ -99,7 +102,7 @@ export function NewGoalPage() {
           <p>Describe an outcome. The system will formalize it before anything is priced.</p>
         </div>
       </div>
-      {!interrupt && snapshot?.status !== "running" ? (
+      {!interrupt && snapshot?.status !== "running" && !(snapshot?.status === "failed" && snapshot.debug?.goal_committed === true) ? (
         <form
           className="composer-form"
           onSubmit={(event) => {
@@ -128,7 +131,12 @@ export function NewGoalPage() {
         <div className="notice" role="alert">
           <h2>Workflow unavailable</h2>
           <p>{error}</p>
-          <Link to="/settings#inference-heading">Check inference settings</Link>
+          <div className="notice-actions">
+            {snapshot?.status === "failed" && snapshot.goal && snapshot.debug?.goal_committed === true ? (
+              <Link to={`/goals/${snapshot.goal.goal_id}`}>Open saved goal</Link>
+            ) : null}
+            <Link to="/settings#inference-heading">Check inference settings</Link>
+          </div>
         </div>
       ) : null}
       {interrupt?.type === "clarification" ? (

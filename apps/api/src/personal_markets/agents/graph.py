@@ -202,6 +202,7 @@ class LangGraphAgentWorkflow:
             **snapshot.debug,
             "user_id": state.get("user_id"),
             "steps": list(state.get("progress") or []),
+            "goal_committed": bool(state.get("committed_goal_id")),
         }
         return snapshot
 
