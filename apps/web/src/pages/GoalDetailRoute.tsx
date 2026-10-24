@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../api/client";
 import { isCourseStandingGoal } from "../adapters/courseGrade";
-import { toMarketDetail } from "../adapters/marketViewModel";
+import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewModel";
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
 
@@ -90,14 +90,18 @@ export function GoalDetailRoute() {
 
   const market = toMarketDetail(goal.data, history.data ?? [], evidence.data ?? []);
   const latestWorkflow = continuation.data ?? workflowSnapshot;
-  const withheld =
-    latestWorkflow?.critic?.decision === "withhold" || market.publication?.status === "withheld";
+  const status = currentForecastStatus(
+    latestWorkflow ? { status: latestWorkflow.status, critic_decision: latestWorkflow.critic?.decision } : null,
+    market.publication?.status,
+  );
+  market.currentForecastStatus = continuation.isError ? "unavailable" : status;
+  if (market.currentForecastStatus !== "published") market.odds = null;
 
   return (
     <>
       <MarketDetailPage
         market={market}
-        criticDecision={withheld ? "withhold" : latestWorkflow?.critic?.decision}
+        criticDecision={status === "withheld" ? "withhold" : latestWorkflow?.critic?.decision}
         onBack={() => { void navigate("/markets"); }}
         onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
         onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}

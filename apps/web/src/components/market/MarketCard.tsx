@@ -15,6 +15,9 @@ function signedPointChange(value: number) {
 }
 
 function changeLabel(market: Market): { text: string; change: number | null } {
+  if (market.currentForecastStatus && market.currentForecastStatus !== "published") {
+    return { text: "Historical forecast shown", change: null };
+  }
   if (!market.historyUnavailable) {
     const change = chartPointChange(market.history);
     if (change != null) return { text: `${signedPointChange(change)} shown`, change };
@@ -45,7 +48,10 @@ export default function MarketCard({
         </div>
 
         <div className="market-card-odds">
-          {market.historyUnavailable || market.odds === null
+          {market.currentForecastStatus === "withheld" ? "Withheld"
+            : market.currentForecastStatus === "evidence_pending" ? "Pending"
+            : market.currentForecastStatus === "evidence_failed" ? "Evidence failed"
+            : market.historyUnavailable || market.odds === null
             ? "—"
             : `${market.odds.toFixed(
                 0,
@@ -54,7 +60,7 @@ export default function MarketCard({
       </div>
 
       <div
-        className={`market-card-return ${market.historyUnavailable ? "neutral" : chartTrend(market.history)}`}
+        className={`market-card-return ${market.historyUnavailable || market.currentForecastStatus !== "published" ? "neutral" : chartTrend(market.history)}`}
         title={movement.change == null ? undefined : "Change across the displayed forecast history"}
       >
         {movement.text}

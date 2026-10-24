@@ -35,10 +35,27 @@ function formatMeta(goal: Goal): string {
   return `Deadline ${deadline} · ${goal.forecast_status.toLowerCase()}`;
 }
 
-export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market {
+export function currentForecastStatus(
+  creation: { status: string; critic_decision?: string | null } | null | undefined,
+  publicationStatus?: string | null,
+): NonNullable<Market["currentForecastStatus"]> {
+  if (creation?.critic_decision === "withhold" || creation?.status === "withheld" || publicationStatus === "withheld") return "withheld";
+  if (creation?.status === "evidence_pending" || creation?.status === "evidence_running") return "evidence_pending";
+  if (creation?.status === "evidence_failed") return "evidence_failed";
+  return "published";
+}
+
+export function toMarketCard(
+  goal: Goal, history: MarketHistoryPoint[],
+  creation?: { status: string; critic_decision: string | null },
+): Market {
   const published = publishedHistoryPoints(history);
   const chart = historyToChart(history);
-  const odds = chart.at(-1)?.value ?? null;
+  const publication = goal.model_requirements?.last_publication;
+  const publicationStatus = publication && typeof publication === "object"
+    ? stringField(publication, "status") : undefined;
+  const status = currentForecastStatus(creation, publicationStatus);
+  const odds = status === "published" ? chart.at(-1)?.value ?? null : null;
   const first = chart[0]?.value ?? null;
   const last = chart.at(-1)?.value ?? null;
   const startOfDay = new Date();
@@ -63,6 +80,7 @@ export function toMarketCard(goal: Goal, history: MarketHistoryPoint[]): Market 
     createdAt: chart[0]?.timestamp ?? Date.now(),
     deadlineAt: Date.parse(goal.deadline),
     odds,
+    currentForecastStatus: status === "published" && odds === null ? "unavailable" : status,
     todayReturn,
     lastRevision,
     totalReturn,

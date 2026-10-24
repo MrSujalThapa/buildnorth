@@ -114,6 +114,19 @@ class InMemoryThreadStore:
                 return snapshot
         return None
 
+    async def latest_creations_for_goals(
+        self, goal_ids: list[UUID], owner_id: UUID,
+    ) -> dict[UUID, WorkflowSnapshot]:
+        requested = set(goal_ids)
+        result: dict[UUID, WorkflowSnapshot] = {}
+        for snapshot in reversed(list(self._rows.values())):
+            goal_id = snapshot.goal.goal_id if snapshot.goal else None
+            if (snapshot.kind == "create_goal" and goal_id is not None and goal_id in requested
+                and snapshot.debug.get("user_id") == str(owner_id)
+                and goal_id not in result):
+                result[goal_id] = snapshot
+        return result
+
 
 class InMemoryAgentRunStore:
     def __init__(self) -> None:
@@ -422,6 +435,22 @@ class PostgresThreadStore:
                 {"goal_id": goal_id, "owner_id": owner_id},
             )).mappings().one_or_none()
         return WorkflowSnapshot.model_validate(row["result_json"]) if row else None
+
+    async def latest_creations_for_goals(
+        self, goal_ids: list[UUID], owner_id: UUID,
+    ) -> dict[UUID, WorkflowSnapshot]:
+        if not goal_ids:
+            return {}
+        async with autocommit_connection(self._engine) as connection:
+            rows = (await connection.execute(
+                text("""
+                select distinct on (goal_id) goal_id, result_json from workflow_threads
+                where goal_id = any(:goal_ids) and user_id = :owner_id and kind = 'create_goal'
+                order by goal_id, updated_at desc, id desc
+                """),
+                {"goal_ids": goal_ids, "owner_id": owner_id},
+            )).mappings().all()
+        return {row["goal_id"]: WorkflowSnapshot.model_validate(row["result_json"]) for row in rows}
 
     async def get(self, thread_id: UUID) -> WorkflowSnapshot | None:
         async with autocommit_connection(self._engine) as connection:

@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from personal_markets.ports import CriticArtifact
+from personal_markets.ports import CriticArtifact, WorkflowSnapshot
 
 WithholdCategory = str
+
+
+def blocks_current_forecast(snapshot: WorkflowSnapshot) -> bool:
+    """A previous receipt is history while this creation is unresolved or withheld."""
+    return snapshot.status in {
+        "withheld", "evidence_pending", "evidence_running", "evidence_failed",
+    } or (snapshot.critic is not None and snapshot.critic.decision == "withhold")
 
 _CATEGORY_ACTIONS: dict[str, str] = {
     "missing_user_information": (

@@ -192,6 +192,13 @@ export default function MarketDetailPage({
                 {market.publication?.reason ?? "Forecast withheld by critic."}
               </div>
             </>
+          ) : market.currentForecastStatus === "evidence_pending" || market.currentForecastStatus === "evidence_failed" || market.currentForecastStatus === "unavailable" ? (
+            <>
+              <div className="market-price" data-testid="goal-price">
+                {market.currentForecastStatus === "evidence_pending" ? "Evidence pending" : market.currentForecastStatus === "evidence_failed" ? "Evidence failed" : "Status unavailable"}
+              </div>
+              <div className="market-price-hint">Historical forecasts remain in the chart below.</div>
+            </>
           ) : market.odds === null ? (
             <>
               <div className="market-price" data-testid="goal-price">Not priced</div>

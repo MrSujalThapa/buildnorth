@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from personal_markets.collections.repository import PALETTE, new_collection
 from personal_markets.core.errors import ConflictError, ForbiddenError, ResourceNotFoundError
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
+
 
 class CollectionService:
     def __init__(self, repository, goals: GoalService) -> None:
@@ -110,14 +112,18 @@ class CollectionService:
         self,
         row: CollectionRecord,
         goals: list[GoalContract],
-        histories: dict[str, list[dict[str, Any]]],
+        histories: Mapping[str, Sequence[Any]],
+        blocked_goal_ids: set[UUID] | None = None,
     ) -> CollectionView:
         by_id = {goal.goal_id: goal for goal in goals}
         members = [by_id[goal_id] for goal_id in row.goal_ids if goal_id in by_id]
         series: list[CollectionSeries] = []
         for index, goal in enumerate(members):
             publication = goal.model_requirements.get("last_publication")
-            withheld = isinstance(publication, dict) and publication.get("status") == "withheld"
+            withheld = (
+                goal.goal_id in (blocked_goal_ids or set())
+                or isinstance(publication, dict) and publication.get("status") == "withheld"
+            )
             points = []
             for point in histories.get(str(goal.goal_id), []):
                 payload = (

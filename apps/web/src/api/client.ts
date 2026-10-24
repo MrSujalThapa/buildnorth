@@ -348,6 +348,7 @@ export interface CollectionView {
 export interface GoalsDashboard {
   goals: Goal[];
   histories: Record<string, MarketHistoryPoint[]>;
+  creation_states?: Record<string, { status: string; critic_decision: string | null }>;
   collections?: CollectionView[];
 }
 

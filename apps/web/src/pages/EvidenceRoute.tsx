@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { publishedHistoryPoints, toMarketDetail } from "../adapters/marketViewModel";
+import { currentForecastStatus, publishedHistoryPoints, toMarketDetail } from "../adapters/marketViewModel";
 import { api, type WorkflowSnapshot } from "../api/client";
 import { EvidenceSourceWorkspace, formatProbability } from "../features/goals/EvidenceSourceWorkspace";
 
@@ -66,12 +66,14 @@ export function EvidenceRoute() {
 
   const publication = toMarketDetail(goal.data, history.data ?? [], []).publication;
   const latestWorkflow = continuation.data ?? initialSnapshot;
-  const withheld = publication?.status === "withheld" || latestWorkflow?.critic?.decision === "withhold" || latestWorkflow?.status === "withheld";
-  const evidenceStatus = latestWorkflow?.status;
-  const forecastLabel = withheld ? "Withheld"
+  const status = currentForecastStatus(
+    latestWorkflow ? { status: latestWorkflow.status, critic_decision: latestWorkflow.critic?.decision } : null,
+    publication?.status,
+  );
+  const forecastLabel = status === "withheld" ? "Withheld"
     : continuation.isError ? "Status unavailable"
-    : evidenceStatus === "evidence_failed" ? "Evidence failed"
-    : evidenceStatus === "evidence_pending" || evidenceStatus === "evidence_running" ? "Evidence pending"
+    : status === "evidence_failed" ? "Evidence failed"
+    : status === "evidence_pending" ? "Evidence pending"
     : formatProbability(latestProbability);
 
   return (
