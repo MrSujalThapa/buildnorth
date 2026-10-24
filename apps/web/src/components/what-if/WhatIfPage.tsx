@@ -614,7 +614,7 @@ export default function WhatIfPage({
 
               loading={futuresLoading}
 
-              priced={baselinePriced}
+              priced={baselinePriced && futuresDistribution?.priced !== false}
 
               message={futuresDistribution?.message ?? null}
 
