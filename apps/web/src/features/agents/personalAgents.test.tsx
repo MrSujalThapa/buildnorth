@@ -63,7 +63,10 @@ test("personal agents shows the endpoint, local-only warning and revokes without
   render(<PersonalAgents />);
   expect(await screen.findByText("http://127.0.0.1:8000/mcp")).toBeInTheDocument();
   expect(screen.getByText(/only works from this computer/)).toBeInTheDocument();
-  expect(screen.getByText("Read goals")).toBeInTheDocument();
+  expect(screen.getByText("ChatGPT Chat: not verified.")).toBeInTheDocument();
+  expect(screen.getByText("ChatGPT Work: not verified.")).toBeInTheDocument();
+  expect(screen.getByText("Grok Bot: not verified.")).toBeInTheDocument();
+  expect(screen.getAllByText("Read goals").length).toBeGreaterThan(0);
   expect(document.body.textContent).not.toMatch(/pio_(at|rt)_/);
 
   fireEvent.click(screen.getByRole("button", { name: "Revoke" }));

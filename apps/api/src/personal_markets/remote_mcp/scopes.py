@@ -69,6 +69,8 @@ SCOPE_INFO: dict[str, ScopeInfo] = {
 TOOL_SCOPES: dict[str, tuple[str, ...]] = {
     "list_goals": (READ,),
     "get_goal": (READ,),
+    "get_forecast_readiness": (READ,),
+    "list_milestones": (READ,),
     "get_forecast": (READ,),
     "get_forecast_history": (READ,),
     "get_evidence_summary": (READ,),
