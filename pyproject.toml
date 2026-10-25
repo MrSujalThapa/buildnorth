@@ -60,7 +60,10 @@ addopts = "-q --import-mode=importlib --confcutdir=."
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 norecursedirs = [".git", ".venv", "node_modules", "dist", "playitout-submission-clean"]
-markers = ["integration: requires a migrated Postgres database"]
+markers = [
+    "integration: requires a migrated Postgres database",
+    "live_spur: paid Spur inference; skipped unless PM_LIVE_SPUR=1",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -79,7 +82,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 python_version = "3.12"
 strict = true
 files = ["apps/api/src", "apps/api/tests", "scripts"]
-exclude = ["scripts/prepare_oulad.py"]
+exclude = ["scripts/prepare_oulad.py", "scripts/_phase0_"]
 
 [[tool.mypy.overrides]]
 module = ["joblib", "pandas", "scipy.*", "sklearn.*", "langgraph.*", "langgraph_checkpoint_postgres.*"]

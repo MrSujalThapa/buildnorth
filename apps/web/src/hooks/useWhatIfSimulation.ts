@@ -53,7 +53,10 @@ export function useWhatIfSimulation(
     enabled: Boolean(goalId),
   });
   const [values, setValues] = useState<TuneValues | null>(null);
+  const [interpretationMessage, setInterpretationMessage] = useState<string | null>(null);
+  const [lastParse, setLastParse] = useState<Awaited<ReturnType<typeof api.parseIntervention>> | null>(null);
   const pendingScenario = useRef<string | null>(null);
+  const parseGeneration = useRef(0);
   const simulation = useMutation({ mutationFn: (body: Record<string, unknown>) => api.fastReprice(body) });
   const persistSimulation = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.simulateWhatIf(body),
@@ -62,6 +65,12 @@ export function useWhatIfSimulation(
   const parseIntervention = useMutation({
     mutationFn: (text: string) => api.parseIntervention({ goal_id: goalId, text }),
   });
+
+  useEffect(() => {
+    parseGeneration.current += 1;
+    setLastParse(null);
+    setInterpretationMessage(null);
+  }, [goalId]);
 
   useEffect(() => {
     if (!baseline.data?.priced) {
@@ -92,7 +101,7 @@ export function useWhatIfSimulation(
     });
   }, [baseline.data, plan, values]);
 
-  const scenarioResult = persistSimulation.data ?? simulation.data;
+  const scenarioResult = persistSimulation.data;
 
   const metric = goal?.success_definition?.metric;
   const targetDimension = typeof metric === "string" ? metric : "target";
@@ -136,8 +145,15 @@ export function useWhatIfSimulation(
 
   const preview: WhatIfPreview | null = useMemo(() => {
     if (!market) return null;
-    return previewFromResult(market, plan, baseline.data, scenarioResult);
-  }, [baseline.data, market, plan, scenarioResult]);
+    const comparison = previewFromResult(market, plan, baseline.data, simulation.data);
+    const scenario = previewFromResult(market, plan, baseline.data, scenarioResult);
+    return {
+      ...scenario,
+      currentOdds: scenarioResult ? scenario.currentOdds : comparison.currentOdds,
+      scenarioOdds: scenarioResult?.priced ? scenario.scenarioOdds : null,
+      improvementPoints: scenarioResult?.priced ? scenario.improvementPoints : null,
+    };
+  }, [baseline.data, market, plan, scenarioResult, simulation.data]);
 
   function runScenario(text: string) {
     const trimmed = text.trim();
@@ -147,8 +163,27 @@ export function useWhatIfSimulation(
       return;
     }
     pendingScenario.current = null;
+    setInterpretationMessage(null);
+    const generation = ++parseGeneration.current;
     parseIntervention.mutate(trimmed, {
-      onSuccess: (parsed) => {
+        onSuccess: (parsed) => {
+        if (generation !== parseGeneration.current) return;
+        setLastParse(parsed);
+        const qualitative = parsed.request_kind && parsed.request_kind !== "quantitative_scenario";
+        if (qualitative || !parsed.changes.length || parsed.pricing_status !== "PRICED") {
+          persistSimulation.reset();
+          if (parsed.insights?.length || parsed.confirmation_needed) {
+            setInterpretationMessage(null);
+            return;
+          }
+          setInterpretationMessage(
+            parsed.consumer_summary ||
+              parsed.unsupported[0] ||
+              parsed.limitations?.[0] ||
+              "This action has no measured link to the goal's forecast. Try a specific modeled quantity, such as applications per week.",
+          );
+          return;
+        }
         const body = {
           ...request,
           parsed_changes: parsed.changes,
@@ -156,7 +191,6 @@ export function useWhatIfSimulation(
         };
         persistSimulation.mutate(body, {
           onSuccess: () => {
-            simulation.mutate(body);
             options?.onScenarioPersisted?.();
           },
         });
@@ -180,6 +214,8 @@ export function useWhatIfSimulation(
     simulation,
     persistSimulation,
     scenarioResult,
+    interpretationMessage,
+    lastParse,
     preview,
     request,
     runScenario,

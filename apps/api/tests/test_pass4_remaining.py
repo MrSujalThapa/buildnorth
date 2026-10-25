@@ -164,9 +164,12 @@ async def test_simulation_repository_rejects_baseline_history_writes() -> None:
 
 @pytest.mark.asyncio
 async def test_possible_futures_fail_closed_then_validate_distribution() -> None:
-    goal_id = str(uuid4())
+    goal = make_goal()
+    goal_id = str(goal.goal_id)
+    goals = InMemoryGoalRepository()
+    await goals.create(goal, uuid4())
     service = LinearWhatIfService(
-        GoalService(InMemoryGoalRepository()), InMemorySimulationRepository()
+        GoalService(goals), InMemorySimulationRepository()
     )
     unpriced = await service.possible_futures(
         PossibleFuturesRequest(

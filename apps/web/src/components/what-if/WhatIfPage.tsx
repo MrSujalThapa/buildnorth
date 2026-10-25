@@ -296,7 +296,9 @@ export default function WhatIfPage({
 
   const [isolatedId, setIsolatedId] = useState<string | null>(null);
 
-  const [targetOdds, setTargetOdds] = useState(70);
+  const [targetOdds, setTargetOdds] = useState(() =>
+    Math.min(99, Math.max(85, Math.ceil((market.odds ?? 80) + 5))),
+  );
 
 
 
@@ -397,13 +399,13 @@ export default function WhatIfPage({
 
   useEffect(() => {
 
-    if (mode !== "paths") return;
+    if (mode !== "paths" || !baseline?.priced) return;
 
     const timer = window.setTimeout(() => pathsRef.current?.(targetOdds / 100), 250);
 
     return () => window.clearTimeout(timer);
 
-  }, [mode, targetOdds]);
+  }, [mode, targetOdds, baseline?.priced]);
 
 
 
@@ -580,7 +582,13 @@ export default function WhatIfPage({
 
               runError={scenarioErrorMessage(
                 simulation.parseIntervention.error ?? simulation.persistSimulation.error,
-              )}
+              ) ?? (simulation.lastParse?.insights?.length ? null : simulation.interpretationMessage) ??
+                (simulation.scenarioResult && !simulation.scenarioResult.priced
+                  ? simulation.scenarioResult.message ?? "This action cannot be priced from the current evidence."
+                  : null)}
+              publishedOdds={market.odds}
+              history={market.history}
+              parseResult={simulation.lastParse}
 
               onQuestionChange={setQuestion}
 

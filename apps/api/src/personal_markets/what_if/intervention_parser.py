@@ -72,19 +72,34 @@ def parse_intervention_text(text: str) -> ParsedIntervention:
             )
         )
 
-    for match in _APPLICATIONS.finditer(cleaned):
-        period = (match.group(2) or "week").lower()
-        metric = "applications_per_week" if period == "week" else "applications_per_month"
+    from personal_markets.agents.intervention_critic import parse_weekly_application_intent
+
+    app_intent = parse_weekly_application_intent(cleaned)
+    if app_intent is not None:
         changes.append(
             TypedInterventionChange(
-                metric=metric,
-                operation="add",
-                value=_parse_number(match.group(1)),
-                unit=f"count/{period}",
-                frequency=period,
+                metric="applications_per_week",
+                operation=app_intent.operation,
+                value=app_intent.value,
+                unit="count/week",
+                frequency="weekly",
                 provenance="USER_ASSUMPTION",
             )
         )
+    else:
+        for match in _APPLICATIONS.finditer(cleaned):
+            period = (match.group(2) or "week").lower()
+            metric = "applications_per_week" if period == "week" else "applications_per_month"
+            changes.append(
+                TypedInterventionChange(
+                    metric=metric,
+                    operation="add",
+                    value=_parse_number(match.group(1)),
+                    unit=f"count/{period}",
+                    frequency=period,
+                    provenance="USER_ASSUMPTION",
+                )
+            )
 
     for match in _WEEKLY_KM.finditer(cleaned):
         changes.append(

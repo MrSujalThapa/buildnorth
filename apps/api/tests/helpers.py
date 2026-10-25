@@ -86,7 +86,9 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
         return WhatIfService(
             GoalService(repository),
             simulation_repository,
+            evidence=workflow._inner._deps.evidence,
             owner_id=principal.user_id,
+            forecasts=workflow._inner._deps.baseline_forecasts,
         )
 
     app.dependency_overrides[get_what_if_service] = _what_if
@@ -102,4 +104,7 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
     get_identity_repository().users[principal.user_id] = principal
     get_identity_repository().by_clerk[principal.clerk_user_id] = principal.user_id
     app.state.auth_bypass_principal = principal
+    from personal_markets.what_if.last_scenario import LastInterventionStore
+
+    app.state.last_intervention_store = LastInterventionStore()
     return app

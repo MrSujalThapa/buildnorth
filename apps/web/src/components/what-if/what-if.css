@@ -726,11 +726,10 @@
 }
 
 .empty-state {
-  min-height: 180px;
+  min-height: 0;
   display: grid;
-  place-content: center;
   gap: 6px;
-  text-align: center;
+  text-align: left;
   color: var(--what-if-muted);
 }
 
@@ -1768,3 +1767,20 @@
   font-size: 13px;
   line-height: 1.4;
 }
+.what-if-market-chart { margin-bottom: 1.25rem; }
+.what-if-market-chart .ws-chart { height: 280px; --market-chart-accent: #d4a82d; }
+.what-if-market-chart .ws-chart.trend-positive,
+.what-if-market-chart .ws-chart.trend-negative,
+.what-if-market-chart .ws-chart.trend-neutral { --market-chart-accent: #d4a82d; }
+.what-if-chart-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: .65rem; font-size: .82rem; color: var(--market-text, #20211f); }
+.what-if-chart-legend span::before { content: ""; display: inline-block; width: .65rem; height: .65rem; margin-right: .4rem; border-radius: 50%; background: #d4a82d; }
+.what-if-chart-legend .comparison-baseline::before { background: #8a8680; }
+.what-if-chart-legend .hypothetical-positive::before { background: #188453; }
+.what-if-chart-legend .hypothetical-negative::before { background: #c44745; }
+.scenario-plain { max-width: 68ch; margin: 0 0 1rem; font-size: 15px; line-height: 1.45; }
+.insight-list { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; gap: 14px; }
+.insight-card { padding: 12px 0; border-top: 1px solid var(--what-if-border); }
+.insight-card header { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.insight-card h3 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
+.insight-card em { font-style: normal; color: var(--what-if-muted); font-size: 12px; }
+.insight-card p { margin: 8px 0 0; max-width: 70ch; line-height: 1.45; }

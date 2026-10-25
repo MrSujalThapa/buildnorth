@@ -252,6 +252,9 @@ class WhatIfBaselineState(BaseModel):
     periods: int | None = None
     direction: Literal["at_least", "at_most"] = "at_least"
     current_probability: float | None = None
+    published_probability: float | None = None
+    published_model_version: str | None = None
+    published_evidence_watermark: str | None = None
     assumptions: list[Assumption] = Field(default_factory=list)
     default_intervention: StructuredIntervention | None = None
     model_family: str

@@ -15,7 +15,7 @@ export function defaultPlanForMarket(market: Market): WhatIfPlan {
 }
 
 export function defaultQuestionForMarket(market: Market): string {
-  if (market.category === "Career") return "What if I study LeetCode 2 hours a day?";
+  if (market.category === "Career") return "What if I apply to 10 jobs each week?";
   if (market.category === "Startup") return "What if I spend 3 focused hours a day building and talking to users?";
   if (market.category === "Competitions") return "What if I practice every day before the event?";
   return `What if I put more consistent time into ${market.title.toLowerCase()}?`;

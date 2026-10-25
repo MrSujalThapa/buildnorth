@@ -29,6 +29,11 @@ def test_profile_patch_cors_preflight() -> None:
     assert "PATCH" in response.headers["access-control-allow-methods"]
 
 
+def test_blank_spur_key_is_treated_as_missing() -> None:
+    settings = _settings(spur_api_key="")
+    assert settings.spur_api_key is None
+
+
 def test_auto_hosted_never_falls_back_to_openai() -> None:
     settings = _settings(
         inference_provider="auto", openai_api_key="sk-openai", anthropic_api_key="sk-ant"

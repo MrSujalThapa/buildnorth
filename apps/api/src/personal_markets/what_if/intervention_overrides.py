@@ -21,17 +21,7 @@ def _assumption_source(provenance: str) -> AssumptionSource:
 _ACTION_METRIC_TARGETS: dict[str, str] = {
     "monthly_contribution": "flow",
     "contribution_per_month": "flow",
-    "weekly_running_km": "flow",
-    "daily_practice_problems": "execution_probability",
     "applications_per_week": "weekly_application_rate",
-    "burn_monthly": "flow",
-    "mock_interviews_per_week": "execution_probability",
-    "linkedin_posts_per_week": "weekly_application_rate",
-    "sleep_hours_per_night": "execution_probability",
-    "running_days_per_week": "flow",
-    "user_conversations_per_week": "execution_probability",
-    "hours_on_startup_per_week": "execution_probability",
-    "sales_calls_per_week": "weekly_application_rate",
 }
 
 
@@ -85,27 +75,6 @@ def apply_parsed_changes_to_assumptions(
             by_name["flow"] = flow.model_copy(
                 update={"value": max(flow.minimum, min(flow.maximum, value)), "source": source}
             )
-        elif change.metric == "weekly_running_km" and "flow" in by_name:
-            flow = by_name["flow"]
-            km_delta = change.value if change.operation == "set" else change.value
-            trend_proxy = -0.25 * km_delta
-            value = flow.value + trend_proxy if change.operation == "add" else trend_proxy
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "daily_practice_problems" and "execution_probability" in by_name:
-            execution = by_name["execution_probability"]
-            boost = min(0.15, change.value * 0.02)
-            value = execution.value + boost if change.operation == "add" else min(1.0, 0.5 + boost)
-            by_name["execution_probability"] = execution.model_copy(
-                update={
-                    "value": max(execution.minimum, min(execution.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
         elif change.metric == "applications_per_week" and "weekly_application_rate" in by_name:
             rate = by_name["weekly_application_rate"]
             value = (
@@ -117,86 +86,6 @@ def apply_parsed_changes_to_assumptions(
                 update={
                     "value": max(rate.minimum, min(rate.maximum, value)),
                     "source": source,
-                }
-            )
-        elif change.metric == "burn_monthly" and "flow" in by_name:
-            flow = by_name["flow"]
-            delta = -abs(change.value) / 1000.0
-            value = flow.value + delta if change.operation == "add" else delta
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "mock_interviews_per_week" and "execution_probability" in by_name:
-            execution = by_name["execution_probability"]
-            boost = min(0.12, change.value * 0.03)
-            value = execution.value + boost if change.operation != "set" else min(1.0, 0.45 + boost)
-            by_name["execution_probability"] = execution.model_copy(
-                update={
-                    "value": max(execution.minimum, min(execution.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "linkedin_posts_per_week" and "weekly_application_rate" in by_name:
-            rate = by_name["weekly_application_rate"]
-            delta = min(3.0, change.value * 0.25)
-            value = rate.value + delta if change.operation != "set" else change.value
-            by_name["weekly_application_rate"] = rate.model_copy(
-                update={
-                    "value": max(rate.minimum, min(rate.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "sleep_hours_per_night" and "execution_probability" in by_name:
-            execution = by_name["execution_probability"]
-            boost = min(0.08, change.value * 0.02)
-            value = execution.value + boost
-            by_name["execution_probability"] = execution.model_copy(
-                update={
-                    "value": max(execution.minimum, min(execution.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "running_days_per_week" and "flow" in by_name:
-            flow = by_name["flow"]
-            trend_proxy = -0.15 * change.value
-            value = flow.value + trend_proxy if change.operation == "add" else trend_proxy
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "user_conversations_per_week" and "execution_probability" in by_name:
-            execution = by_name["execution_probability"]
-            boost = min(0.1, change.value * 0.005)
-            value = execution.value + boost
-            by_name["execution_probability"] = execution.model_copy(
-                update={
-                    "value": max(execution.minimum, min(execution.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "hours_on_startup_per_week" and "execution_probability" in by_name:
-            execution = by_name["execution_probability"]
-            boost = min(0.15, change.value * 0.003)
-            value = execution.value + boost
-            by_name["execution_probability"] = execution.model_copy(
-                update={
-                    "value": max(execution.minimum, min(execution.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "sales_calls_per_week" and "weekly_application_rate" in by_name:
-            rate = by_name["weekly_application_rate"]
-            delta = min(5.0, change.value * 0.1)
-            value = rate.value + delta
-            by_name["weekly_application_rate"] = rate.model_copy(
-                update={
-                    "value": max(rate.minimum, min(rate.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
                 }
             )
 

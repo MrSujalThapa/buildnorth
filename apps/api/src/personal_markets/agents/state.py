@@ -66,6 +66,7 @@ class AgentGraphState(TypedDict, total=False):
     evidence_retries: int
     research_needed: bool
     resume_answers: dict[str, str]
+    evidence_confirmed: bool
     cancelled: bool
     committed_goal_id: str
     committed_evidence_ids: list[str]
@@ -139,6 +140,7 @@ class AgentDependencies:
             InMemoryBaselineForecastRepository()
         )
         self.ladders = ladders(settings)
+        self.last_inference: dict[str, str] = {}
 
 
 async def complete_agent(
@@ -264,6 +266,12 @@ async def complete_agent(
             "status": "completed",
         }
     )
+    deps.last_inference = {
+        "agent": agent,
+        "provider": response.provider,
+        "model": response.model,
+        "request_id": response.request_id or "",
+    }
     log.info(
         "agent_stage_completed",
         thread_id=state["thread_id"],

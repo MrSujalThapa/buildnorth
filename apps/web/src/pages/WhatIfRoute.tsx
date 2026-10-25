@@ -87,7 +87,11 @@ export function WhatIfRoute() {
       const extraPaths = await Promise.all(
         (extra ?? []).map(async (path) => {
           const parsed = await api.parseIntervention({ goal_id: goalId, text: path.label });
-          return { id: path.id, label: path.label, parsed_changes: parsed.changes };
+          return {
+            id: path.id,
+            label: path.label,
+            parsed_changes: parsed.pricing_status === "PRICED" ? parsed.changes : [],
+          };
         }),
       );
       const request = buildCompareRequest(goalId, state, extraPaths, viewRef.current);

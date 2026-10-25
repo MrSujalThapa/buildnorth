@@ -5,7 +5,13 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from pydantic import AliasChoices, Field, ValidationInfo, field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    NoDecode,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+from pydantic_settings.sources import EnvSettingsSource
 
 from personal_markets.core.errors import ProviderNotConfiguredError
 
@@ -17,6 +23,16 @@ AUTHENTICATED_SPUR_MODEL = "spur-glm-5-3"
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
+class _IgnoreBlankEnvSettingsSource(EnvSettingsSource):
+    """Treat empty process env values as unset so `.env` can still supply secrets."""
+
+    def get_field_value(self, field: Any, field_name: str) -> tuple[Any, str, bool]:
+        value, key, is_complex = super().get_field_value(field, field_name)
+        if isinstance(value, str) and not value.strip():
+            return None, key, is_complex
+        return value, key, is_complex
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="PM_",
@@ -24,6 +40,22 @@ class Settings(BaseSettings):
         extra="ignore",
         populate_by_name=True,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            _IgnoreBlankEnvSettingsSource(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     environment: str = "development"
     log_level: str = "INFO"
@@ -95,6 +127,7 @@ class Settings(BaseSettings):
     admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     admin_clerk_user_ids: Annotated[list[str], NoDecode] = Field(default_factory=list)
     test_auth_secret: str | None = None
+    scripted_inference: bool = False
     hosted_inference_enabled: bool = True
     hosted_user_quota_usd: float = Field(default=5.0, ge=0)
     hosted_user_quota_tokens: int = 5_000_000
@@ -171,6 +204,8 @@ class Settings(BaseSettings):
             problems.append("PM_DEV_BOOTSTRAP_TEST_USERS must be false")
         if self.test_auth_secret:
             problems.append("PM_TEST_AUTH_SECRET must be empty")
+        if self.scripted_inference:
+            problems.append("PM_SCRIPTED_INFERENCE must be false")
         if not self.resolved_clerk_jwks_url():
             problems.append("PM_CLERK_JWKS_URL is required")
         if problems:
@@ -181,6 +216,18 @@ class Settings(BaseSettings):
     @field_validator("cors_origin_regex", mode="before")
     @classmethod
     def _empty_cors_regex(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator(
+        "spur_api_key",
+        "openai_api_key",
+        "anthropic_api_key",
+        mode="before",
+    )
+    @classmethod
+    def _blank_secret_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
         return value

@@ -2,6 +2,58 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Chromium hosted Spur: env PASS, browser agent BLOCKED on budget
+
+**Hypothesis:** After blank-`PM_SPUR_API_KEY` masking was fixed, the Chromium app could reach hosted Spur if the FastAPI process loaded `.env` and the isolated DB had inference preference tables.
+
+**Changes:** No product-code change. Isolated `playitout_phase0_test` was missing `0011` `inference_preferences` / `provider_credentials` (schema_migrations had recorded 0011 without the tables). Those tables were applied on the isolated DB only. Started `python -m personal_markets` against that DB with process `PM_SPUR_API_KEY` unset so dotenv could load. No Pass 9, Social, Clerk, or quota-limit changes. Not merged.
+
+**Measured result:**
+- HTTP live consumer journey: **PASS** (prior SHA `0296758`, 6 Spur calls, SET 15 priced).
+- FastAPI hosted selection: **PASS** (unpaid). `api_inference` log `hosted_provider=spur`, `spur_key_configured=true`, `inference_model=spur-glm-5-3`. `GET /api/v1/settings/inference` 200, `hosted_configured=true`, preference `hosted`, `byok_usage.calls=0`. Isolated DB identity `127.0.0.1:54322/playitout_phase0_test`. Local JWT only; not Clerk.
+- Chromium agent-dependent Spur completion: **BLOCKED**. Cumulative authorized Spur completions are exhausted (~44 vs ~40 including retries; last green HTTP run 6 calls, plus 3+7 failed HTTP retries this branch, plus ~28 earlier). Remaining paid budget: **0**. Did not start Playwright create-goal.
+- Real Clerk browser login: **BLOCKED** (unchanged; local JWT is not Clerk).
+
+## 2026-10-25 — Close remaining Spur E2E blockers (confirm, 8→15 critic, hosted key)
+
+**Hypothesis:** Live Spur inference was proven, but consumer acceptance still stopped at `needs_input`, dropped a valid 8→15 applications/week SET, and Chromium hit `ProviderNotConfiguredError` because a blank `PM_SPUR_API_KEY` process env masked `.env`. GitHub typecheck failed on `test_last_scenario.py` returning `Any`.
+
+**Changes:** Type-narrow `_scripted_goal`. Confirming evidence commits the reviewed proposal (resume keeps `confirmed` plus answers) instead of re-invoking the evidence agent. Critic parses `from N to M` / `instead of` as SET of the new weekly rate and `increase by` as ADD; composed career specs still allow hiring-funnel rate aliases. Blank process env secrets no longer hide dotenv keys. Live complete-journey assertions require committed evidence IDs, simulation, and a second receipt. No Pass 9, Social, forecast-coefficient, or production-quota changes.
+
+**Measured result:** Local mypy baseline clean (363 historical). Targeted API tests green. Live complete career journey: 6 Spur calls, ~$0.008, `weekly_application_rate` SET 15, scenario probability 0.588, evidence confirmed and committed, published history 1→2 (0.207 → 0.342). Chromium hosted Spur not re-run this pass (call budget). Not merged.
+
+## 2026-10-25 — Real Spur consumer acceptance and lossless fingerprint uniqueness
+
+**Hypothesis:** Scripted E2E only proved HTTP/Postgres/browser wiring. Empty evidence continuation after confirm was invoking the evidence agent and surfacing `evidence_continuation_failed`. Fingerprint uniqueness numbered `0023` collided with PR #33, and deleting duplicate evidence rows would break dependents.
+
+**Changes:** Skip empty `continue_evidence` after contract confirm. Owner+goal What If last-scenario store for relative follow-ups (`half as` / `twice`). Fingerprint uniqueness is `0024` with a live partial unique index; duplicates are superseded, not deleted. Live Spur acceptance is opt-in (`PM_LIVE_SPUR=1` / `LIVE_SPUR_E2E=1`) and fails if `provider=scripted`. No Pass 9, Social, or forecast-coefficient changes.
+
+**Measured result:** Authorized live Spur (`spur` / `spur-glm-5-3`) completed a career+savings HTTP journey: 19 calls, ~$0.020 estimated, all `provider=scripted` absent. Prior failed attempts in the same pass added ~9 calls. Career 8→15 applications was understood but critic-empty (`NOT_PRICED`). Mock interviews stayed unpriced. Strategy answers varied by question. Additional NL evidence stayed `needs_input` so published history did not move. Chromium vs local JWT still blocked (`ProviderNotConfiguredError` / Clerk). No GitHub paid inference. Not merged.
+
+## 2026-10-25 — Evidence fingerprint uniqueness and stricter strategy validation
+
+**Hypothesis:** Concurrent evidence commits can duplicate rows without a database unique key, and MODELED/citations were too easy to fake from prose.
+
+**Changes:** Additive unique index on `(user_id, fingerprint)`. Concurrent commits race the unique index and corroborate. MODELED requires a verified numeric contract on a supported intervention. Invented citations, invented probability effects, and unsupported personal claims in prose are dropped or qualified; disclaimers that mention odds are kept. Local `PM_SCRIPTED_INFERENCE` uses the scripted provider against Postgres so consumer E2E can run without paid calls. No Pass 9, marketplace, or forecast-coefficient changes.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Hosted-model creative quality remains unverified.
+
+## 2026-10-25 — Strategy agent replaces keyword templates
+
+**Hypothesis:** PlayItOut recommendations were a keyword-to-template lookup. Routing also attached those cards to odds/evidence questions. Published history was readable from the forecast store but not always from What If's in-memory history adapter.
+
+**Changes:** Strategy path uses `complete_validated` + `prompts/strategy/v1.md` + `validate_strategy_proposal`. Template composer removed. Factual request kinds return no insight cards. Inference failure is an unavailable state, not generic advice. Isolated What If history/baseline overlay published forecasts. No Monte Carlo, Details radar, or Spur entitlement change. No paid live inference.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Creative quality of a hosted model is unverified; tests use the scripted provider.
+
+## 2026-10-25 — What If consumer chart honesty and request routing
+
+**Hypothesis:** Simple Change was unreadable because a fabricated future overlay stretched the x-axis to the deadline, and unpriced strategy questions were treated as failed calculations.
+
+**Changes:** Endpoint comparison beside published yellow history; no deadline-length forecast line. Request kinds distinguish quantitative scenarios, evidence, strategy, and current odds. Strategy insights stay unpriced unless a modeled lever is stated. Skip-link is focus-only. No forecast math, Details radar, or Spur entitlements changed.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Historical changelog probabilities were not rewritten.
+
 ## 2026-10-24 — MCP Apps Odds Explorer handshake
 
 **Hypothesis:** Grok Bot called `show_odds_chart` and received `ui://playitout/odds-explorer` without rendering because the view spoke a private handshake (`clientInfo`, data only on `hostContext.toolResult`) instead of MCP Apps `appInfo` / `ui/notifications/tool-result`.

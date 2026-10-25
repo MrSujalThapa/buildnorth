@@ -42,6 +42,7 @@ from personal_markets.integrations.research import (
     MonidResearchProvider,
 )
 from personal_markets.persistence.research_store import ResearchStore
+from personal_markets.ports import InferenceProvider
 from personal_markets.profile.api import router as profile_router
 from personal_markets.what_if.api import router as what_if_router
 from personal_markets.wiring import (
@@ -117,6 +118,16 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment,
         deployed=settings.is_deployed(),
     )
+    from personal_markets.identity.inference_router import hosted_provider
+
+    structlog.get_logger("personal_markets").info(
+        "api_inference",
+        scripted=settings.scripted_inference,
+        hosted_provider=hosted_provider(settings),
+        spur_key_configured=bool(settings.spur_api_key),
+        inference_model=settings.inference_model
+        or (settings.resolved_spur_model() if settings.inference_provider == "spur" else None),
+    )
     structlog.get_logger("personal_markets").warning(
         "single_worker_required",
         reason="MCP rate limits and goal write locks are process-local asyncio state",
@@ -143,7 +154,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         assert settings.database_url is not None
         engine = create_engine(settings.database_url)
         usage = PostgresUsageStore(engine)
-        inference = build_inference(settings, usage)
+        inference: InferenceProvider
+        if settings.scripted_inference and not settings.is_deployed():
+            from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
+
+            inference = ScriptedInferenceProvider()
+        else:
+            inference = build_inference(settings, usage)
         evidence_repo = PostgresEvidenceRepository(engine)
         evidence = EvidenceService(evidence_repo)
         deps = AgentDependencies(
@@ -177,6 +194,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.upload_service = UploadService(PostgresUploadStore(engine))
         application.state.github_cursor_store = PostgresGithubCursorStore(engine)
         application.state.checkpointer = checkpointer
+        from personal_markets.what_if.last_scenario import LastInterventionStore
+
+        application.state.last_intervention_store = LastInterventionStore()
     else:
         from personal_markets.wiring import build_in_memory_workflow, get_goal_repository
 
@@ -187,6 +207,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
         application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
+        from personal_markets.what_if.last_scenario import LastInterventionStore
+
+        application.state.last_intervention_store = LastInterventionStore()
     from personal_markets.integrations.goal_sync_worker import goal_sync_worker
 
     sync_stop = asyncio.Event()

@@ -227,6 +227,21 @@ export interface ParseDecisionResult {
   unsupported: string[];
 }
 
+export interface StrategyInsight {
+  title: string;
+  description: string;
+  why_it_might_help: string;
+  why_this_fits: string;
+  next_step: string;
+  evidence_to_collect: string;
+  constraints?: string;
+  modeled_metric?: string | null;
+  model_status: "MODELED" | "UNPRICED" | "NEEDS_DATA";
+  grounded_facts?: string[];
+  assumptions?: string[];
+  sources?: string[];
+}
+
 export interface ParseInterventionResult {
   raw_text: string;
   changes: ParsedInterventionChange[];
@@ -238,6 +253,10 @@ export interface ParseInterventionResult {
   agent_run_id?: string | null;
   limitations?: string[];
   research_claims?: string[];
+  request_kind?: string;
+  confirmation_needed?: boolean;
+  insights?: StrategyInsight[];
+  consumer_summary?: string;
 }
 
 export interface CourseGradeComponent {
@@ -540,6 +559,9 @@ export interface WhatIfBaselineState {
   periods?: number | null;
   direction: "at_least" | "at_most";
   current_probability?: number | null;
+  published_probability?: number | null;
+  published_model_version?: string | null;
+  published_evidence_watermark?: string | null;
   assumptions: WhatIfAssumption[];
   default_intervention?: Record<string, unknown> | null;
   model_family: string;

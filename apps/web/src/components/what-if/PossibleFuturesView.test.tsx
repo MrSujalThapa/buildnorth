@@ -59,4 +59,16 @@ describe("PossibleFuturesView", () => {
     expect(screen.getByText("Possible futures are structurally valid but unpriced.")).toBeVisible();
     expect(screen.queryByLabelText("Possible future scenarios")).not.toBeInTheDocument();
   });
+
+  it("labels event futures without fractional event counts", () => {
+    render(
+      <PossibleFuturesView view="deep" decision="Apply for roles"
+        onDecisionChange={() => {}} onRun={() => {}}
+        selectedClusterId={null} onSelectCluster={() => {}}
+        scenarios={scenarios}
+        outcomeScale={{ unit: "event", target: 1, direction: "at_least" }} />,
+    );
+    expect(screen.getByText(/offer\/no offer categories/)).toBeVisible();
+    expect(screen.queryByText(/1972\.03 event/)).not.toBeInTheDocument();
+  });
 });

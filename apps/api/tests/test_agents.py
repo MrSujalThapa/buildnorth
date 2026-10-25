@@ -328,11 +328,9 @@ async def test_clear_goal_interrupts_for_confirmation_then_completes() -> None:
     assert second.goal is not None
     assert second.pricing is None
     second = await runtime.continue_evidence(first.thread_id)
-    assert second.status in {"limited", "completed", "withheld"}
+    assert second.status == "evidence_pending"
     assert second.goal is not None
-    assert second.pricing is not None
-    assert second.pricing.raw_probability is None
-    assert second.critic is not None
+    assert second.pricing is None
     assert "Understanding goal" in second.progress
     if second.progress.count("Researching reference class"):
         assert "Reading evidence" not in second.progress
@@ -391,3 +389,66 @@ async def test_manual_evidence_extracts_two_events() -> None:
     assert evidence.pricing.receipt.get("llm_used_for_probability") is False
     transforms = evidence.pricing.receipt.get("feature_transforms") or {}
     assert "funnel_state" in transforms
+
+
+@pytest.mark.asyncio
+async def test_confirm_evidence_with_answers_does_not_create_a_new_goal() -> None:
+    runtime = workflow()
+    created = await runtime.start(
+        WorkflowRequest(kind="create_goal", intent="Receive an SWE offer by August 2027")
+    )
+    priced = await runtime.resume(created.thread_id, ResumePayload(confirmed=True))
+    assert priced.goal is not None
+    goal_id = priced.goal.goal_id
+    evidence = await runtime.start(
+        WorkflowRequest(
+            kind="add_evidence",
+            goal_id=goal_id,
+            evidence_text="I solved 14 LeetCode mediums this week and failed a Meta phone screen.",
+        )
+    )
+    if evidence.interrupt and evidence.interrupt.type == "confirm_evidence":
+        evidence = await runtime.resume(
+            evidence.thread_id,
+            ResumePayload(
+                confirmed=True,
+                answers={"observation_kind": "These are distinct observed events."},
+            ),
+        )
+    assert evidence.goal is not None
+    assert evidence.goal.goal_id == goal_id
+    ids = list(evidence.debug.get("committed_evidence_ids") or [])
+    assert ids
+    duplicate = await runtime.start(
+        WorkflowRequest(
+            kind="add_evidence",
+            goal_id=goal_id,
+            evidence_text="I solved 14 LeetCode mediums this week and failed a Meta phone screen.",
+        )
+    )
+    if duplicate.interrupt:
+        duplicate = await runtime.resume(duplicate.thread_id, ResumePayload(confirmed=True))
+    extra = set(duplicate.debug.get("committed_evidence_ids") or []) - set(ids)
+    assert not extra
+
+
+@pytest.mark.asyncio
+async def test_evidence_confirmation_can_be_cancelled() -> None:
+    runtime = workflow()
+    created = await runtime.start(
+        WorkflowRequest(kind="create_goal", intent="Receive an SWE offer by August 2027")
+    )
+    priced = await runtime.resume(created.thread_id, ResumePayload(confirmed=True))
+    assert priced.goal is not None
+    evidence = await runtime.start(
+        WorkflowRequest(
+            kind="add_evidence",
+            goal_id=priced.goal.goal_id,
+            evidence_text="I solved 14 LeetCode mediums this week and failed a Meta phone screen.",
+        )
+    )
+    if evidence.interrupt is None:
+        pytest.skip("scripted evidence did not request confirmation")
+    cancelled = await runtime.resume(evidence.thread_id, ResumePayload(cancelled=True))
+    assert cancelled.status == "cancelled"
+    assert not cancelled.debug.get("committed_evidence_ids")

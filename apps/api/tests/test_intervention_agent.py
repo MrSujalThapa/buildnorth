@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -18,7 +19,10 @@ from personal_markets.integrations.research import (
     FrozenReferenceProvider,
     MonidResearchProvider,
 )
-from personal_markets.persistence.agent_store import InMemoryAgentRunStore, InMemoryEvidenceRepository
+from personal_markets.persistence.agent_store import (
+    InMemoryAgentRunStore,
+    InMemoryEvidenceRepository,
+)
 from personal_markets.ports import InterventionAgentProposal, InterventionStateChange
 
 
@@ -40,7 +44,11 @@ async def test_intervention_agent_maps_linkedin_semantically() -> None:
     repo = InMemoryGoalRepository()
     await repo.create(goal, uuid4())
     service = InterventionAgentService(
-        settings=Settings(environment="test", intervention_agent_enabled=True, intervention_regex_fallback=False),
+        settings=Settings(
+            environment="test",
+            intervention_agent_enabled=True,
+            intervention_regex_fallback=False,
+        ),
         inference=ScriptedInferenceProvider(),
         research=CompositeResearchProvider(
             FrozenReferenceProvider(), MonidResearchProvider(False, None, None)
@@ -49,7 +57,9 @@ async def test_intervention_agent_maps_linkedin_semantically() -> None:
         evidence=EvidenceService(InMemoryEvidenceRepository()),
         run_store=InMemoryAgentRunStore(),
     )
-    parsed = await service.parse(str(goal.goal_id), "What if I start posting on LinkedIn 4 times a week?")
+    parsed = await service.parse(
+        str(goal.goal_id), "What if I start posting on LinkedIn 4 times a week?"
+    )
     assert parsed.pricing_status in {"PRICED", "ASSUMPTION_REQUIRED"}
     assert parsed.changes
     assert parsed.changes[0].metric == "linkedin_posts_per_week"
@@ -78,6 +88,184 @@ def test_intervention_critic_rejects_probability_fields() -> None:
     critic = critique_intervention(goal, proposal)
     assert critic.approved is False
     assert critic.pricing_status == "NOT_PRICED"
+
+
+def test_cold_email_cannot_become_unmeasured_application_uplift() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Send 10 cold emails",
+        changes=[
+            InterventionStateChange(
+                metric="weekly_application_rate",
+                operation="add",
+                value=10,
+                unit="count/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(career_goal(), proposal, "What if I send 10 cold emails?")
+    assert not critic.approved
+    assert not critic.validated_changes
+    assert "not measured applications" in critic.issues[0]
+
+
+@pytest.mark.parametrize(
+    "text,value,operation",
+    [
+        ("What if I submit 5 additional applications each week?", 5, "add"),
+        ("what if i send 5 more applications every week", 5, "add"),
+        ("what if i apply to 20 jobs next week", 20, "set"),
+        ("what if i do 10 applications a week", 10, "set"),
+        (
+            "What if I increase applications from 8 per week to 15 per week "
+            "for the next two months?",
+            15,
+            "set",
+        ),
+        ("What if I increase from 8/week by 7/week?", 7, "add"),
+        ("What if I do 15 applications/week instead of 8?", 15, "set"),
+    ],
+)
+def test_explicit_weekly_application_changes_survive_critique(
+    text: str, value: float, operation: Literal["set", "add", "subtract"]
+) -> None:
+    proposal = InterventionAgentProposal(
+        understood_action=text,
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation=operation,
+                value=value,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(career_goal(), proposal, text)
+    assert critic.approved
+    assert critic.validated_changes[0].value == value
+    assert critic.validated_changes[0].operation == operation
+
+
+@pytest.mark.parametrize(
+    "text,value,operation",
+    [
+        ("What if I send 10 cold emails and 5 applications?", 5, "add"),
+        ("What if I study 5 hours and apply to jobs?", 5, "set"),
+        ("What if I send 5 more applications each week?", 5, "set"),
+        ("What if I submit 5 applications each week?", 5, "add"),
+        ("What if I apply to 20 jobs next week?", 15, "set"),
+        ("I completed 15 applications yesterday", 15, "set"),
+        ("What if I send 15 additional applications?", 15, "add"),
+    ],
+)
+def test_application_critic_rejects_unstated_or_wrong_semantics(
+    text: str, value: float, operation: Literal["set", "add", "subtract"]
+) -> None:
+    proposal = InterventionAgentProposal(
+        understood_action=text,
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation=operation,
+                value=value,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    assert not critique_intervention(career_goal(), proposal, text).approved
+
+
+def test_study_hours_cannot_invent_a_daily_practice_quantity() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Study for 10 hours tomorrow",
+        changes=[
+            InterventionStateChange(
+                metric="daily_practice_problems",
+                operation="set",
+                value=20,
+                unit="count/day",
+                provenance="USER_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(career_goal(), proposal, "What if I study 10 hours tomorrow?")
+    assert not critic.approved
+    assert not critic.validated_changes
+
+
+def _composed_career_goal() -> GoalContract:
+    goal = career_goal()
+    return goal.model_copy(
+        update={
+            "model_requirements": {
+                "forecast_spec": {
+                    "family": "composed_growth",
+                    "primitives": [
+                        {
+                            "id": "primary",
+                            "kind": "growth",
+                            "config": {"time_unit": "week"},
+                            "unit": "count",
+                        }
+                    ],
+                }
+            }
+        }
+    )
+
+
+def test_composed_career_spec_still_accepts_application_rate() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Increase applications to 15 per week",
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation="set",
+                value=15,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(
+        _composed_career_goal(),
+        proposal,
+        "What if I increase my applications from 8 per week to 15 per week "
+        "for the next two months?",
+    )
+    assert critic.approved
+    assert critic.validated_changes[0].value == 15
+    assert critic.validated_changes[0].operation == "set"
+
+
+def test_composed_career_spec_rejects_unmodeled_mock_interviews() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Four mock interviews",
+        changes=[
+            InterventionStateChange(
+                metric="mock_interviews_per_week",
+                operation="set",
+                value=4,
+                unit="count/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(
+        _composed_career_goal(),
+        proposal,
+        "What if I do four mock interviews per week?",
+    )
+    assert not critic.approved
+    assert not critic.validated_changes
 
 
 def test_parse_intervention_api_uses_agent() -> None:

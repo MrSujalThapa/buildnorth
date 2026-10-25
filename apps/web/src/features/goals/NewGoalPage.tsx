@@ -28,7 +28,10 @@ export function NewGoalPage() {
     queryKey: ["new-goal-thread", threadId],
     queryFn: () => api.getThread(threadId!),
     enabled: Boolean(threadId),
-    refetchInterval: (query) => query.state.data?.status === "running" ? 2000 : false,
+    refetchInterval: (query) =>
+      ["running", "evidence_pending", "evidence_running"].includes(String(query.state.data?.status ?? ""))
+        ? 2000
+        : false,
   });
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export function NewGoalPage() {
       sessionStorage.removeItem(PENDING_GOAL_THREAD);
       setThreadId(null);
     }
-    if (data.goal && ["evidence_pending", "evidence_running", "completed", "limited", "withheld"].includes(data.status)) {
+    if (data.goal && ["evidence_pending", "evidence_running", "evidence_failed", "completed", "limited", "withheld"].includes(data.status)) {
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
       void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });
@@ -82,7 +85,7 @@ export function NewGoalPage() {
         setError(failureMessage(data));
         return;
       }
-      if (data.goal && ["evidence_pending", "evidence_running", "completed", "limited", "withheld"].includes(data.status)) {
+      if (data.goal && ["evidence_pending", "evidence_running", "evidence_failed", "completed", "limited", "withheld"].includes(data.status)) {
         void queryClient.invalidateQueries({ queryKey: ["goals"] });
         void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         void navigate(`/goals/${data.goal.goal_id}`, { state: { snapshot: data } });

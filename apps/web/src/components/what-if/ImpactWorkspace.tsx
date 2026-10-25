@@ -5,8 +5,10 @@ import type { ImpactViewModel } from "../../adapters/impactViewModel";
 import { formatProbabilityPercent } from "../../adapters/formatProbability";
 import { formatOutcome } from "../../adapters/outcomeFormat";
 import type { SimulationPoint } from "../../adapters/simulationTypes";
-import type { Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
-import type { Priceability } from "../../api/client";
+import type { ChartPoint, Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
+import type { ParseInterventionResult, Priceability, StrategyInsight } from "../../api/client";
+import OddsExplorer from "../market/OddsExplorer";
+import { ODDS_EXPLORER_RANGES } from "../market/marketRanges";
 import MissingStatePanel from "./MissingStatePanel";
 import { ScenarioComposer } from "./ScenarioComposer";
 import OutcomeDistribution from "./OutcomeDistribution";
@@ -39,6 +41,9 @@ type Props = {
   running?: boolean;
   runError?: string | null;
   priceability?: Priceability | null;
+  publishedOdds?: number | null;
+  history?: ChartPoint[];
+  parseResult?: ParseInterventionResult | null;
   onSubmitMissingState?: (
     entries: { key: string; label: string; value: number; unit: string }[],
   ) => void;
@@ -109,6 +114,29 @@ function TuneSlider({
   );
 }
 
+function preciseOdds(value: number | null | undefined): string {
+  return value == null ? "—" : `${Number(value.toFixed(2))}%`;
+}
+
+function scenarioPlainLanguage(args: {
+  question: string;
+  publishedOdds?: number | null;
+  preview: WhatIfPreview;
+}): string {
+  const asked = args.question.trim() || "this change";
+  if (args.preview.scenarioOdds == null || args.preview.currentOdds == null) {
+    return "";
+  }
+  const published = args.publishedOdds != null ? preciseOdds(args.publishedOdds) : "unpublished";
+  const direction =
+    (args.preview.improvementPoints ?? 0) >= 0 ? "an improvement" : "a decrease";
+  const delta =
+    args.preview.improvementPoints == null
+      ? "an unquantified shift"
+      : `${Math.abs(args.preview.improvementPoints).toFixed(1)} percentage points`;
+  return `You currently have published odds of ${published}. Under the model's latest recalculated assumptions, “${asked}” changes the comparison from ${preciseOdds(args.preview.currentOdds)} to ${preciseOdds(args.preview.scenarioOdds)}, ${direction} of ${delta}. This is a modeled scenario, not a new published forecast.`;
+}
+
 export default function ImpactWorkspace({
   market,
   view,
@@ -125,6 +153,9 @@ export default function ImpactWorkspace({
   running,
   runError,
   priceability,
+  publishedOdds,
+  history = [],
+  parseResult = null,
   onSubmitMissingState,
   onAddEvidence,
   onConnectSource,
@@ -143,6 +174,17 @@ export default function ImpactWorkspace({
     impact.followThroughPercent === null
       ? "—"
       : `${impact.followThroughPercent.toFixed(0)}%`;
+  const scenarioBranch =
+    preview.currentOdds != null && preview.scenarioOdds != null
+      ? {
+          comparisonBaseline: preview.currentOdds,
+          scenarioOdds: preview.scenarioOdds,
+          tone: resultPositive ? ("positive" as const) : ("negative" as const),
+        }
+      : null;
+  const insights = parseResult?.insights ?? [];
+  const qualitativeKind = parseResult?.request_kind && parseResult.request_kind !== "quantitative_scenario";
+  const plainLanguage = scenarioPlainLanguage({ question, publishedOdds, preview });
 
   const outcomeChart = (label: string) => (
     <OutcomeDistribution
@@ -155,9 +197,10 @@ export default function ImpactWorkspace({
     />
   );
 
-  const unpriced = preview.currentOdds === null || !bins.length;
   let unpricedPanel;
-  if (priceability && priceability.status !== "PRICED" && onSubmitMissingState) {
+  if (insights.length) {
+    unpricedPanel = null;
+  } else if (priceability && priceability.status !== "PRICED" && onSubmitMissingState) {
     unpricedPanel = (
       <MissingStatePanel
         priceability={priceability}
@@ -169,12 +212,12 @@ export default function ImpactWorkspace({
       />
     );
   } else if (preview.scenarioOdds !== null) {
-    unpricedPanel = (
-      <div className="empty-state">
+    unpricedPanel = view === "deep" ? (
+      <div className="empty-state compact">
         <strong>Outcome range unavailable</strong>
-        <span>The scenario odds were computed, but this result has no simulated outcome distribution.</span>
+        <span>This result has no simulated outcome distribution.</span>
       </div>
-    );
+    ) : null;
   } else if (preview.currentOdds !== null) {
     unpricedPanel = (
       <div className="empty-state">
@@ -231,40 +274,88 @@ export default function ImpactWorkspace({
           </aside>
 
           <section className="result-panel">
-            <div className="result-topline">
-              <div className="odds-pair">
-                <div><span>Scenario baseline</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
-                <div className="odds-arrow" aria-hidden="true">→</div>
-                <div><span>Scenario odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
-              </div>
-              <div className={`delta ${deltaTone}`}>
-                <strong>
-                  {preview.improvementPoints === null
-                    ? preview.scenarioOdds === null
-                      ? "—"
-                      : "Unpriced"
-                    : `${preview.improvementPoints >= 0 ? "+" : ""}${preview.improvementPoints.toFixed(1)} pts`}
-                </strong>
-                <span>hypothetical change</span>
-              </div>
-            </div>
-            {impact.causalCaption ? <p className="quiet-copy">{impact.causalCaption}</p> : null}
-
-            <div className="panel-head tight">
-              <div>
-                <p className="section-label">Where you could finish</p>
-                <h2>{bins.length ? `Simulated results across ${impact.drawCount?.toLocaleString() ?? "simulated"} futures` : "Outcome range"}</h2>
+            <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
+              <div className="panel-head tight"><div><h2>Your market</h2></div></div>
+              {history.length ? (
+                <OddsExplorer
+                  history={history}
+                  ranges={ODDS_EXPLORER_RANGES}
+                  scenarioBranch={scenarioBranch}
+                  overlayTone={resultPositive ? "positive" : "negative"}
+                  showTimeAxis
+                  interactive
+                />
+              ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
+              <div className="what-if-chart-legend">
+                <span className="published">Published forecast: {preciseOdds(publishedOdds)}</span>
+                {preview.currentOdds != null ? (
+                  <span className="comparison-baseline">Comparison baseline: {preciseOdds(preview.currentOdds)}</span>
+                ) : null}
+                {preview.scenarioOdds != null ? (
+                  <span className={resultPositive ? "hypothetical-positive" : "hypothetical-negative"}>Hypothetical scenario: {preciseOdds(preview.scenarioOdds)}</span>
+                ) : null}
               </div>
             </div>
+            {plainLanguage ? <p className="scenario-plain">{plainLanguage}</p> : null}
+            {parseResult?.confirmation_needed ? (
+              <p className="quiet-copy" role="status">This looks like real progress. Record it as evidence if you want the published forecast to consider it.</p>
+            ) : null}
+            {insights.length ? (
+              <ul className="insight-list">
+                {insights.map((insight: StrategyInsight) => (
+                  <li key={insight.title} className="insight-card">
+                    <header>
+                      <h3>{insight.title}</h3>
+                      <em>{insight.model_status === "MODELED" ? "Modeled" : insight.model_status === "NEEDS_DATA" ? "Needs more data" : "Probability impact not yet estimated"}</em>
+                    </header>
+                    <p>{insight.description}</p>
+                    <p><strong>Why it might help.</strong> {insight.why_it_might_help}</p>
+                    <p><strong>Why this fits you.</strong> {insight.why_this_fits}</p>
+                    <p><strong>What to do next.</strong> {insight.next_step}</p>
+                    {insight.constraints ? <p><strong>Tradeoff.</strong> {insight.constraints}</p> : null}
+                    <p><strong>Evidence to collect.</strong> {insight.evidence_to_collect}</p>
+                    {insight.assumptions?.length ? <p className="quiet-copy">Assumption: {insight.assumptions.join(" ")}</p> : null}
+                    {insight.sources?.length ? <p className="quiet-copy">Sources: {insight.sources.join(" · ")}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {!qualitativeKind ? (
+              <div className="result-topline">
+                <div className="odds-pair">
+                  <div><span>Published market</span><strong>{preciseOdds(publishedOdds)}</strong></div>
+                  <div className="odds-arrow" aria-hidden="true">→</div>
+                  <div><span>Comparison baseline</span><strong>{preciseOdds(preview.currentOdds)}</strong></div>
+                  <div className="odds-arrow" aria-hidden="true">→</div>
+                  <div><span>Hypothetical</span><strong>{preciseOdds(preview.scenarioOdds)}</strong></div>
+                </div>
+                <div className={`delta ${deltaTone}`}>
+                  <strong>
+                    {preview.improvementPoints === null
+                      ? preview.scenarioOdds === null
+                        ? "—"
+                        : "Unpriced"
+                      : `${preview.improvementPoints >= 0 ? "+" : ""}${preview.improvementPoints.toFixed(1)} pts`}
+                  </strong>
+                  <span>hypothetical change</span>
+                </div>
+              </div>
+            ) : null}
 
-            <div className="result-chart">
-              {unpriced ? unpricedPanel : outcomeChart("Distribution of simulated results after this change")}
-            </div>
+            {bins.length ? (
+              <>
+                <div className="panel-head tight">
+                  <div>
+                    <h2>Simulated results across {impact.drawCount?.toLocaleString() ?? "simulated"} futures</h2>
+                  </div>
+                </div>
+                <div className="result-chart">
+                  {outcomeChart("Distribution of simulated results after this change")}
+                </div>
+              </>
+            ) : unpricedPanel}
 
-            <div className="metric-row four">
-              <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
-              <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
-              <div><span>Likely range</span><strong>{impact.likelyRangeLabel}</strong></div>
+            <div className="metric-row">
               <button type="button" className="text-action" onClick={onOpenDetails}>Details</button>
             </div>
           </section>

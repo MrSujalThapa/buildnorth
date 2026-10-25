@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from personal_markets.what_if.strategy_insights import StrategyInsight
+
 
 class InterventionChangeResponse(BaseModel):
     metric: str
@@ -27,6 +29,12 @@ class ParseInterventionResponse(BaseModel):
     agent_run_id: str | None = None
     limitations: list[str] = Field(default_factory=list)
     research_claims: list[str] = Field(default_factory=list)
+    request_kind: str = "quantitative_scenario"
+    confirmation_needed: bool = False
+    insights: list[StrategyInsight] = Field(default_factory=list)
+    consumer_summary: str = ""
+    inference_provider: str | None = None
+    inference_model: str | None = None
 
 
 class ParseDecisionRequest(BaseModel):
