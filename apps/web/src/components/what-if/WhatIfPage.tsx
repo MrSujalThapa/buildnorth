@@ -25,6 +25,7 @@ import {
 
 } from "../../adapters/whatIfViewModel";
 
+import { primaryLever } from "../../adapters/whatIfRequests";
 import { useWhatIfSimulation } from "../../hooks/useWhatIfSimulation";
 
 import CompareOptionsView from "./CompareOptionsView";
@@ -87,6 +88,12 @@ type Props = {
   pathsError?: string | null;
 
   pathsMessage?: string | null;
+
+  /** Name of the lever plotted on the Reverse frontier's x-axis. */
+  pathsAxisLabel?: string | null;
+
+  /** Futures question that restates a Reverse path as a stated quantity. */
+  futuresQuestionForPath?: (path: PathStrategy) => string;
 
   onRunCompare?: (paths?: { id: string; label: string }[]) => void;
 
@@ -232,6 +239,10 @@ export default function WhatIfPage({
   pathsError,
 
   pathsMessage,
+
+  pathsAxisLabel,
+
+  futuresQuestionForPath,
 
   onRunCompare,
 
@@ -388,12 +399,9 @@ export default function WhatIfPage({
   // particular, do not race an unpriceable automatic run against custom paths
   // after changing analysis depth.
   useEffect(() => {
-    if (mode !== "compare" || compareResult) return;
-    const priceableSuggestions = baseline?.compare_candidates.filter(
-      (item) => item.intervention?.effect_per_unit != null,
-    ) ?? [];
-    if (priceableSuggestions.length >= 2) compareRef.current?.();
-  }, [baseline, compareResult, mode]);
+    if (mode !== "compare" || compareResult || compareLoading) return;
+    if (primaryLever(baseline)) compareRef.current?.();
+  }, [baseline, compareLoading, compareResult, mode]);
 
 
 
@@ -401,7 +409,7 @@ export default function WhatIfPage({
 
     if (mode !== "paths" || !baseline?.priced) return;
 
-    const timer = window.setTimeout(() => pathsRef.current?.(targetOdds / 100), 250);
+    const timer = window.setTimeout(() => pathsRef.current?.(targetOdds / 100), 600);
 
     return () => window.clearTimeout(timer);
 
@@ -446,9 +454,10 @@ export default function WhatIfPage({
 
     setPathContext(path.label);
 
-    setDecision(`What if I take the ${path.label} path?`);
-
+    const handoff = futuresQuestionForPath?.(path) ?? `What if I take the ${path.label} path?`;
+    setDecision(handoff);
     onModeChange("futures");
+    futuresRef.current?.(handoff);
 
     setSelectedSimulation(null);
 
@@ -725,6 +734,8 @@ export default function WhatIfPage({
               onSelectSimulation={setSelectedSimulation}
 
               onFind={() => pathsRef.current?.(targetOdds / 100)}
+
+              xAxisLabel={pathsAxisLabel ?? undefined}
 
             />
 

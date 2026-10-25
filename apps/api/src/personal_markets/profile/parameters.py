@@ -131,6 +131,7 @@ class ParameterEstimate(BaseModel):
     observation_count: int = 0
     source_types: list[str] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
+    last_observed_at: datetime | None = None
     status: Literal["measured", "insufficient"] = "insufficient"
 
 
@@ -307,6 +308,7 @@ def parameter_profile(
                 observation_count=len(rows),
                 source_types=sorted({row.provenance.source_type for row in rows}),
                 evidence_ids=[str(row.evidence_id or row.fingerprint) for row in rows],
+                last_observed_at=rows[-1].observed_at if rows else None,
                 status="measured" if rows else "insufficient",
             )
         )

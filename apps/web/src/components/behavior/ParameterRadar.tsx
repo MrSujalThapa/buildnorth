@@ -1,151 +1,188 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type { ParameterEstimate, ParameterProfile } from "../../api/client";
-import { ExecutionProfileRadar, type BehaviorDimension, type BehaviorProfile } from "./ExecutionProfileRadar";
 import "./execution-profile.css";
 
-const CATEGORY_BY_ID: Record<string, string> = {
-  weekly_applications: "career",
-  weekly_study_hours: "education",
-  monthly_savings: "finance",
-  weekly_running_km: "fitness",
-  reading_minutes: "personal_development",
+const LIFE_AREA_BY_ID: Record<string, { label: string; color: string }> = {
+  weekly_applications: { label: "Career", color: "#1f8f86" },
+  weekly_study_hours: { label: "Education", color: "#5b6ee1" },
+  monthly_savings: { label: "Finance", color: "#c58a14" },
+  weekly_running_km: { label: "Fitness", color: "#d0573f" },
+  reading_minutes: { label: "Personal", color: "#9a5bc4" },
 };
+const FALLBACK = { label: "Other", color: "#706d68" };
 
-function categoryFor(parameter: ParameterEstimate): string {
-  return CATEGORY_BY_ID[parameter.id] ?? "other";
+const SIZE = 520;
+const CX = SIZE / 2;
+const CY = SIZE / 2;
+const RADIUS = 176;
+/** Share of an axis's sector each life-area petal spans on either side of its spoke. */
+const PETAL_HALF_WIDTH = 0.32;
+
+function areaFor(parameter: ParameterEstimate) {
+  return LIFE_AREA_BY_ID[parameter.id] ?? FALLBACK;
 }
 
-function categoryLabel(raw: string): string {
-  const labels: Record<string, string> = {
-    career: "Career",
-    education: "Education",
-    fitness: "Fitness",
-    health: "Health",
-    personal: "Personal development",
-    personal_development: "Personal development",
-    finance: "Finance",
-    startup: "Startup",
-    entrepreneurship: "Startup",
-    relationships: "Relationships",
-    social: "Relationships",
-    other: "Other",
-  };
-  return labels[raw] ?? raw.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function polar(angle: number, magnitude: number) {
+  return { x: CX + Math.cos(angle) * RADIUS * magnitude, y: CY + Math.sin(angle) * RADIUS * magnitude };
 }
 
-function asDimension(parameter: ParameterEstimate): BehaviorDimension {
-  const sources = parameter.source_types.length ? parameter.source_types : ["unobserved"];
-  const details: string[] = [];
-  if (parameter.raw_value != null) {
-    details.push(`Current ${parameter.raw_value} ${parameter.unit}`);
-  }
-  details.push(`${parameter.observation_count} observations in ${parameter.window_days} days`);
-  details.push(`${parameter.metric} · ${parameter.aggregation}`);
-  return {
-    key: parameter.id,
-    label: parameter.name,
-    value: parameter.value,
-    display_percent: parameter.value == null ? null : Math.round(parameter.value * 100),
-    limited_evidence: parameter.status !== "measured",
-    confidence: parameter.status === "measured" ? "medium" : "insufficient",
-    provenance: {
-      comparable_commitments: parameter.observation_count,
-      completed: parameter.observation_count,
-      sources,
-      n_eff: parameter.observation_count,
-      formula: `${parameter.metric} · ${parameter.aggregation} (${parameter.unit})`,
-      details,
-    },
-  };
+function angleFor(index: number, total: number) {
+  return -Math.PI / 2 + (index / total) * Math.PI * 2;
 }
 
-function asProfile(parameters: ParameterEstimate[]): BehaviorProfile {
-  const dimensions = parameters.map(asDimension);
-  const measured = parameters.filter((item) => item.status === "measured");
-  const nEff = measured.reduce((sum, item) => sum + item.observation_count, 0);
-  return {
-    estimator_version: "parameter_profile@1.0.0",
-    execution: {
-      probability: 0,
-      n_eff: nEff,
-      confidence: measured.length ? "medium" : "insufficient",
-      source: measured.length ? "FITTED" : "UNOBSERVED",
-      usable: measured.length > 0,
-      notes: [],
-    },
-    dimensions,
-    disclaimer:
-      "Axes are the parameters you selected. Values come from stored observations, not invented personality scores.",
-    evidence_sufficiency: measured.length ? "low" : "insufficient",
-    n_raw: nEff,
-    n_eff: nEff,
-  };
+function measuredValue(parameter: ParameterEstimate): number | null {
+  return parameter.status === "measured" && parameter.value != null ? parameter.value : null;
 }
 
+function formatRaw(parameter: ParameterEstimate): string {
+  if (parameter.raw_value == null) return "No observation in window";
+  const value = Math.abs(parameter.raw_value) >= 100 ? Math.round(parameter.raw_value).toLocaleString() : String(Math.round(parameter.raw_value * 10) / 10);
+  if (parameter.unit.includes("/month") && /^[A-Za-z]{3}\/|^currency/.test(parameter.unit)) return `${value} ${parameter.unit.replace("currency", "$")}`;
+  return `${value} ${parameter.unit}`;
+}
+
+function formatDate(stamp: string | null | undefined): string | null {
+  if (!stamp) return null;
+  const date = new Date(stamp);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function sourceLabel(parameter: ParameterEstimate): string {
+  if (!parameter.source_types.length) return "No source yet";
+  return parameter.source_types.map((item) => item.replaceAll("_", " ")).join(", ");
+}
+
+/** One radar; every life area is its own colored series, drawn only where it was measured. */
 export function ParameterRadar({ profile }: { profile: ParameterProfile }) {
   const parameters = profile.parameters;
-  const groups = useMemo(() => {
-    const byCategory = new Map<string, ParameterEstimate[]>();
-    for (const parameter of parameters) {
-      const key = categoryFor(parameter);
-      const list = byCategory.get(key) ?? [];
-      list.push(parameter);
-      byCategory.set(key, list);
-    }
-    return [...byCategory.entries()]
-      .map(([id, items]) => ({
-        id,
-        label: categoryLabel(id),
-        items,
-        measured: items.filter((item) => item.status === "measured").length,
-      }))
-      .sort((a, b) => b.measured - a.measured || a.label.localeCompare(b.label));
-  }, [parameters]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const total = parameters.length;
 
-  const [category, setCategory] = useState(groups[0]?.id ?? "");
-  useEffect(() => {
-    if (!groups.some((group) => group.id === category)) {
-      setCategory(groups[0]?.id ?? "");
-    }
-  }, [category, groups]);
-
-  if (!parameters.length) {
+  if (!total) {
     return (
-      <section className="execution-profile-radar parameter-life-radar">
-        <p className="muted">
-          No measured parameters yet. Your selected axes will fill as matching observations arrive.
-        </p>
+      <section className="parameter-life-radar">
+        <p className="muted">No measured parameters yet. Your selected axes will fill as matching observations arrive.</p>
       </section>
     );
   }
 
-  const active = groups.find((group) => group.id === category) ?? groups[0];
-  if (!active) {
-    return null;
-  }
+  const measured = parameters.filter((item) => measuredValue(item) != null);
+  const sector = (Math.PI * 2) / Math.max(total, 3);
+  const active = parameters.find((item) => item.id === activeId) ?? null;
+
   return (
     <section className="parameter-life-radar">
-      {groups.length > 1 ? (
-        <div className="parameter-life-radar-tabs" role="tablist" aria-label="Life area">
-          {groups.map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              role="tab"
-              aria-selected={group.id === active.id}
-              className={group.id === active.id ? "is-active" : ""}
-              onClick={() => setCategory(group.id)}
-            >
-              {group.label}
-              <span>{group.measured}/{group.items.length}</span>
-            </button>
-          ))}
+      <div className="life-radar-layout">
+        <div className="life-radar-stage">
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`Life-area radar: ${measured.length} of ${total} areas measured`}>
+            {[0.25, 0.5, 0.75, 1].map((ring) => (
+              <polygon
+                key={ring}
+                className="radar-ring"
+                points={parameters.map((_, index) => {
+                  const pt = polar(angleFor(index, total), ring);
+                  return `${pt.x},${pt.y}`;
+                }).join(" ")}
+              />
+            ))}
+            {parameters.map((item, index) => {
+              const edge = polar(angleFor(index, total), 1);
+              return <line key={`spoke-${item.id}`} className={measuredValue(item) == null ? "radar-spoke muted" : "radar-spoke"} x1={CX} y1={CY} x2={edge.x} y2={edge.y} />;
+            })}
+            {parameters.map((item, index) => {
+              const value = measuredValue(item);
+              if (value == null) return null;
+              const angle = angleFor(index, total);
+              const reach = Math.max(value, 0.04);
+              const tip = polar(angle, reach);
+              const left = polar(angle - sector * PETAL_HALF_WIDTH, reach * 0.62);
+              const right = polar(angle + sector * PETAL_HALF_WIDTH, reach * 0.62);
+              const area = areaFor(item);
+              const dimmed = activeId != null && activeId !== item.id;
+              return (
+                <g
+                  key={`series-${item.id}`}
+                  className="life-radar-series"
+                  data-testid={`life-series-${item.id}`}
+                  style={{ opacity: dimmed ? 0.28 : 1 }}
+                  onMouseEnter={() => setActiveId(item.id)}
+                  onMouseLeave={() => setActiveId(null)}
+                  onFocus={() => setActiveId(item.id)}
+                  onBlur={() => setActiveId(null)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${area.label}: ${item.name} ${formatRaw(item)}`}
+                >
+                  <polygon
+                    points={`${CX},${CY} ${left.x},${left.y} ${tip.x},${tip.y} ${right.x},${right.y}`}
+                    fill={area.color}
+                    fillOpacity={0.22}
+                    stroke={area.color}
+                    strokeWidth={2}
+                    strokeLinejoin="round"
+                  />
+                  <circle cx={tip.x} cy={tip.y} r={6} fill={area.color} />
+                </g>
+              );
+            })}
+            {parameters.map((item, index) => {
+              const angle = angleFor(index, total);
+              const labelPt = polar(angle, 1.2);
+              const cos = Math.cos(angle);
+              const anchor = cos > 0.35 ? "start" : cos < -0.35 ? "end" : "middle";
+              const dy = Math.sin(angle) > 0.45 ? 16 : Math.sin(angle) < -0.45 ? -8 : 5;
+              const area = areaFor(item);
+              const measuredNow = measuredValue(item) != null;
+              return (
+                <text
+                  key={`label-${item.id}`}
+                  className="radar-label"
+                  x={labelPt.x}
+                  y={labelPt.y + dy}
+                  textAnchor={anchor}
+                  style={{ fill: measuredNow ? area.color : undefined }}
+                >
+                  {area.label}
+                </text>
+              );
+            })}
+          </svg>
+          {active ? (
+            <div className="life-radar-tooltip" role="status">
+              <strong style={{ color: areaFor(active).color }}>{areaFor(active).label} · {active.name}</strong>
+              <span>{formatRaw(active)}</span>
+              <span>Source: {sourceLabel(active)}</span>
+              {formatDate(active.last_observed_at) ? <span>Last observed {formatDate(active.last_observed_at)}</span> : null}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      <p className="parameter-life-radar-lede">
-        {active.label}: selected measurements only. Empty axes stay empty until observations arrive.
-      </p>
-      <ExecutionProfileRadar profile={asProfile(active.items)} />
+        <ul className="life-radar-legend" aria-label="Life areas">
+          {parameters.map((item) => {
+            const area = areaFor(item);
+            const value = measuredValue(item);
+            const observed = formatDate(item.last_observed_at);
+            return (
+              <li
+                key={item.id}
+                className={value == null ? "is-empty" : activeId === item.id ? "is-active" : ""}
+                onMouseEnter={() => setActiveId(item.id)}
+                onMouseLeave={() => setActiveId(null)}
+              >
+                <i style={{ background: value == null ? "transparent" : area.color, borderColor: area.color }} aria-hidden="true" />
+                <div>
+                  <span className="life-radar-legend-area">{area.label}</span>
+                  <span className="life-radar-legend-name">{item.name}</span>
+                </div>
+                <div className="life-radar-legend-value">
+                  <strong>{value == null ? "Not measured" : formatRaw(item)}</strong>
+                  <small>{value == null ? "Add an observation to fill this axis" : `${sourceLabel(item)}${observed ? ` · ${observed}` : ""}`}</small>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <p className="life-radar-note">Each axis is scaled to its own display range, not to goal odds. Empty axes stay empty until a matching observation is stored.</p>
     </section>
   );
 }

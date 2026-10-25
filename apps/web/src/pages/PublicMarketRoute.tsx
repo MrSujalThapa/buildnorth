@@ -105,6 +105,27 @@ export function PublicMarketRoute() {
         ) : (
           <p className="quiet-copy" role="status">No published chart history.</p>
         )}
+        <section className="public-events" aria-labelledby="public-events-title">
+          <h2 id="public-events-title">Recent updates</h2>
+          {item.history.length ? (
+            <ol>
+              {item.history.slice(-6).reverse().map((point, index, recent) => {
+                const previous = recent[index + 1];
+                const change = previous ? (point.probability - previous.probability) * 100 : null;
+                return (
+                  <li key={point.created_at}>
+                    <time dateTime={point.created_at}>{new Date(point.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</time>
+                    <span>{previous ? "Forecast updated" : "Forecast published"}</span>
+                    <strong>{(point.probability * 100).toFixed(1)}%</strong>
+                    {change != null ? (
+                      <span className={change >= 0 ? "is-up" : "is-down"}>{change >= 0 ? "+" : "−"}{Math.abs(change).toFixed(1)} pts</span>
+                    ) : <span />}
+                  </li>
+                );
+              })}
+            </ol>
+          ) : <p className="quiet-copy">No published forecast updates yet.</p>}
+        </section>
         <PublicBlueprintDetails blueprint={item.blueprint} />
       </section>
       {forkOpen ? (

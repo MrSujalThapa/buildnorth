@@ -54,7 +54,7 @@ export default function SocialPage() {
           <div>
             <p className="discover-kicker">Marketplace</p>
             <h1>Discover</h1>
-            <p>Public PlayItOut markets you can inspect, star, and fork. Odds come from stored forecasts — unpublished markets stay honestly unpriced.</p>
+            <p>Real goals other people are tracking, priced from their own evidence. Star the ones you want to follow, or fork one to run it on your own data.</p>
           </div>
         </header>
         <div className="discover-tools">

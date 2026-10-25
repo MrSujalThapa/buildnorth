@@ -2,6 +2,9 @@
 
 import WealthsimpleAreaChart from "./WealthsimpleAreaChart";
 import { chartPointChange, chartTrend } from "./chartTrend";
+import { filterHistoryForRange, type MarketRange } from "./marketRanges";
+
+const ALL_HISTORY: MarketRange = { label: "ALL", unit: "all" };
 
 type Props = {
   market: Market;
@@ -69,14 +72,12 @@ export default function MarketCard({
       <div className={`market-card-chart${market.historyUnavailable || !market.history.length ? " is-empty" : market.history.length === 1 ? " is-sparse" : ""}`}>
         {!market.historyUnavailable && market.history.length ? (
           <WealthsimpleAreaChart
-            data={
-              market.history
-            }
-            interactive={
-              false
-            }
+            data={filterHistoryForRange(market.history, ALL_HISTORY)}
+            interactive={false}
           />
-        ) : null}
+        ) : (
+          <span className="market-card-chart-empty">No published forecast yet</span>
+        )}
       </div>
     </button>
   );

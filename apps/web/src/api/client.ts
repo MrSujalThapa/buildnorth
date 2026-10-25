@@ -206,7 +206,7 @@ export interface TargetSearchResult {
   gap_pp: number;
   feasible: boolean;
   message: string;
-  paths: { label: string; action_ids: string[]; resulting_probability: number; resource_cost: { hours_per_week: number; money: number; energy: number }; fragility_pp: number | null; valid_because: string }[];
+  paths: { label: string; action_ids: string[]; resulting_probability: number; resource_cost: { hours_per_week: number; money: number; energy: number }; fragility_pp: number | null; valid_because: string; assumptions?: WhatIfAssumption[] }[];
   search_method: string;
   run_id: string | null;
   receipt: Record<string, unknown>;
@@ -252,6 +252,8 @@ export interface ParseDecisionResult {
   decision: { action: string; alternative: string | null; timing: string; constraints: string[] } | null;
   scenario_labels: string[];
   unsupported: string[];
+  /** Quantities stated in the text, read deterministically and checked against the model. */
+  changes?: ParsedInterventionChange[];
 }
 
 export interface StrategyInsight {
@@ -585,6 +587,7 @@ export interface ParameterEstimate {
   observation_count: number;
   source_types: string[];
   evidence_ids: string[];
+  last_observed_at?: string | null;
   status: "measured" | "insufficient";
 }
 
@@ -1323,5 +1326,17 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ decision }),
+    }),
+  strategyRecommendationOutcome: (goalId: string, recommendationId: string, attempted: boolean) =>
+    request<Record<string, unknown>>(`/api/v1/goals/${goalId}/strategy-recommendations/${recommendationId}/outcomes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idempotency_key: `self-report:${recommendationId}`,
+        attempted,
+        observed_at: new Date().toISOString(),
+        observation_confidence: 1,
+        outcome_kind: "intermediate",
+      }),
     }),
 };

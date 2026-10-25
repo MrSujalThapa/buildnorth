@@ -339,56 +339,60 @@ export function getMarketRanges(
   ];
 }
 
+const UNIT_MS: Record<Exclude<RangeUnit, "all">, number> = {
+  hour: HOUR,
+  day: DAY,
+  week: WEEK,
+  month: MONTH,
+  year: YEAR,
+};
+
+export type RangeWindow = {
+  /** Published points inside the window, plus flagged carry points at its edges. */
+  points: ChartPoint[];
+  /** Published forecasts that fall inside the window. */
+  updates: number;
+  /** The forecast standing at the window start, published before it. */
+  standing: ChartPoint | null;
+};
+
+/**
+ * Forecasts are step functions: a published value holds until the next publication.
+ * The window ends at `now`; the value standing at its start is carried in and the latest
+ * value is held to `now`, both marked `carried`, so the chart never collapses to a point.
+ */
+export function rangeWindow(
+  history: ChartPoint[],
+  range: MarketRange,
+  now: number = Date.now(),
+): RangeWindow {
+  const sorted = [...history].sort((a, b) => a.timestamp - b.timestamp);
+  const latest = sorted[sorted.length - 1];
+  if (!latest) return { points: [], updates: 0, standing: null };
+  const end = Math.max(now, latest.timestamp);
+  const start =
+    range.unit === "all" || range.amount === undefined
+      ? sorted[0]!.timestamp
+      : end - UNIT_MS[range.unit] * range.amount;
+  const inside = sorted.filter((point) => point.timestamp >= start && point.timestamp <= end);
+  const before = sorted.filter((point) => point.timestamp < start);
+  const standing = before[before.length - 1] ?? null;
+  const points: ChartPoint[] = [];
+  if (standing) points.push({ timestamp: start, value: standing.value, carried: true });
+  points.push(...inside);
+  const last = points[points.length - 1] ?? latest;
+  if (last.timestamp < end) points.push({ timestamp: end, value: last.value, carried: true });
+  if (points.length === 1) {
+    const only = points[0]!;
+    points.unshift({ timestamp: only.timestamp - HOUR, value: only.value, carried: true });
+  }
+  return { points, updates: inside.length, standing };
+}
+
 export function filterHistoryForRange(
   history: ChartPoint[],
   range: MarketRange,
+  now: number = Date.now(),
 ): ChartPoint[] {
-  if (
-    history.length === 0 ||
-    range.unit === "all"
-  ) {
-    return history;
-  }
-
-  const latest =
-    history[
-      history.length - 1
-    ];
-
-  if (
-    !latest ||
-    range.amount === undefined
-  ) {
-    return history;
-  }
-
-  const unitMs: Record<
-    Exclude<
-      RangeUnit,
-      "all"
-    >,
-    number
-  > = {
-    hour: HOUR,
-    day: DAY,
-    week: WEEK,
-    month: MONTH,
-    year: YEAR,
-  };
-
-  const cutoff =
-    latest.timestamp -
-    unitMs[range.unit] *
-      range.amount;
-
-  const filtered =
-    history.filter(
-      (point) =>
-        point.timestamp >=
-        cutoff,
-    );
-
-  return filtered.length
-    ? filtered
-    : history.slice(-1);
+  return rangeWindow(history, range, now).points;
 }

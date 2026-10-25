@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 
 import type { ChartMarker, ChartPoint } from "../../adapters/templateTypes";
 import {
-  filterHistoryForRange,
+  rangeWindow,
   type MarketRange,
 } from "./marketRanges";
 import WealthsimpleAreaChart, {
@@ -41,10 +41,15 @@ export default function OddsExplorer({
 }: Props) {
   const [selectedRange, setSelectedRange] = useState<MarketRange | null>(null);
   const activeRange = selectedRange ?? initialRange ?? ranges[Math.min(2, Math.max(ranges.length - 1, 0))];
-  const chartData = useMemo(
-    () => (activeRange ? filterHistoryForRange(history, activeRange) : history),
+  const rangeView = useMemo(
+    () => (activeRange ? rangeWindow(history, activeRange) : null),
     [activeRange, history],
   );
+  const chartData = rangeView?.points ?? history;
+  const standingNote =
+    rangeView && activeRange && activeRange.unit !== "all" && rangeView.updates === 0 && rangeView.points.length
+      ? `No updates in the last ${activeRange.label}. Holding the standing forecast of ${Math.round(rangeView.points[0]!.value)}%${rangeView.standing ? ` from ${new Date(rangeView.standing.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}.`
+      : null;
 
   function selectRange(range: MarketRange) {
     setSelectedRange(range);
@@ -89,6 +94,7 @@ export default function OddsExplorer({
           </button>
         ))}
       </div>
+      {standingNote ? <p className="chart-standing-note" role="status">{standingNote}</p> : null}
       <div className="chart-help">Press and drag across the chart to compare odds.</div>
     </section>
   );
