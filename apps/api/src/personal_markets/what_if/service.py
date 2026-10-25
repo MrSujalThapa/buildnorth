@@ -1189,21 +1189,32 @@ class WhatIfService:
         return await self._persist_path_comparison(request, result)
 
     async def _ensure_search_levers(self, request: TargetSearchRequest) -> TargetSearchRequest:
-        """Fill Reverse search when the client sends an empty candidate list."""
+        """Fill Reverse search when the client omits candidates or searchable assumptions."""
         updates: dict[str, object] = {}
-        if not request.candidates:
+        names = {item.name for item in request.base.assumptions}
+        needs_state = (not request.candidates) or (
+            request.continuous_variable is None
+            and not names & {"flow", "weekly_application_rate"}
+        )
+        state = None
+        if needs_state:
             try:
                 state = await self.baseline_state(request.base.goal_id)
             except ResourceNotFoundError:
                 state = None
-            if state is not None:
-                updates["candidates"] = [
-                    item.intervention
-                    for item in state.compare_candidates
-                    if item.intervention is not None
-                ]
+        if not request.candidates and state is not None:
+            updates["candidates"] = [
+                item.intervention
+                for item in state.compare_candidates
+                if item.intervention is not None
+            ]
         if request.continuous_variable is None:
-            names = {item.name for item in request.base.assumptions}
+            missing_levers = not names & {"flow", "weekly_application_rate"}
+            if missing_levers and state is not None and state.assumptions:
+                updates["base"] = request.base.model_copy(
+                    update={"assumptions": state.assumptions}
+                )
+                names = {item.name for item in state.assumptions}
             if "flow" in names:
                 updates["continuous_variable"] = ContinuousSearchVariable(assumption="flow")
             elif "weekly_application_rate" in names:

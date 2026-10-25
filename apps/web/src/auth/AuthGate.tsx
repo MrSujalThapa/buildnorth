@@ -1,6 +1,6 @@
 import { SignIn, useAuth, useClerk } from "@clerk/react";
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useTheme } from "../theme/useTheme";
 import { clerkAppearance } from "./clerkAppearance";
@@ -17,6 +17,15 @@ import {
 
 const AccountContext = createContext<AccountView | null>(null);
 const AccountRefreshContext = createContext<(() => Promise<void>) | null>(null);
+
+function isPublicBrowsePath(pathname: string): boolean {
+  return (
+    pathname === "/social" ||
+    pathname === "/marketplace" ||
+    pathname.startsWith("/m/") ||
+    pathname.startsWith("/u/")
+  );
+}
 
 function keepsAdminOnPage(pathname: string): boolean {
   // Send new administrators to invitation settings only from the landing route.
@@ -175,6 +184,7 @@ function ClerkGate({ children }: Props) {
   const { signOut } = useClerk();
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [account, setAccount] = useState<AccountView | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -245,6 +255,9 @@ function ClerkGate({ children }: Props) {
   }
   if (!isLoaded || !ready) return <LoadingScreen slow={slow} />;
   if (!isSignedIn) {
+    if (isPublicBrowsePath(location.pathname)) {
+      return <AccountProviders account={null} refresh={() => Promise.resolve()}>{children}</AccountProviders>;
+    }
     return (
       <main className="auth-screen">
         <section className="auth-panel">

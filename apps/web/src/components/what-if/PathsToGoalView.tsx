@@ -106,20 +106,20 @@ export default function PathsToGoalView({
         </div>
       </section>
       <div className="target-row reverse-target">
-        <label>
+        <label className="reverse-target-slider">
           <span>Target odds</span>
           <strong>{targetOdds}%</strong>
           <input type="range" min={1} max={99} value={targetOdds}
             onChange={(event) => onTargetOddsChange(Number(event.target.value))}
             aria-label="Target odds" />
         </label>
-        <label>
+        <label className="reverse-target-exact">
           <span>Exact target</span>
-          <input type="number" min={1} max={99} value={targetOdds}
+          <input className="ui-field" type="number" min={1} max={99} value={targetOdds}
             onChange={(event) => onTargetOddsChange(Math.min(99, Math.max(1, Number(event.target.value) || 1)))}
             aria-label="Exact target odds" />
         </label>
-        <button type="button" className="primary-action compact" disabled={loadingPaths}
+        <button type="button" className="ui-button" disabled={loadingPaths}
           onClick={() => { setFinding(true); onFind?.(); }}>{loadingPaths ? "Searching…" : "Find feasible paths"}</button>
       </div>
 

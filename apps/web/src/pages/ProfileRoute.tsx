@@ -54,6 +54,17 @@ export function ProfileRoute() {
   const [tab, setTab] = useState<"overview" | "markets" | "stars">("overview");
   const [visibility, setVisibility] = useState<"all" | "public" | "private">("all");
   const [graph, setGraph] = useState<"followers" | "following" | null>(null);
+  const seedWorkspace = useMutation({
+    mutationFn: () => api.workspaceSeed(),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["own-profile-markets"] }),
+        queryClient.invalidateQueries({ queryKey: ["goals"] }),
+      ]);
+    },
+  });
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -170,6 +181,19 @@ export function ProfileRoute() {
             ) : (
               <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
             )}
+            {(profile.data.radar?.evidence_count ?? 0) === 0 ? (
+              <div className="profile-seed-row">
+                <button
+                  type="button"
+                  className="ui-button"
+                  disabled={seedWorkspace.isPending}
+                  onClick={() => seedWorkspace.mutate()}
+                >
+                  {seedWorkspace.isPending ? "Loading demo workspace…" : "Load demo workspace"}
+                </button>
+                {seedWorkspace.isError ? <p role="alert">Could not load the demo workspace. Try again.</p> : null}
+              </div>
+            ) : null}
             {socialProfile.isError ? <p role="alert">Could not load activity. <button type="button" onClick={() => void socialProfile.refetch()}>Try again</button></p> : socialProfile.isLoading ? <p role="status">Loading activity&hellip;</p> : <ContributionHeatmap
               days={socialProfile.data?.activity ?? []}
               total={socialProfile.data?.contribution_total ?? 0}
@@ -178,12 +202,19 @@ export function ProfileRoute() {
         ) : null}
         {tab === "markets" ? (
           <>
-            <div className="discover-tools markets-visibility-tools">
-              <select value={visibility} onChange={(event) => setVisibility(event.target.value as typeof visibility)} aria-label="Filter visibility">
-                <option value="all">All</option>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
-              </select>
+            <div className="profile-visibility-tabs" role="tablist" aria-label="Filter visibility">
+              {(["all", "public", "private"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="tab"
+                  aria-selected={visibility === value}
+                  className={visibility === value ? "is-active" : ""}
+                  onClick={() => setVisibility(value)}
+                >
+                  {value === "all" ? "All" : value === "public" ? "Public" : "Private"}
+                </button>
+              ))}
             </div>
             {ownMarkets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void ownMarkets.refetch()}>Try again</button></p> : ownMarkets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={ownMarkets.data?.items ?? []} empty="No markets match that filter." />}
           </>

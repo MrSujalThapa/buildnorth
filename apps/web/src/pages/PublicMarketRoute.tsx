@@ -60,16 +60,19 @@ export function PublicMarketRoute() {
   const isOwner = account?.user_id === item.creator.user_id;
 
   return (
-    <main className="public-market">
-      <section className="public-market-shell">
-        <p className="quiet-copy">
+    <main className="public-market market-page">
+      <section className="public-market-shell market-shell">
+        <p className="market-eyebrow">
           <Link to={`/u/${item.creator.handle}`}>{item.creator.display_name || item.creator.handle}</Link>
           {item.fork?.source_public && item.fork.source_handle ? (
             <> · Forked from <Link to={`/m/${item.fork.source_goal_id}`}>{item.fork.source_handle}/{item.fork.source_title}</Link></>
           ) : null}
         </p>
-        <h1>{item.title}</h1>
-        <p className="quiet-copy">{item.blueprint.description || item.description || "A public PlayItOut market blueprint."}</p>
+        <div className="market-heading">
+          <div className="market-title-row">
+            <h1>{item.title}</h1>
+          </div>
+        </div>
         <div className="public-actions">
           <button type="button" className="ui-button" disabled={star.isPending} onClick={() => star.mutate()}>
             {item.starred ? "Unstar" : "Star"} · {item.star_count}
@@ -86,7 +89,7 @@ export function PublicMarketRoute() {
           >
             Share
           </button>
-          {isOwner ? <Link className="ui-button ui-button-secondary" to={`/goals/${item.goal_id}`}>Open as owner</Link> : null}
+          {isOwner ? <Link className="ui-button" to={`/goals/${item.goal_id}`}>Open as owner</Link> : null}
         </div>
         {star.isError ? <p role="alert">Could not update star. Try again.</p> : null}
         <section className="market-quote">

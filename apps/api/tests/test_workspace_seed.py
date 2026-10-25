@@ -239,7 +239,13 @@ def test_seed_endpoint_requires_admin_and_scopes_to_caller() -> None:
         assert status["records"]["goal"] == len(SEED_GOALS)
         authentic_profile = client.get("/api/v1/profile")
         assert authentic_profile.status_code == 200
-        assert authentic_profile.json()["radar"]["evidence_count"] == 0
+        assert authentic_profile.json()["radar"]["evidence_count"] > 0
+        invited = invited_principal()
+        app.state.auth_bypass_principal = invited
+        owned = client.post("/api/v1/workspace-seed")
+        assert owned.status_code == 200, owned.text
+        assert client.get("/api/v1/workspace-seed").json()["seeded"] is True
+        app.state.auth_bypass_principal = admin_principal()
         demo_profile = client.get("/api/v1/profile/demo-radar")
         assert demo_profile.status_code == 200
         assert demo_profile.json()["synthetic"] is True

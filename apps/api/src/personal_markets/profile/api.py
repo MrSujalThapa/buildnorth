@@ -118,15 +118,28 @@ async def get_profile(
     )
     account = await identity.account_view(principal, usage, profile)
     authentic_goals = behavior_cohort_goals(owned)
+    fixture_goals = behavior_cohort_goals(owned, synthetic=True)
     trials, rows = await owner_trials_and_evidence(
         principal.user_id, [goal.goal_id for goal in authentic_goals], evidence
+    )
+    _, fixture_rows = await owner_trials_and_evidence(
+        principal.user_id,
+        [goal.goal_id for goal in fixture_goals],
+        evidence,
+        synthetic=True,
     )
     custom = _custom_definitions(account.profile)
     # Behavior estimation remains a separate analytical contract. Parameter
     # choices do not change execution dimensions or What If follow-through.
     selected = list(DEFAULT_TRAIT_IDS)
     traits = estimate_traits(trials, rows, selected=selected, custom=custom)
-    measured = parameter_profile(rows, selected_ids=selected_parameter_ids(account.profile))
+    selected_ids = selected_parameter_ids(account.profile)
+    measured = parameter_profile(rows, selected_ids=selected_ids)
+    # An empty owner workspace can show the owner's own seeded measurements.
+    # Authentic observations still win as soon as any exist, so fixtures never
+    # overwrite a real radar.
+    if measured.evidence_count == 0 and fixture_rows:
+        measured = parameter_profile(fixture_rows, selected_ids=selected_ids)
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),

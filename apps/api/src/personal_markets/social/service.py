@@ -296,7 +296,7 @@ class SocialService:
             start,
             today,
             public_only=viewer_id != user_id,
-            include_fixtures=creator.demo_persona,
+            include_fixtures=creator.demo_persona or viewer_id == user_id,
         )
         activity = [ActivityDay(day=day, count=count) for day, count in sorted(counts.items())]
         return PublicProfile(

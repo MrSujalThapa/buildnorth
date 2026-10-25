@@ -62,6 +62,8 @@ type Props = {
   historyColor?: string;
   lineOnly?: boolean;
   percentAxis?: boolean;
+  /** When false, published history is drawn but omitted from the compact legend. */
+  showHistoryInLegend?: boolean;
   highlightedBranchId?: string | null;
   onBranchSelect?: (id: string) => void;
   xTicks?: { value: number; label: string }[];
@@ -73,9 +75,16 @@ type Props = {
   onSelectionChange?: (selection: ChartSelection | null) => void;
 };
 
-const PLOT_MARGIN = { top: 12, bottom: 0, left: 4 };
+const PLOT_MARGIN = { top: 18, bottom: 0, left: 4 };
 const PERCENT_AXIS_WIDTH = 40;
-const SCENARIO_REGION_SHARE = 0.28;
+/** Share of the plotted x-domain reserved for the hypothetical comparison. */
+export const SCENARIO_REGION_SHARE = 0.45;
+const MIN_HISTORY_SPAN_MS = 24 * 60 * 60 * 1000;
+
+export function scenarioRegionPad(historySpan: number, share = SCENARIO_REGION_SHARE): number {
+  const span = Math.max(historySpan, MIN_HISTORY_SPAN_MS);
+  return (span * share) / (1 - share);
+}
 
 function nearestPointIndex(data: ChartPoint[], targetTimestamp: number) {
   const first = data[0];
@@ -138,6 +147,7 @@ export default function WealthsimpleAreaChart({
   historyColor,
   lineOnly = false,
   percentAxis = false,
+  showHistoryInLegend = true,
   highlightedBranchId = null,
   onBranchSelect,
   xTicks,
@@ -158,26 +168,30 @@ export default function WealthsimpleAreaChart({
   const [hoverTimestamp, setHoverTimestamp] = useState<number | null>(null);
 
   const multiSeries = branches.length > 0;
-  if (data.length === 0 && !branches.some((branch) => (branch.points?.length ?? 0) > 1)) {
+  if (
+    data.length === 0 &&
+    !branches.some(
+      (branch) => (branch.points?.length ?? 0) > 1 || (branch.start != null && branch.end != null),
+    )
+  ) {
     return <div className="ws-chart" />;
   }
 
   const firstPoint = data[0];
   const lastPoint = data[data.length - 1];
-  const historySpan =
-    firstPoint && lastPoint
-      ? Math.max(lastPoint.timestamp - firstPoint.timestamp, 24 * 60 * 60 * 1000)
-      : 0;
-  const anchoredPad = multiSeries && lastPoint ? historySpan * SCENARIO_REGION_SHARE : 0;
+  const historySpan = firstPoint && lastPoint ? lastPoint.timestamp - firstPoint.timestamp : 0;
+  const anchoredPad = multiSeries ? scenarioRegionPad(historySpan) : 0;
   const resolvedBranches = branches
     .map((branch) => {
       if (branch.points?.length) return { ...branch, resolved: branch.points };
-      if (!lastPoint || branch.start == null || branch.end == null) return null;
+      if (branch.start == null || branch.end == null) return null;
+      const origin = lastPoint?.timestamp ?? 0;
+      const pad = lastPoint ? anchoredPad : 1;
       return {
         ...branch,
         resolved: [
-          { timestamp: lastPoint.timestamp, value: branch.start },
-          { timestamp: lastPoint.timestamp + anchoredPad, value: branch.end },
+          { timestamp: origin, value: branch.start },
+          { timestamp: origin + pad, value: branch.end },
         ],
       };
     })
@@ -188,7 +202,8 @@ export default function WealthsimpleAreaChart({
     ...resolvedBranches.flatMap((branch) => branch.resolved.map((point) => point.timestamp)),
   ];
   const firstTimestamp = Math.min(...allTimestamps);
-  const lastTimestamp = lastPoint?.timestamp ?? Math.max(...allTimestamps);
+  const nowTimestamp = lastPoint?.timestamp ?? resolvedBranches[0]?.resolved[0]?.timestamp ?? firstTimestamp;
+  const lastTimestamp = nowTimestamp;
   const legacyPad = !multiSeries && scenarioBranch ? historySpan * 0.22 : 0;
   const xDomain: [number, number] = multiSeries
     ? [firstTimestamp, Math.max(...allTimestamps)]
@@ -305,7 +320,7 @@ export default function WealthsimpleAreaChart({
 
   const legendItems = multiSeries
     ? [
-        ...(lastPoint ? [{ id: "__history", label: historyLabel, color: historyStroke, value: lastPoint.value, dashed: false, note: undefined as string | undefined }] : []),
+        ...(lastPoint && showHistoryInLegend ? [{ id: "__history", label: historyLabel, color: historyStroke, value: lastPoint.value, dashed: false, note: undefined as string | undefined }] : []),
         ...resolvedBranches.map((branch) => ({
           id: branch.id,
           label: branch.label,
@@ -388,7 +403,22 @@ export default function WealthsimpleAreaChart({
           tickLine={false}
         />
 
-        {data.length ? (
+        {data.length && lineOnly ? (
+          <Line
+            type={data.length === 1 ? "linear" : "stepAfter"}
+            dataKey="value"
+            name={historyLabel}
+            stroke={historyStroke}
+            strokeWidth={multiSeries ? 2.4 : 2}
+            strokeOpacity={dimmed("__history") ? 0.3 : 1}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            dot={data.length === 1}
+            activeDot={false}
+            connectNulls
+            isAnimationActive={false}
+          />
+        ) : data.length ? (
           <Area
             type={data.length === 1 ? "linear" : "stepAfter"}
             dataKey="value"
@@ -397,7 +427,7 @@ export default function WealthsimpleAreaChart({
             strokeOpacity={dimmed("__history") ? 0.3 : 1}
             strokeLinecap="round"
             strokeLinejoin="round"
-            fill={lineOnly ? "none" : `url(#${gradientId})`}
+            fill={`url(#${gradientId})`}
             fillOpacity={1}
             dot={data.length === 1}
             activeDot={false}
@@ -427,7 +457,7 @@ export default function WealthsimpleAreaChart({
             dataKey={`branch${index}`}
             name={branch.label}
             stroke={branch.color}
-            strokeWidth={highlightedBranchId === branch.id ? 3.6 : 2.6}
+            strokeWidth={highlightedBranchId === branch.id ? 3.8 : 3.15}
             strokeOpacity={dimmed(branch.id) ? 0.25 : 1}
             strokeDasharray={branch.dashed ? "6 5" : undefined}
             dot={false}
@@ -446,22 +476,42 @@ export default function WealthsimpleAreaChart({
               key={`${branch.id}-end`}
               x={end.timestamp}
               y={end.value}
-              r={highlightedBranchId === branch.id ? 6 : 4.5}
+              r={highlightedBranchId === branch.id ? 6.5 : 5}
               fill={branch.color}
               fillOpacity={dimmed(branch.id) ? 0.3 : 1}
               stroke="var(--market-chart-dot-stroke, #f8f8f5)"
               strokeWidth={2}
+              label={
+                dimmed(branch.id)
+                  ? undefined
+                  : {
+                      value: formatPercent(end.value),
+                      position: "top",
+                      fill: branch.color,
+                      fontSize: 11,
+                      fontWeight: 650,
+                    }
+              }
             />
           );
         })}
 
         {multiSeries && lastPoint ? (
           <ReferenceLine
-            x={lastTimestamp}
+            x={nowTimestamp}
             stroke="var(--market-text, #20211f)"
             strokeOpacity={0.35}
             strokeDasharray="3 4"
             label={{ value: "Now", position: "insideTopLeft", fontSize: 11, fill: "var(--market-text, #686664)" }}
+          />
+        ) : null}
+
+        {multiSeries && !lastPoint && resolvedBranches.length ? (
+          <ReferenceLine
+            x={Math.max(...resolvedBranches.flatMap((branch) => branch.resolved.map((point) => point.timestamp)))}
+            stroke="var(--market-text, #20211f)"
+            strokeOpacity={0.22}
+            strokeDasharray="3 4"
           />
         ) : null}
 

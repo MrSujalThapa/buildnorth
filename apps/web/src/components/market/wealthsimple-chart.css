@@ -36,9 +36,9 @@
 .chart-standing-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 
 
-.ws-chart-multi { display: flex; flex-direction: column; gap: 8px; overflow: visible; }
+.ws-chart-multi { display: flex; flex-direction: column; gap: 10px; overflow: visible; }
 .ws-plot { position: relative; flex: 1; min-height: 0; }
-.ws-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.ws-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
 .ws-legend li { min-width: 0; transition: opacity .15s ease; }
 .ws-legend li.is-dimmed { opacity: .45; }
 .ws-legend button, .ws-legend-static { display: inline-flex; align-items: center; gap: 6px; max-width: 340px; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; }

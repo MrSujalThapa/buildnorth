@@ -24,6 +24,7 @@ type Props = {
   onEvidence?: () => void;
   onShare?: () => void;
   readOnly?: boolean;
+  visibilityControl?: ReactNode;
   children?: ReactNode;
 };
 
@@ -118,6 +119,7 @@ export default function MarketDetailPage({
   onEvidence,
   onShare,
   readOnly = false,
+  visibilityControl,
   children,
 }: Props) {
   const ranges = ODDS_EXPLORER_RANGES;
@@ -149,7 +151,10 @@ export default function MarketDetailPage({
         </header>
 
         <div className="market-heading">
-          <h1>{market.title}</h1>
+          <div className="market-title-row">
+            <h1>{market.title}</h1>
+            {visibilityControl}
+          </div>
           <p className="market-meta">{market.meta}</p>
         </div>
 

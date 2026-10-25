@@ -53,6 +53,7 @@ from personal_markets.wiring import (
     PersistingWorkflow,
     build_inference,
 )
+from personal_markets.workspace_seed.api import owner_router as workspace_owner_seed_router
 from personal_markets.workspace_seed.api import router as workspace_seed_router
 
 configure_windows_selector_event_loop()
@@ -340,6 +341,7 @@ def create_app() -> FastAPI:
     application.include_router(evidence_sources_router, dependencies=private)
     application.include_router(upload_router, dependencies=private)
     application.include_router(workspace_seed_router)
+    application.include_router(workspace_owner_seed_router, dependencies=private)
     if settings.mcp_enabled:
         from personal_markets.remote_mcp.consent_api import router as remote_mcp_router
         from personal_markets.remote_mcp.factory import mount_remote_mcp

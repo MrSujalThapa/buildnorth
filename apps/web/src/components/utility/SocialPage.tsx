@@ -54,21 +54,26 @@ export default function SocialPage() {
           <div>
             <p className="discover-kicker">Marketplace</p>
             <h1>Discover</h1>
-            <p>Real goals other people are tracking, priced from their own evidence. Star the ones you want to follow, or fork one to run it on your own data.</p>
           </div>
         </header>
         <div className="discover-tools">
           <input
+            className="ui-field"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search public markets"
             aria-label="Search public markets"
           />
-          <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort markets">
+          <select className="ui-field" value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort markets">
             <option value="newest">Recently published</option>
             <option value="stars">Most starred</option>
             <option value="forks">Most forked</option>
           </select>
+          {query.trim() || area !== "all" ? (
+            <button type="button" className="ui-button ui-button-secondary" onClick={() => { setQuery(""); setArea("all"); }}>
+              Clear filters
+            </button>
+          ) : null}
         </div>
         <div className="discover-areas" role="tablist" aria-label="Life area">
           <button type="button" role="tab" aria-selected={area === "all"} className={area === "all" ? "is-active" : ""} onClick={() => setArea("all")}>All</button>
@@ -101,11 +106,9 @@ export default function SocialPage() {
         ) : visible.length === 0 ? (
           <div className="empty-social" role="status">
             <h2>{query.trim() || area !== "all" ? "No matching markets" : "No public markets"}</h2>
-            {query.trim() ? (
-              <button type="button" className="secondary" onClick={() => { setQuery(""); setArea("all"); }}>Clear search</button>
-            ) : area !== "all" ? (
-              <button type="button" className="secondary" onClick={() => setArea("all")}>Clear filters</button>
-            ) : <p>Publish a market from its page to make a blueprint discoverable.</p>}
+            {query.trim() || area !== "all" ? (
+              <button type="button" className="ui-button ui-button-secondary" onClick={() => { setQuery(""); setArea("all"); }}>Clear filters</button>
+            ) : <p>No public markets are listed yet.</p>}
           </div>
         ) : (
           <>

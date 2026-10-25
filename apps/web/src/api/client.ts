@@ -949,6 +949,17 @@ export const api = {
   listInvites: (signal?: AbortSignal) => request<InvitationRecord[]>("/api/v1/admin/invites", undefined, signal),
   revokeInvite: (invitationId: string) =>
     request<InvitationRecord>(`/api/v1/admin/invites/${invitationId}/revoke`, { method: "POST" }),
+  workspaceSeedStatus: (signal?: AbortSignal) =>
+    request<{ seed_version: string; seeded: boolean; records: Record<string, number> }>(
+      "/api/v1/workspace-seed",
+      undefined,
+      signal,
+    ),
+  workspaceSeed: () =>
+    request<{ seed_version: string; goals: { key: string; goal_id: string; status: string }[] }>(
+      "/api/v1/workspace-seed",
+      { method: "POST" },
+    ),
   mcpStatus: (signal?: AbortSignal) => request<McpStatus>("/api/v1/mcp/status", undefined, signal),
   mcpConnections: (signal?: AbortSignal) =>
     request<McpConnection[]>("/api/v1/mcp/connections", undefined, signal),
