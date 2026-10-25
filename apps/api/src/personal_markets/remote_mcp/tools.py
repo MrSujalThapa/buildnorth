@@ -244,7 +244,7 @@ class GoalDetail(GoalSummary):
 
 class ForecastView(BaseModel):
     goal_id: str
-    status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     probability: float | None = None
     probability_basis: str | None = None
     forecast_status: str | None = None
@@ -387,7 +387,7 @@ class ForecastCompare(BaseModel):
 class ForecastReadiness(BaseModel):
     goal_id: str
     priced: bool
-    publication_status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    publication_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     contract_forecast_status: str
     spec_status: str | None = None
     model_family: str | None = None
@@ -434,7 +434,8 @@ class StructuredRow(BaseModel):
 class OddsChartView(BaseModel):
     goal_id: str
     title: str
-    status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    status: Literal["PUBLISHED", "NOT_PUBLISHED", "HISTORY_UNAVAILABLE"]
+    current_forecast_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     range: str
     points: list[dict[str, Any]] = Field(default_factory=list)
     evidence_markers: list[dict[str, Any]] = Field(default_factory=list)
@@ -660,11 +661,51 @@ class RemoteMcpTools:
     async def _published(self, goal: GoalContract) -> list[Any]:
         return await self._deps().baseline_forecasts.published_history(goal.goal_id)
 
+    @staticmethod
+    def _current_withheld(goal: GoalContract, latest: Any) -> bool:
+        publication = goal.model_requirements.get("last_publication")
+        if not isinstance(publication, dict) or publication.get("status") != "withheld":
+            return False
+        recorded_at = publication.get("recorded_at")
+        try:
+            recorded = parse_when(recorded_at if isinstance(recorded_at, str) else None)
+        except ValueError:
+            recorded = None
+        published = publication_time(latest)
+        return recorded is None or published is None or recorded >= published
+
     async def _forecast(self, caller: Caller, goal: GoalContract) -> ForecastView:
         history = await self._published(goal)
         if not history:
+            workflow = self._workflow_api()
+            if workflow is not None:
+                snapshot = await workflow.creation_for_goal(goal.goal_id, caller.user_id)
+                if snapshot is not None:
+                    if snapshot.status in {"evidence_pending", "evidence_running"}:
+                        return ForecastView(
+                            goal_id=str(goal.goal_id), status="PENDING",
+                            message=("Goal evidence processing is pending. "
+                                     "No forecast has been published yet."),
+                        )
+                    if snapshot.status == "evidence_failed":
+                        return ForecastView(
+                            goal_id=str(goal.goal_id), status="FAILED",
+                            message=("Goal evidence processing failed. Retry the saved "
+                                     "continuation; no forecast was published."),
+                        )
             return await self._unpublished(goal)
-        latest = history[-1]
+        latest = sort_history(history)[-1]
+        if self._current_withheld(goal, latest):
+            return ForecastView(
+                goal_id=str(goal.goal_id),
+                status="WITHHELD",
+                probability=None,
+                published_points=len(history),
+                message=(
+                    "Current odds are withheld. Earlier published receipts remain "
+                    "available through get_forecast_history and show_odds_chart."
+                ),
+            )
         receipt = latest.receipt or {}
         calibrated = receipt.get("calibrated_probability")
         return ForecastView(
@@ -1996,20 +2037,35 @@ class RemoteMcpTools:
                     "kind": "event_observed_at",
                 }
             )
-        status: Literal["PUBLISHED", "NOT_PUBLISHED"] = (
-            "PUBLISHED" if points else "NOT_PUBLISHED"
+        status: Literal["PUBLISHED", "NOT_PUBLISHED", "HISTORY_UNAVAILABLE"] = (
+            "PUBLISHED" if points else "HISTORY_UNAVAILABLE" if history else "NOT_PUBLISHED"
         )
+        current_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"] = (
+            "PUBLISHED" if history else (await self._forecast(caller, goal)).status
+        )
+        if history and self._current_withheld(goal, sort_history(history)[-1]):
+            current_status = "WITHHELD"
         return goal, OddsChartView(
             goal_id=str(goal.goal_id),
             title=_clip(goal.title, 200),
             status=status,
+            current_forecast_status=current_status,
             range=range_key,
             points=points,
             evidence_markers=markers,
             interactive_host_required=True,
-            message=None
-            if points
-            else "No published forecast receipts. PlayItOut will not invent a series.",
+            message=(
+                "Historical published odds only; current odds are withheld."
+                if current_status == "WITHHELD"
+                else None if points
+                else "Published receipts lack valid dated probabilities; chart unavailable."
+                if history
+                else "Goal evidence processing is pending; no published odds exist yet."
+                if current_status == "PENDING"
+                else "Goal evidence processing failed; no published odds exist yet."
+                if current_status == "FAILED"
+                else "No published forecast receipts. PlayItOut will not invent a series."
+            ),
         )
 
     async def show_odds_chart(

@@ -33,6 +33,7 @@ export function EvidenceWorkflow({ goalId, initialSnapshot = null, onSnapshotCha
         void queryClient.invalidateQueries({ queryKey: ["evidence", goalId] });
         void queryClient.invalidateQueries({ queryKey: ["goal", goalId] });
         void queryClient.invalidateQueries({ queryKey: ["market-history", goalId] });
+        void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         void queryClient.invalidateQueries({ queryKey: ["what-if-baseline", goalId] });
         setEvidenceText("");
       }
@@ -52,6 +53,7 @@ export function EvidenceWorkflow({ goalId, initialSnapshot = null, onSnapshotCha
         void queryClient.invalidateQueries({ queryKey: ["evidence", goalId] });
         void queryClient.invalidateQueries({ queryKey: ["goal", goalId] });
         void queryClient.invalidateQueries({ queryKey: ["market-history", goalId] });
+        void queryClient.invalidateQueries({ queryKey: ["goals", "dashboard"] });
         void queryClient.invalidateQueries({ queryKey: ["what-if-baseline", goalId] });
       }
     },
@@ -102,6 +104,7 @@ export function EvidenceWorkflow({ goalId, initialSnapshot = null, onSnapshotCha
               Cancel
             </button>
           </div>
+          {resume.isError ? <p className="field-hint" role="alert">{String(resume.error)}</p> : null}
         </form>
       ) : (
         <form
