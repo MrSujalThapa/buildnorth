@@ -43,6 +43,7 @@ from personal_markets.integrations.research import (
 )
 from personal_markets.persistence.research_store import ResearchStore
 from personal_markets.profile.api import router as profile_router
+from personal_markets.strategy_learning.api import router as strategy_learning_router
 from personal_markets.what_if.api import router as what_if_router
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
@@ -304,6 +305,7 @@ def create_app() -> FastAPI:
     application.include_router(profile_router, dependencies=private)
     application.include_router(inference_settings_router)
     application.include_router(goals_router, dependencies=private)
+    application.include_router(strategy_learning_router, dependencies=private)
     application.include_router(collections_router, dependencies=private)
     application.include_router(agents_router, dependencies=private)
     application.include_router(what_if_router, dependencies=private)

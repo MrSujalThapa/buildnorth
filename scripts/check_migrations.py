@@ -1,7 +1,8 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
-REQUIRED_FILES = 22
+BASE_REQUIRED_FILES = 22
+LEARNING_MIGRATION = "0025_goal_strategy_learning.sql"
 REQUIRED = {
     "goals",
     "source_connections",
@@ -25,6 +26,9 @@ REQUIRED = {
     "behavior_commitments",
     "behavior_commitment_observations",
     "workspace_seed_records",
+    "strategy_recommendations",
+    "strategy_outcome_observations",
+    "strategy_outcome_evidence",
 }
 
 
@@ -32,17 +36,21 @@ def main() -> int:
     directory = Path(__file__).resolve().parents[1] / "supabase" / "migrations"
     migrations = sorted(directory.glob("*.sql"))
     names = [path.name for path in migrations]
-    expected = [f"{index:04d}_" for index in range(1, REQUIRED_FILES + 1)]
+    expected = [f"{index:04d}_" for index in range(1, BASE_REQUIRED_FILES + 1)]
     missing_files = [
         prefix for prefix in expected if not any(name.startswith(prefix) for name in names)
     ]
-    if missing_files or len(migrations) != REQUIRED_FILES:
+    numbered = [name[:4] for name in names if name[:4].isdigit()]
+    duplicate_numbers = sorted({number for number in numbered if numbered.count(number) > 1})
+    if missing_files or LEARNING_MIGRATION not in names or duplicate_numbers:
         print(
-            f"Expected migrations 0001-{REQUIRED_FILES:04d} "
-            f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"
+            f"Expected migrations 0001-{BASE_REQUIRED_FILES:04d} and "
+            f"{LEARNING_MIGRATION}; found {len(migrations)}: {', '.join(names)}"
         )
         if missing_files:
             print(f"Missing prefixes: {', '.join(missing_files)}")
+        if duplicate_numbers:
+            print(f"Duplicate migration numbers: {', '.join(duplicate_numbers)}")
         return 1
     sql = "\n".join(path.read_text(encoding="utf-8").lower() for path in migrations)
     missing = sorted(
