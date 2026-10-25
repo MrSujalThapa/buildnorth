@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 const GOAL = "20000000-0000-0000-0000-000000000002";
+const screenshotDir = "test-results/whatif-quality";
+
+async function capture(page: import("@playwright/test").Page, label: string) {
+  await mkdir(screenshotDir, { recursive: true });
+  await page.screenshot({ path: `${screenshotDir}/${test.info().project.name}-${label}.png`, fullPage: true });
+}
 
 test.beforeEach(async ({ page }) => {
   await page.route(`**/api/v1/goals/${GOAL}`, (route) => route.fulfill({ json: {
@@ -30,17 +37,22 @@ test.beforeEach(async ({ page }) => {
   } }));
   await page.route("**/api/v1/what-if/parse-intervention", (route) => {
     const text = (route.request().postDataJSON() as { text: string }).text;
+    const applicationCount = /2 applications/i.test(text) ? 2 : 10;
     return route.fulfill({ json: /study|cold email|gym/i.test(text)
       ? { raw_text: text, changes: [], unsupported: ["No measured conversion from this activity to offer odds."], pricing_status: "NOT_PRICED" }
-      : { raw_text: text, changes: [{ metric: "applications_per_week", operation: "set", value: 10, unit: "count/week", provenance: "USER_ASSUMPTION" }], unsupported: [], pricing_status: "PRICED" },
+      : { raw_text: text, changes: [{ metric: "applications_per_week", operation: "set", value: applicationCount, unit: "count/week", provenance: "USER_ASSUMPTION" }], unsupported: [], pricing_status: "PRICED" },
     });
   });
-  await page.route("**/api/v1/what-if/simulate", (route) => route.fulfill({ json: {
+  await page.route("**/api/v1/what-if/simulate", (route) => {
+    const body = route.request().postDataJSON() as { parsed_changes?: { value: number }[] };
+    const lower = body.parsed_changes?.[0]?.value === 2;
+    return route.fulfill({ json: {
     priced: true, status: "EXPLORATORY", baseline_probability: 0.719,
-    scenario_probability: 0.78, expected_uplift_pp: 6.1,
+    scenario_probability: lower ? 0.65 : 0.78, expected_uplift_pp: lower ? -6.9 : 6.1,
     conditional_on_execution_probability: 0.81, execution_probability: 0.72,
     assumptions: [], outcome_quantiles: {}, distribution_bins: [], fan: [], receipt: {},
-  } }));
+  } });
+  });
   await page.route("**/api/v1/what-if/target-search", (route) => {
     const target = (route.request().postDataJSON() as { target_probability: number }).target_probability;
     return route.fulfill({ json: { target_probability: target, current_probability: 0.719,
@@ -56,6 +68,16 @@ test.beforeEach(async ({ page }) => {
       { label: "No offer", probability: 0.24, median: 0.24, p10: 0.1, p90: 0.5, downside: true },
     ], other_probability: 0, evidence_basis: [], model_version: "test", seed: 1,
   } }));
+  await page.route("**/api/v1/what-if/compare-paths", (route) => route.fulfill({ json: {
+    paths: [
+      { id: "path-a", label: "Apply to 10 jobs a week", primary_goal_probability: 0.79,
+        resource_cost: { hours_per_week: 5, money_per_month: 0, energy: 0 },
+        assumptions: [], model_status: "EXPLORATORY", secondary_outcomes: {} },
+      { id: "path-b", label: "Cold email founders", primary_goal_probability: null,
+        resource_cost: { hours_per_week: 2, money_per_month: 0, energy: 0 },
+        assumptions: [], model_status: "NOT_MODELED", secondary_outcomes: {} },
+    ], model_family: "deadline_event_hazard", model_version: "test", seed: 1,
+  } }));
 });
 
 test("Change reconciles published odds with a priced hypothetical", async ({ page }) => {
@@ -67,7 +89,14 @@ test("Change reconciles published odds with a priced hypothetical", async ({ pag
   await expect(page.getByText(/comparison recalculates a 71.9% baseline/i)).toBeVisible();
   await expect(page.getByText(/Hypothetical scenario: 78%/)).toBeVisible();
   await expect(page.locator(".what-if-market-chart .recharts-line")).toBeVisible();
+  await expect(page.locator(".what-if-market-chart .recharts-area-curve")).toBeVisible();
+  expect(await page.locator(".what-if-market-chart .recharts-area-curve").getAttribute("d"))
+    .toMatch(/^M\d/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  await capture(page, "change-light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+  await capture(page, "change-dark");
 });
 
 test("unsupported study input stays unpriced and Reverse target is editable", async ({ page }) => {
@@ -80,7 +109,20 @@ test("unsupported study input stays unpriced and Reverse target is editable", as
   await expect(page.getByLabel("Exact target odds")).toHaveValue("85");
   await page.getByLabel("Exact target odds").fill("90");
   await expect(page.getByRole("slider", { name: "Target odds" })).toHaveValue("90");
+  await capture(page, "reverse");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+});
+
+test("a lower modeled application rate makes a red negative scenario", async ({ page }) => {
+  await page.goto(`/goals/${GOAL}/what-if`);
+  await page.getByPlaceholder(/What if/i).fill("What if I submit 2 applications a week?");
+  await page.getByRole("button", { name: "Run scenario" }).click();
+  await expect(page.getByText("65%", { exact: true })).toBeVisible();
+  await expect(page.getByText("-6.9 pts")).toBeVisible();
+  await expect(page.locator(".what-if-market-chart .hypothetical-negative")).toContainText("65%");
+  await expect(page.locator(".what-if-market-chart .recharts-line-curve"))
+    .toHaveAttribute("stroke", "#c44745");
+  await capture(page, "change-negative");
 });
 
 test("Futures does not show fractional event counts", async ({ page }) => {
@@ -89,4 +131,22 @@ test("Futures does not show fractional event counts", async ({ page }) => {
   await page.getByRole("button", { name: "Map futures" }).click();
   await expect(page.getByLabel("Possible future scenarios")).toContainText("76%");
   await expect(page.locator("body")).not.toContainText("0.76 event");
+  await capture(page, "futures");
+});
+
+test("Compare ranks only modeled options and Deeper analysis remains navigable", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`/goals/${GOAL}/what-if`);
+  await page.getByRole("tab", { name: "Compare" }).click();
+  await page.locator('textarea[name="compare-path-a"]').fill("Apply to 10 jobs a week");
+  await page.locator('textarea[name="compare-path-b"]').fill("Cold email founders");
+  await page.getByRole("button", { name: "Compare these paths" }).click();
+  await expect(page.getByText("Highest modeled goal odds")).toBeVisible();
+  await expect(page.getByText("Apply to 10 jobs a week").first()).toBeVisible();
+  await expect(page.getByText("No modeled effect or ranking is available for this option.")).toBeVisible();
+  await capture(page, "compare");
+  await page.getByRole("tab", { name: "Deeper analysis" }).click();
+  await expect(page.getByLabel("Option visibility")).toBeVisible();
+  expect(errors).toEqual([]);
 });

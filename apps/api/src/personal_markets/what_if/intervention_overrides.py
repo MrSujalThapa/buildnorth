@@ -21,10 +21,7 @@ def _assumption_source(provenance: str) -> AssumptionSource:
 _ACTION_METRIC_TARGETS: dict[str, str] = {
     "monthly_contribution": "flow",
     "contribution_per_month": "flow",
-    "weekly_running_km": "flow",
     "applications_per_week": "weekly_application_rate",
-    "burn_monthly": "flow",
-    "running_days_per_week": "flow",
 }
 
 
@@ -78,17 +75,6 @@ def apply_parsed_changes_to_assumptions(
             by_name["flow"] = flow.model_copy(
                 update={"value": max(flow.minimum, min(flow.maximum, value)), "source": source}
             )
-        elif change.metric == "weekly_running_km" and "flow" in by_name:
-            flow = by_name["flow"]
-            km_delta = change.value if change.operation == "set" else change.value
-            trend_proxy = -0.25 * km_delta
-            value = flow.value + trend_proxy if change.operation == "add" else trend_proxy
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
         elif change.metric == "applications_per_week" and "weekly_application_rate" in by_name:
             rate = by_name["weekly_application_rate"]
             value = (
@@ -100,26 +86,6 @@ def apply_parsed_changes_to_assumptions(
                 update={
                     "value": max(rate.minimum, min(rate.maximum, value)),
                     "source": source,
-                }
-            )
-        elif change.metric == "burn_monthly" and "flow" in by_name:
-            flow = by_name["flow"]
-            delta = -abs(change.value) / 1000.0
-            value = flow.value + delta if change.operation == "add" else delta
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
-                }
-            )
-        elif change.metric == "running_days_per_week" and "flow" in by_name:
-            flow = by_name["flow"]
-            trend_proxy = -0.15 * change.value
-            value = flow.value + trend_proxy if change.operation == "add" else trend_proxy
-            by_name["flow"] = flow.model_copy(
-                update={
-                    "value": max(flow.minimum, min(flow.maximum, value)),
-                    "source": AssumptionSource.EXPLORATION,
                 }
             )
 

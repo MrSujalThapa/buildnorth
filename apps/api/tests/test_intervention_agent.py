@@ -109,6 +109,66 @@ def test_cold_email_cannot_become_unmeasured_application_uplift() -> None:
     assert "not measured applications" in critic.issues[0]
 
 
+@pytest.mark.parametrize(
+    "text,value,operation",
+    [
+        ("What if I submit 5 additional applications each week?", 5, "add"),
+        ("what if i send 5 more applications every week", 5, "add"),
+        ("what if i apply to 20 jobs next week", 20, "set"),
+        ("what if i do 10 applications a week", 10, "set"),
+    ],
+)
+def test_explicit_weekly_application_changes_survive_critique(
+    text: str, value: float, operation: str
+) -> None:
+    proposal = InterventionAgentProposal(
+        understood_action=text,
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation=operation,
+                value=value,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(career_goal(), proposal, text)
+    assert critic.approved
+    assert critic.validated_changes[0].value == value
+    assert critic.validated_changes[0].operation == operation
+
+
+@pytest.mark.parametrize(
+    "text,value,operation",
+    [
+        ("What if I send 10 cold emails and 5 applications?", 5, "add"),
+        ("What if I study 5 hours and apply to jobs?", 5, "set"),
+        ("What if I send 5 more applications each week?", 5, "set"),
+        ("What if I submit 5 applications each week?", 5, "add"),
+        ("What if I apply to 20 jobs next week?", 15, "set"),
+    ],
+)
+def test_application_critic_rejects_unstated_or_wrong_semantics(
+    text: str, value: float, operation: str
+) -> None:
+    proposal = InterventionAgentProposal(
+        understood_action=text,
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation=operation,
+                value=value,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    assert not critique_intervention(career_goal(), proposal, text).approved
+
+
 def test_study_hours_cannot_invent_a_daily_practice_quantity() -> None:
     proposal = InterventionAgentProposal(
         understood_action="Study for 10 hours tomorrow",

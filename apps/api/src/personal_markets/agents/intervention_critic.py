@@ -11,6 +11,19 @@ from personal_markets.ports import (
 from personal_markets.what_if.intervention_registry import allowed_metrics, composed_metric_units
 
 _PROBABILITY_TOKENS = ("probability", "odds", "likelihood", "uplift_pp", "percent_change")
+_APPLICATION_QUANTITY = re.compile(
+    r"\b(?:(?:appl(?:y|ied|ying)\s+to\s+))?(\d+(?:\.\d+)?)\s+"
+    r"(?:additional\s+|more\s+|extra\s+)?(?:job\s+)?applications?\b"
+    r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+jobs?\b",
+    re.I,
+)
+
+
+def _stated_application_quantity(text: str) -> float | None:
+    match = _APPLICATION_QUANTITY.search(text)
+    if match is None or re.search(r"\b(?:week|weekly)\b", text, re.I) is None:
+        return None
+    return float(match.group(1) or match.group(2))
 
 
 def _is_probability_like(metric: str, unit: str) -> bool:
@@ -35,20 +48,51 @@ def critique_intervention(
     # "probability" is good writing, not a contract violation, and must not veto pricing.
     validated_changes = []
     for change in proposal.changes:
-        if (
-            source_text is not None
-            and change.metric in {"applications_per_week", "weekly_application_rate"}
-            and not re.search(
-                r"appl(?:y|ied|ication|ications|ying)|jobs?\s+applied", source_text, re.I
-            )
-        ):
-            issues.append(
-                "Cold emails and networking are not measured applications; "
-                "no application-rate effect was assumed."
-            )
-            continue
+        if source_text is not None and change.metric in {
+            "applications_per_week",
+            "weekly_application_rate",
+        }:
+            if re.search(r"\b(?:yesterday|last week|already)\b", source_text, re.I):
+                issues.append(
+                    "A completed application count is evidence, not a future What If action."
+                )
+                continue
+            if re.search(r"\band\b", source_text, re.I) and re.search(
+                r"\b(?:cold\s+emails?|network\w*|leetcode|study|gym)\b", source_text, re.I
+            ):
+                issues.append(
+                    "This question combines a modeled application change with an "
+                    "unmodeled action; ask about the application change separately."
+                )
+                continue
+            if (
+                re.search(r"\binstead\s+of\b", source_text, re.I)
+                and len(re.findall(r"\d+(?:\.\d+)?", source_text)) > 1
+            ):
+                issues.append(
+                    "The previous and proposed application rates are ambiguous; "
+                    "state the new applications-per-week rate explicitly."
+                )
+                continue
+            stated = _stated_application_quantity(source_text)
+            if stated is None:
+                issues.append(
+                    "Cold emails and networking are not measured applications; "
+                    "state an application count per week to model this change."
+                )
+                continue
+            if abs(stated - change.value) > 1e-9:
+                issues.append("The proposed weekly application count differs from your question.")
+                continue
+            is_delta = bool(re.search(r"\b(?:more|additional|extra)\b", source_text, re.I))
+            if (is_delta and change.operation != "add") or (
+                not is_delta and change.operation != "set"
+            ):
+                issues.append("Application changes must distinguish a new rate from an increase.")
+                continue
         if source_text is not None and change.provenance in {
-            "USER_ASSUMPTION", "EXPLORATION_ASSUMPTION"
+            "USER_ASSUMPTION",
+            "EXPLORATION_ASSUMPTION",
         }:
             numbers = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", source_text)]
             if not any(abs(value - change.value) < 1e-9 for value in numbers):

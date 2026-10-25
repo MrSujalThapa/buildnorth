@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -656,13 +657,27 @@ def _intervention(payload: dict[str, Any]) -> dict[str, Any]:
         ]
         add_change("sleep_hours_per_night", 2.0, "hours/night", operation="add")
         pricing_status = "ASSUMPTION_REQUIRED"
-    elif "application" in text:
+    elif "application" in text or re.search(r"\bappl(?:y|ying|ied)\b", text):
         mechanism = [
             {"variable": "applications_submitted", "description": "Higher application throughput"},
             {"variable": "interview_funnel", "description": "More opportunities enter the funnel"},
         ]
-        add_change("applications_per_week", 15.0, "applications/week", operation="add", frequency="weekly")
-        pricing_status = "PRICED"
+        quantity = re.search(
+            r"\b(\d+(?:\.\d+)?)\s+(?:additional |more |extra )?(?:job )?applications?\b"
+            r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+jobs?\b",
+            text,
+        )
+        if quantity and re.search(r"\b(?:week|weekly)\b", text):
+            is_delta = bool(re.search(r"\b(?:more|additional|extra)\b", text))
+            add_change(
+                "applications_per_week",
+                float(quantity.group(1) or quantity.group(2)),
+                "applications/week",
+                operation="add" if is_delta else "set", frequency="weekly",
+            )
+            pricing_status = "PRICED"
+        else:
+            unsupported.append("State a numeric application count per week to model this change.")
     elif "user" in text and "week" in text:
         mechanism = [
             {"variable": "customer_discovery", "description": "More user conversations"},

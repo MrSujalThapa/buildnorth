@@ -153,7 +153,10 @@ export default function WealthsimpleAreaChart({
 
   const firstTimestamp = firstPoint.timestamp;
   const lastTimestamp = lastPoint.timestamp;
-  const chartEndTimestamp = Math.max(lastTimestamp, ...overlay.map((point) => point.timestamp));
+  const chartData = [
+    ...data.map((point) => ({ ...point, scenarioValue: undefined as number | undefined })),
+    ...overlay.map((point) => ({ timestamp: point.timestamp, value: undefined as number | undefined, scenarioValue: point.value })),
+  ].sort((a, b) => a.timestamp - b.timestamp);
 
   function getIndexFromPointer(
     clientX: number,
@@ -391,7 +394,7 @@ export default function WealthsimpleAreaChart({
         height="100%"
       >
         <ComposedChart
-          data={data}
+          data={chartData}
           margin={{
             top: 10,
             right: 2,
@@ -432,7 +435,7 @@ export default function WealthsimpleAreaChart({
             type="number"
             domain={[
               "dataMin",
-              chartEndTimestamp,
+              "dataMax",
             ]}
             hide
           />
@@ -468,9 +471,8 @@ export default function WealthsimpleAreaChart({
 
           {overlay.length > 1 ? (
             <Line
-              data={overlay}
               type="linear"
-              dataKey="value"
+              dataKey="scenarioValue"
               stroke={overlayTone === "negative" ? "#c44745" : "#188453"}
               strokeDasharray="5 4"
               strokeWidth={2.2}
