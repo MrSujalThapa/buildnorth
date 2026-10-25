@@ -312,6 +312,7 @@ export default function ImpactWorkspace({
                     <p><strong>Why it might help.</strong> {insight.why_it_might_help}</p>
                     <p><strong>Why this fits you.</strong> {insight.why_this_fits}</p>
                     <p><strong>What to do next.</strong> {insight.next_step}</p>
+                    {insight.constraints ? <p><strong>Tradeoff.</strong> {insight.constraints}</p> : null}
                     <p><strong>Evidence to collect.</strong> {insight.evidence_to_collect}</p>
                     {insight.assumptions?.length ? <p className="quiet-copy">Assumption: {insight.assumptions.join(" ")}</p> : null}
                     {insight.sources?.length ? <p className="quiet-copy">Sources: {insight.sources.join(" · ")}</p> : null}

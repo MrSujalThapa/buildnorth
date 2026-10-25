@@ -56,6 +56,7 @@ export function useWhatIfSimulation(
   const [interpretationMessage, setInterpretationMessage] = useState<string | null>(null);
   const [lastParse, setLastParse] = useState<Awaited<ReturnType<typeof api.parseIntervention>> | null>(null);
   const pendingScenario = useRef<string | null>(null);
+  const parseGeneration = useRef(0);
   const simulation = useMutation({ mutationFn: (body: Record<string, unknown>) => api.fastReprice(body) });
   const persistSimulation = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.simulateWhatIf(body),
@@ -64,6 +65,12 @@ export function useWhatIfSimulation(
   const parseIntervention = useMutation({
     mutationFn: (text: string) => api.parseIntervention({ goal_id: goalId, text }),
   });
+
+  useEffect(() => {
+    parseGeneration.current += 1;
+    setLastParse(null);
+    setInterpretationMessage(null);
+  }, [goalId]);
 
   useEffect(() => {
     if (!baseline.data?.priced) {
@@ -157,8 +164,10 @@ export function useWhatIfSimulation(
     }
     pendingScenario.current = null;
     setInterpretationMessage(null);
+    const generation = ++parseGeneration.current;
     parseIntervention.mutate(trimmed, {
         onSuccess: (parsed) => {
+        if (generation !== parseGeneration.current) return;
         setLastParse(parsed);
         const qualitative = parsed.request_kind && parsed.request_kind !== "quantitative_scenario";
         if (qualitative || !parsed.changes.length || parsed.pricing_status !== "PRICED") {

@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Strategy agent replaces keyword templates
+
+**Hypothesis:** PlayItOut recommendations were a keyword-to-template lookup. Routing also attached those cards to odds/evidence questions. Published history was readable from the forecast store but not always from What If's in-memory history adapter.
+
+**Changes:** Strategy path uses `complete_validated` + `prompts/strategy/v1.md` + `validate_strategy_proposal`. Template composer removed. Factual request kinds return no insight cards. Inference failure is an unavailable state, not generic advice. Isolated What If history/baseline overlay published forecasts. No Monte Carlo, Details radar, or Spur entitlement change. No paid live inference.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Creative quality of a hosted model is unverified; tests use the scripted provider.
+
 ## 2026-10-25 — What If consumer chart honesty and request routing
 
 **Hypothesis:** Simple Change was unreadable because a fabricated future overlay stretched the x-axis to the deadline, and unpriced strategy questions were treated as failed calculations.

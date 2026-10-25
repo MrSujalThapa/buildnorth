@@ -86,7 +86,9 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
         return WhatIfService(
             GoalService(repository),
             simulation_repository,
+            evidence=workflow._inner._deps.evidence,
             owner_id=principal.user_id,
+            forecasts=workflow._inner._deps.baseline_forecasts,
         )
 
     app.dependency_overrides[get_what_if_service] = _what_if

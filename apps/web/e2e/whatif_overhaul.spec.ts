@@ -83,6 +83,10 @@ test.beforeEach(async ({ page }) => {
 test("Change reconciles published odds with a priced hypothetical", async ({ page }) => {
   await page.goto(`/goals/${GOAL}/what-if`);
   await expect(page.getByText(/Published forecast: 76.46%/)).toBeVisible();
+  await page.getByRole("button", { name: "Details" }).first().click();
+  await expect(page.getByRole("dialog", { name: "Scenario details" })).toBeVisible();
+  await expect(page.getByText(/No measured parameters yet|Parameter profile radar/)).toBeVisible();
+  await page.getByRole("button", { name: "Close details" }).click();
   const skip = page.getByRole("link", { name: "Skip to main content" });
   await expect(skip).toHaveCSS("clip", /rect\(0(px)?, 0(px)?, 0(px)?, 0(px)?\)/);
   await page.getByPlaceholder(/What if/i).fill("What if I apply to 10 jobs each week?");
@@ -187,4 +191,27 @@ test("strategic questions stay unpriced and still show useful ideas", async ({ p
   await expect(page.getByText("Ask that investor for a few targeted introductions")).toBeVisible();
   await expect(page.getByText("Probability impact not yet estimated")).toBeVisible();
   await expect(page.getByText(/hypothetical change/)).toHaveCount(0);
+});
+
+test("current odds does not invent strategy cards", async ({ page }) => {
+  await page.unroute("**/api/v1/what-if/parse-intervention");
+  await page.route("**/api/v1/what-if/parse-intervention", (route) => {
+    const text = (route.request().postDataJSON() as { text: string }).text;
+    return route.fulfill({
+      json: {
+        raw_text: text,
+        changes: [],
+        unsupported: ["Showing published odds only; no scenario was run."],
+        pricing_status: "NOT_PRICED",
+        request_kind: "current_odds",
+        insights: [],
+        consumer_summary: "Your latest published odds are 76.46%. That is the market number, not a What If scenario.",
+      },
+    });
+  });
+  await page.goto(`/goals/${GOAL}/what-if`);
+  await page.getByPlaceholder(/What if/i).fill("What are my odds right now?");
+  await page.getByRole("button", { name: "Run scenario" }).click();
+  await expect(page.getByText(/Your latest published odds are 76.46%/)).toBeVisible();
+  await expect(page.locator(".insight-card")).toHaveCount(0);
 });

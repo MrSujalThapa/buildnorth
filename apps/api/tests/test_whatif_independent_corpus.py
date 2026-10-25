@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Independently conceived consumer questions. Not variants of LeetCode hours."""
 
 from personal_markets.what_if.request_intent import classify_what_if_request
@@ -47,11 +48,11 @@ INDEPENDENT = [
     ("What should I prioritize this month?", "strategic_advice"),
     (
         "I pitched a VC last month. Is there anything useful I can do with that relationship?",
-        "evidence_report",
+        "strategic_advice",
     ),
-    ("I already know someone at a startup. How should that affect my strategy?", "evidence_report"),
-    ("I won a hackathon. How can I use that to get an interview?", "evidence_report"),
-    ("My former manager offered to refer me. What should I do next?", "evidence_report"),
+    ("I already know someone at a startup. How should that affect my strategy?", "strategic_advice"),
+    ("I won a hackathon. How can I use that to get an interview?", "strategic_advice"),
+    ("My former manager offered to refer me. What should I do next?", "strategic_advice"),
     ("I have a product demo but no customers. How can I get traction?", "opportunity_discovery"),
     ("I applied to 12 jobs yesterday", "evidence_report"),
     ("I had 2 interviews this week", "evidence_report"),

@@ -303,6 +303,7 @@ def get_what_if_service(
         get_simulation_repository(),
         evidence=EvidenceService(get_evidence_repository()),
         owner_id=principal.user_id,
+        forecasts=get_baseline_forecast_service(),
     )
 
 
@@ -438,6 +439,7 @@ def get_intervention_service(
         evidence=deps.evidence,
         run_store=deps.run_store,
         owner_id=principal.user_id,
+        forecasts=deps.baseline_forecasts,
     )
 
 

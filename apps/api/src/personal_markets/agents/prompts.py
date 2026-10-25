@@ -10,6 +10,7 @@ AGENT_PROMPT_FILES = {
     "research": PROMPTS_ROOT / "research" / "v1.md",
     "critic": PROMPTS_ROOT / "critic" / "v1.md",
     "intervention": PROMPTS_ROOT / "intervention" / "v1.md",
+    "strategy": PROMPTS_ROOT / "strategy" / "v1.md",
     "source_planner": PROMPTS_ROOT / "source_planner" / "v1.md",
 }
 

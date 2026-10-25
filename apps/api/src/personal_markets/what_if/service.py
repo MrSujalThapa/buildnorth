@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import numpy as np
 
@@ -19,6 +19,8 @@ from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.primitives import at_numerical_bound
 from personal_markets.forecasting.registry import ForecastModelRegistry
+from personal_markets.forecasting.repository import PublishedBaseline
+from personal_markets.forecasting.service import BaselineForecastService
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.what_if.baseline_state import (
@@ -91,6 +93,7 @@ class WhatIfService:
         evidence: EvidenceService | None = None,
         behavior: BehaviorService | None = None,
         owner_id: UUID | None = None,
+        forecasts: BaselineForecastService | None = None,
     ) -> None:
         self._goals = goals
         self._engine = engine or SimulationEngine()
@@ -99,6 +102,7 @@ class WhatIfService:
         self._evidence = evidence
         self._behavior = behavior or BehaviorService()
         self._owner_id = owner_id
+        self._forecasts = forecasts
 
     async def _require_goal(self, goal_id: str) -> GoalContract:
         return await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
@@ -129,6 +133,19 @@ class WhatIfService:
                     "published_evidence_watermark": latest.evidence_watermark,
                 }
             )
+        if self._forecasts is not None:
+            rows = await self._forecasts.published_history(goal_id)
+            if rows:
+                latest_row = rows[-1]
+                return state.model_copy(
+                    update={
+                        "priced": True,
+                        "status": latest_row.forecast_status,
+                        "published_probability": latest_row.probability,
+                        "published_model_version": latest_row.model_version,
+                        "published_evidence_watermark": latest_row.evidence_watermark,
+                    }
+                )
         return state
 
     async def simulate(self, request: WhatIfRequest) -> WhatIfResult:
@@ -780,10 +797,29 @@ class WhatIfService:
             created_at=point.created_at.isoformat() if point.created_at else None,
         )
 
+    def _published_history_response(self, point: PublishedBaseline) -> MarketHistoryPointResponse:
+        return MarketHistoryPointResponse(
+            id=str(uuid5(NAMESPACE_URL, point.material_hash)),
+            probability=point.probability,
+            forecast_status=point.forecast_status,
+            evidence_watermark=point.evidence_watermark,
+            model_family=point.model_family,
+            model_version=point.model_version,
+            assumption_hash=point.assumption_hash,
+            simulation_run_id=None,
+            source_kind=point.source_kind or "published_forecast",
+            created_at=point.published_at.isoformat() if point.published_at else None,
+        )
+
     async def history(self, goal_id: str) -> list[MarketHistoryPointResponse]:
         await self._require_goal(goal_id)
         points = await self._repository.history(UUID(goal_id))
-        return [self._history_response(point) for point in points]
+        if points:
+            return [self._history_response(point) for point in points]
+        if self._forecasts is None:
+            return []
+        rows = await self._forecasts.published_history(UUID(goal_id))
+        return [self._published_history_response(row) for row in rows]
 
     async def histories(self, goal_ids: list[str]) -> dict[str, list[MarketHistoryPointResponse]]:
         unique: list[UUID] = []
@@ -801,10 +837,19 @@ class WhatIfService:
         self, goal_ids: list[UUID]
     ) -> dict[str, list[MarketHistoryPointResponse]]:
         grouped = await self._repository.history_for_goals(goal_ids)
-        return {
+        result: dict[str, list[MarketHistoryPointResponse]] = {
             str(goal_id): [self._history_response(point) for point in grouped.get(goal_id, [])]
             for goal_id in goal_ids
         }
+        if self._forecasts is None:
+            return result
+        for goal_id in goal_ids:
+            key = str(goal_id)
+            if result[key]:
+                continue
+            rows = await self._forecasts.published_history(goal_id)
+            result[key] = [self._published_history_response(row) for row in rows]
+        return result
 
     async def explorations(self, goal_id: str) -> list[WhatIfExplorationResponse]:
         await self._require_goal(goal_id)

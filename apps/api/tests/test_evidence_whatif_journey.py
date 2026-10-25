@@ -15,7 +15,6 @@ from personal_markets.what_if.domain import WhatIfRequest
 from personal_markets.what_if.intervention_parser import parse_intervention_text
 from personal_markets.what_if.request_intent import classify_what_if_request
 from personal_markets.what_if.service import WhatIfService
-from personal_markets.what_if.strategy_insights import compose_strategy_insights
 
 
 def _hiring_goal() -> GoalContract:
@@ -111,17 +110,29 @@ async def test_confirmed_application_evidence_is_idempotent() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unpriced_introductions_are_not_turned_into_application_counts() -> None:
-    goal = _hiring_goal()
-    insights = compose_strategy_insights(
-        goal,
-        question="What if I ask a VC I've pitched to introduce me to hiring founders?",
-        evidence_summaries=["Pitched a venture capitalist last month."],
-    )
-    assert insights
-    assert all(item.model_status != "MODELED" for item in insights)
+async def test_founder_introductions_are_not_application_counts() -> None:
     classified = classify_what_if_request("I got introduced to 3 founders")
     assert classified.kind == "evidence_report"
+    goal = _hiring_goal()
+    user_id = uuid4()
+    goals = InMemoryGoalRepository()
+    await goals.create(goal, user_id)
+    service = EvidenceService(InMemoryEvidenceRepository({goal.goal_id: True}))
+    event = EvidenceEventProposal.model_validate(
+        {
+            "source_type": "manual",
+            "event_type": "observation",
+            "domain": "career",
+            "metric": "manual_note",
+            "categorical_value": "Introduced to three founders",
+            "observed_at": datetime.now(UTC).isoformat(),
+            "summary": "Introduced to three founders",
+        }
+    )
+    await service.commit(user_id, goal.goal_id, [event], None, [])
+    rows = await service.list_for_goal(goal.goal_id)
+    assert rows[0].metric != "applications_submitted"
+    assert rows[0].numeric_value is None
 
 
 @pytest.mark.asyncio

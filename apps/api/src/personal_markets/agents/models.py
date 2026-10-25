@@ -64,6 +64,12 @@ def ladders(settings: Settings) -> dict[str, ModelLadder]:
             pool_for_model(settings.openai_intervention_model),
             "low",
         ),
+        "strategy": ModelLadder(
+            settings.openai_intervention_model,
+            ("gpt-5.4",) if settings.openai_intervention_model != "gpt-5.4" else (),
+            pool_for_model(settings.openai_intervention_model),
+            "low",
+        ),
         "source_planner": ModelLadder(
             settings.openai_source_planner_model,
             ("gpt-5.4-mini",) if settings.openai_source_planner_model != "gpt-5.4-mini" else (),

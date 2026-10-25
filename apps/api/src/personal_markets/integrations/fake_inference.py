@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 import re
 from collections.abc import Callable
 from typing import Any
@@ -80,6 +81,8 @@ def default_agent_script(request: InferenceRequest) -> dict[str, Any]:
         return _critic(payload)
     if agent == "intervention":
         return _intervention(payload)
+    if agent == "strategy":
+        return _strategy(payload)
     if agent == "source_planner":
         return _source_planner(payload)
     raise SemanticProviderError(f"unsupported scripted agent {agent}")
@@ -606,6 +609,268 @@ def _research(payload: dict[str, Any]) -> dict[str, Any]:
         "claims": claims,
         "reference_class_candidates": payload.get("reference_class_candidates") or [],
         "limitations": payload.get("limitations") or ["Research used frozen artifacts only."],
+    }
+
+
+def _insight(
+    *,
+    title: str,
+    description: str,
+    why_it_might_help: str,
+    why_this_fits: str,
+    next_step: str,
+    evidence_to_collect: str,
+    constraints: str = "Costs time that cannot be spent on other work this week.",
+    grounded_facts: list[str] | None = None,
+    assumptions: list[str] | None = None,
+    sources: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "title": title,
+        "description": description,
+        "why_it_might_help": why_it_might_help,
+        "why_this_fits": why_this_fits,
+        "next_step": next_step,
+        "evidence_to_collect": evidence_to_collect,
+        "constraints": constraints,
+        "model_status": "UNPRICED",
+        "grounded_facts": grounded_facts or [],
+        "assumptions": assumptions or [],
+        "sources": sources or [],
+    }
+
+
+def _strategy(payload: dict[str, Any]) -> dict[str, Any]:
+    """Test double: vary with the actual question and authorized evidence, not domain templates."""
+
+    question = str(payload.get("question") or payload.get("intervention_text") or "").strip()
+    evidence = [str(item) for item in (payload.get("authorized_evidence_summaries") or []) if str(item).strip()]
+    raw_goal = payload.get("goal")
+    goal: dict[str, Any] = raw_goal if isinstance(raw_goal, dict) else {}
+    title = str(goal.get("title") or "this goal")
+    q = question.lower()
+    ev = " ".join(evidence).lower()
+    insights: list[dict[str, Any]] = []
+
+    def evidence_mention(needles: tuple[str, ...]) -> str | None:
+        for item in evidence:
+            blob = item.lower()
+            if any(needle in blob for needle in needles):
+                return item
+        return None
+
+    apps = evidence_mention(("application", "applied", "submitted"))
+    interviews = evidence_mention(("interview", "screen", "onsite", "loop"))
+    interview_fail = evidence_mention(("fail", "rejected", "onsite", "technical", "loop", "system design"))
+
+    if interview_fail and "highest" in q or interview_fail and "leverage" in q:
+        insights.append(
+            _insight(
+                title="The recorded miss is the interview, not sourcing volume",
+                description=f"Authorized notes already show interview trouble: {interview_fail}.",
+                why_it_might_help="A later-stage miss is not fixed by sending more packets into the same funnel.",
+                why_this_fits=interview_fail or evidence[0],
+                next_step="Reproduce the last failed round in a timed mock and write the exact miss.",
+                evidence_to_collect="Mock notes plus the next live round result.",
+                grounded_facts=[interview_fail] if interview_fail else evidence[:1],
+            )
+        )
+    elif apps and not interviews and ("highest" in q or "leverage" in q or "next move" in q):
+        insights.append(
+            _insight(
+                title="Conversion is the bottleneck, not another application wave",
+                description=f"Recorded progress includes applications ({apps}) without interviews.",
+                why_it_might_help="More of a packet that is not converting will not create screens.",
+                why_this_fits=apps,
+                next_step="Rewrite one application around a team’s current problem and send it to a named person.",
+                evidence_to_collect="Screens that follow from that targeted send.",
+                grounded_facts=[apps],
+            )
+        )
+    elif "hiring manager" in q or "access to hiring" in q:
+        insights.append(
+            _insight(
+                title=f"Get in front of hiring managers for {title}",
+                description=(
+                    "The question is about access, not practice volume. "
+                    "A manager conversation beats another anonymous application."
+                ),
+                why_it_might_help="Decision-makers can skip resume filters when someone they trust puts you in the thread.",
+                why_this_fits=evidence[0] if evidence else "No named contact is on file; this stays conditional.",
+                next_step="Name one person who can intro you to a hiring manager this week, or say you have none.",
+                evidence_to_collect="Intros sent and whether a hiring-manager conversation happened.",
+                grounded_facts=evidence[:1],
+                assumptions=[] if evidence else ["You may have a path to a manager; none is recorded."],
+            )
+        )
+    elif "technical interview" in q or "onsite" in q or "leetcode" in q or "prepare for" in q:
+        fail = evidence_mention(("fail", "rejected", "onsite", "technical", "loop"))
+        insights.append(
+            _insight(
+                title="Train the interview format that is actually blocking you",
+                description=(
+                    f"“{question}” is about execution in the room, not more applications."
+                ),
+                why_it_might_help="If screens happen and offers do not, volume is not the bottleneck.",
+                why_this_fits=fail or "No interview-failure evidence is on file; this is a hypothesis about prep.",
+                next_step="Run one timed mock in the same format as the last round and write down the miss.",
+                evidence_to_collect="Mock notes and the next live round outcome. Do not invent a numeric effect.",
+                grounded_facts=[fail] if fail else [],
+                assumptions=[] if fail else ["Interview format is the constraint; confirm with the last round."],
+            )
+        )
+    elif "cold" in q or "application" in q and "interview" in q:
+        apps = evidence_mention(("application", "applied", "submitted"))
+        interviews = evidence_mention(("interview", "screen"))
+        if apps and not interviews:
+            insights.append(
+                _insight(
+                    title="Fix conversion before adding another application wave",
+                    description=f"Recorded progress includes applications ({apps}) without interviews.",
+                    why_it_might_help="More of a packet that is not converting will not create screens.",
+                    why_this_fits=apps,
+                    next_step="Rewrite one application around a team’s current problem and send it to a named person.",
+                    evidence_to_collect="Screens that follow from that targeted send.",
+                    grounded_facts=[apps],
+                )
+            )
+        else:
+            insights.append(
+                _insight(
+                    title="Do not treat cold volume as the only channel",
+                    description=f"The user asked: {question}",
+                    why_it_might_help="Warm or targeted paths can reach a decision-maker without a calibrated coefficient.",
+                    why_this_fits=evidence[0] if evidence else "No conversion evidence is on file.",
+                    next_step="Pick one non-cold channel you actually have, or say you have none.",
+                    evidence_to_collect="Conversations booked outside the job-board blast.",
+                    grounded_facts=evidence[:1],
+                    assumptions=[] if evidence else ["A warmer channel may exist; it is not recorded."],
+                )
+            )
+    elif evidence_mention(("vc", "investor", "venture")) and (
+        "smarter" in q or "intro" in q or "founder" in q or "cold" in q
+    ):
+        fact = evidence_mention(("vc", "investor", "venture")) or evidence[0]
+        insights.append(
+            _insight(
+                title="Use the recorded investor conversation as a distribution path",
+                description=(
+                    "Authorized notes already mention an investor relationship. "
+                    "Asking for a few relevant intros is a concrete next move, not a priced lever."
+                ),
+                why_it_might_help="An investor can open a founder conversation you cannot buy with extra applications.",
+                why_this_fits=fact,
+                next_step="Send a three-sentence ask naming two roles and one artifact they can forward.",
+                evidence_to_collect="Intros made and resulting conversations.",
+                grounded_facts=[fact],
+            )
+        )
+    elif evidence_mention(("manager", "refer")):
+        fact = evidence_mention(("manager", "refer")) or evidence[0]
+        insights.append(
+            _insight(
+                title="Take the existing referral offer before starting another blast",
+                description=f"Authorized evidence includes: {fact}",
+                why_it_might_help="A named referrer is a specific channel, unlike generic networking advice.",
+                why_this_fits=fact,
+                next_step="Reply with the target role, two companies, and a packet they can forward this week.",
+                evidence_to_collect="Whether the referral was submitted and if a screen followed.",
+                grounded_facts=[fact],
+            )
+        )
+    elif "paying" in ev or "customer" in q or "distribution" in q or "retention" in ev:
+        if "retention" in ev or "churn" in ev:
+            insights.append(
+                _insight(
+                    title="Diagnose why people leave before buying more top-of-funnel",
+                    description="Authorized notes mention retention trouble. More acquisition would feed a leaky bucket.",
+                    why_it_might_help="Keeping a user who already showed up is usually cheaper than finding a new one.",
+                    why_this_fits=evidence_mention(("retention", "churn")) or evidence[0],
+                    next_step="Interview two people who left and write the reason in one sentence each.",
+                    evidence_to_collect="Churn reasons and any change in repeat use.",
+                    grounded_facts=[evidence_mention(("retention", "churn")) or evidence[0]],
+                )
+            )
+        else:
+            insights.append(
+                _insight(
+                    title="Talk to people who already pay for the alternative",
+                    description=f"For “{title}”, unpaid building is not the same as demand.",
+                    why_it_might_help="Switching customers reveal the job to be done without inventing a conversion rate.",
+                    why_this_fits=evidence[0] if evidence else "No paying-user evidence is on file.",
+                    next_step="Book three conversations with buyers of a substitute this week.",
+                    evidence_to_collect="Interview notes and any paid commitment.",
+                    grounded_facts=evidence[:1],
+                    assumptions=[] if evidence else ["A substitute product exists in the category."],
+                )
+            )
+    elif "exam" in q or "homework" in ev or "study" in q:
+        insights.append(
+            _insight(
+                title="Practice the assessment format that is actually scoring you down",
+                description=f"The question was “{question}”, not a request for more undifferentiated hours.",
+                why_it_might_help="Homework strength does not automatically transfer to exam retrieval.",
+                why_this_fits=evidence[0] if evidence else "No grade breakdown is on file.",
+                next_step="Do one closed-book retrieval session on the last missed exam topic.",
+                evidence_to_collect="Scores on the next assessment. Hypothetical scores are not evidence.",
+                grounded_facts=evidence[:1],
+            )
+        )
+    elif "recover" in q or "tired" in ev or "mileage" in q or "run" in q:
+        insights.append(
+            _insight(
+                title="Check recovery before adding load",
+                description="More mileage is the default fitness slogan and may be the wrong lever.",
+                why_it_might_help="Missed recovery can erase the value of extra sessions. This is not a medical claim.",
+                why_this_fits=evidence[0] if evidence else "No training log is on file.",
+                next_step="Write planned vs completed sessions for two weeks and mark rest days.",
+                evidence_to_collect="Completed sessions and how you felt, without inventing a finish-time delta.",
+                grounded_facts=evidence[:1],
+                assumptions=["I am not making a diagnosis; this is a planning question."],
+            )
+        )
+    elif "guitar" in q or "song" in q or "practice" in q and "habit" in title.lower():
+        insights.append(
+            _insight(
+                title="Isolate the bar of the song that actually breaks down",
+                description=f"The user asked: {question}. More minutes of the same loop may not be the skill.",
+                why_it_might_help="Performance of a whole piece fails at a specific transition more often than at total time.",
+                why_this_fits=evidence[0] if evidence else "No practice log details are on file.",
+                next_step="Record one pass, mark the first bar that falls apart, and drill only that bar slowly.",
+                evidence_to_collect="A recording of that bar before and after two sessions.",
+                grounded_facts=evidence[:1],
+            )
+        )
+    else:
+        insights.append(
+            _insight(
+                title=f"Answer “{question[:72]}” from the actual bottleneck on {title}",
+                description=(
+                    "No canned playbook is attached. The next move should follow this question "
+                    "and the authorized notes, not a generic domain template."
+                ),
+                why_it_might_help="A recommendation that ignores the question is not useful even if it is true in general.",
+                why_this_fits=evidence[0] if evidence else "Authorized evidence is sparse, so this stays a hypothesis.",
+                next_step="State the single constraint that most recently blocked progress on this goal.",
+                evidence_to_collect="That constraint, dated, so the next answer can be specific.",
+                grounded_facts=evidence[:2],
+                assumptions=[] if evidence else ["The bottleneck is not yet recorded."],
+            )
+        )
+
+    claims = []
+    raw_research = payload.get("research")
+    research: dict[str, Any] = raw_research if isinstance(raw_research, dict) else {}
+    for claim in research.get("claims") or []:
+        source = str(claim.get("source") or "")
+        text = str(claim.get("claim") or "")
+        if text and "placeholder" not in text.lower():
+            claims.append(f"{text} ({source})" if source else text)
+    return {
+        "understood_question": question,
+        "insights": insights[:3],
+        "limitations": [],
+        "research_claims": claims[:4],
     }
 
 

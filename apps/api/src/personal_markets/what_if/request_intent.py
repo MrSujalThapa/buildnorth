@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Deterministic What If request classification. No probabilities are assigned here."""
 
 from __future__ import annotations
@@ -62,6 +63,11 @@ _DIAGNOSTIC = re.compile(
     r"\bwhy (aren'?t|are not|did|isn'?t|isn't)\b|\bholding me back\b|"
     r"\bstrategy actually working\b|\bweakest\b|\bchange your mind\b|"
     r"\bnot making progress\b|\bworked harder\b",
+    re.I,
+)
+_ASK_NEXT = re.compile(
+    r"\b(what should i|what do i do next|how (can|should|do) i|"
+    r"how can i use|how should that|is there anything useful|what next)\b",
     re.I,
 )
 _FOLLOW_UP = re.compile(
@@ -131,6 +137,13 @@ def classify_what_if_request(text: str) -> ClassifiedRequest:
         re.search(r"\b(yesterday|last week|already|i actually|this week)\b", raw, re.I)
     )
     if past and (not hypothetical or completed):
+        if _ASK_NEXT.search(raw) or _STRATEGIC.search(raw) or _OPPORTUNITY.search(raw):
+            return ClassifiedRequest(
+                kind="strategic_advice" if not _OPPORTUNITY.search(raw) else "opportunity_discovery",
+                uncertain=uncertain,
+                needs_confirmation=not uncertain,
+                reason="Observed fact plus a request for what to do next.",
+            )
         return ClassifiedRequest(
             kind="evidence_report",
             uncertain=uncertain,
