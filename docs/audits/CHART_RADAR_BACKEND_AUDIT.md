@@ -40,6 +40,11 @@ excluding recognized synthetic fixture rows. `ParameterRadar` consumes the retur
 `radar.parameters`; `ExecutionProfileRadar` consumes separate behavior estimates.
 Neither radar's display normalization is a forecast coefficient.
 
+Savings measurements require a recognized currency code; mixed currencies are withheld
+instead of converted. The current recognized-code set is explicit and can be extended
+after a unit contract is added. Measurement units such as `hrs/month` cannot pass as
+currency.
+
 For historical backfill, the supported route is an owner-authorized evidence workflow
 with explicit metric, value, unit, observation kind and actual `observed_at`; the user
 must review and confirm it. Dated application counts, practice/study hours, running

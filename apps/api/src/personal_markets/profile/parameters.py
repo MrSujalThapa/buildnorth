@@ -81,6 +81,41 @@ PRESETS: tuple[ParameterSpec, ...] = (
 )
 BY_ID = {spec.id: spec for spec in PRESETS}
 DEFAULT_IDS = [spec.id for spec in PRESETS]
+_CURRENCY_CODES = frozenset(
+    {
+        "aed",
+        "aud",
+        "brl",
+        "cad",
+        "chf",
+        "cny",
+        "dkk",
+        "eur",
+        "gbp",
+        "hkd",
+        "inr",
+        "jpy",
+        "krw",
+        "mxn",
+        "nok",
+        "nzd",
+        "sar",
+        "sek",
+        "sgd",
+        "usd",
+        "zar",
+    }
+)
+
+
+def _currency_unit(unit: str, *, period: bool) -> bool:
+    normalized = unit.lower().replace(" ", "")
+    if period:
+        match = re.fullmatch(r"([a-z]{3}|currency)/(?:month|mo)", normalized)
+        return match is not None and (
+            match.group(1) == "currency" or match.group(1) in _CURRENCY_CODES
+        )
+    return normalized in _CURRENCY_CODES
 
 
 class ParameterEstimate(BaseModel):
@@ -128,7 +163,7 @@ def _compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synthetic: bool
         return False
     unit = (row.unit or "").lower().replace(" ", "")
     if spec.id == "monthly_savings":
-        return bool(re.fullmatch(r"(?:[a-z]{3}|currency)/(?:month|mo)", unit))
+        return _currency_unit(unit, period=True)
     allowed = {
         "weekly_applications": {
             "applications/week",
@@ -175,7 +210,7 @@ def _increment_compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synth
             "kilometres",
         }
     if spec.id == "monthly_savings":
-        return row.metric == "monthly_contribution" and bool(re.fullmatch(r"[a-z]{3}", unit))
+        return row.metric == "monthly_contribution" and _currency_unit(unit, period=False)
     return False
 
 
@@ -260,7 +295,8 @@ def parameter_profile(
                     else rows[-1].unit
                     if spec.id == "monthly_savings" and rows
                     else spec.unit
-                ) or spec.unit,
+                )
+                or spec.unit,
                 window_days=increment_window if use_increments else spec.window_days,
                 aggregation=effective_aggregation,
                 normalization=(

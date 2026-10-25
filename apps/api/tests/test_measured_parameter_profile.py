@@ -123,5 +123,20 @@ def test_recent_period_supersedes_components_and_currency_is_not_converted() -> 
     assert usd_axis.raw_value == 100
     assert usd_axis.unit == "USD/30 days"
     invalid = observation("monthly_contribution", 100, "period", "hours/month", 1)
-    assert next(item for item in parameter_profile([invalid], as_of=NOW).parameters
-                if item.id == "monthly_savings").value is None
+    assert (
+        next(
+            item
+            for item in parameter_profile([invalid], as_of=NOW).parameters
+            if item.id == "monthly_savings"
+        ).value
+        is None
+    )
+    abbreviated = observation("monthly_contribution", 100, "period", "hrs/month", 1)
+    assert (
+        next(
+            item
+            for item in parameter_profile([abbreviated], as_of=NOW).parameters
+            if item.id == "monthly_savings"
+        ).value
+        is None
+    )
