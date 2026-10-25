@@ -35,6 +35,9 @@ const market = {
 test("marketplace and public market stay honest with real chart data", async ({ page }, testInfo) => {
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/me") return route.fulfill({ json: {
+      user_id: "user-1", clerk_user_id: "clerk-1", email: "alice@example.test", invited: true, role: "user",
+    } });
     if (path === "/api/v1/public/markets") return route.fulfill({ json: { items: [market], total: 1, limit: 24, offset: 0 } });
     if (path.endsWith(`/api/v1/public/markets/${market.goal_id}`)) return route.fulfill({ json: market });
     if (path === "/api/v1/public/creators") return route.fulfill({ json: { items: [market.creator] } });

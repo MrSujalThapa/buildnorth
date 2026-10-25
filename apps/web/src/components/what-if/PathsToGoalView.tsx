@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 
 import type { Market, WhatIfView } from "../../adapters/templateTypes";
 import {
@@ -47,6 +47,10 @@ export default function PathsToGoalView({
   const axes = pathAxes(market);
   const selected = paths.find((path) => path.id === selectedPathId) ?? paths[0];
   const [finding, setFinding] = useState(false);
+  useEffect(() => {
+    if (loading) setFinding(true);
+    else setFinding(false);
+  }, [loading]);
   const selectedVariant = selected?.variants.find((item) => item.id === selectedVariantId);
   const pathPoints: SimulationPoint[] = paths.map((path, index) => ({
     id: index + 1,
@@ -83,7 +87,7 @@ export default function PathsToGoalView({
           <h2>What would move the odds?</h2>
         </div>
       </section>
-      <div className="target-row">
+      <div className="target-row reverse-target">
         <label>
           <span>Target odds</span>
           <strong>{targetOdds}%</strong>
@@ -94,21 +98,24 @@ export default function PathsToGoalView({
         <label>
           <span>Exact target</span>
           <input type="number" min={1} max={99} value={targetOdds}
-            onChange={(event) => onTargetOddsChange(Math.min(99, Math.max(1, Number(event.target.value))))}
+            onChange={(event) => onTargetOddsChange(Math.min(99, Math.max(1, Number(event.target.value) || 1)))}
             aria-label="Exact target odds" />
         </label>
         <button type="button" className="primary-action compact" disabled={loadingPaths}
-          onClick={() => { setFinding(true); onFind?.(); }}>Find feasible paths</button>
+          onClick={() => { setFinding(true); onFind?.(); }}>{loadingPaths ? "Searching…" : "Find feasible paths"}</button>
       </div>
 
       {!priced ? (
         <div className="unpriced-state">
           <strong>Paths unavailable</strong>
           <span>{message ?? "Price the baseline before searching for paths."}</span>
+          {onFind ? <button type="button" className="secondary" onClick={() => onFind()}>Retry</button> : null}
         </div>
       ) : null}
 
-      {priced && loadingPaths ? <p role="status">Searching backend paths for {targetOdds}% target…</p> : null}
+      {priced && loadingPaths ? (
+        <p className="reverse-loading" role="status">Searching for paths that reach {targetOdds}%…</p>
+      ) : null}
 
       {priced && !loadingPaths && !paths.length ? (
         <div className="past-empty">

@@ -192,6 +192,50 @@
   }
 }
 
+.parameter-life-radar {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.parameter-life-radar-lede {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+}
+
+.parameter-life-radar-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.parameter-life-radar-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.parameter-life-radar-tabs button span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+
+.parameter-life-radar-tabs button.is-active {
+  color: var(--app-ink);
+  border-color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+}
+
 @media (max-width: 720px) {
   .radar-stage {
     width: calc(100% - 72px);

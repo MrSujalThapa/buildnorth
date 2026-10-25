@@ -1,7 +1,8 @@
-﻿import { useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api, type PublicMarketCard } from "../../api/client";
+import { lifeCategoryFromTitle } from "../../features/goals/marketViewModel";
 import MarketSparkline from "../market/MarketSparkline";
 import "../social/social.css";
 
@@ -12,10 +13,13 @@ function chartPoints(market: PublicMarketCard) {
   }));
 }
 
+const LIFE_AREAS = ["Career", "Education", "Fitness", "Finance", "Startup", "Relationships", "Personal"] as const;
+
 export default function SocialPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
+  const [area, setArea] = useState<string>("all");
   const markets = useInfiniteQuery({
     queryKey: ["public-markets", query, sort],
     retry: false,
@@ -36,6 +40,10 @@ export default function SocialPage() {
     seen.add(item.goal_id);
     return true;
   });
+  const visible = useMemo(
+    () => items.filter((item) => area === "all" || lifeCategoryFromTitle(item.title) === area),
+    [area, items],
+  );
   const total = markets.data?.pages.at(-1)?.total;
   const people = creators.data?.items ?? [];
 
@@ -44,8 +52,9 @@ export default function SocialPage() {
       <section className="discover-shell">
         <header className="discover-header">
           <div>
+            <p className="discover-kicker">Marketplace</p>
             <h1>Discover</h1>
-            <p>Public PlayItOut markets you can inspect, star, and fork. Private goals stay private.</p>
+            <p>Public PlayItOut markets you can inspect, star, and fork. Odds come from stored forecasts — unpublished markets stay honestly unpriced.</p>
           </div>
         </header>
         <div className="discover-tools">
@@ -60,6 +69,14 @@ export default function SocialPage() {
             <option value="stars">Most starred</option>
             <option value="forks">Most forked</option>
           </select>
+        </div>
+        <div className="discover-areas" role="tablist" aria-label="Life area">
+          <button type="button" role="tab" aria-selected={area === "all"} className={area === "all" ? "is-active" : ""} onClick={() => setArea("all")}>All</button>
+          {LIFE_AREAS.map((label) => (
+            <button key={label} type="button" role="tab" aria-selected={area === label} className={area === label ? "is-active" : ""} onClick={() => setArea(label)}>
+              {label}
+            </button>
+          ))}
         </div>
         {creators.isError ? <p role="alert">Could not load creators. <button type="button" onClick={() => void creators.refetch()}>Try again</button></p> : null}
         {people.length ? (
@@ -81,18 +98,20 @@ export default function SocialPage() {
           <div className="empty-social" role="alert"><h2>Could not load markets</h2><button type="button" className="secondary" onClick={() => void markets.refetch()}>Try again</button></div>
         ) : markets.isPending ? (
           <p role="status">Loading public markets&hellip;</p>
-        ) : items.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="empty-social" role="status">
-            <h2>{query.trim() ? "No matching markets" : "No public markets"}</h2>
+            <h2>{query.trim() || area !== "all" ? "No matching markets" : "No public markets"}</h2>
             {query.trim() ? (
-              <button type="button" className="secondary" onClick={() => setQuery("")}>Clear search</button>
+              <button type="button" className="secondary" onClick={() => { setQuery(""); setArea("all"); }}>Clear search</button>
+            ) : area !== "all" ? (
+              <button type="button" className="secondary" onClick={() => setArea("all")}>Clear filters</button>
             ) : <p>Publish a market from its page to make a blueprint discoverable.</p>}
           </div>
         ) : (
           <>
-          <p className="discover-result-count" role="status">Showing {items.length} of {Math.max(total ?? items.length, items.length)} public markets</p>
+          <p className="discover-result-count" role="status">Showing {visible.length} of {Math.max(total ?? items.length, items.length)} public markets</p>
           <div className="discover-grid">
-            {items.map((market) => (
+            {visible.map((market) => (
               <button
                 key={market.goal_id}
                 type="button"
@@ -105,13 +124,19 @@ export default function SocialPage() {
                     withheld={market.forecast.status === "withheld"}
                   />
                 </div>
-                <h2>{market.title}</h2>
-                <div className="discover-meta">
-                  <span>{market.creator.display_name || market.creator.handle}</span>
-                  <span>{market.category.replaceAll("_", " ")}</span>
-                  <span>{market.latest_probability == null ? "Odds unpublished" : `${Math.round(market.latest_probability * 100)}%`}</span>
-                  <span>{market.star_count} stars</span>
-                  <span>{market.fork_count} forks</span>
+                <div className="discover-card-body">
+                  <span className="discover-category">{lifeCategoryFromTitle(market.title)}</span>
+                  <h2>{market.title}</h2>
+                  {market.description ? <p>{market.description}</p> : null}
+                  <div className="discover-meta">
+                    <span className="discover-owner">
+                      <span className="mini-avatar">{market.creator.has_photo ? <img src={api.publicPhotoUrl(market.creator.handle)} alt="" width={22} height={22} loading="lazy" /> : (market.creator.display_name || market.creator.handle).slice(0, 1).toUpperCase()}</span>
+                      {market.creator.display_name || market.creator.handle}
+                    </span>
+                    <span>{market.latest_probability == null ? "Unpriced" : `${Math.round(market.latest_probability * 100)}%`}</span>
+                    <span>{market.star_count} stars</span>
+                    <span>{market.fork_count} forks</span>
+                  </div>
                 </div>
               </button>
             ))}

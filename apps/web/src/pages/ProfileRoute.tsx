@@ -52,8 +52,8 @@ export function ProfileRoute() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingParameters, setEditingParameters] = useState(false);
   const [tab, setTab] = useState<"overview" | "markets" | "stars">("overview");
-  const [marketQuery, setMarketQuery] = useState("");
   const [visibility, setVisibility] = useState<"all" | "public" | "private">("all");
+  const [graph, setGraph] = useState<"followers" | "following" | null>(null);
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -97,12 +97,16 @@ export function ProfileRoute() {
     enabled: Boolean(profile.data && handle),
   });
   const ownMarkets = useQuery({
-    queryKey: ["own-profile-markets", handle, marketQuery, visibility],
+    queryKey: ["own-profile-markets", handle, visibility],
     queryFn: ({ signal }) => api.publicProfileMarkets(handle, {
-      q: marketQuery || undefined,
       visibility: visibility === "all" ? undefined : visibility,
     }, signal),
     enabled: Boolean(profile.data && handle) && tab !== "stars",
+  });
+  const people = useQuery({
+    queryKey: ["own-follow-graph", handle, graph],
+    queryFn: ({ signal }) => api.publicFollowGraph(handle, graph ?? "followers", signal),
+    enabled: Boolean(profile.data && handle && graph),
   });
   const ownStars = useQuery({
     queryKey: ["own-profile-stars", handle],
@@ -136,13 +140,13 @@ export function ProfileRoute() {
             <span>@{handle}</span>
             {fields.bio ? <p>{fields.bio}</p> : null}
           </div>
-          <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
+          <button type="button" className="ui-button ui-button-secondary" onClick={() => setEditing(true)}>Edit profile</button>
         </section>
         <div className="follow-counts">
           {socialProfile.data ? (
             <>
-              <Link to={`/u/${handle}`}>{socialProfile.data.follower_count} followers</Link>
-              <span>{socialProfile.data.following_count} following</span>
+              <button type="button" onClick={() => setGraph("followers")}>{socialProfile.data.follower_count} followers</button>
+              <button type="button" onClick={() => setGraph("following")}>{socialProfile.data.following_count} following</button>
             </>
           ) : socialProfile.isError ? <span role="alert">Follow counts unavailable</span> : <span role="status">Loading follow counts&hellip;</span>}
         </div>
@@ -174,8 +178,7 @@ export function ProfileRoute() {
         ) : null}
         {tab === "markets" ? (
           <>
-            <div className="discover-tools">
-              <input className="repo-search" value={marketQuery} onChange={(event) => setMarketQuery(event.target.value)} placeholder="Find a market…" aria-label="Find a market" />
+            <div className="discover-tools markets-visibility-tools">
               <select value={visibility} onChange={(event) => setVisibility(event.target.value as typeof visibility)} aria-label="Filter visibility">
                 <option value="all">All</option>
                 <option value="public">Public</option>
@@ -281,6 +284,24 @@ export function ProfileRoute() {
           </div>
         </form>
       </div> : null}
+      {graph ? (
+        <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="follow-graph-title">
+          <div className="confirm-card">
+            <h2 id="follow-graph-title">{graph === "followers" ? "Followers" : "Following"}</h2>
+            <ul>
+              {(people.data?.items ?? []).map((item) => (
+                <li key={item.creator.user_id}>
+                  <Link to={`/u/${item.creator.handle}`} onClick={() => setGraph(null)}>
+                    {item.creator.display_name || item.creator.handle}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {people.isError ? <p role="alert">Could not load people. <button type="button" onClick={() => void people.refetch()}>Try again</button></p> : people.isLoading ? <p role="status">Loading people&hellip;</p> : !people.data?.items.length ? <p className="quiet-copy">No one here yet.</p> : null}
+            <button type="button" className="ui-button ui-button-secondary" onClick={() => setGraph(null)}>Close</button>
+          </div>
+        </div>
+      ) : null}
       {editingParameters ? (
         <ParameterEditor
           selected={profile.data.selected_parameters}

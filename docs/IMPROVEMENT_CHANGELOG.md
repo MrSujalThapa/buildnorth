@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Desktop UI overhaul (Discover, Profile radar, What If)
+
+**Hypothesis:** Finishing visual hierarchy, marketplace density, Profile radar reuse, and What If layout would make the shipped product usable without changing numerical engines.
+
+**Changes:** Discover/My Markets restyle (no invented odds). Profile radar reuses ExecutionProfileRadar visuals grouped by life area. Workspace seed writes parameter-compatible observations and a dedicated demo-account marketplace publisher. What If legends, compact odds, and Reverse loading/retry. No forecast coefficients, no Spur.
+
+**Measured result:** Pending verification on this branch.
+
 ## 2026-10-25 — Async clarification resume polls until Confirm
 
 **Hypothesis:** After Continue on goal clarification, `resumeThreadAsync` returned `running` but React Query still cached `needs_input`, so refetch stopped and Confirm never appeared.

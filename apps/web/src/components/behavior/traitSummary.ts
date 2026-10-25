@@ -3,8 +3,10 @@ import type { BehaviorDimension } from "./ExecutionProfileRadar";
 export const TRAIT_COLORS: Record<string, string> = {
   weekly_applications: "#2ec4b6",
   weekly_focus_hours: "#ff9f1c",
+  weekly_study_hours: "#ff9f1c",
   monthly_savings: "#2e86de",
   weekly_running_km: "#6a994e",
+  reading_minutes: "#b08968",
   books_per_month: "#b08968",
   sleep_hours: "#c9184a",
 };

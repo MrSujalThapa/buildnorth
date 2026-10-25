@@ -110,7 +110,7 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
     return PublicBlueprint(
         title=goal.title,
         description=description or str(goal.success_definition.get("description") or ""),
-        category=goal.goal_type.value,
+        category=str(goal.model_requirements.get("life_area") or goal.goal_type.value),
         deadline=goal.deadline,
         success_criteria=success,
         milestones=[item for item in milestones if isinstance(item, (str, dict))],

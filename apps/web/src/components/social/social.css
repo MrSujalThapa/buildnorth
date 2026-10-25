@@ -473,6 +473,120 @@
 .sparse-public-history.is-compact .sparse-public-points { gap: 12px 25px; }
 .sparse-public-history.is-compact .sparse-public-point strong { font-size: 17px; }
 .sparse-public-history.is-compact .sparse-public-point time { font-size: 11px; }
+.discover-kicker {
+  margin: 0 0 6px;
+  color: var(--app-accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discover-areas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -12px 0 22px;
+}
+
+.discover-areas button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.discover-areas button.is-active {
+  color: var(--app-ink);
+  border-color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.discover-card {
+  padding: 0;
+  border: 1px solid var(--app-border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--app-surface);
+  transition: border-color 120ms ease;
+}
+
+.discover-card:hover {
+  border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.discover-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px 16px;
+}
+
+.discover-card-body h2 {
+  font-size: 17px;
+}
+
+.discover-card-body p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.discover-category {
+  color: var(--app-accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.discover-owner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.discover-card-chart {
+  height: 132px;
+}
+
+.repo-row {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  padding: 18px 4px;
+  border-radius: 12px;
+}
+
+.repo-row:hover {
+  background: color-mix(in srgb, var(--app-surface) 80%, transparent);
+}
+
+.repo-chart {
+  min-height: 72px;
+}
+
+.repo-row .market-sparkline {
+  height: 72px;
+}
+
+.follow-counts button {
+  color: var(--app-ink);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.follow-counts button:hover {
+  color: var(--app-accent);
+}
+
+.profile-page .profile-card,
+.profile-page .follow-counts a {
+  text-decoration: none;
+}
+
+.heatmap-cell.level-0 { background: color-mix(in srgb, var(--app-ink) 8%, var(--app-surface)); }
+
 .discover-result-count { margin: -10px 0 20px; color: var(--app-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .discover-more { display: flex; justify-content: center; padding: 30px 0 0; }
 .discover-page-error { margin-top: 24px; }
