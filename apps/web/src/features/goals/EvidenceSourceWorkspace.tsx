@@ -594,6 +594,46 @@ function DatasetUpload({ goalId }: { goalId: string }) {
   );
 }
 
+function SelectedSourcePreview({
+  pluginId,
+  resourceId,
+  resourceTitle,
+  resourceType,
+}: {
+  pluginId: string;
+  resourceId: string;
+  resourceTitle: string;
+  resourceType: string;
+}) {
+  const [measurementId, setMeasurementId] = useState<string | null>(null);
+  const [trackingLabel, setTrackingLabel] = useState("");
+  const preview = useQuery({
+    queryKey: ["plugin-preview", pluginId, resourceId, {}],
+    queryFn: () => api.previewPluginSource(pluginId, {
+      resource_id: resourceId,
+      resource_title: resourceTitle,
+      resource_type: resourceType,
+      arguments: {},
+    }),
+    staleTime: 60_000,
+  });
+  return (
+    <div className="source-inline-preview">
+      {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+      {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+      {preview.data ? (
+        <SourcePreviewView
+          preview={preview.data}
+          selectedMeasurementId={measurementId}
+          trackingLabel={trackingLabel}
+          onSelectMeasurement={setMeasurementId}
+          onTrackingLabel={setTrackingLabel}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function SourceResourcePanel({
   source,
   selectedResources,
@@ -678,15 +718,25 @@ function SourceResourcePanel({
   const [measurementId, setMeasurementId] = useState<string | null>(null);
   const [trackingLabel, setTrackingLabel] = useState("");
   const [previewArguments, setPreviewArguments] = useState<Record<string, string>>({});
+  const [queryText, setQueryText] = useState("");
+  const [committedQuery, setCommittedQuery] = useState("");
+  const access = useQuery({
+    queryKey: ["plugin-access", source.pluginId],
+    queryFn: ({ signal }) => api.pluginAccess(source.pluginId, signal),
+    enabled: source.connected,
+    staleTime: 60_000,
+  });
+  const queryMode = Boolean(access.data?.models.includes("query"));
+  const previewTarget = selectedOption?.resource_id || (queryMode ? committedQuery : "");
   const preview = useQuery({
-    queryKey: ["plugin-preview", source.pluginId, selectedOption?.resource_id, previewArguments],
+    queryKey: ["plugin-preview", source.pluginId, previewTarget, previewArguments],
     queryFn: () => api.previewPluginSource(source.pluginId, {
-      resource_id: selectedOption?.resource_id ?? "",
-      resource_title: selectedOption?.label,
-      resource_type: selectedOption?.resource_type,
+      resource_id: previewTarget,
+      resource_title: selectedOption?.label || committedQuery,
+      resource_type: selectedOption?.resource_type || (queryMode ? "message" : "resource"),
       arguments: previewArguments,
     }),
-    enabled: Boolean(selectedOption),
+    enabled: Boolean(previewTarget),
     staleTime: 60_000,
   });
   useEffect(() => {
@@ -749,7 +799,7 @@ function SourceResourcePanel({
                     <ExternalLink size={17} aria-hidden="true" />
                   </a>
                 ) : null}
-                {checked ? (
+                {checked && resource.resource_id === selectedOption?.resource_id ? (
                   <div className="source-inline-preview">
                     {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
                     {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
@@ -767,6 +817,14 @@ function SourceResourcePanel({
                       />
                     ) : null}
                   </div>
+                ) : null}
+                {checked && resource.resource_id !== selectedOption?.resource_id ? (
+                  <SelectedSourcePreview
+                    pluginId={source.pluginId}
+                    resourceId={resource.resource_id}
+                    resourceTitle={resource.label}
+                    resourceType={resource.resource_type}
+                  />
                 ) : null}
               </li>
             );
@@ -795,7 +853,47 @@ function SourceResourcePanel({
           />
         </label>
       ) : null}
-      {generic && !options.length ? (
+      {queryMode ? (
+        <form className="evidence-ref-field" onSubmit={(event) => {
+          event.preventDefault();
+          const value = queryText.trim();
+          if (!value) return;
+          setCommittedQuery(value);
+          onResourceRefChange(value);
+          const key = access.data?.query_argument;
+          if (key) {
+            onArgumentChange(key, value);
+            setPreviewArguments({ [key]: value });
+          }
+        }}>
+          <span>{access.data?.query_label || "Search"}</span>
+          <input className="ui-field" value={queryText} maxLength={200}
+            onChange={(event) => setQueryText(event.target.value)}
+            placeholder="Describe the messages or records to include" />
+          <button type="submit" className="ui-button">Preview this search</button>
+          <small>Only this search is read. The rest of the account stays untouched.</small>
+        </form>
+      ) : null}
+      {queryMode && committedQuery && !selectedOption ? (
+        <div className="source-inline-preview">
+          {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+          {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+          {preview.data ? (
+            <SourcePreviewView
+              preview={preview.data}
+              selectedMeasurementId={measurementId}
+              trackingLabel={trackingLabel}
+              onSelectMeasurement={(id) => {
+                const measurement = preview.data?.measurements.find((item) => item.id === id);
+                setMeasurementId(id);
+                setTrackingLabel(measurement?.label ?? "");
+              }}
+              onTrackingLabel={setTrackingLabel}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {generic && !options.length && !queryMode ? (
         <label className="evidence-ref-field">
           <span>Authorized resource ID or bounded query</span>
           <input className="ui-field" value={resourceRef} maxLength={500}

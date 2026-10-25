@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -30,6 +31,8 @@ def normalize_tool_result(
             row = {"row_index": index, "values": row[:20]}
         if not isinstance(row, dict):
             continue
+        _decode_declared_encoding(row)
+        _attach_nested_text(row)
         source_uri = recipe_step.resource_uri if recipe_step else None
         external_id = str(
             (row.get("sha") if plugin_id == "github" else None)
@@ -120,6 +123,96 @@ _COLUMN_ROLES = {
     "unit": "unit",
     "units": "unit",
 }
+
+
+def _decode_declared_encoding(row: dict[str, Any]) -> None:
+    """Turn a declared base64 document into text. The encoding field is the signal."""
+    if str(row.get("encoding") or "").strip().lower() != "base64":
+        return
+    for key in ("content", "body", "text", "data"):
+        value = row.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        try:
+            compact = "".join(value.split())
+            decoded = base64.b64decode(compact, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if decoded.strip():
+            row["plain_text"] = decoded.strip()[:2000]
+            return
+
+
+def _attach_nested_text(row: dict[str, Any]) -> None:
+    """Lift readable nested text out of wrappers without treating ids as content."""
+    if isinstance(row.get("values"), list):
+        return
+    existing = ("markdown", "plain_text", "text", "content")
+    if any(isinstance(row.get(key), str) and str(row.get(key)).strip() for key in existing):
+        return
+    text = _nested_text(row)
+    if text:
+        row["plain_text"] = text[:2000]
+
+
+def _nested_text(value: Any, depth: int = 0) -> str:
+    if depth > 4:
+        return ""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if _looks_like_identifier(stripped):
+            return ""
+        return stripped
+    if isinstance(value, list):
+        parts = [_nested_text(item, depth + 1) for item in value[:30]]
+        return "\n".join(part for part in parts if part)
+    if isinstance(value, dict):
+        preferred = (
+            "markdown",
+            "plain_text",
+            "plaintext",
+            "paragraph",
+            "text",
+            "content",
+            "snippet",
+        )
+        for key in preferred:
+            if key in value:
+                found = _nested_text(value[key], depth + 1)
+                if found:
+                    return found
+        parts = []
+        for key, child in value.items():
+            if key in {
+                "id",
+                "object",
+                "type",
+                "created_time",
+                "last_edited_time",
+                "created_at",
+                "updated_at",
+                "request_id",
+                "parent",
+                "url",
+                "archived",
+            }:
+                continue
+            found = _nested_text(child, depth + 1)
+            if found:
+                parts.append(found)
+        return "\n".join(parts)
+    return ""
+
+
+def _looks_like_identifier(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            value,
+            re.IGNORECASE,
+        )
+        or re.fullmatch(r"[0-9a-f]{16,}", value, re.IGNORECASE)
+    )
 
 
 def _column_role(header: str) -> str | None:
@@ -219,7 +312,18 @@ def _extract_rows(payload: dict[str, Any]) -> list[Any]:
 
 
 def _observed_at(row: dict[str, Any]) -> str:
-    for key in ("observed_at", "updated_at", "created_at", "date", "timestamp", "committed_date"):
+    for key in (
+        "observed_at",
+        "updated_at",
+        "created_at",
+        "date",
+        "timestamp",
+        "messageTimestamp",
+        "message_timestamp",
+        "sent_at",
+        "sentAt",
+        "committed_date",
+    ):
         value = row.get(key)
         if value:
             return str(value)

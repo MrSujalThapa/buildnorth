@@ -509,11 +509,7 @@ class ComposioIntegrationGateway:
                 discovered_tool = discovery_tool(toolkit_slug, tools)
                 tool_name = discovered_tool.name if discovered_tool else None
         if not tool_name:
-            raise IntegrationProviderError(
-                ProviderErrorKind.UNSUPPORTED_CAPABILITY,
-                f"{toolkit_slug} has no supported resource discovery read.",
-                retryable=False,
-            )
+            return []
         discovery_arguments = bound_page_arguments(discovered_tool, {}) if discovered_tool else {}
         if discovered_tool:
             from jsonschema import Draft202012Validator, SchemaError, ValidationError

@@ -554,6 +554,30 @@ class IntegrationGatewayService:
             rows = [row for row in rows if row.tool_name in offered]
         return [row.model_dump(mode="json") for row in rows]
 
+    async def source_access(
+        self, plugin_id: str, *, user_id: UUID | None = None
+    ) -> dict[str, object]:
+        from personal_markets.integrations.generic_reads import access_model
+        from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+        owner = self._owner(user_id)
+        connection = await self._repository.get_connection(owner, plugin_id)
+        if connection is None or connection.status != "connected":
+            return {"models": ["unsupported"], "query_argument": "", "query_label": "Search"}
+        if not await self._repository.list_capabilities(connection.id):
+            await self._discover_and_persist(connection)
+        rows = await self._repository.list_capabilities(connection.id)
+        tools = [
+            MCPToolDescriptor(
+                name=row.tool_name or "",
+                description=row.label,
+                input_schema=row.input_schema,
+            )
+            for row in rows
+            if row.tool_name
+        ]
+        return access_model(plugin_id, tools)
+
     async def list_resources(
         self, plugin_id: str, *, user_id: UUID | None = None
     ) -> list[dict[str, object]]:
@@ -580,9 +604,9 @@ class IntegrationGatewayService:
         user_id: UUID | None = None,
     ) -> dict[str, object]:
         """Read one selected resource for display. Nothing is stored."""
-        from personal_markets.integrations.generic_reads import preview_call
+        from personal_markets.integrations.generic_reads import preview_plan
         from personal_markets.integrations.mcp_domain import MCPToolDescriptor
-        from personal_markets.integrations.source_presentation import SourcePreview, present_source
+        from personal_markets.integrations.source_presentation import SourcePreview
 
         owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
@@ -607,46 +631,124 @@ class IntegrationGatewayService:
             for key, value in (arguments or {}).items()
             if isinstance(value, str) and value.strip() and len(value) <= 500
         }
-        chosen = preview_call(plugin_id, tools, resource_id, supplied)
-        if chosen is None:
+        plan = preview_plan(plugin_id, tools, resource_id, supplied)
+        if not plan:
             return SourcePreview(
                 resource_title=resource_title or resource_id,
                 resource_type=resource_type or "resource",
                 error="No safely scoped read is available for this source.",
             ).model_dump(mode="json")
-        tool, call_arguments = chosen
         transport = self._transport_for(connection)
-        try:
-            payload = await asyncio.wait_for(
+        preview = await self._execute_preview_plan(
+            plugin_id=plugin_id,
+            connection_id=connection.id,
+            owner=str(owner),
+            tools=tools,
+            plan=plan,
+            resource_id=resource_id,
+            resource_title=resource_title,
+            resource_type=resource_type,
+            transport=transport,
+            supplied=supplied,
+        )
+        return preview.model_dump(mode="json")
+
+    async def _execute_preview_plan(
+        self,
+        *,
+        plugin_id: str,
+        connection_id: UUID,
+        owner: str,
+        tools: list[Any],
+        plan: list[tuple[Any, dict[str, Any]]],
+        resource_id: str,
+        resource_title: str,
+        resource_type: str,
+        transport: MCPTransport,
+        supplied: dict[str, Any] | None = None,
+    ) -> Any:
+        from personal_markets.integrations.generic_reads import (
+            accepts_preview,
+            content_follow_ups,
+            has_reader_content,
+            public_provider_error,
+        )
+        from personal_markets.integrations.source_presentation import SourcePreview, present_source
+
+        calls_left = 4
+        last_error: BaseException | None = None
+        payloads: list[dict[str, Any]] = []
+        tool_name = ""
+        arguments: dict[str, Any] = {}
+
+        async def _read(tool: Any, call_arguments: dict[str, Any]) -> list[dict[str, Any]]:
+            nonlocal calls_left
+            calls_left -= 1
+            response = await asyncio.wait_for(
                 transport.call_tool(tool.name, call_arguments),
                 timeout=_SYNC_TOOL_TIMEOUT_SECONDS,
             )
-        except IntegrationProviderError:
+            raw_payload = response.get("raw") if isinstance(response.get("raw"), dict) else response
+            normalized = normalize_tool_result(
+                plugin_id=plugin_id,
+                plugin_connection_id=connection_id,
+                sync_run_id=uuid4(),
+                tool_name=tool.name,
+                payload=raw_payload if isinstance(raw_payload, dict) else {"records": raw_payload},
+                user_id=owner,
+                recipe_step=None,
+            )
+            return [row.payload for row in normalized]
+
+        for tool, call_arguments in plan:
+            if calls_left <= 0:
+                break
+            try:
+                payloads = await _read(tool, call_arguments)
+            except IntegrationProviderError as error:
+                last_error = error
+                continue
+            tool_name = tool.name
+            arguments = call_arguments
+            if accepts_preview(tool, payloads, supplied):
+                break
+            follow_ups = [
+                item
+                for item in content_follow_ups(plugin_id, tools, resource_id, payloads)
+                if item[0].name != tool.name
+            ]
+            collected: list[dict[str, Any]] = []
+            for follow_tool, follow_arguments in follow_ups:
+                if calls_left <= 0:
+                    break
+                try:
+                    collected.extend(await _read(follow_tool, follow_arguments))
+                except IntegrationProviderError as error:
+                    last_error = error
+            if follow_ups and accepts_preview(follow_ups[0][0], collected, supplied):
+                payloads = collected
+                tool_name = follow_ups[0][0].name
+                arguments = follow_ups[0][1]
+                break
+        if not payloads and last_error is not None:
             return SourcePreview(
                 resource_title=resource_title or resource_id,
                 resource_type=resource_type or "resource",
-                tool_name=tool.name,
-                arguments={key: str(value) for key, value in call_arguments.items()},
-                error="This source could not be read. Adjust the required fields and try again.",
-            ).model_dump(mode="json")
-        raw_payload = payload.get("raw") if isinstance(payload.get("raw"), dict) else payload
-        normalized = normalize_tool_result(
-            plugin_id=plugin_id,
-            plugin_connection_id=connection.id,
-            sync_run_id=uuid4(),
-            tool_name=tool.name,
-            payload=raw_payload if isinstance(raw_payload, dict) else {"records": raw_payload},
-            user_id=str(owner),
-            recipe_step=None,
-        )
+                error=public_provider_error(last_error),
+            )
         preview = present_source(
             resource_title=resource_title or resource_id,
             resource_type=resource_type or "resource",
-            tool_name=tool.name,
-            arguments=call_arguments,
-            payloads=[row.payload for row in normalized],
+            tool_name=tool_name,
+            arguments=arguments,
+            payloads=payloads,
         )
-        return preview.model_dump(mode="json")
+        if payloads and not any(has_reader_content(item) for item in payloads):
+            preview.error = (
+                "This read returned identifiers only. "
+                "No authorized content read accepted them."
+            )
+        return preview
 
     async def list_descendants(
         self, plugin_id: str, parent_id: str, *, user_id: UUID | None = None

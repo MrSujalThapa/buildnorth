@@ -86,6 +86,14 @@ async def preview_plugin_source(
     )
 
 
+@router.get("/{plugin_id}/access")
+async def plugin_access(
+    plugin_id: str,
+    gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
+) -> dict[str, object]:
+    return await gateway.source_access(plugin_id)
+
+
 @router.get("/{plugin_id}/resources")
 async def plugin_resources(
     plugin_id: str,

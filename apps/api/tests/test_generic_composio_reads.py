@@ -12,7 +12,6 @@ import pytest
 
 from personal_markets.agents.source_planner_service import SourcePlannerService
 from personal_markets.core.config import Settings
-from personal_markets.core.errors import IntegrationProviderError
 from personal_markets.integrations.composio_gateway import ComposioIntegrationGateway
 from personal_markets.integrations.generic_reads import (
     arguments_for_selection,
@@ -412,8 +411,196 @@ async def test_unknown_provider_discovers_bounded_resources_without_adapter(
         return [MCPToolDescriptor(name="NEW_PROVIDER_XYZ_DELETE_ALL")]
 
     monkeypatch.setattr(gateway, "list_tools", no_tools)
-    with pytest.raises(IntegrationProviderError, match="no supported resource discovery"):
-        await gateway.list_resources(owner, "new_provider_xyz", connected_account_id="ca-1")
+    empty = await gateway.list_resources(
+        owner, "new_provider_xyz", connected_account_id="ca-1"
+    )
+    assert empty == []
+
+
+def test_unknown_provider_reads_content_instead_of_metadata() -> None:
+    from personal_markets.integrations.generic_reads import (
+        content_follow_ups,
+        discovery_tool,
+        preview_call,
+    )
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    tools = [
+        MCPToolDescriptor(
+            name="ACME_LIST_ITEMS",
+            description="List records",
+            input_schema={"type": "object", "properties": {}},
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_METADATA",
+            description="Fetch metadata",
+            input_schema={
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"],
+            },
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_MARKDOWN",
+            description="Fetch markdown content",
+            input_schema={
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"],
+            },
+        ),
+    ]
+    chosen = preview_call("fieldkit", tools, "item-1", {})
+    assert chosen is not None
+    assert chosen[0].name == "ACME_GET_MARKDOWN"
+    follow = content_follow_ups(
+        "fieldkit",
+        tools,
+        "item-1",
+        [{"id": "page-9", "created_at": "2026-10-20T00:00:00Z"}],
+    )
+    assert follow[0][0].name == "ACME_GET_MARKDOWN"
+    assert follow[0][1]["id"] == "page-9"
+    assert discovery_tool("fieldkit", tools) is not None
+    listed = discovery_tool("fieldkit", tools)
+    assert listed is not None and listed.name == "ACME_LIST_ITEMS"
+
+
+def test_query_only_source_offers_a_search_instead_of_no_sources() -> None:
+    from personal_markets.integrations.generic_reads import (
+        access_model,
+        content_follow_ups,
+        discovery_tool,
+        preview_call,
+    )
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    tools = [
+        MCPToolDescriptor(
+            name="ACME_LIST_FILTERS",
+            description="List filters",
+            input_schema={"type": "object", "properties": {"user_id": {"type": "string"}}},
+        ),
+        MCPToolDescriptor(
+            name="ACME_LIST_DRAFTS",
+            description="List draft messages",
+            input_schema={"type": "object", "properties": {"user_id": {"type": "string"}}},
+        ),
+        MCPToolDescriptor(
+            name="ACME_LIST_MESSAGES",
+            description="List messages",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "q": {"type": "string", "description": "Search messages."},
+                    "user_id": {
+                        "type": "string",
+                        "description": "Use me for the authenticated account.",
+                    },
+                },
+            },
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_MESSAGE_MARKDOWN",
+            description="Fetch markdown for one message",
+            input_schema={
+                "type": "object",
+                "properties": {"message_id": {"type": "string"}},
+                "required": ["message_id"],
+            },
+        ),
+    ]
+    assert discovery_tool("fieldkit", tools) is None
+    access = access_model("fieldkit", tools)
+    assert access["models"] == ["query"]
+    assert access["query_argument"] == "q"
+    chosen = preview_call("fieldkit", tools, "interview", {})
+    assert chosen is not None
+    assert chosen[0].name == "ACME_LIST_MESSAGES"
+    assert chosen[1]["q"] == "interview"
+    assert chosen[1]["user_id"] == "me"
+    tools.append(
+        MCPToolDescriptor(
+            name="ACME_FETCH_MESSAGE_BY_MESSAGE_ID",
+            description="ACME_FETCH_MESSAGE_BY_MESSAGE_ID",
+            input_schema={
+                "type": "object",
+                "properties": {"message_id": {"type": "string"}, "user_id": {"type": "string"}},
+                "required": ["message_id"],
+            },
+        )
+    )
+    follow = content_follow_ups(
+        "fieldkit",
+        tools,
+        "interview",
+        [{"id": "msg-1"}, {"id": "msg-2"}],
+    )
+    assert follow[0][1]["message_id"] == "msg-1"
+    assert follow[1][1]["message_id"] == "msg-2"
+
+
+def test_selected_resource_is_not_rewritten_into_a_search() -> None:
+    from personal_markets.integrations.generic_reads import accepts_preview, preview_call
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    tools = [
+        MCPToolDescriptor(
+            name="ACME_SEARCH_REPOSITORIES",
+            description="Search repositories",
+            input_schema={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_README",
+            description="Fetch readme content",
+            input_schema={
+                "type": "object",
+                "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}},
+                "required": ["owner", "repo"],
+            },
+        ),
+    ]
+    chosen = preview_call("fieldkit", tools, "ada/notes", {})
+    assert chosen is not None
+    assert chosen[0].name == "ACME_GET_README"
+    searched = preview_call("fieldkit", tools, "notes", {"query": "notes"})
+    assert searched is not None
+    assert searched[0].name == "ACME_SEARCH_REPOSITORIES"
+    assert accepts_preview(
+        tools[0],
+        [{"plain_text": "A repository description that is long enough to read."}],
+        {},
+    ) is False
+    assert accepts_preview(
+        tools[1],
+        [{"plain_text": "A repository description that is long enough to read."}],
+        {},
+    ) is True
+
+
+def test_slash_separated_resource_fills_both_required_names() -> None:
+    from personal_markets.integrations.generic_reads import preview_call
+    from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+    tools = [
+        MCPToolDescriptor(
+            name="ACME_GET_README",
+            description="Fetch readme content",
+            input_schema={
+                "type": "object",
+                "properties": {"owner": {"type": "string"}, "repo": {"type": "string"}},
+                "required": ["owner", "repo"],
+            },
+        )
+    ]
+    chosen = preview_call("fieldkit", tools, "ada/notes", {})
+    assert chosen is not None
+    assert chosen[1]["owner"] == "ada"
+    assert chosen[1]["repo"] == "notes"
 
 
 def test_preview_prefers_a_bounded_record_read_and_presents_real_rows() -> None:
@@ -627,6 +814,113 @@ def test_a_dated_numeric_grid_is_a_measurement_without_a_known_provider() -> Non
     assert preview.records[0].timestamp == "2026-10-20"
     assert preview.measurements[0].label == "Hours"
     assert preview.notice is None
+
+
+def test_a_score_without_a_unit_stays_readable_and_unmeasured() -> None:
+    from personal_markets.integrations.source_presentation import present_source
+
+    preview = present_source(
+        resource_title="Outreach",
+        resource_type="resource",
+        tool_name="ACME_GET_GRID",
+        arguments={},
+        payloads=[
+            {"values": ["Day", "Score"]},
+            {"values": ["2026-10-20", "95"]},
+        ],
+    )
+    assert preview.measurements == []
+    assert preview.columns == ["Day", "Score"]
+    assert preview.records[0].cells == ["2026-10-20", "95"]
+
+
+def test_message_timestamp_is_kept_with_the_message() -> None:
+    from personal_markets.integrations.source_presentation import present_source
+
+    preview = present_source(
+        resource_title="inbox",
+        resource_type="message",
+        tool_name="ACME_FETCH_MESSAGE",
+        arguments={"message_id": "m-1"},
+        payloads=[
+            {
+                "sender": "Ada <ada@example.com>",
+                "subject": "Notes",
+                "messageText": "The bounded note is ready.",
+                "messageTimestamp": "2026-10-24T15:04:00Z",
+            }
+        ],
+    )
+    assert preview.records[0].kind == "message"
+    assert preview.records[0].timestamp == "2026-10-24T15:04:00Z"
+    assert preview.records[0].actor == "Ada <ada@example.com>"
+
+
+def test_declared_base64_content_becomes_readable_text() -> None:
+    import base64
+    from uuid import uuid4
+
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+    from personal_markets.integrations.generic_reads import has_reader_content
+    from personal_markets.integrations.source_presentation import present_source
+
+    raw = base64.b64encode(b"# Notes\n\nThe plan is to finish the read path.").decode()
+    encoded = "\n".join(raw[index : index + 60] for index in range(0, len(raw), 60))
+    records = normalize_tool_result(
+        plugin_id="fieldkit",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name="ACME_GET_FILE",
+        payload={"name": "notes.md", "encoding": "base64", "content": encoded},
+        user_id="user-1",
+    )
+    assert records
+    assert has_reader_content(records[0].payload)
+    preview = present_source(
+        resource_title="notes",
+        resource_type="file",
+        tool_name="ACME_GET_FILE",
+        arguments={"id": "file-1"},
+        payloads=[records[0].payload],
+    )
+    assert preview.records[0].kind == "document"
+    assert preview.records[0].text is not None
+    assert "finish the read path" in preview.records[0].text
+    assert encoded not in (preview.records[0].text or "")
+
+
+def test_nested_text_becomes_a_document_instead_of_an_identifier() -> None:
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+    from personal_markets.integrations.source_presentation import present_source
+
+    page_id = "11111111-1111-1111-1111-111111111111"
+    rows = normalize_tool_result(
+        plugin_id="fieldkit",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name="ACME_GET_PAGE",
+        payload={
+            "results": [
+                {
+                    "id": page_id,
+                    "created_time": "2026-10-20T00:00:00Z",
+                    "paragraph": {"text": {"content": "Bring the plan into one page."}},
+                }
+            ]
+        },
+        user_id="user",
+    )
+    preview = present_source(
+        resource_title="Plan",
+        resource_type="document",
+        tool_name="ACME_GET_PAGE",
+        arguments={},
+        payloads=[row.payload for row in rows],
+    )
+    rendered = " ".join(f"{record.title} {record.text or ''}" for record in preview.records)
+    assert "Bring the plan into one page." in rendered
+    assert page_id not in rendered
+    assert preview.measurements == []
 
 
 def test_a_grid_without_labels_does_not_use_the_first_row_as_headers() -> None:

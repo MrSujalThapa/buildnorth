@@ -2,6 +2,10 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — Bounded content reads for unfamiliar providers
+
+Preview planning now prefers a content read over metadata and can make one follow-up read with identifiers the first response actually returned. A selected resource is not rewritten into a search. Declared base64 content is decoded before display. A message list can be followed by a bounded per-message read. Query-only connections offer a search instead of an empty source list. A bare number is not treated as progress unless a date and a unit or quantity name are present. No forecast was published. Hosted inference credit remains unavailable, so tracked rows stay unverified.
+
 ## 2026-10-24 — Preview quality for any connected source
 
 The same preview now classifies records from their fields. Empty rows and provider-prefixed labels are omitted. A source with no numeric measurement says that no measurable progress was detected. The Plugins page and the goal evidence page both use that preview. No forecast was published.

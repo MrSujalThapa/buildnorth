@@ -52,6 +52,9 @@ class UnifiedIntegrationGateway:
     async def list_capabilities(self, plugin_id: str) -> list[dict[str, object]]:
         return await self._mcp.list_capabilities(plugin_id, user_id=self._user_id)
 
+    async def source_access(self, plugin_id: str) -> dict[str, object]:
+        return await self._mcp.source_access(plugin_id, user_id=self._user_id)
+
     async def list_resources(self, plugin_id: str) -> list[dict[str, object]]:
         return await self._mcp.list_resources(plugin_id, user_id=self._user_id)
 

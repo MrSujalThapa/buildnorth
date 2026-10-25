@@ -1038,6 +1038,12 @@ export const api = {
       undefined,
       signal,
     ),
+  pluginAccess: (pluginId: string, signal?: AbortSignal) =>
+    request<{ models: string[]; query_argument: string; query_label: string }>(
+      `/api/v1/plugins/${pluginId}/access`,
+      undefined,
+      signal,
+    ),
   pluginResources: (pluginId: string, signal?: AbortSignal) =>
     request<{ uri: string; name: string; description?: string; resource_type?: string; metadata?: { url?: string; provider_id?: string; connected_account_id?: string } }[]>(
       `/api/v1/plugins/${pluginId}/resources`,

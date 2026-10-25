@@ -88,6 +88,23 @@ _HIDDEN = {
     "row_index",
     "values",
     "raw",
+    "id",
+    "uuid",
+    "block_id",
+    "page_id",
+    "object",
+    "request_id",
+    "parent",
+    "url",
+    "href",
+    "etag",
+    "created_time",
+    "last_edited_time",
+    "created_at",
+    "updated_at",
+    "archived",
+    "cover",
+    "icon",
 }
 
 
@@ -103,6 +120,13 @@ def present_source(
     columns, records = _arrange(records)
     records = records[:8]
     measurements = _measurements(records)
+    kinds = {record.kind for record in records}
+    if measurements or not records:
+        notice = None
+    elif kinds & {"document", "message", "activity"}:
+        notice = "Readable content is below. No measurable progress was confirmed."
+    else:
+        notice = _NO_MEASUREMENT
     return SourcePreview(
         resource_title=resource_title,
         resource_type=resource_type or "resource",
@@ -112,7 +136,7 @@ def present_source(
         columns=columns,
         measurements=measurements,
         records=records,
-        notice=None if measurements or not records else _NO_MEASUREMENT,
+        notice=notice,
     )
 
 
@@ -126,7 +150,12 @@ def _present_record(payload: dict[str, Any]) -> PreviewRecord | None:
     numeric = _number(event.get("numeric_value"))
     metric = _text(event.get("metric")) or _text(payload.get("metric"))
     unit = _text(event.get("unit")) or _text(payload.get("unit"))
-    timestamp = _text(event.get("observed_at")) or _text(payload.get("date"))
+    timestamp = (
+        _text(event.get("observed_at"))
+        or _text(payload.get("date"))
+        or _text(payload.get("observed_at"))
+        or _text(payload.get("messageTimestamp"))
+    )
     actor = _actor(payload)
     body = _body(payload)
     title = _title(payload, event)
@@ -282,7 +311,7 @@ def _title(payload: dict[str, Any], event: dict[str, Any]) -> str | None:
     for source in (payload, event):
         for key in _TITLE_KEYS:
             value = _display(source.get(key)) if key == "summary" else _text(source.get(key))
-            if value:
+            if value and not _identifier(value):
                 return value[:160]
     return None
 
@@ -324,7 +353,7 @@ def _object_fields(payload: dict[str, Any]) -> tuple[list[str], list[str]]:
         if key in _HIDDEN or key.startswith("_"):
             continue
         text = _cell(value)
-        if not text or len(text) > 160:
+        if not text or len(text) > 160 or _identifier(text):
             continue
         labels.append(key.replace("_", " ").strip().title())
         cells.append(text)
@@ -418,7 +447,7 @@ def _measured_grid(columns: list[str], records: list[PreviewRecord]) -> list[Pre
         for index in range(len(columns))
         if index != date_index and _mostly_numeric(records, index)
     ]
-    if len(numeric_indexes) != 1:
+    if len(numeric_indexes) != 1 or date_index is None:
         return []
     value_index = numeric_indexes[0]
     unit_index = next(
@@ -429,6 +458,8 @@ def _measured_grid(columns: list[str], records: list[PreviewRecord]) -> list[Pre
         ),
         None,
     )
+    if unit_index is None and not _measure_name(columns[value_index]):
+        return []
     measured: list[PreviewRecord] = []
     for record in records:
         raw = record.cells[value_index] if value_index < len(record.cells) else ""
@@ -497,6 +528,49 @@ def _without_duplicate(record: PreviewRecord) -> PreviewRecord:
 def _visible(record: PreviewRecord) -> bool:
     return bool(
         record.title or record.text or record.numeric_value is not None or any(record.cells)
+    )
+
+
+_MEASURE_WORDS = frozenset(
+    {
+        "hour",
+        "hours",
+        "minute",
+        "minutes",
+        "second",
+        "seconds",
+        "km",
+        "mile",
+        "miles",
+        "meter",
+        "meters",
+        "kilometer",
+        "kilometers",
+        "rep",
+        "reps",
+        "calorie",
+        "calories",
+        "duration",
+        "distance",
+        "weight",
+        "quantity",
+        "amount",
+    }
+)
+
+
+def _measure_name(label: str) -> bool:
+    tokens = set(re.split(r"[^a-z0-9]+", label.lower()))
+    return bool(tokens & _MEASURE_WORDS)
+
+
+def _identifier(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            value.strip(),
+            re.IGNORECASE,
+        )
     )
 
 
