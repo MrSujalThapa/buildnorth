@@ -27,6 +27,33 @@ function mockApi(goals: unknown = []) {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     let payload: unknown = goals;
     if (url.endsWith("/health")) payload = { status: "ok", service: "api", version: "test" };
+    else if (url.includes("/api/v1/me") || url.endsWith("/me")) {
+      payload = {
+        user_id: "test-user",
+        clerk_user_id: "test-clerk",
+        email: "judge@example.test",
+        email_verified: true,
+        role: "user",
+        invited: true,
+        hosted: {
+          enabled: false,
+          quota_usd: 0,
+          quota_tokens: 0,
+          reserved_usd: 0,
+          spent_usd: 0,
+          reserved_tokens: 0,
+          spent_tokens: 0,
+          remaining_usd: 0,
+          remaining_tokens: 0,
+          global_remaining_usd: null,
+          kill_switch: false,
+          billing_note: "",
+        },
+      };
+    }
+    else if (url.includes("/profile/photo")) {
+      return Promise.resolve(new Response(null, { status: 404 }));
+    }
     else if (url.includes("/history/")) payload = [];
     else if (url.includes("/plugins")) payload = { items: [], provider_status: "unavailable" };
     else if (url.includes("/goals/dashboard")) payload = { goals, histories: {}, collections: [] };

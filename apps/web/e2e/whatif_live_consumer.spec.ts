@@ -29,12 +29,16 @@ async function createGoal(page: Page, intent: string): Promise<string> {
   for (let round = 0; round < 4; round += 1) {
     await expect(continueBtn.or(confirm)).toBeVisible({ timeout: 120000 });
     if (await confirm.isVisible()) break;
-    const inputs = page.locator("form.composer-form input");
+    const inputs = page.locator("form.composer-form input:visible");
     const count = await inputs.count();
     for (let index = 0; index < count; index += 1) {
-      await inputs.nth(index).fill("Target company set; deadline August 2027; FDE role.");
+      const field = inputs.nth(index);
+      if (!(await field.isVisible().catch(() => false))) continue;
+      await field.fill("Target company set; deadline August 2027; FDE role.");
     }
-    await continueBtn.click();
+    if (await continueBtn.isVisible().catch(() => false)) {
+      await continueBtn.click();
+    }
   }
   await expect(confirm).toBeVisible({ timeout: 120000 });
   await expect(confirm).toBeEnabled();
