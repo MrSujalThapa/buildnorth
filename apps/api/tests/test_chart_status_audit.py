@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from math import nan
+from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
@@ -22,7 +23,42 @@ from remote_mcp_support import McpHarness, create_hiring_goal, register, structu
 
 
 @pytest.mark.asyncio
-async def test_withheld_current_forecast_keeps_historical_chart_and_receipt() -> None:
+async def test_pending_and_failed_creation_are_not_called_permanently_unpriced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async with McpHarness() as harness:
+        goal_id = await create_hiring_goal(harness)
+        grant = await harness.connect()
+        workflow = harness.app.state.agent_workflow
+        for workflow_status, expected in (
+            ("evidence_pending", "PENDING"), ("evidence_failed", "FAILED")
+        ):
+            async def creation_for_goal(
+                *_: object, status: str = workflow_status
+            ) -> SimpleNamespace:
+                return SimpleNamespace(status=status)
+
+            monkeypatch.setattr(workflow, "creation_for_goal", creation_for_goal)
+            forecast = structured(await harness.call(
+                grant.access_token, "get_forecast", {"goal_id": goal_id}
+            ))
+            readiness = structured(await harness.call(
+                grant.access_token, "get_forecast_readiness", {"goal_id": goal_id}
+            ))
+            chart = structured(await harness.call(
+                grant.access_token, "show_odds_chart", {"goal_id": goal_id}
+            ))
+            assert forecast["status"] == expected
+            assert forecast["probability"] is None
+            assert readiness["publication_status"] == expected
+            assert chart["current_forecast_status"] == expected
+            assert chart["points"] == []
+
+
+@pytest.mark.asyncio
+async def test_withheld_current_forecast_keeps_historical_chart_and_receipt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async with McpHarness() as harness:
         goal_id = await create_hiring_goal(harness)
         grant = await harness.connect()
@@ -45,6 +81,14 @@ async def test_withheld_current_forecast_keeps_historical_chart_and_receipt() ->
             await harness.call(grant.access_token, "get_forecast", {"goal_id": goal_id})
         )
         assert before["status"] == "PUBLISHED"
+        async def later_pending(*_: object) -> SimpleNamespace:
+            return SimpleNamespace(status="evidence_pending")
+
+        monkeypatch.setattr(harness.app.state.agent_workflow, "creation_for_goal", later_pending)
+        still_published = structured(
+            await harness.call(grant.access_token, "get_forecast", {"goal_id": goal_id})
+        )
+        assert still_published["receipt_id"] == before["receipt_id"]
         deps = harness.app.state.agent_workflow._inner._deps
         await deps.goals.record_publication(
             UUID(goal_id),

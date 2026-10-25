@@ -1,4 +1,5 @@
 import type { Goal, MarketHistoryPoint } from "../../api/client";
+import { publishedHistoryPoints } from "../../adapters/marketViewModel";
 
 export interface MarketCardViewModel {
   id: string;
@@ -7,6 +8,7 @@ export interface MarketCardViewModel {
   odds: number | null;
   todayReturn: number | null;
   history: { timestamp: number; value: number }[];
+  historyUnavailable: boolean;
 }
 
 const CATEGORY_PATTERNS: Array<[RegExp, string]> = [
@@ -24,18 +26,22 @@ export function marketCategory(goal: Goal): string {
 }
 
 export function toMarketCardViewModel(goal: Goal, points: MarketHistoryPoint[]): MarketCardViewModel {
-  const published = points.filter((point) => point.source_kind !== "synthetic_demo");
-  const history = published.map((point, index) => ({
-    timestamp: point.created_at ? Date.parse(point.created_at) : index,
+  const published = publishedHistoryPoints(points);
+  const history = published.map((point) => ({
+    timestamp: Date.parse(point.created_at!),
     value: point.probability * 100,
   }));
-  const odds = history.at(-1)?.value ?? null;
+  const publication = goal.model_requirements?.last_publication;
+  const withheld = publication && typeof publication === "object" && "status" in publication
+    && publication.status === "withheld";
+  const odds = withheld ? null : history.at(-1)?.value ?? null;
   const first = history[0]?.value;
   return {
     id: goal.goal_id,
     category: marketCategory(goal),
     title: goal.title,
     odds,
+    historyUnavailable: points.some((point) => point.source_kind !== "synthetic_demo") && history.length === 0,
     todayReturn: odds != null && first != null ? odds - first : null,
     history,
   };

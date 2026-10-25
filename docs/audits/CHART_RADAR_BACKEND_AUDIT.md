@@ -75,3 +75,33 @@ as an isolated regression fixture; the live receipt count and exact value were n
 queried from production. DOM and MCP SDK tests are identified as harness tests, not
 ChatGPT host acceptance. Mobile, dark mode, and post-deployment browser acceptance
 remain open.
+
+## Follow-up on PR #38
+
+The follow-up repairs the frontend findings previously listed as deferred. Both
+market adapters now use one normalization path: published receipts with finite
+probabilities in `[0,1]` and valid publication timestamps are sorted by timestamp
+and receipt ID, then deduplicated by receipt ID. Malformed dated receipts remain
+outside chart geometry. A nonempty published response with no usable dated points
+sets `historyUnavailable`; an authentically empty response does not. Withheld current
+odds stay null while the historical points remain visible. The secondary MarketTile
+labels missing dated history and withheld current odds distinctly.
+
+EvidenceWorkflow now invalidates the dashboard cache only when a workflow reaches
+completed, limited, or withheld. It also exposes confirmation request failures.
+Component tests cover completion, incomplete response, and failure. They do not
+constitute a deployed browser test or assert a new publication on an unchanged
+workflow.
+
+MCP `get_forecast`, readiness, and chart now use the owner-scoped persisted creation
+snapshot when *no receipt exists*: `evidence_pending`/`evidence_running` report
+`PENDING`, and `evidence_failed` reports `FAILED`, both with null odds. An existing
+published receipt remains current through a later incomplete workflow; a withheld
+publication still takes precedence. MCP harness tests cover these states.
+
+**Host/browser boundary:** no PlayItOut MCP connection is exposed to this Codex
+session, so actual ChatGPT tool responses and interactive Odds Explorer screenshots
+remain BLOCKED. This branch is not deployed and no isolated browser database is
+available; post-change browser, mobile, and dark-mode acceptance are also BLOCKED.
+The DOM host-message harness and in-process MCP transport are fixture verification,
+not real ChatGPT-host acceptance. No production writes or paid inference occurred.
