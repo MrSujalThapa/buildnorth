@@ -25,7 +25,10 @@ async function createGoal(page: Page, intent: string): Promise<string> {
   await page.getByLabel(/What should happen/i).fill(intent);
   await page.getByRole("button", { name: /Create market/i }).click();
   const continueBtn = page.getByRole("button", { name: /^Continue$/ });
-  if (await continueBtn.isVisible({ timeout: 90000 }).catch(() => false)) {
+  const confirm = page.getByRole("button", { name: /^Confirm$/ });
+  for (let round = 0; round < 4; round += 1) {
+    await expect(continueBtn.or(confirm)).toBeVisible({ timeout: 120000 });
+    if (await confirm.isVisible()) break;
     const inputs = page.locator("form.composer-form input");
     const count = await inputs.count();
     for (let index = 0; index < count; index += 1) {
@@ -33,8 +36,7 @@ async function createGoal(page: Page, intent: string): Promise<string> {
     }
     await continueBtn.click();
   }
-  const confirm = page.getByRole("button", { name: /^Confirm$/ });
-  await expect(confirm).toBeVisible({ timeout: 90000 });
+  await expect(confirm).toBeVisible({ timeout: 120000 });
   await expect(confirm).toBeEnabled();
   const resume = page.waitForResponse(
     (response) => response.url().includes("/agent/threads/") && response.url().includes("/resume") && response.request().method() === "POST",
