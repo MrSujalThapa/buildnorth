@@ -591,13 +591,14 @@ export default function WhatIfPage({
 
               runError={scenarioErrorMessage(
                 simulation.parseIntervention.error ?? simulation.persistSimulation.error,
-              ) ?? (simulation.lastParse?.insights?.length ? null : simulation.interpretationMessage) ??
+              ) ?? (simulation.lastParse?.insights?.length || simulation.lastParse?.strategy_plan ? null : simulation.interpretationMessage) ??
                 (simulation.scenarioResult && !simulation.scenarioResult.priced
                   ? simulation.scenarioResult.message ?? "This action cannot be priced from the current evidence."
                   : null)}
               publishedOdds={market.odds}
               history={market.history}
               parseResult={simulation.lastParse}
+              onRunPlannedChange={simulation.runPlannedChange}
 
               onQuestionChange={setQuestion}
 

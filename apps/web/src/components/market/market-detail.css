@@ -100,26 +100,40 @@
 .visibility-control {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--app-border, #292828);
+  align-self: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px 0 8px;
+  border: 1px solid var(--app-border, #dfddd8);
   border-radius: 999px;
-  background: var(--app-surface, #131314);
-  color: var(--app-ink, #f3f1ed);
+  background: transparent;
+  color: var(--app-muted, #706d68);
   font: 600 12px/1 var(--font-sans, inherit);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
 }
 
-.visibility-control.is-private {
-  color: var(--app-muted, #9b9791);
+.visibility-control:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--app-ink, #161513) 35%, var(--app-border, #dfddd8));
+  background: color-mix(in srgb, var(--app-ink, #161513) 6%, transparent);
+  color: var(--app-ink, #161513);
+}
+
+.visibility-control:focus-visible {
+  outline: 2px solid var(--app-accent, #1f8f86);
+  outline-offset: 2px;
 }
 
 .visibility-control.is-public {
-  border-color: color-mix(in srgb, var(--app-accent, #5ec8bd) 45%, transparent);
-  color: var(--app-accent, #5ec8bd);
+  border-color: color-mix(in srgb, var(--app-accent, #1f8f86) 50%, var(--app-border, #dfddd8));
+  color: var(--app-accent, #1f8f86);
+}
+
+.visibility-control.is-public:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--app-accent, #1f8f86) 10%, transparent);
+  color: var(--app-accent, #1f8f86);
 }
 
 .visibility-control:disabled {

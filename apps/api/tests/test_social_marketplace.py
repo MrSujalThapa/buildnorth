@@ -325,3 +325,210 @@ def test_public_blueprint_and_fork_use_reviewed_snapshot() -> None:
         assert "private_journal" not in str(copied)
         app.state.auth_bypass_principal = owner
         assert client.get(f"/api/v1/goals/{forked['goal_id']}").status_code == 404
+
+
+def _books_goal() -> GoalContract:
+    goal_id = uuid4()
+    return GoalContract(
+        goal_id=goal_id,
+        title="Read 20 books by end of 2026",
+        goal_type=GoalType.THRESHOLD,
+        success_definition={"metric": "books_read", "operator": ">=", "target": "20"},
+        deadline=datetime(2026, 12, 31, 23, 59, 59, tzinfo=UTC),
+        state_dimensions=["books_read"],
+        model_requirements={
+            "life_area": "learning",
+            "last_publication": {"status": "completed"},
+            "forecast_spec": {
+                "spec_version": 2,
+                "goal_id": str(goal_id),
+                "owner_id": str(uuid4()),
+                "units": "books",
+                "family": "count_process",
+                "parameter_provenance": [{"source": "journal", "value": 3}],
+                "primitives": [
+                    {"id": "reading", "kind": "count", "metric": "books_read", "observed": 7}
+                ],
+                "observed_total": 7,
+            },
+        },
+    )
+
+
+def test_success_summary_templates() -> None:
+    from personal_markets.social.blueprint import success_summary
+
+    deadline = datetime(2026, 12, 31, tzinfo=UTC)
+    assert (
+        success_summary(
+            {"metric": "books_read", "operator": ">=", "target": "20", "unit": "books"}, deadline
+        )
+        == "Reach 20 books read by Dec 31, 2026"
+    )
+    assert (
+        success_summary(
+            {"metric": "emergency_fund", "operator": ">=", "target": 20000, "unit": "USD"},
+            datetime(2027, 12, 1, tzinfo=UTC),
+        )
+        == "Reach $20,000 in emergency fund by Dec 1, 2027"
+    )
+    assert (
+        success_summary(
+            {"metric": "10k_time", "operator": "<=", "value": 2700, "unit": "seconds"}, None
+        )
+        == "Stay at or under 2,700 seconds of 10k time"
+    )
+    assert success_summary({"event": "signed_offer"}, deadline) == (
+        "Achieve signed offer by Dec 31, 2026"
+    )
+    assert success_summary({}, deadline) == ""
+
+
+def test_owner_private_market_uses_live_blueprint_and_published_state() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    goal = _books_goal()
+    asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    stamp = datetime.now(UTC)
+    app.state.social_repository.add_history(
+        goal.goal_id,
+        [
+            {"probability": 0.31, "created_at": stamp - timedelta(days=2)},
+            {"probability": 0.42, "created_at": stamp},
+        ],
+    )
+    with TestClient(app) as client:
+        detail = client.get(f"/api/v1/public/markets/{goal.goal_id}").json()
+    assert detail["visibility"] == "private"
+    assert detail["forecast"]["status"] == "published"
+    assert detail["latest_probability"] == 0.42
+    blueprint = detail["blueprint"]
+    assert blueprint["deadline"].startswith("2026-12-31")
+    assert blueprint["category"] == "learning"
+    assert blueprint["success_criteria"] == {
+        "metric": "books_read",
+        "operator": ">=",
+        "target": "20",
+        "unit": "books",
+    }
+    assert blueprint["description"] == "Reach 20 books read by Dec 31, 2026"
+    assert detail["description"] == blueprint["description"]
+    assert "forecast_spec" not in str(blueprint["model_configuration"])
+
+
+def test_withheld_publication_hides_latest_probability() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    goal = _books_goal()
+    goal.model_requirements["last_publication"] = {"status": "withheld", "category": "data"}
+    asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    app.state.social_repository.add_history(
+        goal.goal_id, [{"probability": 0.5, "created_at": datetime.now(UTC)}]
+    )
+    with TestClient(app) as client:
+        detail = client.get(f"/api/v1/public/markets/{goal.goal_id}").json()
+    assert detail["forecast"]["status"] == "withheld"
+    assert detail["latest_probability"] is None
+    assert len(detail["history"]) == 1
+
+
+def test_publish_persists_enriched_blueprint_and_fills_legacy_snapshot() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    visitor = invited_principal("legacy-visitor")
+    _register(visitor)
+    goal = _books_goal()
+    asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    repo = app.state.social_repository
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                f"/api/v1/social/markets/{goal.goal_id}/visibility",
+                json={"visibility": "public"},
+            ).status_code
+            == 200
+        )
+        stored = repo._blueprint[goal.goal_id]
+        assert stored["success_criteria"]["unit"] == "books"
+        assert stored["description"] == "Reach 20 books read by Dec 31, 2026"
+        assert stored["deadline"].startswith("2026-12-31")
+
+        repo._blueprint[goal.goal_id] = {
+            "title": goal.title,
+            "category": "threshold",
+            "description": "",
+            "deadline": None,
+            "success_criteria": {},
+            "milestones": [],
+            "forecast": {"status": "unpublished"},
+        }
+        app.state.auth_bypass_principal = visitor
+        detail = client.get(f"/api/v1/public/markets/{goal.goal_id}").json()
+    blueprint = detail["blueprint"]
+    assert blueprint["success_criteria"]["target"] == "20"
+    assert blueprint["success_criteria"]["unit"] == "books"
+    assert blueprint["deadline"].startswith("2026-12-31")
+    assert blueprint["description"] == "Reach 20 books read by Dec 31, 2026"
+    assert blueprint["forecast"]["status"] == "published"
+
+
+def test_fork_carries_blueprint_and_public_safe_forecast_spec() -> None:
+    import asyncio
+    from uuid import UUID
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    visitor = invited_principal("fork-blueprint-visitor")
+    _register(visitor)
+    asyncio.run(
+        get_identity_repository().upsert_profile(
+            owner.user_id, UserProfile(username="reader", display_name="Reader")
+        )
+    )
+    goal = _books_goal()
+    goal.success_definition["milestones"] = ["Finish 10 by June"]
+    asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    with TestClient(app) as client:
+        client.post(
+            f"/api/v1/social/markets/{goal.goal_id}/visibility", json={"visibility": "public"}
+        )
+        app.state.auth_bypass_principal = visitor
+        response = client.post(
+            f"/api/v1/social/markets/{goal.goal_id}/fork",
+            json={"idempotency_key": "fork-blueprint-key"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert set(body["carried_fields"]) >= {
+            "title",
+            "deadline",
+            "success_criteria",
+            "milestones",
+            "category",
+            "forecast_spec",
+        }
+        fork_id = UUID(body["goal_id"])
+        forked = app.state.goal_repository._goals[fork_id]
+        assert forked.success_definition["unit"] == "books"
+        assert forked.success_definition["milestones"] == ["Finish 10 by June"]
+        assert forked.deadline == goal.deadline
+        requirements = forked.model_requirements
+        assert requirements["life_area"] == "learning"
+        assert "last_publication" not in requirements
+        spec = requirements["forecast_spec"]
+        assert spec["goal_id"] == str(fork_id)
+        assert spec["units"] == "books"
+        assert "owner_id" not in spec
+        assert "parameter_provenance" not in spec
+        assert "observed_total" not in spec
+        assert "observed" not in spec["primitives"][0]
+        assert requirements["forked_blueprint"]["source_goal_id"] == str(goal.goal_id)
+        social = client.get(f"/api/v1/social/markets/{fork_id}").json()
+        assert social["fork"]["source_handle"] == "reader"
+        assert "forecast_spec" in social["fork"]["carried_fields"]

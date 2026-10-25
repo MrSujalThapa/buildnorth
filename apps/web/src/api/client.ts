@@ -208,8 +208,66 @@ export interface TargetSearchResult {
   message: string;
   paths: { label: string; action_ids: string[]; resulting_probability: number; resource_cost: { hours_per_week: number; money: number; energy: number }; fragility_pp: number | null; valid_because: string; assumptions?: WhatIfAssumption[] }[];
   search_method: string;
+  /** Recommended combination of changes; absent on older API builds. */
+  blueprint?: ReverseBlueprint | null;
   run_id: string | null;
   receipt: Record<string, unknown>;
+}
+
+export interface ReverseBlueprintLeverChange {
+  lever_id: string;
+  label: string;
+  unit: string;
+  baseline_value: number;
+  recommended_value: number;
+  change: number;
+  relative_change: number | null;
+  range_used: number;
+  effort: "none" | "light" | "moderate" | "heavy";
+  description: string;
+}
+
+export interface ReverseBlueprintAction {
+  action_id: string;
+  title: string;
+  hours_per_week: number;
+  money: number;
+}
+
+export interface ReverseBlueprint {
+  target_probability: number;
+  baseline_probability: number;
+  modeled_probability: number | null;
+  delta_pp: number | null;
+  reachable: boolean;
+  already_satisfied: boolean;
+  headline: string;
+  rationale: string;
+  lever_changes: ReverseBlueprintLeverChange[];
+  actions: ReverseBlueprintAction[];
+  steps: string[];
+  tradeoffs: string[];
+  follow_through_probability: number | null;
+  max_modeled_probability: number | null;
+  plateau: {
+    lever_id: string;
+    plateau_probability: number;
+    starts_at_value: number | null;
+    cause: "follow_through" | "saturation" | "lever_range";
+    explanation: string;
+  } | null;
+  alternatives: {
+    id: string;
+    label: string;
+    lever_changes: ReverseBlueprintLeverChange[];
+    actions: ReverseBlueprintAction[];
+    modeled_probability: number;
+    reaches_target: boolean;
+    effort_score: number;
+    note: string | null;
+  }[];
+  tolerance_pp: number;
+  method: string;
 }
 
 export interface ActionFrontierResult {
@@ -286,6 +344,32 @@ export interface ParseInterventionResult {
   confirmation_needed?: boolean;
   insights?: StrategyInsight[];
   consumer_summary?: string;
+  /** Deterministic mapping of a strategy onto a modeled lever; carries no probability. */
+  strategy_plan?: StrategyPlan | null;
+}
+
+export interface StrategyLever {
+  assumption: string;
+  label: string;
+  unit: string;
+  unit_label: string;
+  baseline_value: number | null;
+  minimum: number | null;
+  maximum: number | null;
+  operation: string;
+  question: string;
+  mapping_note: string;
+  suggested_values: number[];
+}
+
+export interface StrategyPlan {
+  family: string;
+  interpretation: string;
+  levers: StrategyLever[];
+  needs: string[];
+  analysis: { heading: string; body: string }[];
+  stated_quantity: number | null;
+  modeled: boolean;
 }
 
 export interface CourseGradeComponent {
@@ -481,14 +565,17 @@ export interface PublicMarketCard {
   latest_probability: number | null;
   forecast: PublicForecastState;
   history: PublicHistoryPoint[];
-  fork: {
-    source_goal_id: string;
-    source_user_id: string;
-    source_handle: string | null;
-    source_title: string | null;
-    source_public: boolean;
-    forked_at: string;
-  } | null;
+  fork: ForkProvenance | null;
+}
+
+export interface ForkProvenance {
+  source_goal_id: string;
+  source_user_id: string;
+  source_handle: string | null;
+  source_title: string | null;
+  source_public: boolean;
+  forked_at: string;
+  carried_fields?: string[];
 }
 
 export interface PublicMarketDetail extends PublicMarketCard {
@@ -504,6 +591,7 @@ export interface OwnerMarketSocial {
   fork_count: number;
   starred: boolean;
   public_preview?: PublicBlueprint | null;
+  fork?: ForkProvenance | null;
 }
 
 export interface PublicProfile {
@@ -568,6 +656,11 @@ export interface ProfilePayload {
   goal_count: number;
   collection_count: number;
   traits: TraitProfile;
+  trait_sources?: {
+    cohort: "authentic" | "workspace_seed" | "mixed";
+    authentic_trials: number;
+    workspace_seed_trials: number;
+  };
   radar: ParameterProfile;
   selected_parameters: string[];
   available_parameters: TraitOption[];
@@ -589,6 +682,7 @@ export interface ParameterEstimate {
   evidence_ids: string[];
   last_observed_at?: string | null;
   status: "measured" | "insufficient";
+  cohort?: "authentic" | "workspace_seed";
 }
 
 export interface ParameterProfile {
@@ -1068,7 +1162,7 @@ export const api = {
   unstarMarket: (goalId: string) =>
     request<{ starred: boolean; star_count: number }>(`/api/v1/social/markets/${goalId}/star`, { method: "DELETE" }),
   forkMarket: (goalId: string, body: { title?: string; deadline?: string; idempotency_key?: string }) =>
-    request<{ goal_id: string; created: boolean; visibility: string; forked_from: string }>(
+    request<{ goal_id: string; created: boolean; visibility: string; forked_from: string; carried_fields?: string[] }>(
       `/api/v1/social/markets/${goalId}/fork`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
     ),

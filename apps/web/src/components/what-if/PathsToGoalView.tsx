@@ -1,5 +1,13 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
+import type { ReverseBlueprint } from "../../api/client";
+import {
+  blueprintFromPaths,
+  blueprintFuturesPath,
+  toBlueprintView,
+  type BlueprintAlternativeView,
+  type BlueprintView,
+} from "../../adapters/reverseBlueprint";
 import type { Market, WhatIfView } from "../../adapters/templateTypes";
 import {
   pathAxes,
@@ -7,6 +15,118 @@ import {
   type SimulationPoint,
 } from "../../adapters/simulations";
 import SimulationCloud from "./SimulationCloud";
+
+function BlueprintPanel({ view, onSeeFutures }: { view: BlueprintView; onSeeFutures?: () => void }) {
+  return (
+    <section className={`reverse-blueprint is-${view.status}`} aria-labelledby="reverse-blueprint-title">
+      <header className="reverse-blueprint-head">
+        <p className="reverse-eyebrow">Recommended path</p>
+        <span className={`reverse-status is-${view.status}`}>{view.statusLabel}</span>
+      </header>
+      <h3 id="reverse-blueprint-title" className="reverse-headline">{view.headline}</h3>
+      <dl className="reverse-odds" aria-label="Modeled odds">
+        <div>
+          <dt>Today</dt>
+          <dd>{view.baseline}</dd>
+        </div>
+        <span className="reverse-odds-arrow" aria-hidden="true">→</span>
+        <div className="is-modeled">
+          <dt>With this path</dt>
+          <dd>{view.modeled ?? "—"}</dd>
+        </div>
+        {view.delta ? (
+          <div className={`reverse-odds-delta is-${view.deltaTone}`}>
+            <dt>Change</dt>
+            <dd>{view.delta}</dd>
+          </div>
+        ) : null}
+        <div className="reverse-odds-target">
+          <dt>Target</dt>
+          <dd>{view.target}</dd>
+        </div>
+      </dl>
+      {view.plan.length ? (
+        <ol className="reverse-plan" aria-label="Steps">
+          {view.plan.map((item, index) =>
+            item.kind === "change" ? (
+              <li key={`change-${item.change.id}`} className="reverse-plan-change">
+                <span className="reverse-plan-index">{index + 1}</span>
+                <div className="reverse-plan-body">
+                  <strong>{item.change.label}</strong>
+                  <span className="reverse-plan-values">
+                    {item.change.from} <span aria-hidden="true">→</span>
+                    <span className="visually-hidden"> to </span> <b>{item.change.to}</b>
+                    <em>{item.change.delta}</em>
+                  </span>
+                </div>
+                <span className={`reverse-effort is-${item.change.effort}`}>{item.change.effortLabel}</span>
+              </li>
+            ) : (
+              <li key={`step-${index}`} className="reverse-plan-step">
+                <span className="reverse-plan-index">{index + 1}</span>
+                <p>{item.text}</p>
+              </li>
+            ),
+          )}
+        </ol>
+      ) : null}
+      <div className="reverse-notes">
+        <div>
+          <h4>Why this path</h4>
+          <p>{view.rationale}</p>
+          {view.followThrough ? <p className="reverse-quiet">{view.followThrough}.</p> : null}
+        </div>
+        {view.tradeoffs.length ? (
+          <div>
+            <h4>Effort and tradeoffs</h4>
+            <ul>
+              {view.tradeoffs.map((note) => <li key={note}>{note}</li>)}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+      {view.plateau ? (
+        <p className="reverse-plateau" role="note">
+          <strong>{view.plateau.label}.</strong> {view.plateau.explanation}
+        </p>
+      ) : null}
+      {onSeeFutures ? (
+        <button type="button" className="primary-action" onClick={onSeeFutures}>
+          See how this could play out
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
+function AlternativesTable({ items }: { items: BlueprintAlternativeView[] }) {
+  if (!items.length) return null;
+  return (
+    <section className="reverse-alternatives" aria-labelledby="reverse-alternatives-title">
+      <h3 id="reverse-alternatives-title">Alternatives</h3>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Option</th>
+            <th scope="col">Modeled odds</th>
+            <th scope="col">Effort</th>
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id} className={item.reaches ? "is-reaching" : undefined}>
+              <th scope="row">{item.label}</th>
+              <td className="reverse-num">{item.odds}</td>
+              <td>{item.effortLabel}</td>
+              <td>{item.note ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 type Props = {
   market: Market;
   view: WhatIfView;
@@ -26,6 +146,8 @@ type Props = {
   onFind?: () => void;
   /** When set, `path.cost` is the real lever setting named here and the x-axis fits the data. */
   xAxisLabel?: string;
+  /** Search blueprint; defaults to the one carried on `paths`. */
+  blueprint?: ReverseBlueprint | null;
 };
 
 export default function PathsToGoalView({
@@ -44,9 +166,13 @@ export default function PathsToGoalView({
   onSeeFutures,
   onFind,
   xAxisLabel,
+  blueprint: blueprintProp,
 }: Props) {
   const paths = pathsProp ?? [];
   const loadingPaths = loading;
+  const blueprint = blueprintProp ?? blueprintFromPaths(pathsProp);
+  const blueprintView = useMemo(() => (blueprint ? toBlueprintView(blueprint) : null), [blueprint]);
+  const blueprintPath = useMemo(() => (blueprint ? blueprintFuturesPath(blueprint) : null), [blueprint]);
   const baseAxes = pathAxes(market);
   const leverValues = paths.map((path) => path.cost);
   const leverMin = leverValues.length ? Math.min(...leverValues) : 0;
@@ -135,13 +261,23 @@ export default function PathsToGoalView({
         <p className="reverse-loading" role="status">Searching for paths that reach {targetOdds}%…</p>
       ) : null}
 
-      {priced && !loadingPaths && !paths.length ? (
+      {priced && !loadingPaths && !paths.length && !blueprintView ? (
         <div className="past-empty">
           {message ?? "No feasible paths met this target. Lower the target odds or add evidence."}
         </div>
       ) : null}
 
-      {priced && paths.length ? (
+      {priced && !loadingPaths && blueprintView ? (
+        <div className="reverse-result">
+          <BlueprintPanel
+            view={blueprintView}
+            onSeeFutures={blueprintPath ? () => onSeeFutures(blueprintPath) : undefined}
+          />
+          <AlternativesTable items={blueprintView.alternatives} />
+        </div>
+      ) : null}
+
+      {priced && paths.length && !(blueprintView && view === "simple") ? (
       <section className={view === "deep" ? "paths-workspace deep" : "paths-workspace"}>
         {view === "simple" ? (
           <div className="paths-simple">

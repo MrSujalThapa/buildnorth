@@ -305,12 +305,40 @@ def test_authentic_profile_keeps_seed_out_and_persists_measured_preferences() ->
         assert profile.status_code == 200, profile.text
         body = profile.json()
         assert body["selected_parameters"] == selected
-        assert body["radar"]["evidence_count"] == 1
         reading = body["radar"]["parameters"][0]
         assert reading["raw_value"] == 45
         assert reading["source_types"] == ["manual"]
         assert reading["evidence_ids"] == [evidence_id]
-        assert all(item["value"] is None for item in body["radar"]["parameters"][1:])
+        assert reading["cohort"] == "authentic"
+        # Seeded readings only fill axes the authentic record leaves empty, labeled.
+        filled = body["radar"]["parameters"][1:]
+        assert {item["cohort"] for item in filled} == {"workspace_seed"}
+        assert all(item["status"] == "measured" for item in filled)
+        assert body["radar"]["synthetic"] is True
+        # No authentic commitments exist, so traits come from the owner's seed.
+        assert body["trait_sources"]["cohort"] == "workspace_seed"
+        assert body["trait_sources"]["workspace_seed_trials"] == 106
+        series = {row["id"] for row in body["traits"]["series"]}
+        assert {"overall", "career", "relationships"} <= series
+        assert all(item["value"] is not None for item in body["traits"]["traits"])
+
+
+def test_seed_records_current_activity_readings_idempotently() -> None:
+    app = isolated_app()
+    app.state.auth_bypass_principal = invited_principal()
+    with TestClient(app) as client:
+        first = client.post("/api/v1/workspace-seed")
+        assert first.status_code == 200, first.text
+        again = client.post("/api/v1/workspace-seed")
+        assert again.status_code == 200, again.text
+        readings = {row["key"]: row["activity_readings"] for row in again.json()["goals"]}
+        assert readings["fde_offer"] == 2 and readings["reading"] == 6
+        parameters = client.get("/api/v1/profile").json()["radar"]["parameters"]
+        radar = {row["id"]: row for row in parameters}
+        assert radar["weekly_applications"]["raw_value"] == 8
+        assert radar["weekly_study_hours"]["raw_value"] == 11
+        # Same-day re-seeding must not double count: 285 current + 135 from the timeline.
+        assert radar["reading_minutes"]["raw_value"] == 420
 
 
 def test_marketplace_accounts_cover_distinct_fixture_subsets() -> None:

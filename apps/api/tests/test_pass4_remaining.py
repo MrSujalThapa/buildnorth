@@ -23,15 +23,16 @@ from personal_markets.what_if.domain import (
 )
 from personal_markets.what_if.optimizer import ActionOptimizer, ResourceLimits
 from personal_markets.what_if.repository import InMemorySimulationRepository
-from personal_markets.what_if.service import WhatIfService, _target_lever_label
+from personal_markets.what_if.reverse_search import target_lever_label
+from personal_markets.what_if.service import WhatIfService
 
 
 def test_reverse_labels_use_action_and_observation_units() -> None:
     flow = make_assumptions()[0]
-    assert _target_lever_label(flow.model_copy(update={"unit": "currency/month"}), 927.2) == (
+    assert target_lever_label(flow.model_copy(update={"unit": "currency/month"}), 927.2) == (
         "Contribute 927 each month"
     )
-    assert _target_lever_label(flow.model_copy(update={"unit": "seconds/week"}), -3.5) == (
+    assert target_lever_label(flow.model_copy(update={"unit": "seconds/week"}), -3.5) == (
         "Change weekly pace trend to -3.5 seconds"
     )
 
@@ -108,13 +109,18 @@ def action(
 class LinearWhatIfService(WhatIfService):
     async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
         del persist
-        flow = next(item.value for item in request.assumptions if item.name == "flow")
+        baseline_flow = next(item.value for item in request.assumptions if item.name == "flow")
+        # Like the engine, a parsed setpoint moves only the scenario arm.
+        flow = next(
+            (item.value for item in request.parsed_changes if item.metric == "flow"),
+            baseline_flow,
+        )
         effect = request.intervention.effect_per_unit if request.intervention else 0
         probability = min(1.0, 0.25 + flow * 0.05 + float(effect or 0))
         return WhatIfResult(
             priced=True,
             status="EXPLORATORY",
-            baseline_probability=0.25 + flow * 0.05,
+            baseline_probability=0.25 + baseline_flow * 0.05,
             scenario_probability=probability,
             expected_outcome=probability * 100,
             downside_probability=0,

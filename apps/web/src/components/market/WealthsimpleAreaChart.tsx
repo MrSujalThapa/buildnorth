@@ -353,6 +353,7 @@ export default function WealthsimpleAreaChart({
         ? new Date(hoverTimestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
         : scenarioRegionLabel ?? "Scenario";
 
+  const anchorValue = resolvedBranches.find((branch) => !branch.points?.length)?.resolved[0]?.value ?? null;
   const tickLabels = xTicks ? new Map(xTicks.map((tick) => [tick.value, tick.label])) : null;
   const dimmed = (id: string) => highlightedBranchId != null && highlightedBranchId !== id;
 
@@ -487,14 +488,30 @@ export default function WealthsimpleAreaChart({
                   : {
                       value: formatPercent(end.value),
                       position: "top",
+                      offset: 9,
                       fill: branch.color,
-                      fontSize: 11,
-                      fontWeight: 650,
+                      fontSize: 13,
+                      fontWeight: 700,
                     }
               }
             />
           );
         })}
+
+        {multiSeries && lastPoint && xDomain[1] > nowTimestamp ? (
+          <ReferenceArea
+            x1={nowTimestamp}
+            x2={xDomain[1]}
+            fill="var(--market-scenario-region, rgba(128,128,128,.07))"
+            fillOpacity={1}
+            strokeOpacity={0}
+            label={
+              scenarioRegionLabel
+                ? { value: scenarioRegionLabel, position: "insideTopRight", fontSize: 11.5, fill: "var(--market-text, #686664)", offset: 8 }
+                : undefined
+            }
+          />
+        ) : null}
 
         {multiSeries && lastPoint ? (
           <ReferenceLine
@@ -502,7 +519,7 @@ export default function WealthsimpleAreaChart({
             stroke="var(--market-text, #20211f)"
             strokeOpacity={0.35}
             strokeDasharray="3 4"
-            label={{ value: "Now", position: "insideTopLeft", fontSize: 11, fill: "var(--market-text, #686664)" }}
+            label={{ value: "Now", position: "insideTopLeft", fontSize: 11.5, fill: "var(--market-text, #686664)" }}
           />
         ) : null}
 
@@ -515,14 +532,19 @@ export default function WealthsimpleAreaChart({
           />
         ) : null}
 
-        {multiSeries && lastPoint && resolvedBranches.some((branch) => !branch.points?.length) ? (
+        {multiSeries && lastPoint && anchorValue != null ? (
           <ReferenceDot
             x={lastTimestamp}
-            y={resolvedBranches.find((branch) => !branch.points?.length)!.resolved[0]!.value}
+            y={anchorValue}
             r={4.5}
             fill="var(--market-text, #20211f)"
             stroke="var(--market-chart-dot-stroke, #f8f8f5)"
             strokeWidth={2}
+            label={
+              Math.abs(anchorValue - lastPoint.value) >= 0.5
+                ? { value: `Recalculated today ${formatPercent(anchorValue)}`, position: "left", offset: 10, fontSize: 11.5, fill: "var(--market-text, #686664)" }
+                : undefined
+            }
           />
         ) : null}
 

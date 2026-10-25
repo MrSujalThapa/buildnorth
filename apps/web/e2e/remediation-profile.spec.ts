@@ -7,21 +7,9 @@ const axes = ["weekly_applications", "monthly_savings", "weekly_running_km", "re
 const parameterNames = ["Applications / week", "Monthly savings", "Running / week", "Reading time"];
 const parameterValues = [12, 900, null, 45];
 const parameterUnits = ["applications/week", "CAD/month", "km/week", "minutes/30 days"];
-const traits = axes.map((id, index) => ({
-  id, name: ["Discipline", "Goal realism", "Focus", "Consistency"][index],
-  description: "Observed behavior.", measurement: "Based on recorded commitments.",
-  evidence: ["manual"], custom: false, forecast_use: id === "discipline" ? "execution_probability" : "exploratory",
-  value: [0.81, 0.7, null, 0.62][index], interval: index === 2 ? null : [0.5, 0.9],
-  n_eff: 12, observations: 16, confidence: "moderate", previous_value: null, sources: ["manual"], window_days: 28,
-}));
-const traitProfile = {
-  estimator_version: "behavior_traits_v1", as_of: "2026-10-24T00:00:00Z", traits,
-  series: [
-    { id: "overall", label: "Overall", values: { discipline: 0.81, realism: 0.7, focus: null, consistency: 0.62 } },
-    { id: "coding", label: "Coding", values: { discipline: 0.61, realism: 0.65, focus: null, consistency: 0.5 } },
-  ],
-  trial_count: 16, evidence_count: 0,
-};
+// Captured from the production trait estimator for a seeded owner workspace.
+const traitProfile = JSON.parse(readFileSync("e2e/fixtures/profile-traits.json", "utf8")) as unknown;
+const traitSources = { cohort: "workspace_seed", authentic_trials: 0, workspace_seed_trials: 106 };
 
 test("profile editing, photo, and execution areas work at desktop and mobile widths", async ({ page }, testInfo) => {
   const errors: string[] = [];
@@ -61,7 +49,7 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
     return route.fulfill({ json: {
       account: { user_id: "10000000-0000-0000-0000-000000000001", email: "reader@example.com", profile: { ...fields, avatar_value: null, dimensions: [] } },
       goal_count: 1, collection_count: 0, privacy: "private",
-      traits: traitProfile, selected_parameters: selectedParameters,
+      traits: traitProfile, trait_sources: traitSources, selected_parameters: selectedParameters,
       radar: { version: "measured_parameters@2.0.0", as_of: "2026-10-24T00:00:00Z", evidence_count: 3, synthetic: false,
         parameters: selectedParameters.map((id) => {
           const index = axes.indexOf(id);
@@ -72,46 +60,54 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
             observation_count: raw == null ? 0 : 1, source_types: raw == null ? [] : ["manual"],
             evidence_ids: raw == null ? [] : [`fixture-${id}`], status: raw == null ? "insufficient" : "measured" };
         }) },
-      available_parameters: axes.map((id, index) => ({ id, name: parameterNames[index], description: `${parameterUnits[index]} Â· last 56 days`, custom: false })),
+      available_parameters: axes.map((id, index) => ({ id, name: parameterNames[index], description: `${parameterUnits[index]} · last 56 days`, custom: false })),
     } });
   });
   await page.goto("/profile");
   await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
   await expect(page.getByText("@reader")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add photo" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Your parameters" })).toBeVisible();
-  await expect(page.getByRole("img", { name: /Parameter radar/ })).toBeVisible();
-  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).click();
-  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
-  await page.getByRole("button", { name: /Applications \/ week, 12 applications/ }).click();
-  await page.getByRole("button", { name: /Reading time, 45 minutes/ }).focus();
+  await expect(page.getByRole("heading", { name: "Behavior profile" })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Behavior radar with 6 series/ })).toBeVisible();
+  await expect(page.locator(".trait-series")).toHaveCount(6);
+  await expect(page.locator(".trait-area-filter")).toHaveCount(0);
+  await page.getByRole("button", { name: /Consistency, overall 65%/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
-  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
-  await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
+  await expect(page.locator(".trait-readout-value")).toHaveText("65%");
+  await expect(page.getByRole("list", { name: "Series" })).toContainText("Personal33%");
+  await page.getByRole("list", { name: "Series" }).getByText("Career").hover();
+  await expect(page.locator("[data-testid='trait-series-career']")).toHaveClass(/is-highlighted/);
+  await expect(page.getByText(/demo workspace/).first()).toBeVisible();
+  await expect(page.getByTestId("parameter-reading_minutes")).toContainText("45 minutes/30 days");
+  await expect(page.getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
+  await page.screenshot({ path: `test-results/remediation-profile-light-${testInfo.project.name}.png`, fullPage: true });
+  await page.evaluate(() => window.localStorage.setItem("pm-theme", "dark"));
+  await page.reload();
+  await expect(page.locator(".trait-series")).toHaveCount(6);
+  await page.locator(".trait-radar").screenshot({ path: `test-results/profile-radar-dark-${testInfo.project.name}.png` });  await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Edit parameters" }).click();
   await expect(page.getByRole("dialog", { name: "Edit parameters" })).toBeVisible();
   await page.getByRole("button", { name: "Remove Monthly savings" }).click();
   await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("img", { name: /Parameter radar/ })).not.toContainText("Monthly savings");
+  await expect(page.getByRole("list", { name: "Measured activity" })).not.toContainText("Monthly savings");
   await page.reload();
   await expect(page.getByRole("button", { name: "Edit parameters" })).toBeVisible();
   await page.getByRole("button", { name: "Edit parameters" }).click();
   await expect(page.getByRole("button", { name: "Remove Monthly savings" })).toHaveCount(0);
   await page.getByRole("dialog", { name: "Edit parameters" }).getByRole("button", { name: "Cancel" }).click();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Edit profile" })).toBeVisible();
   await page.getByRole("textbox", { name: "Display name" }).fill("Unsaved name");
   await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Reader", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
   await page.getByRole("textbox", { name: "Display name" }).fill("Reader Two");
   await page.getByRole("textbox", { name: "Bio" }).fill("Reading and coding.");
   await page.getByRole("dialog", { name: "Edit profile" }).getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: "Reader Two" })).toBeVisible();
   await page.reload();
   await expect(page.getByText("Reading and coding.")).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
   await page.locator("#profile-photo-input").setInputFiles({
     name: "avatar.png", mimeType: "image/png",
     buffer: avatar,
@@ -125,7 +121,7 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
   await expect(page.getByLabel("Profile photo").locator("img")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Profile photo").locator("img")).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("button", { name: "Edit profile", exact: true }).click();
   await page.getByRole("button", { name: "Remove photo" }).click();
   await expect(page.getByLabel("Initials avatar")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

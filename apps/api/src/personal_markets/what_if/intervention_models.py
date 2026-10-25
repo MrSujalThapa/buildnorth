@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 
 from personal_markets.what_if.strategy_insights import StrategyInsight
+from personal_markets.what_if.strategy_plan import StrategyPlan
 
 
 class InterventionChangeResponse(BaseModel):
@@ -33,6 +34,7 @@ class ParseInterventionResponse(BaseModel):
     confirmation_needed: bool = False
     insights: list[StrategyInsight] = Field(default_factory=list)
     consumer_summary: str = ""
+    strategy_plan: StrategyPlan | None = None
     inference_provider: str | None = None
     inference_model: str | None = None
 

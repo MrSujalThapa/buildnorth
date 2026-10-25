@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { TraitEstimate, TraitSeries } from "../../api/client";
 import { TraitRadar, pointsChange } from "./TraitRadar";
+import { radarSeries } from "./traitRadarModel";
 
 function trait(id: string, value: number | null, previous: number | null = null): TraitEstimate {
   return {
@@ -24,42 +25,43 @@ function trait(id: string, value: number | null, previous: number | null = null)
 }
 
 const traits = [trait("discipline", 0.72, 0.64), trait("realism", 0.6), trait("focus", null), trait("consistency", 0.55)];
+const series: TraitSeries[] = [
+  { id: "overall", label: "Overall", values: { discipline: 0.72, realism: 0.6, focus: null, consistency: 0.55 } },
+  { id: "career", label: "Career", values: { discipline: 0.8, realism: 0.6, focus: 0.5, consistency: 0.7 } },
+  { id: "personal", label: "Personal", values: { discipline: 0.6, realism: 0.7, focus: null, consistency: 0.5 } },
+];
 
 describe("TraitRadar", () => {
-  it("defaults to overall and selects one measured area without averaging contexts", () => {
-    const series: TraitSeries[] = [
-      { id: "career", label: "Career", values: { discipline: 0.8, realism: 0.6, focus: 0.5, consistency: 0.7 } },
-      { id: "personal", label: "Personal", values: { discipline: 0.6, realism: 0.7, focus: 0.4, consistency: 0.5 } },
-    ];
+  it("overlays every life area on one radar with no area toggles", () => {
     const { container } = render(<TraitRadar traits={traits} series={series} />);
-    expect(container.querySelectorAll(".trait-shape")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: "Overall" })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", { name: "Career" }));
-    expect(container.querySelectorAll(".trait-shape")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Career" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("img", { name: /Career execution radar/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Personal" }));
-    expect(container.querySelectorAll(".trait-shape")).toHaveLength(1);
-    expect(screen.getByRole("img", { name: /Personal execution radar/ })).toBeInTheDocument();
+    expect(container.querySelectorAll(".trait-series")).toHaveLength(3);
+    expect(container.querySelectorAll(".trait-shape")).toHaveLength(3);
+    expect(screen.queryByRole("group", { name: "Execution area" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Career" })).toBeNull();
+    expect(screen.getByRole("img", { name: /3 series: Career, Personal, Overall/ })).toBeInTheDocument();
     expect(container.querySelectorAll(".trait-axis")).toHaveLength(4);
   });
 
-  it("does not close a shape through an unmeasured axis or invent a value", () => {
-    const series: TraitSeries[] = [
-      { id: "overall", label: "Overall", values: { discipline: 0.72, realism: 0.6, focus: null, consistency: 0.55 } },
-    ];
+  it("skips an unmeasured axis instead of drawing it as zero", () => {
+    const shapes = radarSeries(traits, series);
+    const personal = shapes.find((shape) => shape.id === "personal")!;
+    expect(personal.points.map((point) => point.traitId)).toEqual(["discipline", "realism", "consistency"]);
+    expect(personal.missing).toEqual(["focus"]);
     const { container } = render(<TraitRadar traits={traits} series={series} />);
-    expect(container.querySelector(".trait-shape")).toBeNull();
-    expect(container.querySelectorAll(".trait-node")).toHaveLength(3);
-    expect(screen.queryByRole("group", { name: "Execution area" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Focus, not enough evidence/ }));
+    expect(container.querySelectorAll("[data-testid='trait-series-personal'] .trait-node")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: /Focus, overall not enough evidence/ }));
     expect(screen.getByText(/Not enough evidence yet/)).toBeInTheDocument();
   });
 
-  it("explains the forecast link and the change in points", () => {
-    render(<TraitRadar traits={traits} series={[{ id: "overall", label: "Overall", values: { discipline: 0.72, realism: 0.6, focus: null, consistency: 0.55 } }]} />);
+  it("reads out real per-area values for the focused trait", () => {
+    render(<TraitRadar traits={traits} series={series} sourceNote="From demo workspace" />);
+    const legend = screen.getByRole("list", { name: "Series" });
+    expect(legend).toHaveTextContent("Overall72%");
+    expect(legend).toHaveTextContent("Career80%");
+    expect(legend).toHaveTextContent("Personal60%");
     expect(screen.getByText(/\+8 pts over 28 days/)).toBeInTheDocument();
     expect(screen.getByText(/Used in forecasts/)).toBeInTheDocument();
+    expect(screen.getByText("From demo workspace")).toBeInTheDocument();
     expect(pointsChange(traits[1]!)).toBeNull();
   });
 });

@@ -192,12 +192,6 @@
   }
 }
 
-.parameter-life-radar {
-  display: grid;
-  gap: 12px;
-  width: 100%;
-}
-
 .parameter-life-radar-lede {
   margin: 0;
   color: var(--app-muted);
@@ -252,22 +246,14 @@
   }
 }
 
-.life-radar-layout { display: grid; grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 1fr); gap: 28px; align-items: center; }
-.life-radar-stage { position: relative; }
-.life-radar-stage svg { width: 100%; height: auto; display: block; overflow: visible; }
-.life-radar-series { cursor: pointer; transition: opacity 140ms ease; outline: none; }
-.life-radar-series:focus-visible polygon { stroke-width: 3; }
-.life-radar-tooltip { position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%); display: grid; gap: 2px; min-width: 220px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 10%, transparent); font-size: 13px; color: var(--muted); pointer-events: none; }
-.life-radar-tooltip strong { font-size: 13px; }
-.life-radar-tooltip span:nth-of-type(1) { color: var(--ink); font: 600 15px/1.3 var(--font-mono); }
-.life-radar-legend { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid var(--hairline); }
-.life-radar-legend li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--hairline); transition: background 120ms ease; }
-.life-radar-legend li.is-active { background: color-mix(in srgb, var(--ink) 4%, transparent); }
-.life-radar-legend i { width: 12px; height: 12px; border-radius: 3px; border: 2px solid; }
-.life-radar-legend-area { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-.life-radar-legend-name { display: block; font-size: 15px; color: var(--ink); }
-.life-radar-legend-value { text-align: right; display: grid; gap: 2px; }
-.life-radar-legend-value strong { font: 600 15px/1.2 var(--font-mono); color: var(--ink); }
-.life-radar-legend-value small { font-size: 12px; color: var(--muted); }
-.life-radar-legend li.is-empty .life-radar-legend-value strong { color: var(--muted); font-family: var(--font-sans); font-weight: 500; }
-.life-radar-note { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+.measured-parameters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; border: 1px solid var(--app-border, #dfddd8); border-radius: 14px; overflow: hidden; background: var(--app-border, #dfddd8); }
+.measured-parameters li { display: grid; gap: 8px; align-content: start; padding: 16px 16px 14px; background: var(--app-bg, #f4f2ee); }
+.measured-parameter-head { display: grid; gap: 3px; }
+.measured-parameter-area { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.measured-parameter-name { font-size: 14px; color: var(--app-ink, #161513); }
+.measured-parameter-value { font: 600 16px/1.2 var(--font-mono); color: var(--app-ink, #161513); font-variant-numeric: tabular-nums; }
+.measured-parameter-bar { height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--app-ink, #161513) 8%, transparent); overflow: hidden; }
+.measured-parameter-bar span { display: block; height: 100%; border-radius: 2px; }
+.measured-parameters small { color: var(--app-muted, #706d68); font-size: 12px; line-height: 1.35; }
+.measured-parameters li.is-empty .measured-parameter-value { color: var(--app-muted, #706d68); font-family: var(--font-sans); font-weight: 500; }
+@media (max-width: 1100px) { .measured-parameters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

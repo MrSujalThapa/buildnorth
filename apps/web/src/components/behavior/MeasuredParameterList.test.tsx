@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 import type { ParameterProfile } from "../../api/client";
-import { ParameterRadar } from "./ParameterRadar";
+import { MeasuredParameterList } from "./MeasuredParameterList";
 
 const profile: ParameterProfile = {
   version: "measured_parameters@2.0.0",
@@ -58,20 +58,16 @@ const profile: ParameterProfile = {
   ],
 };
 
-test("draws every measured life area at once and leaves unmeasured areas empty", () => {
-  render(<ParameterRadar profile={profile} />);
+test("lists every selected parameter with real units and leaves unmeasured ones empty", () => {
+  render(<MeasuredParameterList profile={profile} />);
   expect(screen.queryByRole("tab")).toBeNull();
-  expect(screen.getByTestId("life-series-weekly_applications")).toBeInTheDocument();
-  expect(screen.getByTestId("life-series-weekly_running_km")).toBeInTheDocument();
-  expect(screen.queryByTestId("life-series-reading_minutes")).toBeNull();
-  expect(screen.getByText("Not measured")).toBeVisible();
+  expect(screen.getByTestId("parameter-weekly_applications")).toHaveTextContent("8 applications/week");
+  expect(screen.getByTestId("parameter-weekly_running_km")).toHaveTextContent("24 km/week");
+  expect(screen.getByTestId("parameter-reading_minutes")).toHaveTextContent("Not measured");
 });
 
-test("tooltip shows measurement, unit, source and observation date", () => {
-  render(<ParameterRadar profile={profile} />);
-  fireEvent.mouseEnter(screen.getByTestId("life-series-weekly_applications"));
-  const tooltip = screen.getByRole("status");
-  expect(tooltip).toHaveTextContent("8 applications/week");
-  expect(tooltip).toHaveTextContent("Source: manual");
-  expect(tooltip).toHaveTextContent("Last observed");
+test("labels demo-workspace readings and shows source", () => {
+  const seeded = { ...profile, parameters: [{ ...profile.parameters[0]!, cohort: "workspace_seed" as const }] };
+  render(<MeasuredParameterList profile={seeded} />);
+  expect(screen.getByTestId("parameter-weekly_applications")).toHaveTextContent("manual · demo workspace");
 });

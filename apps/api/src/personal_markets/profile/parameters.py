@@ -133,6 +133,7 @@ class ParameterEstimate(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
     last_observed_at: datetime | None = None
     status: Literal["measured", "insufficient"] = "insufficient"
+    cohort: Literal["authentic", "workspace_seed"] = "authentic"
 
 
 class ParameterProfile(BaseModel):
@@ -314,4 +315,29 @@ def parameter_profile(
         )
     return ParameterProfile(
         as_of=stamp, parameters=estimates, evidence_count=len(used), synthetic=synthetic
+    )
+
+
+def merge_parameter_profiles(
+    authentic: ParameterProfile, seed: ParameterProfile | None
+) -> ParameterProfile:
+    """Authentic measurements win per parameter; seeded ones fill only empty axes."""
+    if seed is None:
+        return authentic
+    by_id = {item.id: item for item in seed.parameters}
+    merged: list[ParameterEstimate] = []
+    filled = 0
+    for item in authentic.parameters:
+        fallback = by_id.get(item.id)
+        if item.status != "measured" and fallback is not None and fallback.status == "measured":
+            merged.append(fallback.model_copy(update={"cohort": "workspace_seed"}))
+            filled += fallback.observation_count
+        else:
+            merged.append(item)
+    return authentic.model_copy(
+        update={
+            "parameters": merged,
+            "evidence_count": authentic.evidence_count + filled,
+            "synthetic": filled > 0,
+        }
     )
