@@ -407,6 +407,7 @@ export interface PublicBlueprint {
   title: string;
   description: string;
   category: string;
+  deadline?: string | null;
   success_criteria: Record<string, unknown>;
   milestones: unknown[];
   strategies: string[];
@@ -944,13 +945,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal_ids: goalIds }),
     }),
-  publicMarkets: (params?: { q?: string; category?: string; sort?: string }, signal?: AbortSignal) => {
+  publicMarkets: (params?: { q?: string; category?: string; sort?: string; limit?: number; offset?: number }, signal?: AbortSignal) => {
     const search = new URLSearchParams();
     if (params?.q) search.set("q", params.q);
     if (params?.category) search.set("category", params.category);
     if (params?.sort) search.set("sort", params.sort);
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    if (params?.offset != null) search.set("offset", String(params.offset));
     const suffix = search.toString() ? `?${search}` : "";
-    return request<{ items: PublicMarketCard[] }>(`/api/v1/public/markets${suffix}`, undefined, signal);
+    return request<{ items: PublicMarketCard[]; total: number; limit: number; offset: number }>(`/api/v1/public/markets${suffix}`, undefined, signal);
   },
   publicMarket: (goalId: string, signal?: AbortSignal) =>
     request<PublicMarketDetail>(`/api/v1/public/markets/${goalId}`, undefined, signal),

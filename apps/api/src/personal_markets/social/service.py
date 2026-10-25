@@ -17,6 +17,7 @@ from personal_markets.social.domain import (
     ActivityDay,
     ForkProvenance,
     OwnerMarketSocial,
+    PublicBlueprint,
     PublicCreator,
     PublicForecastState,
     PublicMarketCard,
@@ -76,6 +77,8 @@ class SocialService:
         row = await self._repository.get_goal_row(goal_id)
         if row:
             published_at = row.get("published_at")
+            if visibility == "public":
+                blueprint = self._reviewed_blueprint(row)
         stars = await self._repository.star_counts([goal_id])
         forks = await self._repository.fork_counts([goal_id])
         return OwnerMarketSocial(
@@ -222,6 +225,38 @@ class SocialService:
         )
         return await self._cards_from_rows(rows, viewer_id)
 
+    async def search_markets_page(
+        self,
+        *,
+        query: str | None,
+        category: str | None,
+        sort: str,
+        limit: int,
+        offset: int,
+        viewer_id: UUID | None,
+    ) -> tuple[list[PublicMarketCard], int]:
+        items = await self.search_markets(
+            query=query,
+            category=category,
+            sort=sort,
+            limit=limit,
+            offset=offset,
+            viewer_id=viewer_id,
+        )
+        total = await self._repository.count_public(query=query, category=category)
+        return items, total
+
+    @staticmethod
+    def _reviewed_blueprint(row: dict[str, Any]) -> PublicBlueprint:
+        stored = row.get("public_blueprint_json")
+        if isinstance(stored, dict) and stored:
+            return PublicBlueprint.model_validate(stored)
+        return PublicBlueprint(
+            title=str(row["title"]),
+            category=str(row["goal_type"]),
+            forecast=PublicForecastState(status="unpublished"),
+        )
+
     async def public_market(self, goal_id: UUID, viewer_id: UUID | None) -> PublicMarketDetail:
         row = await self._repository.get_goal_row(goal_id)
         if row is None:
@@ -231,15 +266,7 @@ class SocialService:
             raise ResourceNotFoundError("Market was not found")
         cards = await self._cards_from_rows([row], viewer_id)
         card = cards[0]
-        goal = await self._goals.get_goal(goal_id)
-        blueprint = build_public_blueprint(goal)
-        stored = row.get("public_blueprint_json") or {}
-        if isinstance(stored, dict) and stored:
-            blueprint = blueprint.model_copy(
-                update={
-                    "description": stored.get("description") or blueprint.description,
-                }
-            )
+        blueprint = self._reviewed_blueprint(row)
         return PublicMarketDetail(
             **card.model_dump(),
             blueprint=blueprint,
@@ -256,7 +283,9 @@ class SocialService:
         )
         today = datetime.now(UTC).date()
         start = today - timedelta(days=365)
-        counts = await self._repository.activity_counts(user_id, start, today)
+        counts = await self._repository.activity_counts(
+            user_id, start, today, public_only=viewer_id != user_id
+        )
         activity = [ActivityDay(day=day, count=count) for day, count in sorted(counts.items())]
         return PublicProfile(
             creator=creator,
@@ -355,9 +384,25 @@ class SocialService:
         row = await self._repository.get_goal_row(source_goal_id)
         if row is None or row.get("visibility") != "public":
             raise ResourceNotFoundError("Market was not found")
+        blueprint = self._reviewed_blueprint(row)
+        if not blueprint.success_criteria:
+            raise ConflictError("This blueprint has no public success criteria to fork")
         source = await self._goals.get_goal(source_goal_id)
+        metric = blueprint.success_criteria.get("metric")
+        state_dimensions = [metric] if isinstance(metric, str) and metric else ["progress"]
+        reviewed_source = source.model_copy(
+            update={
+                "title": blueprint.title,
+                "success_definition": blueprint.success_criteria,
+                "model_requirements": blueprint.model_configuration,
+                "state_dimensions": state_dimensions,
+            }
+        )
         new_id = uuid4()
-        forked = fork_goal(source, owner_title=title, deadline=deadline, new_goal_id=new_id)
+        reviewed_deadline = deadline or blueprint.deadline or datetime.now(UTC) + timedelta(days=90)
+        forked = fork_goal(
+            reviewed_source, owner_title=title, deadline=reviewed_deadline, new_goal_id=new_id
+        )
         stored, created = await self._repository.create_fork(
             goal_id=forked.goal_id,
             owner_id=owner_id,

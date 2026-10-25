@@ -25,6 +25,7 @@ class PublicBlueprint(BaseModel):
     title: str
     description: str = ""
     category: str
+    deadline: datetime | None = None
     success_criteria: dict[str, Any] = Field(default_factory=dict)
     milestones: list[Any] = Field(default_factory=list)
     strategies: list[str] = Field(default_factory=list)

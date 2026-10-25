@@ -46,9 +46,9 @@ async def search_markets(
     category: str | None = None,
     sort: str = "newest",
     limit: int = Query(default=24, ge=1, le=50),
-    offset: int = Query(default=0, ge=0, le=500),
+    offset: int = Query(default=0, ge=0),
 ) -> dict[str, Any]:
-    items = await service.search_markets(
+    items, total = await service.search_markets_page(
         query=q,
         category=category,
         sort=sort,
@@ -56,7 +56,12 @@ async def search_markets(
         offset=offset,
         viewer_id=viewer.user_id if viewer else None,
     )
-    return {"items": [item.model_dump(mode="json") for item in items]}
+    return {
+        "items": [item.model_dump(mode="json") for item in items],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @public_router.get("/markets/{goal_id}")

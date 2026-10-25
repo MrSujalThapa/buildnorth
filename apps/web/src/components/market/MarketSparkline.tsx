@@ -1,5 +1,6 @@
 import type { ChartPoint } from "../../adapters/templateTypes";
 import WealthsimpleAreaChart from "./WealthsimpleAreaChart";
+import SparsePublicHistory from "../social/SparsePublicHistory";
 
 type Props = {
   history: ChartPoint[];
@@ -14,6 +15,7 @@ export default function MarketSparkline({ history, withheld = false }: Props) {
       </div>
     );
   }
+  if (history.length <= 2) return <SparsePublicHistory history={history} compact />;
   return (
     <div className="market-sparkline">
       <WealthsimpleAreaChart data={history} interactive={false} />

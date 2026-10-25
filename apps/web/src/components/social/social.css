@@ -127,6 +127,26 @@
   gap: 8px;
   color: inherit;
   text-decoration: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  min-height: 44px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.creator-chip:hover,
+.creator-chip:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.discover-card:focus-visible,
+.repo-row:focus-visible,
+.profile-tabs button:focus-visible,
+.follow-counts button:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
 }
 
 .creator-chip img,
@@ -139,6 +159,11 @@
   display: grid;
   place-items: center;
   font-size: 12px;
+}
+
+.mini-avatar img {
+  width: 100%;
+  height: 100%;
 }
 
 .profile-tabs {
@@ -372,3 +397,105 @@
     padding-bottom: 140px;
   }
 }
+
+/* A public profile is a person, not a nested settings card. */
+.profile-social .profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 16px;
+}
+
+.profile-social .follow-counts {
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.profile-social .follow-counts button {
+  padding: 0;
+  min-height: 32px;
+}
+
+@media (max-width: 520px) {
+  .profile-social .profile-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .profile-social .profile-card > .secondary {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* Sparse receipts are shown as individual observations, without an interpolated line. */
+.sparse-public-history {
+  min-height: 220px;
+  padding: 22px 24px;
+  background: var(--app-surface);
+}
+.sparse-public-heading {
+  margin: 0 0 30px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sparse-public-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 56px;
+}
+.sparse-public-point {
+  display: grid;
+  grid-template-columns: 9px auto;
+  align-items: baseline;
+  column-gap: 9px;
+  row-gap: 4px;
+}
+.sparse-public-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--app-accent);
+}
+.sparse-public-point strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.sparse-public-point time { grid-column: 2; font-size: 13px; color: var(--app-muted); }
+.sparse-public-note { margin: 30px 0 0; color: var(--app-muted); font-size: 13px; }
+.sparse-public-history.is-compact {
+  display: grid;
+  align-content: center;
+  min-height: 100%;
+  padding: 20px;
+}
+.sparse-public-history.is-compact .sparse-public-points { gap: 12px 25px; }
+.sparse-public-history.is-compact .sparse-public-point strong { font-size: 17px; }
+.sparse-public-history.is-compact .sparse-public-point time { font-size: 11px; }
+.discover-result-count { margin: -10px 0 20px; color: var(--app-muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.discover-more { display: flex; justify-content: center; padding: 30px 0 0; }
+.discover-page-error { margin-top: 24px; }
+.heatmap-scope { margin: 8px 0 16px; color: var(--app-muted); font-size: 13px; }
+.heatmap-month-track { min-width: 742px; }
+@media (max-width: 720px) {
+  .heatmap-header { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .heatmap-month-track { min-width: 636px; }
+  .heatmap-month-track .mobile-month-hidden { display: none; }
+  .sparse-public-history { min-height: 175px; padding: 20px; }
+  .sparse-public-heading { margin-bottom: 22px; }
+  .sparse-public-history.is-compact { padding: 16px; }
+}
+
+.public-blueprint { margin-top: 44px; padding-top: 26px; border-top: 1px solid var(--app-border); }
+.public-blueprint > h2 { margin: 0 0 8px; font-size: 23px; letter-spacing: -0.03em; }
+.public-blueprint > .quiet-copy { max-width: 60ch; }
+.public-blueprint-deadline { margin: 16px 0 0; font-size: 14px; font-variant-numeric: tabular-nums; }
+.public-blueprint-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 34px; margin-top: 30px; }
+.public-blueprint-sections h3 { margin: 0 0 16px; font-size: 16px; }
+.public-blueprint .criteria-list { gap: 0; }
+.public-blueprint .criteria-list > div { padding: 9px 0; border-top: 1px solid var(--app-border); }
+.public-blueprint .criteria-list dt { color: var(--app-muted); }
+.public-blueprint .criteria-list dd { overflow-wrap: anywhere; }
+.public-milestones { margin: 0; padding-left: 20px; }
+.public-milestones li { padding: 7px 0; line-height: 1.45; overflow-wrap: anywhere; }

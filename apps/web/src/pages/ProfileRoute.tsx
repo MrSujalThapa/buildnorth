@@ -139,8 +139,12 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="follow-counts">
-          <Link to={`/u/${handle}`}>{socialProfile.data?.follower_count ?? 0} followers</Link>
-          <span>{socialProfile.data?.following_count ?? 0} following</span>
+          {socialProfile.data ? (
+            <>
+              <Link to={`/u/${handle}`}>{socialProfile.data.follower_count} followers</Link>
+              <span>{socialProfile.data.following_count} following</span>
+            </>
+          ) : socialProfile.isError ? <span role="alert">Follow counts unavailable</span> : <span role="status">Loading follow counts&hellip;</span>}
         </div>
         <nav className="profile-tabs" aria-label="Profile sections">
           <button type="button" className={tab === "overview" ? "is-active" : ""} onClick={() => setTab("overview")}>Overview</button>
@@ -162,10 +166,10 @@ export function ProfileRoute() {
             ) : (
               <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
             )}
-            <ContributionHeatmap
+            {socialProfile.isError ? <p role="alert">Could not load activity. <button type="button" onClick={() => void socialProfile.refetch()}>Try again</button></p> : socialProfile.isLoading ? <p role="status">Loading activity&hellip;</p> : <ContributionHeatmap
               days={socialProfile.data?.activity ?? []}
               total={socialProfile.data?.contribution_total ?? 0}
-            />
+            />}
           </>
         ) : null}
         {tab === "markets" ? (
@@ -178,11 +182,11 @@ export function ProfileRoute() {
                 <option value="private">Private</option>
               </select>
             </div>
-            <MarketRepoList items={ownMarkets.data?.items ?? []} empty="No markets match that filter." />
+            {ownMarkets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void ownMarkets.refetch()}>Try again</button></p> : ownMarkets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={ownMarkets.data?.items ?? []} empty="No markets match that filter." />}
           </>
         ) : null}
         {tab === "stars" ? (
-          <MarketRepoList items={ownStars.data?.items ?? []} empty="You have not starred a public market yet." />
+          ownStars.isError ? <p role="alert">Could not load stars. <button type="button" onClick={() => void ownStars.refetch()}>Try again</button></p> : ownStars.isLoading ? <p role="status">Loading stars&hellip;</p> : <MarketRepoList items={ownStars.data?.items ?? []} empty="You have not starred a public market yet." />
         ) : null}
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">

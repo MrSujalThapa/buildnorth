@@ -1133,3 +1133,24 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Spur GLM 5.3 estimates changed from the previously unverified $2.50/$15 per million tokens to the published $0.30/$1.00 rates. Historical ledger entries were not altered. Settings now displays spent and reserved amounts and a safe unavailable reason.
 - Local mocked entitlement and authorization tests pass. Live Spur inference and the production account row have not yet been verified; no paid provider call was made in this run.
 - Scheduled and MCP inference now requires a fresh Clerk verification for each internal owner lookup, failing closed when Clerk cannot confirm the current account. The production watch-runtime group was confirmed linked only to `playitout-source-watch`; it received the existing Clerk secret, existing admin email allowlist, and verified immutable admin ID. The web service received only the verified ID. Values remain masked. These configuration changes trigger Render redeploys; live entitlement and provider behavior remain to be checked after the code merge.
+
+## Social and Profile product audit (PR #33 child branch)
+
+- Inspected Social, public/private Profile, public blueprints and Pass 9A/9B contracts in an isolated worktree. Rendered desktop/mobile fixture journeys exposed silent API-error-as-empty states, missing public photos, an awkward mobile public identity card, and sparse chart presentation.
+- Fixed public activity aggregation to exclude private-goal events for other viewers. Added two-principal regression coverage, including unpublishing. Fixed fork contract fallback that could copy private success fields and personal resources. Public chart history now excludes non-published source kinds.
+- Added visible retry states, social cache invalidation, photo display and mobile identity styling. The public chart now opens at All history; the two-point fixture still reveals a sparse-chart visual defect to resolve before shipment.
+- No production data or inference used. Mocked browser and in-memory HTTP tests do not establish live Clerk/PostgreSQL behavior. Full findings: `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+
+## Social/Profile audit follow-up (PR #37)
+
+- Replaced sparse public probability lines with source-backed dated observations; retained the established interactive chart for three or more points. Captured desktop/mobile snapshots.
+- Added API-backed Discover pagination with total count, stable tie ordering, deduplication, query reset and page-error retry.
+- Bound public blueprint display and private forking to the reviewed publication snapshot, preventing later private goal edits from appearing publicly or entering a visitor's fork.
+- Clarified heatmap event scope and mobile month labels. No inference, production writes or migration changes. Tests and limitations are recorded in `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+### 2026-10-25 Social/Profile PostgreSQL acceptance boundary (PR #37)
+
+- Added a disposable PostgreSQL integration test for public market persistence, follow/star, private fork ownership, reviewed blueprint stability and activity revocation after unpublish. It uses test identities; genuine Clerk authentication remains unverified.
+- Characterized offset pagination under concurrent publication: a new market can shift the next page and repeat an ID. The frontend deduplicates repeats, but a refresh is needed to see the new market. No cursor change was made.
+- Existing production data and published forecasts were not touched. No inference was called. This is verification work, not a measured forecasting improvement.
