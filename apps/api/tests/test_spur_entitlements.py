@@ -249,7 +249,8 @@ async def test_scheduled_admin_lookup_rechecks_clerk_and_fails_closed() -> None:
     with pytest.raises(ForbiddenError, match="verification failed"):
         await service.principal_for_user_id(initial.user_id)
     assert reads == 2
-    assert (await repo.get_user(initial.user_id)).hosted_quota_usd == 100
+    stored = await repo.get_user(initial.user_id)
+    assert stored is not None and stored.hosted_quota_usd == 100
 
 
 async def test_background_user_charge_never_uses_admin_allocation() -> None:
