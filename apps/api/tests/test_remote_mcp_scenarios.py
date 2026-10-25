@@ -197,8 +197,11 @@ async def test_b_distinct_increments_add_and_equal_snapshots_corroborate() -> No
         history = structured(await harness.call(
             grant.access_token, "get_forecast_history", {"goal_id": goal_id}
         ))
-        assert latest["receipt_id"] == history["points"][-1]["receipt_id"]
-        assert latest["published_at"] == history["points"][-1]["published_at"]
+        assert latest["status"] == "WITHHELD"
+        assert latest["probability"] is None
+        assert latest["receipt_id"] is None
+        assert history["points"][-1]["receipt_id"]
+        assert history["points"][-1]["published_at"]
 
 
 async def test_b_agent_report_corroborates_manual_entry_without_upgrading_trust() -> None:
