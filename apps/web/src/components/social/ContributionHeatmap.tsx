@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 type Props = {
   days: { day: string; count: number }[];
   total: number;
+  publicView?: boolean;
 };
 
 const WEEKDAYS = ["", "Mon", "", "Wed", "", "Fri", ""];
@@ -32,7 +33,7 @@ function iso(day: Date): string {
   return day.toISOString().slice(0, 10);
 }
 
-export default function ContributionHeatmap({ days, total }: Props) {
+export default function ContributionHeatmap({ days, total, publicView = false }: Props) {
   const [tip, setTip] = useState<string | null>(null);
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -55,16 +56,17 @@ export default function ContributionHeatmap({ days, total }: Props) {
   });
 
   return (
-    <section className="heatmap" aria-label="Contribution activity">
+    <section className="heatmap" aria-label="Recorded goal activity">
       <header className="heatmap-header">
         <h2>Activity</h2>
-        <p>{total} contributions in the last year</p>
+        <p>{total} recorded events in the last year</p>
       </header>
+      <p className="heatmap-scope">{publicView ? "Only events on public markets appear here." : "Market creation, publication and accepted evidence appear here."}</p>
       <div className="heatmap-scroll">
         <div className="heatmap-months" aria-hidden="true">
           <div className="heatmap-month-track">
-            {monthMarks.map((mark) => (
-              <span key={`${mark.label}-${mark.index}`} style={{ ["--week-index" as string]: mark.index }}>
+            {monthMarks.map((mark, index) => (
+              <span key={`${mark.label}-${mark.index}`} className={index % 2 ? "mobile-month-hidden" : undefined} style={{ ["--week-index" as string]: mark.index }}>
                 {mark.label}
               </span>
             ))}
@@ -89,7 +91,7 @@ export default function ContributionHeatmap({ days, total }: Props) {
                       role="listitem"
                       key={key}
                       className={`heatmap-cell level-${level}`}
-                      aria-label={`${count} contributions on ${key}`}
+                      aria-label={`${count} recorded events on ${key}`}
                       onMouseEnter={() => setTip(`${count} on ${key}`)}
                       onMouseLeave={() => setTip(null)}
                       onFocus={() => setTip(`${count} on ${key}`)}

@@ -102,10 +102,10 @@ class PostgresSocialRepository:
         star_order = "(select count(*) from market_stars s where s.goal_id = goals.id) desc"
         fork_order = "(select count(*) from goals f where f.forked_from_goal_id = goals.id) desc"
         order = {
-            "stars": f"{star_order}, published_at desc",
-            "forks": f"{fork_order}, published_at desc",
-            "updated": "updated_at desc",
-        }.get(sort, "published_at desc nulls last, updated_at desc")
+            "stars": f"{star_order}, published_at desc nulls last, id desc",
+            "forks": f"{fork_order}, published_at desc nulls last, id desc",
+            "updated": "updated_at desc, id desc",
+        }.get(sort, "published_at desc nulls last, updated_at desc, id desc")
         filters = ["visibility = 'public'", "status = 'active'"]
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if category:
@@ -122,6 +122,20 @@ class PostgresSocialRepository:
         async with autocommit_connection(self._engine) as connection:
             rows = (await connection.execute(text(sql), params)).mappings()
             return [dict(row) for row in rows]
+
+    async def count_public(self, *, query: str | None, category: str | None) -> int:
+        filters = ["visibility = 'public'", "status = 'active'"]
+        params: dict[str, Any] = {}
+        if category:
+            filters.append("goal_type = :category")
+            params["category"] = category
+        if query:
+            filters.append("(title ilike :needle or public_blueprint_json::text ilike :needle)")
+            params["needle"] = f"%{query}%"
+        sql = f"select count(*)::int from goals where {' and '.join(filters)}"
+        async with autocommit_connection(self._engine) as connection:
+            count = await connection.scalar(text(sql), params)
+        return int(count or 0)
 
     async def public_goals_for_user(
         self, user_id: UUID, *, query: str | None, limit: int, offset: int

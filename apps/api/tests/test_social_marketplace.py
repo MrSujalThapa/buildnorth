@@ -237,3 +237,91 @@ def test_public_history_only_uses_published_forecasts() -> None:
         {"source_kind": "scenario", "probability": 0.8, "created_at": stamp},
     ]
     assert [point.probability for point in history_points(rows)] == [0.4]
+
+
+def test_public_search_pages_and_counts_track_filters() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    goals = [_goal(f"Public journey {index:02d}") for index in range(27)]
+    for goal in goals:
+        asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    with TestClient(app) as client:
+        for goal in goals:
+            response = client.post(
+                f"/api/v1/social/markets/{goal.goal_id}/visibility",
+                json={"visibility": "public"},
+            )
+            assert response.status_code == 200
+        first = client.get("/api/v1/public/markets", params={"limit": 24, "offset": 0}).json()
+        second = client.get("/api/v1/public/markets", params={"limit": 24, "offset": 24}).json()
+        assert first["total"] == second["total"] == 27
+        assert first["limit"] == second["limit"] == 24
+        assert [len(first["items"]), len(second["items"])] == [24, 3]
+        ids = [item["goal_id"] for item in first["items"] + second["items"]]
+        assert len(ids) == len(set(ids)) == 27
+        assert client.post(f"/api/v1/social/markets/{goals[-1].goal_id}/star").status_code == 200
+        most_starred = client.get(
+            "/api/v1/public/markets", params={"sort": "stars", "limit": 24}
+        ).json()
+        assert most_starred["items"][0]["goal_id"] == str(goals[-1].goal_id)
+        starred_next = client.get(
+            "/api/v1/public/markets", params={"sort": "stars", "limit": 24, "offset": 24}
+        ).json()
+        starred_ids = [item["goal_id"] for item in most_starred["items"] + starred_next["items"]]
+        assert len(starred_ids) == len(set(starred_ids)) == 27
+        filtered = client.get(
+            "/api/v1/public/markets", params={"q": "journey 01", "sort": "stars"}
+        ).json()
+        assert filtered["total"] == 1
+        assert filtered["items"][0]["title"] == "Public journey 01"
+
+
+def test_public_blueprint_and_fork_use_reviewed_snapshot() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    visitor = invited_principal("snapshot-visitor")
+    _register(visitor)
+    goal = _goal("Get a signed offer")
+    goal.success_definition = {
+        "event": "signed_offer",
+        "milestones": ["Prepare portfolio"],
+        "private_journal": "Never publish this",
+    }
+    asyncio.run(app.state.goal_repository.create(goal, owner.user_id))
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                f"/api/v1/social/markets/{goal.goal_id}/visibility",
+                json={"visibility": "public"},
+            ).status_code
+            == 200
+        )
+        reviewed_deadline = goal.deadline
+        goal.success_definition["event"] = "changed_after_publication"
+        goal.success_definition["private_journal"] = "New secret"
+        goal.deadline = reviewed_deadline + timedelta(days=30)
+        preview = client.get(f"/api/v1/social/markets/{goal.goal_id}").json()
+        assert preview["public_preview"]["success_criteria"]["event"] == "signed_offer"
+        app.state.auth_bypass_principal = visitor
+        detail = client.get(f"/api/v1/public/markets/{goal.goal_id}").json()
+        assert detail["blueprint"]["success_criteria"]["event"] == "signed_offer"
+        assert detail["blueprint"]["deadline"] == reviewed_deadline.isoformat().replace(
+            "+00:00", "Z"
+        )
+        assert detail["blueprint"]["milestones"] == ["Prepare portfolio"]
+        assert "private_journal" not in str(detail)
+        forked = client.post(
+            f"/api/v1/social/markets/{goal.goal_id}/fork",
+            json={"idempotency_key": "reviewed-snapshot-fork"},
+        ).json()
+        assert forked["visibility"] == "private"
+        copied = client.get(f"/api/v1/goals/{forked['goal_id']}").json()
+        assert copied["success_definition"]["event"] == "signed_offer"
+        assert copied["deadline"] == reviewed_deadline.isoformat().replace("+00:00", "Z")
+        assert "private_journal" not in str(copied)
+        app.state.auth_bypass_principal = owner
+        assert client.get(f"/api/v1/goals/{forked['goal_id']}").status_code == 404

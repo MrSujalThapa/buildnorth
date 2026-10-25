@@ -111,6 +111,7 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
         title=goal.title,
         description=description or str(goal.success_definition.get("description") or ""),
         category=goal.goal_type.value,
+        deadline=goal.deadline,
         success_criteria=success,
         milestones=[item for item in milestones if isinstance(item, (str, dict))],
         strategies=[str(strategy)] if strategy else [],

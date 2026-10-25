@@ -1,6 +1,6 @@
 ﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { api, type PublicMarketCard } from "../../api/client";
 import MarketSparkline from "../market/MarketSparkline";
 import "../social/social.css";
@@ -16,15 +16,27 @@ export default function SocialPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
-  const markets = useQuery({
+  const markets = useInfiniteQuery({
     queryKey: ["public-markets", query, sort],
-    queryFn: ({ signal }) => api.publicMarkets({ q: query || undefined, sort }, signal),
+    retry: false,
+    initialPageParam: 0,
+    queryFn: ({ pageParam, signal }) => api.publicMarkets({
+      q: query.trim() || undefined, sort, limit: 24, offset: pageParam,
+    }, signal),
+    getNextPageParam: (lastPage) => lastPage.items.length > 0 && lastPage.offset + lastPage.items.length < lastPage.total
+      ? lastPage.offset + lastPage.items.length : undefined,
   });
   const creators = useQuery({
     queryKey: ["public-creators"],
     queryFn: ({ signal }) => api.publicCreators(signal),
   });
-  const items = markets.data?.items ?? [];
+  const seen = new Set<string>();
+  const items = (markets.data?.pages.flatMap((page) => page.items) ?? []).filter((item) => {
+    if (seen.has(item.goal_id)) return false;
+    seen.add(item.goal_id);
+    return true;
+  });
+  const total = markets.data?.pages.at(-1)?.total;
   const people = creators.data?.items ?? [];
 
   return (
@@ -49,6 +61,7 @@ export default function SocialPage() {
             <option value="forks">Most forked</option>
           </select>
         </div>
+        {creators.isError ? <p role="alert">Could not load creators. <button type="button" onClick={() => void creators.refetch()}>Try again</button></p> : null}
         {people.length ? (
           <div className="creator-row" aria-label="Creators">
             {people.map((creator) => (
@@ -64,16 +77,20 @@ export default function SocialPage() {
             ))}
           </div>
         ) : null}
-        {markets.isError ? (
+        {markets.isError && !markets.data ? (
           <div className="empty-social" role="alert"><h2>Could not load markets</h2><button type="button" className="secondary" onClick={() => void markets.refetch()}>Try again</button></div>
-        ) : markets.isLoading ? (
+        ) : markets.isPending ? (
           <p role="status">Loading public markets&hellip;</p>
         ) : items.length === 0 ? (
           <div className="empty-social" role="status">
-            <h2>No public markets</h2>
-            <p>Publish a market from its page to make a blueprint discoverable. Nothing here is invented.</p>
+            <h2>{query.trim() ? "No matching markets" : "No public markets"}</h2>
+            {query.trim() ? (
+              <button type="button" className="secondary" onClick={() => setQuery("")}>Clear search</button>
+            ) : <p>Publish a market from its page to make a blueprint discoverable.</p>}
           </div>
         ) : (
+          <>
+          <p className="discover-result-count" role="status">Showing {items.length} of {Math.max(total ?? items.length, items.length)} public markets</p>
           <div className="discover-grid">
             {items.map((market) => (
               <button
@@ -99,6 +116,12 @@ export default function SocialPage() {
               </button>
             ))}
           </div>
+          {markets.isFetchNextPageError ? (
+            <p role="alert" className="discover-page-error">Could not load more markets. <button type="button" className="secondary" onClick={() => void markets.fetchNextPage()}>Try again</button></p>
+          ) : markets.hasNextPage ? (
+            <div className="discover-more"><button type="button" className="secondary" disabled={markets.isFetchingNextPage} onClick={() => void markets.fetchNextPage()}>{markets.isFetchingNextPage ? "Loading more\u2026" : "Load more"}</button></div>
+          ) : null}
+          </>
         )}
       </section>
     </main>

@@ -81,7 +81,7 @@ export function PublicProfileRoute() {
         </nav>
         {tab === "overview" ? (
           <>
-            <ContributionHeatmap days={profile.data.activity} total={profile.data.contribution_total} />
+            <ContributionHeatmap days={profile.data.activity} total={profile.data.contribution_total} publicView />
             <h2>Public markets</h2>
             {markets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void markets.refetch()}>Try again</button></p> : markets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={markets.data?.items ?? []} empty="No public markets yet." />}
           </>

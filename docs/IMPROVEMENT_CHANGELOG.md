@@ -1140,3 +1140,11 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Fixed public activity aggregation to exclude private-goal events for other viewers. Added two-principal regression coverage, including unpublishing. Fixed fork contract fallback that could copy private success fields and personal resources. Public chart history now excludes non-published source kinds.
 - Added visible retry states, social cache invalidation, photo display and mobile identity styling. The public chart now opens at All history; the two-point fixture still reveals a sparse-chart visual defect to resolve before shipment.
 - No production data or inference used. Mocked browser and in-memory HTTP tests do not establish live Clerk/PostgreSQL behavior. Full findings: `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+
+## Social/Profile audit follow-up (PR #37)
+
+- Replaced sparse public probability lines with source-backed dated observations; retained the established interactive chart for three or more points. Captured desktop/mobile snapshots.
+- Added API-backed Discover pagination with total count, stable tie ordering, deduplication, query reset and page-error retry.
+- Bound public blueprint display and private forking to the reviewed publication snapshot, preventing later private goal edits from appearing publicly or entering a visitor's fork.
+- Clarified heatmap event scope and mobile month labels. No inference, production writes or migration changes. Tests and limitations are recorded in `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.

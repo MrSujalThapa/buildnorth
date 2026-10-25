@@ -118,16 +118,25 @@ class InMemorySocialRepository:
 
         def key(row: dict[str, Any]) -> tuple[Any, ...]:
             if sort == "stars":
-                return (-stars.get(row["id"], 0), row["title"])
+                return (-stars.get(row["id"], 0), row["title"], str(row["id"]))
             if sort == "forks":
-                return (-forks.get(row["id"], 0), row["title"])
+                return (-forks.get(row["id"], 0), row["title"], str(row["id"]))
             stamp = (
                 row.get("published_at") or row.get("updated_at") or datetime.min.replace(tzinfo=UTC)
             )
-            return (-stamp.timestamp(), row["title"])
+            return (-stamp.timestamp(), row["title"], str(row["id"]))
 
         rows.sort(key=key)
         return rows[offset : offset + limit]
+
+    async def count_public(self, *, query: str | None, category: str | None) -> int:
+        return sum(
+            1
+            for goal_id in self._goals._goals
+            if (row := self._row(goal_id))
+            and row["visibility"] == "public"
+            and self._matches(row, query, category)
+        )
 
     async def public_goals_for_user(
         self, user_id: UUID, *, query: str | None, limit: int, offset: int

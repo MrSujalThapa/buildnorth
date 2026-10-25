@@ -7,43 +7,13 @@ import OddsExplorer from "../components/market/OddsExplorer";
 import { ODDS_EXPLORER_RANGES } from "../components/market/marketRanges";
 import { useAccount } from "../auth/AuthGate";
 import { absoluteUrl, shareLink } from "../features/social/share";
+import SparsePublicHistory from "../components/social/SparsePublicHistory";
+import PublicBlueprintDetails from "../components/social/PublicBlueprintDetails";
 import "../components/social/social.css";
 import "../components/market/market-detail.css";
 
 function historyPoints(points: { created_at: string; probability: number }[]): ChartPoint[] {
   return points.map((point) => ({ timestamp: Date.parse(point.created_at), value: point.probability * 100 }));
-}
-
-function CriteriaList({ value }: { value: unknown }) {
-  if (value == null || value === "") {
-    return <p className="quiet-copy">No public success criteria.</p>;
-  }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return <p>{String(value)}</p>;
-  }
-  if (Array.isArray(value)) {
-    return (
-      <ul>
-        {value.map((item, index) => (
-          <li key={index}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
-        ))}
-      </ul>
-    );
-  }
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    return (
-      <dl className="criteria-list">
-        {entries.map(([key, item]) => (
-          <div key={key}>
-            <dt>{key.replaceAll("_", " ")}</dt>
-            <dd>{typeof item === "string" || typeof item === "number" ? String(item) : JSON.stringify(item)}</dd>
-          </div>
-        ))}
-      </dl>
-    );
-  }
-  return <p className="quiet-copy">No public success criteria.</p>;
 }
 
 export function PublicMarketRoute() {
@@ -128,27 +98,14 @@ export function PublicMarketRoute() {
             <><div className="market-price">{(item.latest_probability * 100).toFixed(1)}%</div><div className="market-price-hint">Latest published odds</div></>
           )}
         </section>
-        {history.length ? (
+        {history.length > 2 ? (
           <OddsExplorer history={history} ranges={ODDS_EXPLORER_RANGES} initialRange={ODDS_EXPLORER_RANGES.at(-1)} />
+        ) : history.length ? (
+          <SparsePublicHistory history={history} />
         ) : (
           <p className="quiet-copy" role="status">No published chart history.</p>
         )}
-        <section className="market-section">
-          <h2>Success criteria</h2>
-          <CriteriaList value={item.blueprint.success_criteria} />
-        </section>
-        {item.blueprint.milestones.length ? (
-          <section className="market-section">
-            <h2>Milestones</h2>
-            <ul>{item.blueprint.milestones.map((milestone, index) => <li key={index}>{typeof milestone === "string" ? milestone : JSON.stringify(milestone)}</li>)}</ul>
-          </section>
-        ) : null}
-        {item.blueprint.strategies.length ? (
-          <section className="market-section">
-            <h2>Strategy</h2>
-            {item.blueprint.strategies.map((row) => <p key={row}>{row}</p>)}
-          </section>
-        ) : null}
+        <PublicBlueprintDetails blueprint={item.blueprint} />
       </section>
       {forkOpen ? (
         <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="fork-title">
