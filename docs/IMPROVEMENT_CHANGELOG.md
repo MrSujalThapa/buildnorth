@@ -1214,3 +1214,11 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Added a disposable PostgreSQL integration test for public market persistence, follow/star, private fork ownership, reviewed blueprint stability and activity revocation after unpublish. It uses test identities; genuine Clerk authentication remains unverified.
 - Characterized offset pagination under concurrent publication: a new market can shift the next page and repeat an ID. The frontend deduplicates repeats, but a refresh is needed to see the new market. No cursor change was made.
 - Existing production data and published forecasts were not touched. No inference was called. This is verification work, not a measured forecasting improvement.
+
+## 2026-10-25 — Pass 9B personal strategy learning and synthetic offline experiment
+
+- **Hypothesis:** Structured prior strategy attempts and measured outcomes can inform a later recommendation without conflating execution reliability, evidence, causation or published forecast probability.
+- **Changes:** Added owner-scoped, additive strategy recommendation/outcome/evidence-link tables; typed learning service and pollable API; existing inference router integration; deterministic fact/citation/relationship and probability-claim guards; synthetic-fixture exclusion from authentic evidence links; optional reviewed-blueprint port. The service feeds a bounded history of prior observed results into the next structured inference request. No What If, radar, source-watch, or marketplace code was modified.
+- **Tested:** Isolated migrated PostgreSQL records a first recommendation, acceptance, linked unsuccessful interview observation, and a second recommendation whose controlled inference input contains that earlier outcome. Duplicate submissions and cross-owner access are checked. No real user data or paid inference was used.
+- **Offline result:** Fixed synthetic-only 400-user, user-disjoint 247/73/80 train/validation/test split. Test Brier reference 0.221679 vs candidate 0.204225; log loss 0.635602 vs 0.598781; ECE-10 0.047438 vs 0.081008. The candidate's calibration is worse and the fixture is synthetic, so this does **not** justify a production model change. See `benchmarks/strategy_learning_v1/results.json` and `docs/STRATEGY_LEARNING.md`.
+

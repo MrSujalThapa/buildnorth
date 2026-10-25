@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-REQUIRED_FILES = 24
+REQUIRED_FILES = 25
 RESERVED_GAPS: set[str] = set()
 REQUIRED = {
     "goals",
@@ -29,6 +29,9 @@ REQUIRED = {
     "market_stars",
     "user_follows",
     "profile_activity_events",
+    "strategy_recommendations",
+    "strategy_outcome_observations",
+    "strategy_outcome_evidence",
 }
 
 
@@ -42,8 +45,8 @@ def main() -> int:
     ]
     if occupied_reserved:
         print(
-            "Migration 0023 is reserved for PR #33 social marketplace; "
-            f"found {', '.join(occupied_reserved)}. Fingerprint uniqueness belongs in 0024."
+            "Reserved migration prefixes occupied: "
+            f"{', '.join(occupied_reserved)}."
         )
         return 1
     missing_files = [
@@ -53,13 +56,17 @@ def main() -> int:
         and not any(name.startswith(prefix) for name in names)
     ]
     expected_count = REQUIRED_FILES - len(RESERVED_GAPS)
-    if missing_files or len(migrations) != expected_count:
+    numbered = [name[:4] for name in names if name[:4].isdigit()]
+    duplicate_numbers = sorted({number for number in numbered if numbered.count(number) > 1})
+    if missing_files or len(migrations) != expected_count or duplicate_numbers:
         print(
             f"Expected migrations 0001-{REQUIRED_FILES:04d} "
             f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"
         )
         if missing_files:
             print(f"Missing prefixes: {', '.join(missing_files)}")
+        if duplicate_numbers:
+            print(f"Duplicate migration numbers: {', '.join(duplicate_numbers)}")
         return 1
     sql = "\n".join(path.read_text(encoding="utf-8").lower() for path in migrations)
     missing = sorted(

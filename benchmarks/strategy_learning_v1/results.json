@@ -1,0 +1,59 @@
+{
+  "data_is_synthetic": true,
+  "dataset": "pass9b_synthetic_strategy_outcomes_v1",
+  "feature_contract": "dated prior outcomes before recommendation; goal family; strategy types seen in training",
+  "fixture_brier_better": true,
+  "held_out_brier_improvement": 0.017453335031490935,
+  "limitation": "Association only; selection bias and confounding remain. Synthetic evaluation cannot establish production accuracy.",
+  "model_version": "strategy_outcome_logistic_offline_v1",
+  "n_eligible": 400,
+  "n_excluded": 0,
+  "outcome_contracts": {
+    "career_interview_30d_v1": [
+      "interviews",
+      "count",
+      30
+    ],
+    "education_practice_30d_v1": [
+      "practice_sessions",
+      "count",
+      30
+    ]
+  },
+  "production_improvement_supported": false,
+  "seed": 20261025,
+  "split": "sha256(user_id) modulo 10: train 0-5, validation 6-7, test 8-9",
+  "status": "evaluated",
+  "test": {
+    "candidate": {
+      "brier": 0.20422520029828384,
+      "ece_10": 0.08100788205097133,
+      "log_loss": 0.5987806769932447
+    },
+    "n": 80,
+    "n_users": 80,
+    "reference": {
+      "brier": 0.22167853532977477,
+      "ece_10": 0.04743804091266718,
+      "log_loss": 0.6356021628743236
+    }
+  },
+  "train": {
+    "n": 247,
+    "n_users": 247
+  },
+  "validation": {
+    "candidate": {
+      "brier": 0.19352368031662182,
+      "ece_10": 0.10853498196241601,
+      "log_loss": 0.5742313215056682
+    },
+    "n": 73,
+    "n_users": 73,
+    "reference": {
+      "brier": 0.21910305543824446,
+      "ece_10": 0.05746922029538459,
+      "log_loss": 0.6303308955114109
+    }
+  }
+}
