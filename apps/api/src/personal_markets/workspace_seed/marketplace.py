@@ -18,13 +18,13 @@ from personal_markets.workspace_seed.service import WorkspaceSeedService
 DEMO_ACCOUNTS: tuple[dict[str, str], ...] = (
     {
         "clerk": "demo-marketplace-maya",
-        "username": "maya-chen",
+        "username": "mayachen",
         "display_name": "Maya Chen",
         "bio": "Tracking a Fall internship, weekly training, and a reading streak.",
     },
     {
         "clerk": "demo-marketplace-jordan",
-        "username": "jordan-okonkwo",
+        "username": "jordanokonkwo",
         "display_name": "Jordan Okonkwo",
         "bio": "Building a software product and keeping an emergency fund on track.",
     },
