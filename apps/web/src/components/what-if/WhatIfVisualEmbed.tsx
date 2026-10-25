@@ -29,6 +29,8 @@ export type WhatIfVisualPayload = {
   comparison?: PathComparisonResult | null;
   targetSearch?: TargetSearchResult | null;
   targetProbability?: number | null;
+  alternatives?: string[] | null;
+  request_id?: string | null;
   state?: "ready" | "pending" | "failed" | "unpriced";
   message?: string | null;
 };

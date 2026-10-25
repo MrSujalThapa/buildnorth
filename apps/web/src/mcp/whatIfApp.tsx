@@ -15,6 +15,7 @@ let selectedRequest: string | null = null;
 let expected: Pick<WhatIfVisualRequest, "mode" | "view" | "question"> | null = null;
 let payload: WhatIfVisualPayload | null = window.__PLAYITOUT_WHATIF_PAYLOAD__ ?? null;
 let error: string | null = null;
+let loading = false;
 
 function isPayload(value: unknown): value is WhatIfVisualPayload {
   if (!value || typeof value !== "object") return false;
@@ -36,6 +37,7 @@ function ingest(value: unknown): void {
   selectedGoal = value.goal.goal_id;
   payload = value;
   error = null;
+  loading = false;
   draw();
 }
 
@@ -45,6 +47,7 @@ async function requestVisual(request: WhatIfVisualRequest): Promise<void> {
   selectedRequest = requestId;
   expected = { mode: request.mode, view: request.view, question: request.question };
   error = null;
+  loading = true;
   draw();
   try {
     const response = await app.callServerTool({ name: "show_what_if_visualization", arguments: {
@@ -55,6 +58,7 @@ async function requestVisual(request: WhatIfVisualRequest): Promise<void> {
   } catch (caught) {
     if (selectedRequest === requestId) {
       error = caught instanceof Error ? caught.message : "The What If operation failed.";
+      loading = false;
       draw();
     }
   }
@@ -63,10 +67,13 @@ async function requestVisual(request: WhatIfVisualRequest): Promise<void> {
 function View() {
   const [, refresh] = useState(0);
   window.__playitoutRefresh = () => refresh((value) => value + 1);
-  if (!payload) return <main className="what-if-page mcp-what-if"><p role="status">Waiting for a What If result…</p></main>;
+  if (loading || !payload) return <main className="what-if-page mcp-what-if">
+    {error ? <p role="alert">{error}</p> : <p role="status">{loading ? "Running the backend analysis…" : "Waiting for a What If result…"}</p>}
+  </main>;
   const change = (mode: WhatIfMode, view: WhatIfView) => void requestVisual({
     goal_id: payload!.goal.goal_id, mode, view, question: payload!.question,
     target_probability: payload!.targetProbability ?? undefined,
+    alternatives: payload!.alternatives ?? undefined,
   });
   return <div className="mcp-what-if-host">
     <nav className="mcp-what-if-controls" aria-label="What If analysis">
@@ -76,7 +83,7 @@ function View() {
       <button aria-pressed={payload.view === "deep"} onClick={() => change(payload!.mode, "deep")}>Deeper analysis</button>
     </nav>
     {error ? <p role="alert">{error}</p> : null}
-    <WhatIfVisualEmbed key={`${payload.goal.goal_id}:${payload.mode}:${payload.view}`}
+    <WhatIfVisualEmbed key={`${payload.goal.goal_id}:${payload.mode}:${payload.view}:${payload.request_id ?? payload.question}`}
       payload={payload} onRequest={(request) => { void requestVisual(request); }} />
   </div>;
 }
@@ -98,16 +105,20 @@ app.ontoolinput = (input) => {
       ? { mode, view, question } : null;
     selectedRequest = typeof input.arguments?.request_id === "string"
       ? input.arguments.request_id : null;
-    if (id === selectedGoal && payload?.mode === mode && payload?.view === view
-      && payload?.question === question) return;
     selectedGoal = id;
     payload = null;
     error = null;
+    loading = true;
     draw();
   }
 };
 app.ontoolresult = (result) => {
   if (!result.isError) ingest(result.structuredContent);
+  else {
+    loading = false;
+    error = "The What If operation failed. Please retry.";
+    draw();
+  }
 };
 app.onhostcontextchanged = (context) => {
   document.documentElement.classList.toggle("theme-dark", context.theme === "dark");

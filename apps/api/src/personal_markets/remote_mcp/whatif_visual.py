@@ -84,6 +84,7 @@ async def build_visual_payload(
         "view": view,
         "question": question,
         "targetProbability": target_probability,
+        "alternatives": alternatives,
         "state": "ready" if baseline.priced else "unpriced",
         "message": baseline.message if not baseline.priced else None,
     }
