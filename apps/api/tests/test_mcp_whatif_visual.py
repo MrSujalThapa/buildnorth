@@ -106,6 +106,11 @@ async def test_eight_mode_depth_results_preserve_published_receipts() -> None:
                     folder = Path(".artifacts/mcp-whatif")
                     await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
                     await asyncio.to_thread((folder / f"{mode}-{view}.png").write_bytes, png)
+                    await asyncio.to_thread(
+                        (folder / f"{mode}-{view}.json").write_text,
+                        json.dumps(payload),
+                        encoding="utf-8",
+                    )
 
         history_after = await deps.baseline_forecasts.published_history(UUID(goal_id))
         assert [item.material_hash for item in history_after] == receipt_ids
