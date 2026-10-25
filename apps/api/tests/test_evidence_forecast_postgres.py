@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from helpers import POSTGRES_MIGRATION_SKIP, isolated_postgres_url
 from personal_markets.core.config import DEFAULT_USER_ID
+from personal_markets.evidence.domain import EvidenceCommit
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.repository import PostgresBaselineForecastRepository
 from personal_markets.forecasting.reprice import BaselineRepriceService
@@ -19,7 +20,6 @@ from personal_markets.persistence.agent_store import PostgresEvidenceRepository
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresGoalRepository
 from personal_markets.ports import EvidenceEventProposal
-from personal_markets.evidence.domain import EvidenceCommit
 from personal_markets.what_if.repository import PostgresSimulationRepository
 
 pytestmark = pytest.mark.integration

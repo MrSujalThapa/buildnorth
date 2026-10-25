@@ -42,9 +42,9 @@ from personal_markets.integrations.research import (
     MonidResearchProvider,
 )
 from personal_markets.persistence.research_store import ResearchStore
+from personal_markets.ports import InferenceProvider
 from personal_markets.profile.api import router as profile_router
 from personal_markets.what_if.api import router as what_if_router
-from personal_markets.ports import InferenceProvider
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
     PersistingWorkflow,
