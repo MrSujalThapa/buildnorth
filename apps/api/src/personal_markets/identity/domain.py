@@ -16,6 +16,21 @@ def user_id_for_clerk(clerk_user_id: str) -> UUID:
     return uuid5(NAMESPACE, f"playitout:clerk:{clerk_user_id}")
 
 
+# Server-created marketplace personas. Never Clerk users, so no one can sign in as them.
+DEMO_PERSONA_CLERK_IDS: tuple[str, ...] = (
+    "demo-marketplace-maya",
+    "demo-marketplace-jordan",
+    "demo-marketplace-priya",
+)
+DEMO_PERSONA_USER_IDS: frozenset[UUID] = frozenset(
+    user_id_for_clerk(clerk) for clerk in DEMO_PERSONA_CLERK_IDS
+)
+
+
+def is_demo_persona(user_id: UUID) -> bool:
+    return user_id in DEMO_PERSONA_USER_IDS
+
+
 class Principal(BaseModel):
     user_id: UUID
     clerk_user_id: str

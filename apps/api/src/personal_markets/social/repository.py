@@ -105,8 +105,20 @@ class SocialRepository(Protocol):
     ) -> None: ...
 
     async def activity_counts(
-        self, user_id: UUID, start: date, end: date, *, public_only: bool = False
-    ) -> dict[date, int]: ...
+        self,
+        user_id: UUID,
+        start: date,
+        end: date,
+        *,
+        public_only: bool = False,
+        include_fixtures: bool = False,
+    ) -> dict[date, int]:
+        """Per-day count of publications, goal creations and stored evidence observations.
+
+        Fixture records (seeded workspace goals and seed observations) are excluded unless
+        `include_fixtures`, so sample data never counts as a real person's activity.
+        """
+        ...
 
     async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]: ...
 

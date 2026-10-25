@@ -41,7 +41,7 @@ services:
       - key: PM_INFERENCE_PROVIDER
         value: spur
       - key: PM_INFERENCE_MODEL
-        value: spur-glm-5-3
+        value: spur-deepseek-v4-flash
       - key: PM_COMPOSIO_ENABLED
         value: "true"
       - key: PM_HOSTED_USER_RPM

@@ -24,6 +24,7 @@ from personal_markets.ports import (
     InferenceProvider,
     InferenceRequest,
     InterventionAgentProposal,
+    InterventionStateChange,
     ResearchProvider,
     ResearchQuery,
 )
@@ -120,6 +121,30 @@ class InterventionAgentService:
             return self._with_routing(
                 text,
                 self._regex_response(text, fallback_note="Intervention agent disabled."),
+                classified,
+                baseline,
+            )
+
+        explicit = self.explicit_changes(goal, text)
+        if explicit is not None:
+            self._remember_changes(goal.goal_id, text, explicit)
+            return self._with_routing(
+                text,
+                ParseInterventionResponse(
+                    raw_text=text,
+                    changes=explicit,
+                    unsupported=[],
+                    effect_assigned=False,
+                    understood_action=text,
+                    mechanism=[],
+                    pricing_status="PRICED",
+                    agent_run_id=None,
+                    limitations=[
+                        "Stated quantities were read directly from your question and checked "
+                        "against the model's parameters; no inference call was needed."
+                    ],
+                    research_claims=[],
+                ),
                 classified,
                 baseline,
             )
@@ -513,6 +538,52 @@ class InterventionAgentService:
             }
         )
         return proposal, critic, str(run_id)
+
+    @staticmethod
+    def explicit_changes(
+        goal: GoalContract, text: str
+    ) -> list[InterventionChangeResponse] | None:
+        """Changes stated as explicit quantities, validated by the same critic as agent output.
+
+        Returns None when anything in the question falls outside the deterministic grammar,
+        so ambiguous or compound requests still go to the intervention agent.
+        """
+        parsed = parse_intervention_text(text)
+        if not parsed.changes:
+            return None
+        proposal = InterventionAgentProposal(
+            understood_action=text,
+            changes=[
+                InterventionStateChange(
+                    metric=item.metric,
+                    operation=item.operation,
+                    value=item.value,
+                    unit=item.unit,
+                    frequency=item.frequency,
+                    scope=item.scope,
+                    provenance="USER_ASSUMPTION",
+                )
+                for item in parsed.changes
+            ],
+            pricing_status="PRICED",
+        )
+        critic = critique_intervention(goal, proposal, text)
+        if not critic.approved or critic.issues:
+            return None
+        if len(critic.validated_changes) != len(parsed.changes):
+            return None
+        return [
+            InterventionChangeResponse(
+                metric=item.metric,
+                operation=item.operation,
+                value=item.value,
+                unit=item.unit,
+                frequency=item.frequency,
+                scope=item.scope,
+                provenance=item.provenance,
+            )
+            for item in critic.validated_changes
+        ]
 
     @staticmethod
     def _regex_response(text: str, *, fallback_note: str) -> ParseInterventionResponse:

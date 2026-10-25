@@ -20,21 +20,24 @@ sys.path.insert(0, str(ROOT / "apps" / "api" / "src"))
 
 from personal_markets.behavior.commitments import get_commitment_store  # noqa: E402
 from personal_markets.collections.service import CollectionService  # noqa: E402
+from personal_markets.core.config import get_settings  # noqa: E402
 from personal_markets.evidence.service import EvidenceService  # noqa: E402
 from personal_markets.forecasting.service import BaselineForecastService  # noqa: E402
-from personal_markets.identity.factory import get_identity_repository, get_identity_service  # noqa: E402
+from personal_markets.identity.factory import (  # noqa: E402
+    get_identity_repository,
+    get_identity_service,
+)
+from personal_markets.persistence.database import create_engine  # noqa: E402
 from personal_markets.wiring import (  # noqa: E402
+    get_baseline_forecast_repository,
     get_collection_repository,
     get_evidence_repository,
-    get_baseline_forecast_repository,
     get_goal_service,
     get_social_service,
 )
 from personal_markets.workspace_seed.marketplace import seed_marketplace  # noqa: E402
 from personal_markets.workspace_seed.registry import PostgresSeedRegistry  # noqa: E402
 from personal_markets.workspace_seed.service import WorkspaceSeedService  # noqa: E402
-from personal_markets.core.config import get_settings  # noqa: E402
-from personal_markets.persistence.database import create_engine  # noqa: E402
 
 
 def _seeder() -> WorkspaceSeedService:

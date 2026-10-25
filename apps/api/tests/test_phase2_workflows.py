@@ -41,7 +41,7 @@ from personal_markets.what_if.service import WhatIfService
 @pytest.mark.parametrize(
     "mode,provider,model",
     [
-        ("hosted", "spur", "spur-glm-5-3"),
+        ("hosted", "spur", "spur-deepseek-v4-flash"),
         ("byok", "openai", "gpt-5.4-mini"),
         ("byok", "anthropic", "claude-sonnet-5-5"),
     ],
@@ -53,7 +53,7 @@ def test_scenarios_a_b_c_native_protocol_to_persisted_forecast(
     principal = app.state.auth_bypass_principal
     settings = Settings(
         inference_provider="spur",
-        inference_model="spur-glm-5-3",
+        inference_model="spur-deepseek-v4-flash",
         spur_api_key="platform-key",
         openai_max_retries=0,
         byok_encryption_keys={"v1": base64.urlsafe_b64encode(os.urandom(32)).decode()},
@@ -240,6 +240,7 @@ def test_scenarios_a_b_c_native_protocol_to_persisted_forecast(
             )
         )
         assert intervention.changes
+        assert intervention.agent_run_id is None
         simulations = WhatIfService(
             deps.goals,
             InMemorySimulationRepository(),
@@ -272,9 +273,10 @@ def test_scenarios_a_b_c_native_protocol_to_persisted_forecast(
         )
         assert 0 <= simulation.execution_probability <= 1
         assert len(asyncio.run(deps.baseline_forecasts.published_history(UUID(goal_id)))) == 3
-    assert len(budget_store.ledger) == 4  # Architect, two evidence, Intervention.
+    # Architect and two evidence calls; the stated weekly quantity is parsed without inference.
+    assert len(budget_store.ledger) == 3
     assert {r["billing_mode"] for r in budget_store.ledger} == {mode}
     assert (asyncio.run(budget_store.counters("global"))).spent_tokens == (
-        120 if mode == "hosted" else 0
+        90 if mode == "hosted" else 0
     )
     assert len(set(calls)) == 1

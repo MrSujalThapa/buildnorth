@@ -318,7 +318,13 @@ class InMemorySocialRepository:
         self._activity.append(key)
 
     async def activity_counts(
-        self, user_id: UUID, start: date, end: date, *, public_only: bool = False
+        self,
+        user_id: UUID,
+        start: date,
+        end: date,
+        *,
+        public_only: bool = False,
+        include_fixtures: bool = False,
     ) -> dict[date, int]:
         counts: dict[date, int] = {}
         for owner, _type, day, goal_id in self._activity:

@@ -29,6 +29,7 @@ from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
 from personal_markets.ports import CriticArtifact, EvidenceEventProposal, GoalArchitectProposal
 from personal_markets.workspace_seed.fixtures import (
+    MARKETPLACE_ONLY_GOALS,
     SEED_COLLECTIONS,
     SEED_GOALS,
     SEED_VERSION,
@@ -134,19 +135,27 @@ class WorkspaceSeedService:
             counts[entity_type] = counts.get(entity_type, 0) + 1
         return {"seed_version": SEED_VERSION, "seeded": bool(counts), "records": counts}
 
-    async def seed(self, owner_id: UUID, *, now: datetime | None = None) -> dict[str, Any]:
+    async def seed(
+        self,
+        owner_id: UUID,
+        *,
+        now: datetime | None = None,
+        keys: Sequence[str] | None = None,
+    ) -> dict[str, Any]:
         """Idempotent: an active seeded goal is left untouched.
 
         A goal that fails part-way is archived and retired, so a retry rebuilds it under
-        the next generation id instead of keeping a half-replayed history.
+        the next generation id instead of keeping a half-replayed history. `keys` selects
+        a subset of fixtures; by default the user workspace set is seeded.
         """
         clock = now or datetime.now(UTC)
+        selected = SEED_GOALS if keys is None else _select_goals(keys)
         rows = await self._registry.list(owner_id)
         registered = {entity_id for _, entity_id in rows}
         active_ids = {goal.goal_id for goal in await self._goals.list_goals(owner_id=owner_id)}
         created: dict[str, UUID] = {}
         summary: list[dict[str, Any]] = []
-        for seed in SEED_GOALS:
+        for seed in selected:
             generation, goal_id = next(
                 (gen, candidate)
                 for gen in range(MAX_GENERATIONS)
@@ -178,6 +187,8 @@ class WorkspaceSeedService:
         names = {row.name.casefold() for row in await self._collections.list_for(owner_id)}
         for collection in SEED_COLLECTIONS:
             if collection.name.casefold() in names:
+                continue
+            if not any(key in created for key in collection.goal_keys):
                 continue
             row = await self._collections.create(
                 owner_id,
@@ -308,6 +319,14 @@ class WorkspaceSeedService:
         status = await self._forecasts.publish(goal, pricing, critic, published_at=moment)
         await self._goals.record_publication(goal.goal_id, owner_id, critic, status)
         return status, pricing.raw_probability
+
+
+def _select_goals(keys: Sequence[str]) -> tuple[SeedGoal, ...]:
+    catalog = {seed.key: seed for seed in (*SEED_GOALS, *MARKETPLACE_ONLY_GOALS)}
+    unknown = [key for key in keys if key not in catalog]
+    if unknown:
+        raise ValueError(f"unknown seed goal keys: {', '.join(unknown)}")
+    return tuple(catalog[key] for key in keys)
 
 
 def _observed_by(item: NormalizedEvidence, moment: datetime) -> bool:

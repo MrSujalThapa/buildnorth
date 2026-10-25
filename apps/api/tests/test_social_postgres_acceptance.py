@@ -13,13 +13,16 @@ from sqlalchemy import text
 from helpers import isolated_postgres_url
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.evidence.service import EvidenceService
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.domain import UserProfile
 from personal_markets.identity.service import IdentityService
 from personal_markets.identity.store import InMemoryIdentityRepository
+from personal_markets.persistence.agent_store import PostgresEvidenceRepository
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresGoalRepository
+from personal_markets.ports import EvidenceEventProposal
 from personal_markets.social.postgres import PostgresSocialRepository
 from personal_markets.social.service import SocialService
 
@@ -143,5 +146,57 @@ async def test_offset_page_can_shift_when_new_market_is_published() -> None:
         )
         assert await repo.count_public(query=query, category=None) == 3
         assert first[0]["id"] == second[0]["id"]
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_activity_counts_stored_evidence_dates_and_keeps_seed_fixtures_out() -> None:
+    url = isolated_postgres_url()
+    if not url:
+        pytest.skip("PM_TEST_DATABASE_URL is not configured")
+    engine = create_engine(url)
+    owner = uuid4()
+    goals = PostgresGoalRepository(engine)
+    repo = PostgresSocialRepository(engine)
+    evidence = EvidenceService(PostgresEvidenceRepository(engine))
+    now = datetime.now(UTC)
+
+    def contract(title: str, seeded: bool) -> GoalContract:
+        return GoalContract(
+            goal_id=uuid4(), title=title, goal_type=GoalType.THRESHOLD,
+            success_definition={"metric": "sessions", "operator": ">=", "target": 10},
+            deadline=now + timedelta(days=90), state_dimensions=["sessions"],
+            model_requirements={"workspace_seed": "fixture"} if seeded else {},
+        )
+
+    def observation(days_ago: int, identity: str | None = None) -> EvidenceEventProposal:
+        return EvidenceEventProposal(
+            event_type="observation", domain="user_state", metric="sessions",
+            numeric_value=float(days_ago), unit="sessions",
+            observed_at=(now - timedelta(days=days_ago)).isoformat(),
+            source_type="manual", summary=f"sessions {days_ago}",
+            observation_kind="snapshot", event_identity=identity,
+        )
+
+    real, seeded = contract("Real sessions", False), contract("Seeded sessions", True)
+    try:
+        await goals.create(real, owner)
+        await goals.create(seeded, owner)
+        await evidence.commit(owner, real.goal_id, [observation(3), observation(10)], None, [])
+        await evidence.commit(
+            owner, seeded.goal_id, [observation(5, f"seed:test:{seeded.goal_id}")], None, []
+        )
+        start, today = (now - timedelta(days=30)).date(), now.date()
+        authentic = await repo.activity_counts(owner, start, today)
+        assert authentic == {
+            (now - timedelta(days=10)).date(): 1,
+            (now - timedelta(days=3)).date(): 1,
+            today: 1,
+        }
+        persona = await repo.activity_counts(owner, start, today, include_fixtures=True)
+        assert persona[(now - timedelta(days=5)).date()] == 1
+        assert persona[today] == 2
+        assert await repo.activity_counts(owner, start, today, public_only=True) == {}
     finally:
         await engine.dispose()

@@ -23,6 +23,7 @@ from openai import (
 )
 
 from personal_markets.agents.budget import TokenBudget
+from personal_markets.core.config import AUTHENTICATED_SPUR_MODEL
 from personal_markets.core.errors import (
     PermanentProviderError,
     ProviderBudgetExceededError,
@@ -90,8 +91,10 @@ class SpurInferenceProvider:
     def _resolve_model(self, request: InferenceRequest) -> str:
         candidate = request.model or self._default_model
         lowered = candidate.strip().lower()
-        if lowered != "spur-glm-5-3":
-            raise SemanticProviderError("Unsupported Spur model; select spur-glm-5-3")
+        if lowered != AUTHENTICATED_SPUR_MODEL:
+            raise SemanticProviderError(
+                f"Unsupported Spur model; select {AUTHENTICATED_SPUR_MODEL}"
+            )
         return candidate
 
     async def _once(self, request: InferenceRequest, model: str, retries: int) -> InferenceResponse:

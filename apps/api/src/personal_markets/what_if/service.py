@@ -73,6 +73,9 @@ from personal_markets.what_if.resources import (
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
 
+# Bisection steps over a lever's [minimum, maximum]; 12 resolves a 0–50/week range to ~0.01.
+TARGET_SEARCH_BISECTIONS = 12
+
 
 def _target_lever_label(assumption: Assumption, value: float) -> str:
     if assumption.name == "flow" and assumption.unit == "currency/month":
@@ -1332,17 +1335,28 @@ class WhatIfService:
             return None
         low, high = assumption.minimum, assumption.maximum
         best: float | None = None
-        for _ in range(18):
-            midpoint = (low + high) / 2
-            changed = [
-                item.model_copy(update={"value": midpoint})
-                if item.name == assumption.name
-                else item
-                for item in request.base.assumptions
-            ]
-            priced = await self._simulate(
-                request.base.model_copy(update={"assumptions": changed}), persist=False
+
+        def setpoint(value: float) -> WhatIfRequest:
+            # Same semantics as setpoint paths and Compare: the lever is a scenario
+            # change subject to follow-through, not a rewritten baseline.
+            change = InterventionChangeInput(
+                metric=assumption.name,
+                operation="set",
+                value=value,
+                unit=assumption.unit,
+                provenance="EXPLORATION_ASSUMPTION",
             )
+            changed = apply_parsed_changes_to_assumptions(
+                request.base.assumptions,
+                [InterventionChangeResponse.model_validate(change.model_dump())],
+            )
+            return request.base.model_copy(
+                update={"assumptions": changed, "parsed_changes": [change], "intervention": None}
+            )
+
+        for _ in range(TARGET_SEARCH_BISECTIONS):
+            midpoint = (low + high) / 2
+            priced = await self._simulate(setpoint(midpoint), persist=False)
             if priced.scenario_probability is None:
                 low = midpoint
                 continue
@@ -1358,13 +1372,9 @@ class WhatIfService:
                 low = midpoint
         if best is None:
             return None
-        changed = [
-            item.model_copy(update={"value": best}) if item.name == assumption.name else item
-            for item in request.base.assumptions
-        ]
-        verified = await self._simulate(
-            request.base.model_copy(update={"assumptions": changed}), persist=False
-        )
+        verified_request = setpoint(best)
+        changed = verified_request.assumptions
+        verified = await self._simulate(verified_request, persist=False)
         probability = verified.scenario_probability
         if probability is None:
             return None

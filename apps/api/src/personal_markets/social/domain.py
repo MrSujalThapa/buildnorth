@@ -42,6 +42,7 @@ class PublicCreator(BaseModel):
     display_name: str | None = None
     bio: str | None = None
     has_photo: bool = False
+    demo_persona: bool = False
 
 
 class ForkProvenance(BaseModel):

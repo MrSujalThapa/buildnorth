@@ -54,3 +54,4 @@ class ParseDecisionResponse(BaseModel):
     decision: TypedDecisionResponse | None = None
     scenario_labels: list[str] = Field(default_factory=list)
     unsupported: list[str] = Field(default_factory=list)
+    changes: list[InterventionChangeResponse] = Field(default_factory=list)

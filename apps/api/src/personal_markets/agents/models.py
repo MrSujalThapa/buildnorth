@@ -11,6 +11,7 @@ ESTIMATED_USD_PER_MILLION: dict[str, dict[str, float]] = {
     "gpt-5.4-mini": {"input": 0.75, "output": 4.50},
     "gpt-5.4": {"input": 2.50, "output": 15.00},
     "spur-glm-5-3": {"input": 0.30, "output": 1.00},
+    "spur-deepseek-v4-flash": {"input": 0.14, "output": 0.28},
     "claude-sonnet-5-5": {"input": 2, "output": 10},
     "claude-opus-5-5": {"input": 4, "output": 20},
 }

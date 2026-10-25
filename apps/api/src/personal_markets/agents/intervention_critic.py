@@ -15,7 +15,8 @@ _PROBABILITY_TOKENS = ("probability", "odds", "likelihood", "uplift_pp", "percen
 _APPLICATION_QUANTITY = re.compile(
     r"\b(?:(?:appl(?:y|ied|ying)\s+to\s+))?(\d+(?:\.\d+)?)\s+"
     r"(?:additional\s+|more\s+|extra\s+)?(?:job\s+)?applications?\b"
-    r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+jobs?\b",
+    r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+"
+    r"(?:jobs?|internships?|roles?|positions?|companies)\b",
     re.I,
 )
 _APPS_FROM_TO = re.compile(
