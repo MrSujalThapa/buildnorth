@@ -507,25 +507,59 @@ class PostgresSocialRepository:
             )
 
     async def activity_counts(
-        self, user_id: UUID, start: date, end: date, *, public_only: bool = False
+        self,
+        user_id: UUID,
+        start: date,
+        end: date,
+        *,
+        public_only: bool = False,
+        include_fixtures: bool = False,
     ) -> dict[date, int]:
         async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
                         """
-                        select occurred_on, count(*)::int as n
-                        from profile_activity_events a
-                        where a.user_id = :user_id and a.occurred_on between :start and :end
-                          and (not :public_only or exists (
-                            select 1 from goals g where g.id = a.goal_id
-                              and g.user_id = a.user_id and g.visibility = 'public'
-                              and g.status = 'active'
-                          ))
-                        group by occurred_on
+                        with owned as (
+                          select g.id, g.created_at from goals g
+                          where g.user_id = :user_id and g.status = 'active'
+                            and (not :public_only or g.visibility = 'public')
+                            and (:include_fixtures
+                              or not jsonb_exists(g.model_requirements_json, 'workspace_seed'))
+                        ),
+                        observed as (
+                          select distinct e.id, (e.observed_at at time zone 'UTC')::date as day
+                          from evidence_events e
+                          join goal_evidence ge on ge.evidence_id = e.id
+                          join owned o on o.id = ge.goal_id
+                          where e.user_id = :user_id and e.status = 'active'
+                            and (:include_fixtures or (
+                              e.source_quality not in ('demo_fixture', 'synthetic_demo')
+                              and coalesce(e.provenance_json->>'event_identity', '')
+                                not like 'seed:%'
+                            ))
+                        ),
+                        days as (
+                          select a.occurred_on as day from profile_activity_events a
+                          where a.user_id = :user_id and a.event_type = 'market_published'
+                            and a.goal_id in (select id from owned)
+                          union all
+                          select (o.created_at at time zone 'UTC')::date from owned o
+                          union all
+                          select day from observed
+                        )
+                        select day, count(*)::int as n from days
+                        where day between :start and :end
+                        group by day
                         """
                     ),
-                    {"user_id": user_id, "start": start, "end": end, "public_only": public_only},
+                    {
+                        "user_id": user_id,
+                        "start": start,
+                        "end": end,
+                        "public_only": public_only,
+                        "include_fixtures": include_fixtures,
+                    },
                 )
             ).all()
             return {row[0]: int(row[1]) for row in rows}

@@ -22,6 +22,7 @@ HIRING_LABELS = (
     "Offer received",
     "Final-stage pipeline",
     "Technical-stage pipeline",
+    "Screening-stage pipeline",
     "No meaningful progress",
 )
 STARTUP_LABELS = (

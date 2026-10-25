@@ -22,7 +22,8 @@ from personal_markets.identity.testing import admin_principal, invited_principal
 from personal_markets.persistence.agent_store import InMemoryEvidenceRepository
 from personal_markets.ports import EvidenceEventProposal
 from personal_markets.profile.parameters import parameter_profile
-from personal_markets.workspace_seed.fixtures import SEED_GOALS
+from personal_markets.workspace_seed.fixtures import MARKETPLACE_ONLY_GOALS, SEED_GOALS
+from personal_markets.workspace_seed.marketplace import DEMO_ACCOUNTS
 from personal_markets.workspace_seed.registry import InMemorySeedRegistry
 from personal_markets.workspace_seed.service import WorkspaceSeedService, build_seed_goal
 
@@ -304,3 +305,37 @@ def test_authentic_profile_keeps_seed_out_and_persists_measured_preferences() ->
         assert reading["source_types"] == ["manual"]
         assert reading["evidence_ids"] == [evidence_id]
         assert all(item["value"] is None for item in body["radar"]["parameters"][1:])
+
+
+def test_marketplace_accounts_cover_distinct_fixture_subsets() -> None:
+    keys = [key for account in DEMO_ACCOUNTS for key in account.goal_keys]
+    assert len(keys) == len(set(keys))
+    catalog = {seed.key: seed for seed in (*SEED_GOALS, *MARKETPLACE_ONLY_GOALS)}
+    assert set(keys) == set(catalog)
+    assert {catalog[key].domain for key in keys} >= {
+        "career", "startup", "finance", "running", "education", "personal", "relationships"
+    }
+    assert not {seed.key for seed in MARKETPLACE_ONLY_GOALS} & {seed.key for seed in SEED_GOALS}
+
+
+def test_seed_subset_prices_only_selected_goals() -> None:
+    async def run() -> None:
+        service, parts = _service()
+        owner = uuid4()
+        result = await service.seed(owner, keys=("ml_course", "meditation"))
+        assert [item["key"] for item in result["goals"]] == ["ml_course", "meditation"]
+        for item in result["goals"]:
+            priced = [p["probability"] for p in item["history"] if p["probability"] is not None]
+            assert len(priced) >= 3, item["key"]
+        goals = parts["goals"]
+        assert isinstance(goals, GoalService)
+        assert len(await goals.list_goals(owner_id=owner)) == 2
+        collections = parts["collections"]
+        assert isinstance(collections, CollectionService)
+        assert await collections.list_for(owner) == []
+        again = await service.seed(owner, keys=("ml_course", "meditation"))
+        assert {item["status"] for item in again["goals"]} == {"exists"}
+        with pytest.raises(ValueError, match="unknown seed goal keys"):
+            await service.seed(owner, keys=("not_a_goal",))
+
+    asyncio.run(run())

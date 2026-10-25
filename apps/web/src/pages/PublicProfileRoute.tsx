@@ -58,6 +58,7 @@ export function PublicProfileRoute() {
             <div className="profile-identity">
               <h2>{display}</h2>
               <span>@{creator.handle}</span>
+              {creator.demo_persona ? <span className="demo-persona-tag" title="A sample account created by PlayItOut. Its goals and observations are illustrative fixtures, not a real person's record.">Sample account</span> : null}
               {creator.bio ? <p>{creator.bio}</p> : null}
               <div className="follow-counts">
                 <button type="button" onClick={() => setGraph("followers")}>{profile.data.follower_count} followers</button>

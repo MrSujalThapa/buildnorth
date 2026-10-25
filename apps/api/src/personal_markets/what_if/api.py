@@ -141,6 +141,7 @@ async def parse_decision(
         decision=decision,
         scenario_labels=list(parsed.scenario_labels),
         unsupported=list(parsed.unsupported),
+        changes=InterventionAgentService.explicit_changes(goal, payload.text) or [],
     )
 
 

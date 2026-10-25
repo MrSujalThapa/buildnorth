@@ -69,6 +69,17 @@ MODELS = (
         display_name="Spur GLM 5.3",
         pricing_available=True,
     ),
+    ModelCapability(
+        "spur",
+        "spur-deepseek-v4-flash",
+        0.14,
+        0.28,
+        tools=False,
+        minimum_output_tokens=4096,
+        pricing_basis="Spur /v1/models listed pricing, checked 2026-10-25",
+        display_name="Spur DeepSeek V4 Flash",
+        pricing_available=True,
+    ),
 )
 
 
@@ -107,9 +118,11 @@ def hosted_allowlist(provider: str, configured_model: str | None) -> set[str]:
 
 
 def default_model(provider: str) -> str:
-    return {"openai": "gpt-5.4-mini", "anthropic": "claude-sonnet-5-5", "spur": "spur-glm-5-3"}[
-        provider
-    ]
+    return {
+        "openai": "gpt-5.4-mini",
+        "anthropic": "claude-sonnet-5-5",
+        "spur": "spur-deepseek-v4-flash",
+    }[provider]
 
 
 def classify_discovered(

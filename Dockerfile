@@ -19,6 +19,7 @@ COPY pyproject.toml uv.lock ./
 COPY apps/api/src ./apps/api/src
 COPY supabase/migrations ./supabase/migrations
 COPY scripts/db_migrate.py ./scripts/db_migrate.py
+COPY scripts/seed_hackathon_marketplace.py ./scripts/seed_hackathon_marketplace.py
 
 RUN uv sync --frozen --no-dev
 

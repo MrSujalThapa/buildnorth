@@ -6,7 +6,7 @@ from uuid import UUID, uuid4
 
 from personal_markets.core.errors import ConflictError, ForbiddenError, ResourceNotFoundError
 from personal_markets.goals.service import GoalService
-from personal_markets.identity.domain import UserProfile
+from personal_markets.identity.domain import UserProfile, is_demo_persona
 from personal_markets.identity.service import IdentityService
 from personal_markets.social.blueprint import (
     build_public_blueprint,
@@ -58,6 +58,7 @@ class SocialService:
             display_name=display,
             bio=profile.bio,
             has_photo=has_photo,
+            demo_persona=is_demo_persona(user_id),
         )
 
     async def resolve_handle(self, handle: str) -> UUID:
@@ -173,7 +174,11 @@ class SocialService:
                     if isinstance(blueprint_data, dict)
                     else "",
                     category=str(
-                        (blueprint_data.get("category") if isinstance(blueprint_data, dict) else None)
+                        (
+                            blueprint_data.get("category")
+                            if isinstance(blueprint_data, dict)
+                            else None
+                        )
                         or row["goal_type"]
                     ),
                     visibility="public" if row.get("visibility") == "public" else "private",
@@ -287,7 +292,11 @@ class SocialService:
         today = datetime.now(UTC).date()
         start = today - timedelta(days=365)
         counts = await self._repository.activity_counts(
-            user_id, start, today, public_only=viewer_id != user_id
+            user_id,
+            start,
+            today,
+            public_only=viewer_id != user_id,
+            include_fixtures=creator.demo_persona,
         )
         activity = [ActivityDay(day=day, count=count) for day, count in sorted(counts.items())]
         return PublicProfile(

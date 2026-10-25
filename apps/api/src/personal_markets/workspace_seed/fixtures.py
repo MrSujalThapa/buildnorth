@@ -510,6 +510,72 @@ FAMILY_DINNERS = SeedGoal(
     ),
 )
 
+ML_COURSE = SeedGoal(
+    key="ml_course",
+    domain="education",
+    deadline_days=150,
+    proposal={
+        "ready_to_commit": True,
+        "title": "Complete 40 lessons of a machine learning course",
+        "goal_type": "threshold",
+        "success_metric": "lessons_completed",
+        "success_operator": ">=",
+        "success_target": "40",
+        "state_dimensions": ["lessons_completed"],
+        "model_family_compatibility": "composed_cumulative_count",
+        "success_unit": "lessons",
+        "primitive_kind": "cumulative_count",
+    },
+    observations=_counts(
+        "lessons_completed",
+        "lessons",
+        "Lessons completed",
+        [(84, 3), (70, 6), (56, 9), (42, 11), (28, 15), (14, 17), (3, 20)],
+    ),
+    commitments=_weekly(
+        83,
+        11,
+        "Finish two lessons",
+        2,
+        "lessons",
+        "ccpcmcccpcc",
+        actual_scale=(1.0, 1.0, 0.5, 1.0),
+    ),
+)
+
+MEDITATION = SeedGoal(
+    key="meditation",
+    domain="personal",
+    deadline_days=120,
+    proposal={
+        "ready_to_commit": True,
+        "title": "Log 100 meditation sessions",
+        "goal_type": "threshold",
+        "success_metric": "meditation_sessions",
+        "success_operator": ">=",
+        "success_target": "100",
+        "state_dimensions": ["meditation_sessions"],
+        "model_family_compatibility": "composed_cumulative_count",
+        "success_unit": "sessions",
+        "primitive_kind": "cumulative_count",
+    },
+    observations=_counts(
+        "meditation_sessions",
+        "sessions",
+        "Meditation sessions logged",
+        [(63, 4), (49, 11), (35, 15), (21, 22), (7, 29), (1, 31)],
+    ),
+    commitments=_weekly(
+        62,
+        8,
+        "Meditate on five mornings",
+        5,
+        "sessions",
+        "cpcmcpcc",
+        actual_scale=(1.0, 0.6, 1.0, 1.0),
+    ),
+)
+
 SEED_GOALS: tuple[SeedGoal, ...] = (
     FDE_OFFER,
     STARTUP_RAISE,
@@ -519,6 +585,9 @@ SEED_GOALS: tuple[SeedGoal, ...] = (
     PROJECT,
     FAMILY_DINNERS,
 )
+
+# Published only by dedicated marketplace demo accounts, never the user's own workspace.
+MARKETPLACE_ONLY_GOALS: tuple[SeedGoal, ...] = (ML_COURSE, MEDITATION)
 
 
 @dataclass(frozen=True, slots=True)

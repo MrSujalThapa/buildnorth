@@ -12,10 +12,13 @@ from personal_markets.wiring import build_inference
 
 
 def test_spur_requires_authenticated_model_id() -> None:
-    assert Settings(spur_model="spur-glm-5-3").resolved_spur_model() == AUTHENTICATED_SPUR_MODEL
+    assert (
+        Settings(spur_model=AUTHENTICATED_SPUR_MODEL).resolved_spur_model()
+        == AUTHENTICATED_SPUR_MODEL
+    )
     assert Settings(spur_model="").resolved_spur_model() == AUTHENTICATED_SPUR_MODEL
-    for model in ("glm-5.2", "spur-glm-5-2"):
-        with pytest.raises(ProviderNotConfiguredError, match="spur-glm-5-3"):
+    for model in ("glm-5.2", "spur-glm-5-2", "spur-glm-5-3"):
+        with pytest.raises(ProviderNotConfiguredError, match=AUTHENTICATED_SPUR_MODEL):
             Settings(spur_model=model).resolved_spur_model()
 
 

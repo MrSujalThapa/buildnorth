@@ -437,6 +437,7 @@ export interface PublicCreator {
   display_name: string | null;
   bio: string | null;
   has_photo: boolean;
+  demo_persona?: boolean;
 }
 
 export interface PublicHistoryPoint {

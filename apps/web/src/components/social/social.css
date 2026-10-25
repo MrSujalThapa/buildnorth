@@ -613,3 +613,17 @@
 .public-blueprint .criteria-list dd { overflow-wrap: anywhere; }
 .public-milestones { margin: 0; padding-left: 20px; }
 .public-milestones li { padding: 7px 0; line-height: 1.45; overflow-wrap: anywhere; }
+
+.demo-persona-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}

@@ -65,7 +65,7 @@ _BAND_LABEL_TOKENS: dict[BandKey, tuple[str, ...]] = {
     "final_stage": ("final", "late stage"),
     "technical_stage": ("technical", " onsite"),
     "screening_stage": ("screen", "response", "pipeline"),
-    "no_progress": ("no progress", "stagnat", "downside"),
+    "no_progress": ("no progress", "no meaningful progress", "stagnat", "downside"),
 }
 
 
@@ -306,9 +306,9 @@ def _career_funnel_weights(
         "current_trajectory": bands["screening_stage"],
         "downside": bands["no_progress"],
     }
-    mapped = _map_labels_to_bands(scenario_labels, continuous_bands, domain="career")
+    mapped = _map_labels_to_bands(scenario_labels, bands, domain="career_stages")
     if not mapped:
-        mapped = _map_labels_to_bands(scenario_labels, bands, domain="career_stages")
+        mapped = _map_labels_to_bands(scenario_labels, continuous_bands, domain="career")
     if not mapped:
         return None
     outcomes = _definitions_from_map(scenario_labels, mapped, AssumptionSource.REFERENCE)
@@ -398,10 +398,16 @@ def _map_labels_to_bands(
     domain: str,
 ) -> dict[str, float]:
     mapped: dict[str, float] = {}
+    claimed: set[BandKey] = set()
     for label in labels:
         band_key = _band_key_for_label(label, bands)
-        if band_key is not None:
-            mapped[label] = mapped.get(label, 0.0) + bands[band_key]
+        if band_key is None:
+            continue
+        if band_key in claimed:
+            # Two labels on one band would each receive its full mass.
+            return {}
+        claimed.add(band_key)
+        mapped[label] = bands[band_key]
     if not mapped:
         return {}
     total = sum(mapped.values())
