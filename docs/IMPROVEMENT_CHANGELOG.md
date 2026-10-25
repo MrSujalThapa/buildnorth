@@ -1148,3 +1148,9 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Added API-backed Discover pagination with total count, stable tie ordering, deduplication, query reset and page-error retry.
 - Bound public blueprint display and private forking to the reviewed publication snapshot, preventing later private goal edits from appearing publicly or entering a visitor's fork.
 - Clarified heatmap event scope and mobile month labels. No inference, production writes or migration changes. Tests and limitations are recorded in `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+### 2026-10-25 Social/Profile PostgreSQL acceptance boundary (PR #37)
+
+- Added a disposable PostgreSQL integration test for public market persistence, follow/star, private fork ownership, reviewed blueprint stability and activity revocation after unpublish. It uses test identities; genuine Clerk authentication remains unverified.
+- Characterized offset pagination under concurrent publication: a new market can shift the next page and repeat an ID. The frontend deduplicates repeats, but a refresh is needed to see the new market. No cursor change was made.
+- Existing production data and published forecasts were not touched. No inference was called. This is verification work, not a measured forecasting improvement.
