@@ -176,18 +176,29 @@ async def test_b_distinct_increments_add_and_equal_snapshots_corroborate() -> No
         await harness.call(
             grant.access_token, "submit_structured_evidence", _evidence(goal_id, "snap-a-0001")
         )
+        receipts_before_duplicate = len(await _history(harness, goal_id))
         again = structured(
             await harness.call(
                 grant.access_token, "submit_structured_evidence", _evidence(goal_id, "snap-b-0001")
             )
         )
         assert again["dedup"] == ["corroborated_existing"]
+        assert again["publication"]["status"] == "unchanged"
         snapshots = [
             row
             for row in await _deps(harness).evidence.list_for_goal(UUID(goal_id))
             if row.provenance.observation_kind == "snapshot"
         ]
         assert len(snapshots) == 1
+        assert len(await _history(harness, goal_id)) == receipts_before_duplicate
+        latest = structured(await harness.call(
+            grant.access_token, "get_forecast", {"goal_id": goal_id}
+        ))
+        history = structured(await harness.call(
+            grant.access_token, "get_forecast_history", {"goal_id": goal_id}
+        ))
+        assert latest["receipt_id"] == history["points"][-1]["receipt_id"]
+        assert latest["published_at"] == history["points"][-1]["published_at"]
 
 
 async def test_b_agent_report_corroborates_manual_entry_without_upgrading_trust() -> None:

@@ -116,6 +116,40 @@ def test_github_activity_is_not_a_verified_solution() -> None:
     assert event["ingested_at"] != event["observed_at"]
 
 
+def test_github_pr_edit_has_a_new_identity_but_repeated_read_deduplicates() -> None:
+    from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
+
+    connection = uuid4()
+
+    def read(updated_at: str) -> RawSourceRecord:
+        return normalize_tool_result(
+            plugin_id="github", plugin_connection_id=connection,
+            sync_run_id=uuid4(), tool_name="GITHUB_GET_PULL_REQUESTS",
+            user_id="owner-a",
+            payload={"items": [{
+                "id": 42, "title": "Ship feature", "state": "open",
+                "updated_at": updated_at,
+            }]},
+        )[0]
+
+    first = read("2026-10-20T00:00:00Z")
+    repeated = read("2026-10-20T00:00:00Z")
+    edited = read("2026-10-21T00:00:00Z")
+    assert first.external_id == repeated.external_id
+    assert first.external_id != edited.external_id
+    assert first.payload["events"][0]["classification"] == "observed_activity"
+    assert first.payload["promotes_to_verified_outcome"] is False
+
+    async def verify() -> None:
+        repository = InMemoryIntegrationRepository()
+        assert len(await repository.append_raw_records([first, repeated])) == 1
+        assert len(await repository.append_raw_records([edited])) == 1
+
+    import asyncio
+
+    asyncio.run(verify())
+
+
 def test_notion_edit_is_content_not_a_completed_book() -> None:
     connection_id = uuid4()
     sync_run_id = uuid4()

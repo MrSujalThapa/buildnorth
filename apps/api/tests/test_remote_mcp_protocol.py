@@ -74,6 +74,10 @@ async def test_sdk_client_discovers_and_calls_tools() -> None:
             assert by_name["simulate_intervention"].output_schema is not None
             schema = by_name["submit_structured_evidence"].input_schema
             assert "idempotency_key" in schema["required"]
+            assert "real observation" in (by_name["submit_structured_evidence"].description or "")
+            assert "hypothetical" in (by_name["simulate_intervention"].description or "")
+            assert "receipt ID" in (by_name["get_forecast"].description or "")
+            assert "observed_at" in (by_name["get_evidence_summary"].description or "")
             result = await client.call_tool("list_goals", {})
     assert result.is_error is False
     body = structured(result)

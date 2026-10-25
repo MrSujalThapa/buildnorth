@@ -84,9 +84,10 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
             receipt["forecast_result"] = (
                 outcome.pricing.model_dump(mode="json") if outcome.pricing else None
             )
-            # An irrelevant source observation is a successful read with no
-            # forecast change, not a failed provider sync.
-            failed = outcome.status not in {"completed", "unchanged"}
+            # A source can be read and committed while the forecast is withheld
+            # for insufficient evidence. That is a completed sync, not a failed
+            # provider read; the receipt retains the honest forecast status.
+            failed = outcome.status not in {"completed", "unchanged", "withheld"}
         receipt["completed_at"] = datetime.now(UTC).isoformat()
         result_error = (
             "Watched source is no longer approved. Review monitoring setup."

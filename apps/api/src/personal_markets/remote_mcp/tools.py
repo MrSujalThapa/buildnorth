@@ -253,6 +253,7 @@ class ForecastView(BaseModel):
     compiler_version: str | None = None
     published_at: str | None = None
     evidence_watermark: str | None = None
+    receipt_id: str | None = None
     assumptions: list[Any] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     diagnostics: dict[str, Any] = Field(default_factory=dict)
@@ -268,6 +269,7 @@ class HistoryPoint(BaseModel):
     model_family: str
     model_version: str
     evidence_watermark: str
+    receipt_id: str
     published_at: str | None = None
 
 
@@ -285,6 +287,7 @@ class EvidenceItem(BaseModel):
     unit: str | None
     observation_kind: str | None
     observed_at: str | None
+    received_at: str | None = None
     source_type: str
     verification_status: str | None
     corroborating_sources: int = 0
@@ -675,6 +678,7 @@ class RemoteMcpTools:
             compiler_version=receipt.get("compiler_version"),
             published_at=latest.published_at.isoformat() if latest.published_at else None,
             evidence_watermark=latest.evidence_watermark,
+            receipt_id=str(latest.material_hash),
             assumptions=_clip_list(receipt.get("assumptions")),
             limitations=_clip_list(receipt.get("limitations")),
             diagnostics={
@@ -734,6 +738,7 @@ class RemoteMcpTools:
                 model_family=item.model_family,
                 model_version=item.model_version,
                 evidence_watermark=item.evidence_watermark,
+                receipt_id=str(item.material_hash),
                 published_at=item.published_at.isoformat() if item.published_at else None,
             )
             for item in history[-limit:]
@@ -751,6 +756,9 @@ class RemoteMcpTools:
             unit=item.unit,
             observation_kind=provenance.observation_kind,
             observed_at=item.observed_at.isoformat() if item.observed_at else None,
+            received_at=(
+                provenance.submission.received_at.isoformat() if provenance.submission else None
+            ),
             source_type=provenance.source_type,
             verification_status=provenance.verification_status,
             corroborating_sources=len(provenance.corroborating_sources),
@@ -978,7 +986,19 @@ class RemoteMcpTools:
             except Exception:
                 await self._store.finish_submission(caller.user_id, key, "failed", {})
                 raise
-            publication = await self._reprice(caller, goal.goal_id)
+            if any(item.evidence_id not in before for item in commit.events):
+                publication = await self._reprice(caller, goal.goal_id)
+            else:
+                current = await self._forecast(caller, goal)
+                publication = PublicationView(
+                    status="unchanged",
+                    priced=current.status == "PUBLISHED",
+                    probability=current.probability,
+                    reason=(
+                        "All submitted observations corroborated existing evidence; "
+                        "no new receipt was published."
+                    ),
+                )
         result = SubmissionResult(
             status="committed",
             goal_id=str(goal.goal_id),
