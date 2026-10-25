@@ -2,6 +2,7 @@ import asyncio
 
 import pytest
 
+from personal_markets.agents.models import estimate_cost_usd
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import (
     ForbiddenError,
@@ -217,3 +218,12 @@ async def test_deployed_admin_requires_both_immutable_id_and_verified_email() ->
 def test_invalid_hosted_model_fails_before_a_provider_call() -> None:
     with pytest.raises(SemanticProviderError, match="unsupported"):
         hosted_allowlist("spur", "unknown-spur-model")
+
+
+def test_spur_glm_estimate_matches_published_token_rate() -> None:
+    assert estimate_cost_usd("spur-glm-5-3", 1_000_000, 1_000_000) == pytest.approx(1.30)
+
+
+def test_render_admin_id_list_parses_without_email_fallback() -> None:
+    settings = Settings(admin_clerk_user_ids='["trusted-id"]')  # type: ignore[arg-type]
+    assert settings.admin_clerk_user_ids == ["trusted-id"]

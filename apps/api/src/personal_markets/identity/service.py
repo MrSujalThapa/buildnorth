@@ -100,17 +100,31 @@ class IdentityService:
         )
         stored = await self._repository.upsert_user(incoming)
         is_admin = role == "admin"
-        redeemed = await self._repository.has_invitation_redemption(stored.user_id)
+        redeemed = (
+            False if is_admin else await self._repository.has_invitation_redemption(stored.user_id)
+        )
         if is_admin or redeemed:
+            quota_usd = (
+                self._settings.hosted_admin_quota_usd
+                if is_admin
+                else min(self._settings.hosted_user_quota_usd, 5.0)
+            )
+            quota_tokens = (
+                self._settings.hosted_admin_quota_tokens
+                if is_admin
+                else self._settings.hosted_user_quota_tokens
+            )
+            if (
+                stored.hosted_enabled
+                and stored.hosted_quota_usd == quota_usd
+                and stored.hosted_quota_tokens == quota_tokens
+            ):
+                return stored.model_copy(update={"trusted_admin": is_admin})
             await self._repository.reconcile_entitlement(
                 stored.user_id,
                 enabled=True,
-                quota_usd=self._settings.hosted_admin_quota_usd
-                if is_admin
-                else min(self._settings.hosted_user_quota_usd, 5.0),
-                quota_tokens=self._settings.hosted_admin_quota_tokens
-                if is_admin
-                else self._settings.hosted_user_quota_tokens,
+                quota_usd=quota_usd,
+                quota_tokens=quota_tokens,
             )
             refreshed = await self._repository.get_user(stored.user_id)
             return (refreshed or stored).model_copy(update={"trusted_admin": is_admin})
