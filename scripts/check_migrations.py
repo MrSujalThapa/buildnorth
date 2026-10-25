@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-REQUIRED_FILES = 22
+REQUIRED_FILES = 23
 REQUIRED = {
     "goals",
     "source_connections",

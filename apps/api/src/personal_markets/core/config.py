@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     admin_clerk_user_ids: Annotated[list[str], NoDecode] = Field(default_factory=list)
     test_auth_secret: str | None = None
+    scripted_inference: bool = False
     hosted_inference_enabled: bool = True
     hosted_user_quota_usd: float = Field(default=5.0, ge=0)
     hosted_user_quota_tokens: int = 5_000_000
@@ -171,6 +172,8 @@ class Settings(BaseSettings):
             problems.append("PM_DEV_BOOTSTRAP_TEST_USERS must be false")
         if self.test_auth_secret:
             problems.append("PM_TEST_AUTH_SECRET must be empty")
+        if self.scripted_inference:
+            problems.append("PM_SCRIPTED_INFERENCE must be false")
         if not self.resolved_clerk_jwks_url():
             problems.append("PM_CLERK_JWKS_URL is required")
         if problems:

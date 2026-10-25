@@ -71,6 +71,8 @@ def test_startup_refuses_bootstrap_and_test_auth_when_deployed() -> None:
         _deployed_settings(dev_bootstrap_test_users=True).assert_safe_startup()
     with pytest.raises(RuntimeError, match="PM_TEST_AUTH_SECRET"):
         _deployed_settings(test_auth_secret="x" * 32).assert_safe_startup()
+    with pytest.raises(RuntimeError, match="PM_SCRIPTED_INFERENCE"):
+        _deployed_settings(scripted_inference=True).assert_safe_startup()
     with pytest.raises(RuntimeError, match="PM_CLERK_JWKS_URL"):
         _deployed_settings(clerk_jwks_url=None, clerk_issuer=None).assert_safe_startup()
     _deployed_settings().assert_safe_startup()

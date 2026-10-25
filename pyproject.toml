@@ -79,7 +79,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 python_version = "3.12"
 strict = true
 files = ["apps/api/src", "apps/api/tests", "scripts"]
-exclude = ["scripts/prepare_oulad.py"]
+exclude = ["scripts/prepare_oulad.py", "scripts/_phase0_"]
 
 [[tool.mypy.overrides]]
 module = ["joblib", "pandas", "scipy.*", "sklearn.*", "langgraph.*", "langgraph_checkpoint_postgres.*"]

@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.agents.budget import InMemoryUsageStore
@@ -293,40 +294,47 @@ class PostgresEvidenceRepository:
         assert stored.evidence_id is not None
         payload = stored.model_dump(mode="json")
         payload["provenance"]["fingerprint"] = fingerprint
-        async with transaction(self._engine) as connection:
-            await connection.execute(
-                text("""
-                insert into evidence_events (
-                  id, user_id, event_type, domain, metric, numeric_value, categorical_value, unit,
-                  observed_at, source_quality, provenance_json, status, agent_run_id
-                ) values (
-                  :id, :user_id, :event_type, :domain, :metric, :numeric_value, :categorical_value, :unit,
-                  :observed_at, :source_quality, cast(:provenance as jsonb), 'active', :agent_run_id
-                ) on conflict (id) do nothing
-                """),
-                {
-                    "id": stored.evidence_id,
-                    "user_id": user_id,
-                    "event_type": stored.event_type,
-                    "domain": stored.domain,
-                    "metric": stored.metric,
-                    "numeric_value": stored.numeric_value,
-                    "categorical_value": stored.categorical_value,
-                    "unit": stored.unit,
-                    "observed_at": stored.observed_at,
-                    "source_quality": stored.source_quality,
-                    "provenance": json_dumps(payload["provenance"]),
-                    "agent_run_id": agent_run_id,
-                },
-            )
-            await connection.execute(
-                text("""
-                insert into goal_evidence (goal_id, evidence_id, relevance_metadata_json)
-                values (:goal_id, :evidence_id, '{}'::jsonb)
-                on conflict do nothing
-                """),
-                {"goal_id": goal_id, "evidence_id": stored.evidence_id},
-            )
+        try:
+            async with transaction(self._engine) as connection:
+                await connection.execute(
+                    text("""
+                    insert into evidence_events (
+                      id, user_id, event_type, domain, metric, numeric_value, categorical_value, unit,
+                      observed_at, source_quality, provenance_json, status, agent_run_id
+                    ) values (
+                      :id, :user_id, :event_type, :domain, :metric, :numeric_value, :categorical_value, :unit,
+                      :observed_at, :source_quality, cast(:provenance as jsonb), 'active', :agent_run_id
+                    ) on conflict (id) do nothing
+                    """),
+                    {
+                        "id": stored.evidence_id,
+                        "user_id": user_id,
+                        "event_type": stored.event_type,
+                        "domain": stored.domain,
+                        "metric": stored.metric,
+                        "numeric_value": stored.numeric_value,
+                        "categorical_value": stored.categorical_value,
+                        "unit": stored.unit,
+                        "observed_at": stored.observed_at,
+                        "source_quality": stored.source_quality,
+                        "provenance": json_dumps(payload["provenance"]),
+                        "agent_run_id": agent_run_id,
+                    },
+                )
+                await connection.execute(
+                    text("""
+                    insert into goal_evidence (goal_id, evidence_id, relevance_metadata_json)
+                    values (:goal_id, :evidence_id, '{}'::jsonb)
+                    on conflict do nothing
+                    """),
+                    {"goal_id": goal_id, "evidence_id": stored.evidence_id},
+                )
+        except IntegrityError:
+            winner = await self.find_fingerprint(user_id, fingerprint)
+            if winner is None or winner.evidence_id is None:
+                raise
+            await self.link_goal(goal_id, winner.evidence_id)
+            return await self.record_corroboration(winner, event, submission)
         return stored
 
     async def record_corroboration(

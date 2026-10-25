@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Evidence fingerprint uniqueness and stricter strategy validation
+
+**Hypothesis:** Concurrent evidence commits can duplicate rows without a database unique key, and MODELED/citations were too easy to fake from prose.
+
+**Changes:** Additive unique index on `(user_id, fingerprint)`. Concurrent commits race the unique index and corroborate. MODELED requires a verified numeric contract on a supported intervention. Invented citations, invented probability effects, and unsupported personal claims in prose are dropped or qualified; disclaimers that mention odds are kept. Local `PM_SCRIPTED_INFERENCE` uses the scripted provider against Postgres so consumer E2E can run without paid calls. No Pass 9, marketplace, or forecast-coefficient changes.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Hosted-model creative quality remains unverified.
+
 ## 2026-10-25 — Strategy agent replaces keyword templates
 
 **Hypothesis:** PlayItOut recommendations were a keyword-to-template lookup. Routing also attached those cards to odds/evidence questions. Published history was readable from the forecast store but not always from What If's in-memory history adapter.

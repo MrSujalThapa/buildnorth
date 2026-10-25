@@ -39,7 +39,7 @@ _PLANNED = re.compile(
 _OPPORTUNITY = re.compile(
     r"\b(overlooking|missing|smarter|highest leverage|who could help|"
     r"leverage|creative ways|haven't tried|what would you do|"
-    r"opportunit|underused|warm intro|how can i get|traction)\b",
+    r"opportunit|underused|warm intro|how can i get|traction|better way)\b",
     re.I,
 )
 _STRATEGIC = re.compile(
@@ -61,7 +61,7 @@ _CURRENT = re.compile(
 )
 _DIAGNOSTIC = re.compile(
     r"\bwhy (aren'?t|are not|did|isn'?t|isn't)\b|\bholding me back\b|"
-    r"\bstrategy actually working\b|\bweakest\b|\bchange your mind\b|"
+    r"\bstrategy actually working\b|\bweakest\b|\bchange your (mind|recommendation)\b|"
     r"\bnot making progress\b|\bworked harder\b",
     re.I,
 )
@@ -180,6 +180,13 @@ def classify_what_if_request(text: str) -> ClassifiedRequest:
         return ClassifiedRequest(
             kind="clarification_needed",
             reason="Relative change needs a known baseline quantity.",
+        )
+    if hypothetical and re.search(
+        r"\b(half as (much|many)|twice as (much|many)|double my)\b", raw, re.I
+    ) and not re.search(r"\b\d+\b", raw):
+        return ClassifiedRequest(
+            kind="follow_up",
+            reason="Relative change without a stated baseline; restated quantity is required.",
         )
     if _QUANT_RATE.search(raw) or hypothetical:
         return ClassifiedRequest(

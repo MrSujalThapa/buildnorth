@@ -44,6 +44,7 @@ from personal_markets.integrations.research import (
 from personal_markets.persistence.research_store import ResearchStore
 from personal_markets.profile.api import router as profile_router
 from personal_markets.what_if.api import router as what_if_router
+from personal_markets.ports import InferenceProvider
 from personal_markets.wiring import (
     InMemoryGithubCursorStore,
     PersistingWorkflow,
@@ -143,7 +144,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         assert settings.database_url is not None
         engine = create_engine(settings.database_url)
         usage = PostgresUsageStore(engine)
-        inference = build_inference(settings, usage)
+        inference: InferenceProvider
+        if settings.scripted_inference and not settings.is_deployed():
+            from personal_markets.integrations.fake_inference import ScriptedInferenceProvider
+
+            inference = ScriptedInferenceProvider()
+        else:
+            inference = build_inference(settings, usage)
         evidence_repo = PostgresEvidenceRepository(engine)
         evidence = EvidenceService(evidence_repo)
         deps = AgentDependencies(

@@ -8,7 +8,15 @@ export default defineConfig({
     command: "npm run dev -- --host 127.0.0.1 --port 5174 --strictPort",
     url: "http://127.0.0.1:5174",
     reuseExistingServer: false,
-    env: { VITE_AUTH_BYPASS: "true", VITE_BACKGROUND_MONITORING: "true" },
+    env: {
+      VITE_AUTH_BYPASS: "true",
+      VITE_BACKGROUND_MONITORING: "true",
+      VITE_API_BASE_URL:
+        process.env.PLAYWRIGHT_API_BASE_URL ||
+        process.env.VITE_API_BASE_URL ||
+        "http://127.0.0.1:8000",
+      VITE_TEST_AUTH_TOKEN: process.env.LIVE_E2E_TOKEN || process.env.VITE_TEST_AUTH_TOKEN || "",
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },

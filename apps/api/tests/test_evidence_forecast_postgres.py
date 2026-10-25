@@ -1,4 +1,7 @@
+# ruff: noqa: E501,ASYNC240
+import asyncio
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -16,6 +19,7 @@ from personal_markets.persistence.agent_store import PostgresEvidenceRepository
 from personal_markets.persistence.database import create_engine
 from personal_markets.persistence.repositories import PostgresGoalRepository
 from personal_markets.ports import EvidenceEventProposal
+from personal_markets.evidence.domain import EvidenceCommit
 from personal_markets.what_if.repository import PostgresSimulationRepository
 
 pytestmark = pytest.mark.integration
@@ -45,6 +49,19 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
             state_dimensions=["applications"],
         )
         await goals.create_goal(goal, DEFAULT_USER_ID)
+        migration = Path(__file__).resolve().parents[3] / "supabase" / "migrations" / "0023_evidence_fingerprint_unique.sql"
+        sql = (
+            migration.read_text(encoding="utf-8")
+            .replace("begin;", "")
+            .replace("commit;", "")
+        )
+        cleaned = "\n".join(
+            line for line in sql.splitlines() if line.strip() and not line.strip().startswith("--")
+        )
+        statements = [part.strip() for part in cleaned.split(";") if part.strip()]
+        async with engine.begin() as conn:
+            for statement in statements:
+                await conn.exec_driver_sql(statement)
         observed = datetime.now(UTC).isoformat()
         event = EvidenceEventProposal(
             event_type="manual_state_entry",
@@ -57,20 +74,16 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
             summary="Applications submitted so far",
         )
 
-        first = await evidence.commit(
-            user_id=DEFAULT_USER_ID,
-            goal_id=goal_id,
-            events=[event],
-            agent_run_id=None,
-            conflicts=[],
-        )
-        second = await evidence.commit(
-            user_id=DEFAULT_USER_ID,
-            goal_id=goal_id,
-            events=[event],
-            agent_run_id=None,
-            conflicts=[],
-        )
+        async def commit_once() -> EvidenceCommit:
+            return await evidence.commit(
+                user_id=DEFAULT_USER_ID,
+                goal_id=goal_id,
+                events=[event],
+                agent_run_id=None,
+                conflicts=[],
+            )
+
+        first, second = await asyncio.gather(commit_once(), commit_once())
         rows = await evidence.list_for_goal(goal_id)
         ids = {
             item.evidence_id
@@ -87,5 +100,38 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
         retry = await reprice.publish_if_priceable(goal_id)
         assert retry.status == "unchanged"
         assert len(await markets.history(goal_id)) == 1
+        async with engine.begin() as conn:
+            index = await conn.scalar(
+                text(
+                    "select indexname from pg_indexes "
+                    "where indexname = 'evidence_events_user_fingerprint_idx'"
+                )
+            )
+            assert index == "evidence_events_user_fingerprint_idx"
+            other_user = uuid4()
+            await conn.execute(
+                text("insert into app_users (id, clerk_user_id) values (:id, :clerk)"),
+                {"id": other_user, "clerk": f"test-other-{other_user}"},
+            )
+        other_goal = GoalContract(
+            goal_id=uuid4(),
+            title="Receive an SWE offer by 2027",
+            goal_type=GoalType.DEADLINE_EVENT,
+            success_definition={"metric": "offer_received", "target": "swe_offer"},
+            deadline=datetime.now(UTC) + timedelta(days=400),
+            state_dimensions=["applications"],
+        )
+        await goals.create_goal(other_goal, other_user)
+        isolated = await evidence.commit(
+            user_id=other_user,
+            goal_id=other_goal.goal_id,
+            events=[event],
+            agent_run_id=None,
+            conflicts=[],
+        )
+        owner_rows = await evidence.list_for_goal(goal_id)
+        other_rows = await evidence.list_for_goal(other_goal.goal_id)
+        assert isolated.events[0].evidence_id != first.events[0].evidence_id
+        assert {item.evidence_id for item in owner_rows} != {item.evidence_id for item in other_rows}
     finally:
         await engine.dispose()

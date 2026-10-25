@@ -235,6 +235,7 @@ export interface StrategyInsight {
   next_step: string;
   evidence_to_collect: string;
   constraints?: string;
+  modeled_metric?: string | null;
   model_status: "MODELED" | "UNPRICED" | "NEEDS_DATA";
   grounded_facts?: string[];
   assumptions?: string[];
