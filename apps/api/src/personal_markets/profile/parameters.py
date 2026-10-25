@@ -36,7 +36,7 @@ PRESETS: tuple[ParameterSpec, ...] = (
         56,
         "latest_period",
         20,
-        ("weekly_application_rate",),
+        ("weekly_application_rate", "applications_submitted"),
     ),
     ParameterSpec(
         "weekly_study_hours",
@@ -46,7 +46,7 @@ PRESETS: tuple[ParameterSpec, ...] = (
         56,
         "latest_period",
         30,
-        ("focused_hours_per_week", "hours_per_week"),
+        ("focused_hours_per_week", "hours_per_week", "study_hours", "practice_hours"),
     ),
     ParameterSpec(
         "monthly_savings",

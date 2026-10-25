@@ -106,6 +106,16 @@ def test_dated_study_and_running_activity_populate_only_matching_units() -> None
     assert by_id["weekly_running_km"].observation_count == 1
 
 
+def test_canonical_period_metrics_match_weekly_radar_axes() -> None:
+    applications = observation("applications_submitted", 12, "period", "count/week", 1)
+    practice = observation("practice_hours", 6, "period", "hours/week", 1)
+    profile = parameter_profile([applications, practice], as_of=NOW)
+    by_id = {item.id: item for item in profile.parameters}
+    assert by_id["weekly_applications"].raw_value == 12
+    assert by_id["weekly_applications"].aggregation == "latest_period"
+    assert by_id["weekly_study_hours"].raw_value == 6
+
+
 def test_recent_period_supersedes_components_and_currency_is_not_converted() -> None:
     activity = observation("monthly_contribution", 100, "increment", "USD", 8)
     period = observation("monthly_contribution", 800, "period", "USD/month", 1)
