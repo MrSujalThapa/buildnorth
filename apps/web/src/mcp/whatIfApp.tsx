@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import type { WhatIfMode, WhatIfView } from "../adapters/templateTypes";
 import { WhatIfVisualEmbed, type WhatIfVisualPayload, type WhatIfVisualRequest } from "../components/what-if/WhatIfVisualEmbed";
+import { acceptsVisual } from "./whatIfMessageGuard";
 
 declare global {
   interface Window { __PLAYITOUT_WHATIF_PAYLOAD__?: WhatIfVisualPayload; }
@@ -17,23 +18,8 @@ let payload: WhatIfVisualPayload | null = window.__PLAYITOUT_WHATIF_PAYLOAD__ ??
 let error: string | null = null;
 let loading = false;
 
-function isPayload(value: unknown): value is WhatIfVisualPayload {
-  if (!value || typeof value !== "object") return false;
-  const item = value as Record<string, unknown>;
-  const goal = item.goal as Record<string, unknown> | undefined;
-  return item.kind === "playitout_what_if" && typeof goal?.goal_id === "string"
-    && ["impact", "futures", "compare", "paths"].includes(String(item.mode))
-    && ["simple", "deep"].includes(String(item.view))
-    && Array.isArray(item.history) && Boolean(item.baseline);
-}
-
 function ingest(value: unknown): void {
-  if (!isPayload(value)) return;
-  if (selectedGoal && value.goal.goal_id !== selectedGoal) return;
-  if (expected && (value.mode !== expected.mode || value.view !== expected.view
-    || value.question !== expected.question)) return;
-  const requestId = (value as WhatIfVisualPayload & { request_id?: string }).request_id;
-  if (selectedRequest && requestId !== selectedRequest) return;
+  if (!acceptsVisual(value, { goalId: selectedGoal, requestId: selectedRequest, expected })) return;
   selectedGoal = value.goal.goal_id;
   payload = value;
   error = null;
