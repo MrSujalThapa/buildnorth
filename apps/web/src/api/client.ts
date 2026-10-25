@@ -53,6 +53,33 @@ export type InvitationRecord = {
   token?: string | null;
 };
 
+export type StrategyDecision = "pending" | "accepted" | "declined" | "ignored";
+
+export type StrategyTrial = {
+  recommendation_id: string;
+  strategy_key: string;
+  action: string;
+  recommended_at: string;
+  decision: StrategyDecision;
+  expected?: { metric: string; unit: string; direction: string; target?: number | null };
+  next_step?: string;
+  why_now?: string;
+  outcome_status?: string;
+};
+
+export type StrategyLearningContext = {
+  goal_id: string;
+  as_of: string;
+  past_trials: StrategyTrial[];
+  note: string;
+};
+
+export type StrategyRecommendation = StrategyTrial & {
+  why_now: string;
+  next_step: string;
+  evidence_to_collect?: string;
+};
+
 export interface Goal {
   goal_id: string;
   title: string;
@@ -1282,4 +1309,18 @@ export const api = {
     ),
   latestEvidenceSourceSync: (goalId: string, signal?: AbortSignal) =>
     request<GoalSyncJob | null>(`/api/v1/goals/${goalId}/evidence/sources/sync`, undefined, signal),
+  strategyLearning: (goalId: string, signal?: AbortSignal) =>
+    request<StrategyLearningContext>(`/api/v1/goals/${goalId}/strategy-recommendations`, undefined, signal),
+  generateStrategyRecommendation: (goalId: string) =>
+    request<StrategyRecommendation>(`/api/v1/goals/${goalId}/strategy-recommendations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+  strategyRecommendationFeedback: (goalId: string, recommendationId: string, decision: Exclude<StrategyDecision, "pending">) =>
+    request<StrategyRecommendation>(`/api/v1/goals/${goalId}/strategy-recommendations/${recommendationId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    }),
 };

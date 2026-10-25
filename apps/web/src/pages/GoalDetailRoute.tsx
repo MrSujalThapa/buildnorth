@@ -7,6 +7,7 @@ import { isCourseStandingGoal } from "../adapters/courseGrade";
 import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewModel";
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
+import { StrategyLearningPanel } from "../features/goals/StrategyLearningPanel";
 import "../components/social/social.css";
 
 export function GoalDetailRoute() {
@@ -141,6 +142,7 @@ export function GoalDetailRoute() {
           </button>
         </div>
         {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
+        {goalId ? <StrategyLearningPanel goalId={goalId} /> : null}
         {latestWorkflow?.status === "evidence_pending" || latestWorkflow?.status === "evidence_running" ? (
           <div role="status">
             <p>Goal saved. Evidence interpretation is pending; no new odds have been published.</p>
