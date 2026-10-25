@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from uuid import UUID
+from uuid import uuid4
 
 import pytest
 from PIL import Image
@@ -129,6 +130,32 @@ async def test_eight_mode_depth_results_preserve_published_receipts() -> None:
         )
         assert len(custom["comparison"]["paths"]) == 3
         assert custom["comparison"]["paths"][2]["primary_goal_probability"] is None
+
+        unsupported = structured(
+            await harness.call(
+                grant.access_token,
+                "show_what_if_visualization",
+                {
+                    "goal_id": goal_id,
+                    "mode": "impact",
+                    "question": "What if I cold email recruiters and study LeetCode?",
+                },
+            )
+        )
+        assert unsupported["state"] == "unpriced"
+        assert "scenario" not in unsupported
+        assert unsupported["history"]
+
+        missing_goal = await harness.call(
+            grant.access_token,
+            "show_what_if_visualization",
+            {
+                "goal_id": str(uuid4()),
+                "mode": "impact",
+                "question": "What if I submit 5 additional applications each week?",
+            },
+        )
+        assert missing_goal.is_error is True
 
         if os.name != "nt":
             image_result = await harness.call(
