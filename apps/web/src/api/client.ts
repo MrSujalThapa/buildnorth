@@ -540,6 +540,9 @@ export interface WhatIfBaselineState {
   periods?: number | null;
   direction: "at_least" | "at_most";
   current_probability?: number | null;
+  published_probability?: number | null;
+  published_model_version?: string | null;
+  published_evidence_watermark?: string | null;
   assumptions: WhatIfAssumption[];
   default_intervention?: Record<string, unknown> | null;
   model_family: string;

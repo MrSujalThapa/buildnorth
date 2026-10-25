@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from personal_markets.goals.domain import GoalContract
 from personal_markets.ports import (
     InterventionAgentProposal,
@@ -19,6 +21,7 @@ def _is_probability_like(metric: str, unit: str) -> bool:
 def critique_intervention(
     goal: GoalContract,
     proposal: InterventionAgentProposal,
+    source_text: str | None = None,
 ) -> InterventionCriticArtifact:
     issues: list[str] = []
     limitations = list(proposal.limitations)
@@ -32,6 +35,27 @@ def critique_intervention(
     # "probability" is good writing, not a contract violation, and must not veto pricing.
     validated_changes = []
     for change in proposal.changes:
+        if (
+            source_text is not None
+            and change.metric in {"applications_per_week", "weekly_application_rate"}
+            and not re.search(
+                r"appl(?:y|ied|ication|ications|ying)|jobs?\s+applied", source_text, re.I
+            )
+        ):
+            issues.append(
+                "Cold emails and networking are not measured applications; "
+                "no application-rate effect was assumed."
+            )
+            continue
+        if source_text is not None and change.provenance in {
+            "USER_ASSUMPTION", "EXPLORATION_ASSUMPTION"
+        }:
+            numbers = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", source_text)]
+            if not any(abs(value - change.value) < 1e-9 for value in numbers):
+                issues.append(
+                    f"Dropped `{change.metric}`: the proposed quantity was not in your question."
+                )
+                continue
         if _is_probability_like(change.metric, change.unit):
             issues.append(
                 f"Dropped `{change.metric}`: execution likelihood comes from the observed "

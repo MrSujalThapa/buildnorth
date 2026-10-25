@@ -41,7 +41,8 @@ export default function CompareOptionsView({
   const [pathB, setPathB] = useState("");
   const selected = catalog.filter((option) => selectedIds.includes(option.id));
   const available = catalog.filter((option) => !selectedIds.includes(option.id));
-  const leader = [...selected].sort((a, b) => (b.odds ?? -1) - (a.odds ?? -1))[0];
+  const leader = [...selected].filter((option) => option.modeled !== false && option.odds != null)
+    .sort((a, b) => (b.odds ?? -1) - (a.odds ?? -1))[0];
   const highlightedId = isolatedId ?? leader?.id ?? null;
   const intervalRows: OutcomeIntervalRow[] = selected
     .filter((option) => !isolatedId || option.id === isolatedId)
@@ -225,8 +226,8 @@ export default function CompareOptionsView({
       {view === "simple" ? (
         <section className="compare-simple">
           <div className="compare-leader">
-            <span>Strongest on goal odds</span>
-            <strong>{leader?.label ?? "—"}</strong>
+            <span>Highest modeled goal odds</span>
+            <strong>{leader?.label ?? "No defensible ranking yet"}</strong>
             <em>{leader?.odds == null ? "—" : `${leader.odds.toFixed(0)}%`}</em>
           </div>
 
@@ -250,11 +251,11 @@ export default function CompareOptionsView({
                     <h3>{option.label}</h3>
                     <strong>{option.odds == null ? "—" : `${option.odds.toFixed(0)}%`}</strong>
                   </header>
-                  <dl>
+                  {option.modeled !== false ? <dl>
                     <div><dt>Likely result</dt><dd>{formatOutcomeRange(option.outcome?.p10 ?? null, option.outcome?.p90 ?? null, outcomeScale.unit)}</dd></div>
                     <div><dt>Downside</dt><dd>{option.downside}</dd></div>
                     <div><dt>Time</dt><dd>{option.time}</dd></div>
-                  </dl>
+                  </dl> : <p>No modeled effect or ranking is available for this option.</p>}
                   <p>{option.note}</p>
                 </button>
               );

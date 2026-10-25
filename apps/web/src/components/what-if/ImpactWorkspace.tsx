@@ -5,8 +5,9 @@ import type { ImpactViewModel } from "../../adapters/impactViewModel";
 import { formatProbabilityPercent } from "../../adapters/formatProbability";
 import { formatOutcome } from "../../adapters/outcomeFormat";
 import type { SimulationPoint } from "../../adapters/simulationTypes";
-import type { Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
+import type { ChartPoint, Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
 import type { Priceability } from "../../api/client";
+import WealthsimpleAreaChart from "../market/WealthsimpleAreaChart";
 import MissingStatePanel from "./MissingStatePanel";
 import { ScenarioComposer } from "./ScenarioComposer";
 import OutcomeDistribution from "./OutcomeDistribution";
@@ -39,6 +40,8 @@ type Props = {
   running?: boolean;
   runError?: string | null;
   priceability?: Priceability | null;
+  publishedOdds?: number | null;
+  history?: ChartPoint[];
   onSubmitMissingState?: (
     entries: { key: string; label: string; value: number; unit: string }[],
   ) => void;
@@ -109,6 +112,10 @@ function TuneSlider({
   );
 }
 
+function preciseOdds(value: number | null | undefined): string {
+  return value == null ? "—" : `${Number(value.toFixed(2))}%`;
+}
+
 export default function ImpactWorkspace({
   market,
   view,
@@ -125,6 +132,8 @@ export default function ImpactWorkspace({
   running,
   runError,
   priceability,
+  publishedOdds,
+  history = [],
   onSubmitMissingState,
   onAddEvidence,
   onConnectSource,
@@ -143,6 +152,15 @@ export default function ImpactWorkspace({
     impact.followThroughPercent === null
       ? "—"
       : `${impact.followThroughPercent.toFixed(0)}%`;
+  const lastPublished = history.at(-1);
+  const comparisonTime = (lastPublished?.timestamp ?? Date.now()) + 24 * 60 * 60 * 1000;
+  const futureTime = Math.max(market.deadlineAt, comparisonTime + 24 * 60 * 60 * 1000);
+  const scenarioOverlay = preview.currentOdds != null && preview.scenarioOdds != null
+    ? [
+        { timestamp: comparisonTime, value: preview.currentOdds },
+        { timestamp: futureTime, value: preview.scenarioOdds },
+      ]
+    : [];
 
   const outcomeChart = (label: string) => (
     <OutcomeDistribution
@@ -231,11 +249,26 @@ export default function ImpactWorkspace({
           </aside>
 
           <section className="result-panel">
+            <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
+              <div className="panel-head tight"><div><p className="section-label">Odds over time</p><h2>Published history and your scenario</h2></div></div>
+              {history.length ? (
+                <WealthsimpleAreaChart
+                  data={history}
+                  overlay={scenarioOverlay}
+                  overlayTone={resultPositive ? "positive" : "negative"}
+                  interactive={false}
+                />
+              ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
+              <div className="what-if-chart-legend">
+                <span className="published">Published forecast history: {preciseOdds(publishedOdds)}</span>
+                <span className={resultPositive ? "hypothetical-positive" : "hypothetical-negative"}>Hypothetical scenario: {preciseOdds(preview.scenarioOdds)}</span>
+              </div>
+            </div>
             <div className="result-topline">
               <div className="odds-pair">
-                <div><span>Scenario baseline</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
+                <div><span>Scenario baseline</span><strong>{preciseOdds(preview.currentOdds)}</strong></div>
                 <div className="odds-arrow" aria-hidden="true">→</div>
-                <div><span>Scenario odds</span><strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong></div>
+                <div><span>Scenario odds</span><strong>{preciseOdds(preview.scenarioOdds)}</strong></div>
               </div>
               <div className={`delta ${deltaTone}`}>
                 <strong>
@@ -249,6 +282,9 @@ export default function ImpactWorkspace({
               </div>
             </div>
             {impact.causalCaption ? <p className="quiet-copy">{impact.causalCaption}</p> : null}
+            {publishedOdds != null && preview.currentOdds != null && Math.abs(publishedOdds - preview.currentOdds) >= 0.05 ? (
+              <p className="quiet-copy">The latest published forecast is {preciseOdds(publishedOdds)}. This What If comparison recalculates a {preciseOdds(preview.currentOdds)} baseline with its current assumptions. The hypothetical change is measured from that comparison baseline; it does not revise the published forecast.</p>
+            ) : null}
 
             <div className="panel-head tight">
               <div>

@@ -124,7 +124,9 @@ class WhatIfService:
                 update={
                     "priced": True,
                     "status": latest.forecast_status,
-                    "current_probability": latest.probability,
+                    "published_probability": latest.probability,
+                    "published_model_version": latest.model_version,
+                    "published_evidence_watermark": latest.evidence_watermark,
                 }
             )
         return state
@@ -879,7 +881,8 @@ class WhatIfService:
                         assumptions=request.base.assumptions,
                         fragility_pp=baseline.fragility_pp,
                         valid_because=(
-                            "The verified current probability clears the target tolerance."
+                            "The What If comparison baseline clears the target tolerance; "
+                            "this does not revise published odds."
                         ),
                         model_provenance={
                             "family": "continuous_target_transition",
@@ -1021,6 +1024,8 @@ class WhatIfService:
         )
 
     async def possible_futures(self, request: PossibleFuturesRequest) -> ScenarioDistribution:
+        goal = await self._require_goal(request.goal_id)
+        event_outcome = goal.goal_type == GoalType.DEADLINE_EVENT
         if any(item.weight is None for item in request.outcomes):
             resolved = await self._resolve_futures_weights(request)
             if resolved is not None:
@@ -1055,9 +1060,9 @@ class WhatIfService:
                 label=item.label,
                 probability=float(item.weight or 0) / denominator,
                 parameter_source=item.weight_source,
-                median=item.median,
-                p10=item.p10,
-                p90=item.p90,
+                median=None if event_outcome else item.median,
+                p10=None if event_outcome else item.p10,
+                p90=None if event_outcome else item.p90,
                 downside=item.downside,
             )
             for item in request.outcomes
@@ -1079,17 +1084,32 @@ class WhatIfService:
         budget = budget_from_goal(goal)
         items: list[PathComparisonItem] = []
         for path in request.paths:
+            changes = path.parsed_changes or list(request.base.parsed_changes)
+            if path.intervention.effect_per_unit is None and not changes:
+                items.append(
+                    PathComparisonItem(
+                        id=path.id,
+                        label=path.label,
+                        resource_cost=path.intervention.cost,
+                        assumptions=request.base.assumptions,
+                        model_status="NOT_MODELED",
+                        secondary_outcomes=path.secondary_outcomes,
+                    )
+                )
+                continue
             usage = evaluate_resource_usage(path.intervention, budget)
             priced = await self._simulate(
                 request.base.model_copy(
                     update={
                         "intervention": path.intervention,
-                        "parsed_changes": path.parsed_changes or list(request.base.parsed_changes),
+                        "parsed_changes": changes,
                     }
                 ),
                 persist=False,
             )
-            quantiles = priced.outcome_quantiles
+            quantiles = (
+                {} if goal.goal_type == GoalType.DEADLINE_EVENT else priced.outcome_quantiles
+            )
             model_status = priced.status
             if not usage.within_budget:
                 model_status = "EXPLORATORY_OVER_BUDGET"
@@ -1200,7 +1220,10 @@ class WhatIfService:
                         resource_cost=ResourceCost(),
                         assumptions=changed,
                         fragility_pp=priced.fragility_pp,
-                        valid_because="This modeled change reached your target in simulation.",
+                        valid_because=(
+                            "This model-parameter setting reaches the target; "
+                            "required real-world effort is not estimated."
+                        ),
                         model_provenance={
                             "family": "assumption_lever",
                             "version": "1.0.0",

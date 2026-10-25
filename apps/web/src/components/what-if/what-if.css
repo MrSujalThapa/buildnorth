@@ -1768,3 +1768,12 @@
   font-size: 13px;
   line-height: 1.4;
 }
+.what-if-market-chart { margin-bottom: 1.25rem; }
+.what-if-market-chart .ws-chart { height: 220px; --market-chart-accent: #d4a82d; }
+.what-if-market-chart .ws-chart.trend-positive,
+.what-if-market-chart .ws-chart.trend-negative,
+.what-if-market-chart .ws-chart.trend-neutral { --market-chart-accent: #d4a82d; }
+.what-if-chart-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: .65rem; font-size: .82rem; color: var(--market-text, #20211f); }
+.what-if-chart-legend span::before { content: ""; display: inline-block; width: .65rem; height: .65rem; margin-right: .4rem; border-radius: 50%; background: #d4a82d; }
+.what-if-chart-legend .hypothetical-positive::before { background: #188453; }
+.what-if-chart-legend .hypothetical-negative::before { background: #c44745; }

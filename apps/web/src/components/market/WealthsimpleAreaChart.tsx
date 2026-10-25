@@ -6,7 +6,8 @@
 
 import {
   Area,
-  AreaChart,
+  ComposedChart,
+  Line,
   ReferenceArea,
   ReferenceDot,
   ReferenceLine,
@@ -34,6 +35,7 @@ export type ChartSelection = {
 type Props = {
   data: ChartPoint[];
   overlay?: ChartPoint[];
+  overlayTone?: "positive" | "negative";
   markers?: ChartMarker[];
   comparison?: ChartPoint | null;
   interactive?: boolean;
@@ -83,6 +85,7 @@ function nearestPointIndex(
 export default function WealthsimpleAreaChart({
   data,
   overlay = [],
+  overlayTone = "positive",
   markers = [],
   comparison = null,
   interactive = true,
@@ -150,6 +153,7 @@ export default function WealthsimpleAreaChart({
 
   const firstTimestamp = firstPoint.timestamp;
   const lastTimestamp = lastPoint.timestamp;
+  const chartEndTimestamp = Math.max(lastTimestamp, ...overlay.map((point) => point.timestamp));
 
   function getIndexFromPointer(
     clientX: number,
@@ -386,7 +390,7 @@ export default function WealthsimpleAreaChart({
         width="100%"
         height="100%"
       >
-        <AreaChart
+        <ComposedChart
           data={data}
           margin={{
             top: 10,
@@ -428,7 +432,7 @@ export default function WealthsimpleAreaChart({
             type="number"
             domain={[
               "dataMin",
-              "dataMax",
+              chartEndTimestamp,
             ]}
             hide
           />
@@ -463,15 +467,14 @@ export default function WealthsimpleAreaChart({
           />
 
           {overlay.length > 1 ? (
-            <Area
+            <Line
               data={overlay}
-              type="monotone"
+              type="linear"
               dataKey="value"
-              stroke="var(--market-chart-accent, #299f96)"
+              stroke={overlayTone === "negative" ? "#c44745" : "#188453"}
               strokeDasharray="5 4"
-              strokeWidth={1.4}
-              fill="none"
-              dot={false}
+              strokeWidth={2.2}
+              dot={{ r: 4 }}
               activeDot={false}
               isAnimationActive={false}
             />
@@ -604,7 +607,7 @@ export default function WealthsimpleAreaChart({
                 )}
               </>
             )}
-        </AreaChart>
+        </ComposedChart>
       </ResponsiveContainer>
 
       {interactive && (

@@ -29,6 +29,7 @@ export function toCompareOptions(
       return {
         id: path.id,
         label: path.label,
+        modeled: priced,
         odds: asPercent(path.primary_goal_probability),
         downside:
           path.downside_probability == null
@@ -36,7 +37,7 @@ export function toCompareOptions(
             : levelFromNumber(path.downside_probability, [0.25, 0.5]),
         time: levelFromNumber(path.resource_cost.hours_per_week, [5, 12]),
         followThrough:
-          path.execution_probability == null ? 0 : Math.round(path.execution_probability * 100),
+          path.execution_probability == null ? null : Math.round(path.execution_probability * 100),
         sensitivity: levelFromNumber(path.fragility_pp ?? 0, [3, 8]),
         note: priced
           ? `${path.model_status.replaceAll("_", " ")} · median result ${
@@ -53,10 +54,11 @@ export function toCompareOptions(
   ).map((candidate) => ({
     id: candidate.id,
     label: candidate.title,
+    modeled: false,
     odds: null,
     downside: "Medium" as const,
     time: "Medium" as const,
-    followThrough: 70,
+    followThrough: null,
     sensitivity: "Medium" as const,
     note: candidate.provenance.join(" · ") || "Awaiting backend comparison.",
     outcome: null,

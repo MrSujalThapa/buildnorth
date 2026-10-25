@@ -83,6 +83,23 @@ export default function PathsToGoalView({
           <h2>What would move the odds?</h2>
         </div>
       </section>
+      <div className="target-row">
+        <label>
+          <span>Target odds</span>
+          <strong>{targetOdds}%</strong>
+          <input type="range" min={1} max={99} value={targetOdds}
+            onChange={(event) => onTargetOddsChange(Number(event.target.value))}
+            aria-label="Target odds" />
+        </label>
+        <label>
+          <span>Exact target</span>
+          <input type="number" min={1} max={99} value={targetOdds}
+            onChange={(event) => onTargetOddsChange(Math.min(99, Math.max(1, Number(event.target.value))))}
+            aria-label="Exact target odds" />
+        </label>
+        <button type="button" className="primary-action compact" disabled={loadingPaths}
+          onClick={() => { setFinding(true); onFind?.(); }}>Find feasible paths</button>
+      </div>
 
       {!priced ? (
         <div className="unpriced-state">
@@ -124,28 +141,6 @@ export default function PathsToGoalView({
         ) : (
           <>
         <div className="target-row">
-          <label>
-            <span>Target odds</span>
-            <strong>{targetOdds}%</strong>
-            <input
-              type="range"
-              min={40}
-              max={85}
-              value={targetOdds}
-              onChange={(event) => onTargetOddsChange(Number(event.target.value))}
-              aria-label="Target odds"
-            />
-          </label>
-          <button
-            type="button"
-            className="primary-action compact"
-            onClick={() => {
-              setFinding(true);
-              onFind?.();
-            }}
-          >
-            Find feasible paths
-          </button>
           <span className="meta">
             {finding
               ? `${feasible.length} path${feasible.length === 1 ? "" : "s"} sit on or above ${targetOdds}%`

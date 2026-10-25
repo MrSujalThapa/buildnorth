@@ -38,6 +38,7 @@ export default function PossibleFuturesView({
   outcomeScale,
 }: Props) {
   const scenarios = scenariosProp ?? [];
+  const binaryEvent = (outcomeScale.unit ?? "").trim().toLowerCase() === "event";
   const mostLikely = [...scenarios].sort((a, b) => (b.probability ?? -1) - (a.probability ?? -1))[0];
   const strongChance = scenarios
     .filter((scenario) => scenario.tone === "positive")
@@ -45,9 +46,9 @@ export default function PossibleFuturesView({
   const selected = scenarios.find((scenario) => scenario.id === selectedClusterId);
   const hasResults = priced && scenarios.some((scenario) => scenario.probability !== null);
   const rangeFor = (scenario: FutureScenario) =>
-    formatOutcomeRange(scenario.outcome?.p10 ?? null, scenario.outcome?.p90 ?? null, outcomeScale.unit);
+    binaryEvent ? "—" : formatOutcomeRange(scenario.outcome?.p10 ?? null, scenario.outcome?.p90 ?? null, outcomeScale.unit);
   const intervalRows = scenarios
-    .filter((scenario) => scenario.outcome && (scenario.probability ?? 0) > 0)
+    .filter((scenario) => !binaryEvent && scenario.outcome && (scenario.probability ?? 0) > 0)
     .map((scenario) => ({
       id: scenario.id,
       label: scenario.label,
@@ -115,7 +116,7 @@ export default function PossibleFuturesView({
                 <span>{selected?.label ?? "Select a scenario"}</span>
                 <p>
                   {selected
-                    ? `${share(selected)} of simulated futures.${selected.outcome ? ` Likely result ${rangeFor(selected)}.` : ""}`
+                    ? `${share(selected)} of modeled futures match this outcome.${!binaryEvent && selected.outcome ? ` Likely result ${rangeFor(selected)}.` : ""}`
                     : "Choose a scenario to see how often it happens and where it finishes."}
                 </p>
               </div>
@@ -145,7 +146,7 @@ export default function PossibleFuturesView({
                   {intervalRows.length ? (
                     <OutcomeIntervals ariaLabel="Simulated result range per scenario" rows={intervalRows} scale={outcomeScale} />
                   ) : (
-                    <p className="quiet-copy">The model returned scenario weights without result quantiles.</p>
+                    <p className="quiet-copy">{binaryEvent ? "This goal is an event, so outcomes are offer/no offer categories rather than fractional event counts." : "The model returned scenario weights without result quantiles."}</p>
                   )}
                 </div>
 
@@ -166,7 +167,7 @@ export default function PossibleFuturesView({
                     ))}
                   </ul>
                   <p className="quiet-copy">
-                    {selected?.outcome
+                    {!binaryEvent && selected?.outcome
                       ? `${selected.label}: likely result ${rangeFor(selected)}.`
                       : "Percentages are the share of simulated futures in each scenario."}
                   </p>

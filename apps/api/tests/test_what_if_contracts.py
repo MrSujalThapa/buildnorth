@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from helpers import isolated_app
 from personal_markets.evidence.service import EvidenceService
+from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
@@ -30,7 +31,10 @@ from personal_markets.what_if.domain import (
     WhatIfResult,
 )
 from personal_markets.what_if.futures_decision import parse_futures_decision
-from personal_markets.what_if.repository import InMemorySimulationRepository
+from personal_markets.what_if.repository import (
+    InMemorySimulationRepository,
+    MarketHistoryPoint,
+)
 from personal_markets.what_if.service import WhatIfService
 from personal_markets.wiring import get_what_if_service
 from test_pass4_remaining import (
@@ -92,6 +96,63 @@ def _prob(result: ScenarioDistribution, needle: str) -> float:
         if needle.lower() in item.label.lower():
             return float(item.probability or 0)
     raise AssertionError(f"missing outcome containing {needle!r}")
+
+
+@pytest.mark.asyncio
+async def test_published_forecast_and_comparison_baseline_stay_distinct() -> None:
+    goal_id = uuid4()
+    repository = InMemorySimulationRepository()
+    repository._history[goal_id] = {
+        "published": MarketHistoryPoint(
+            id=uuid4(), goal_id=goal_id, probability=0.7646,
+            forecast_status="published", evidence_watermark="published-evidence",
+            model_family="hiring", model_version="published-v1",
+            assumption_hash="receipt", simulation_artifact_id=None,
+        )
+    }
+    state = WhatIfBaselineState(
+        goal_id=str(goal_id), priced=True, status="EXPLORATORY",
+        current_probability=0.719, model_family="hiring", model_version="what-if-v2",
+    )
+    service = WhatIfService(GoalService(InMemoryGoalRepository()), repository)
+    combined = await service._overlay_published_baseline(goal_id, state)
+    assert combined.current_probability == pytest.approx(0.719)
+    assert combined.published_probability == pytest.approx(0.7646)
+    assert combined.published_model_version == "published-v1"
+
+
+@pytest.mark.asyncio
+async def test_event_futures_keep_weights_without_fractional_event_quantiles() -> None:
+    goal = GoalContract.model_validate({
+        "goal_id": uuid4(), "title": "Receive an FDE offer",
+        "goal_type": GoalType.DEADLINE_EVENT,
+        "success_definition": {"metric": "offer_received", "target": "fde_offer"},
+        "deadline": datetime.now(UTC) + timedelta(days=180),
+        "state_dimensions": ["applications_submitted"],
+    })
+    goals = InMemoryGoalRepository()
+    await goals.create(goal, uuid4())
+    result = await WhatIfService(GoalService(goals)).possible_futures(
+        PossibleFuturesRequest(
+            goal_id=str(goal.goal_id), name="Offer outcomes",
+            outcomes=[
+                ScenarioDefinition(
+                    label="Offer", weight=0.6, weight_source=AssumptionSource.USER,
+                    median=0.6, p10=0.2, p90=0.9,
+                ),
+                ScenarioDefinition(
+                    label="No offer", weight=0.4, weight_source=AssumptionSource.USER,
+                    median=0.4, p10=0.1, p90=0.8,
+                ),
+            ],
+        )
+    )
+    assert result.priced
+    assert [item.probability for item in result.outcomes] == pytest.approx([0.6, 0.4])
+    assert all(
+        item.median is None and item.p10 is None and item.p90 is None
+        for item in result.outcomes
+    )
 
 
 @pytest.mark.asyncio
@@ -189,6 +250,33 @@ async def test_compare_unpriced_path_stays_null() -> None:
     assert unpriced.primary_goal_probability is None
     assert unpriced.median is None
     assert priced.primary_goal_probability == 0.55
+
+
+@pytest.mark.asyncio
+async def test_compare_does_not_rank_an_unmapped_custom_strategy() -> None:
+    goal = make_goal()
+    goals = InMemoryGoalRepository()
+    await goals.create(goal, uuid4())
+
+    class UnexpectedPriceService(WhatIfService):
+        async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
+            del request, persist
+            raise AssertionError("Unmapped strategy must not reach numerical simulation")
+
+    intervention = action("cold-email", 0.1, 1).model_copy(
+        update={"effect_per_unit": None, "effect_source": None}
+    )
+    result = await UnexpectedPriceService(GoalService(goals)).compare_paths(
+        PathComparisonRequest(
+            base=make_base(str(goal.goal_id)),
+            paths=[
+                PathDefinition(id="cold-email", label="Cold email", intervention=intervention),
+                PathDefinition(id="networking", label="Networking", intervention=intervention),
+            ],
+        )
+    )
+    assert all(item.primary_goal_probability is None for item in result.paths)
+    assert all(item.model_status == "NOT_MODELED" for item in result.paths)
 
 
 @pytest.mark.asyncio

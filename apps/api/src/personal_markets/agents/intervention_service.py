@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+from personal_markets.agents.completion import complete_validated
 from personal_markets.agents.intervention_critic import critique_intervention
 from personal_markets.agents.json_schema import strict_json_schema
-from personal_markets.agents.completion import complete_validated
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
@@ -20,7 +20,10 @@ from personal_markets.ports import (
     ResearchQuery,
 )
 from personal_markets.what_if.baseline_state import build_baseline_state
-from personal_markets.what_if.intervention_models import InterventionChangeResponse, ParseInterventionResponse
+from personal_markets.what_if.intervention_models import (
+    InterventionChangeResponse,
+    ParseInterventionResponse,
+)
 from personal_markets.what_if.intervention_parser import parse_intervention_text
 from personal_markets.what_if.intervention_registry import (
     allowed_metrics,
@@ -97,7 +100,9 @@ class InterventionAgentService:
                     mechanism=[],
                     pricing_status="PRICED",
                     agent_run_id=None,
-                    limitations=["Regex fast-path used after agent returned no defensible changes."],
+                    limitations=[
+                        "Regex fast-path used after agent returned no defensible changes."
+                    ],
                     research_claims=[],
                 )
 
@@ -156,7 +161,7 @@ class InterventionAgentService:
             self._inference, request, InterventionAgentProposal,
             timeout_seconds=self._settings.inference_run_timeout_seconds,
         )
-        critic = critique_intervention(goal, proposal)
+        critic = critique_intervention(goal, proposal, text)
         await self._run_store.record(  # type: ignore[attr-defined]
             {
                 "id": run_id,

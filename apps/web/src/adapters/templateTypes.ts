@@ -86,9 +86,10 @@ export type CompareOption = {
   id: string;
   label: string;
   odds: number | null;
+  modeled?: boolean;
   downside: "Low" | "Medium" | "High";
   time: "Low" | "Medium" | "High";
-  followThrough: number;
+  followThrough: number | null;
   sensitivity: "Low" | "Medium" | "High";
   note: string;
   /** Simulated end-value quantiles in the goal's unit; null until priced. */
