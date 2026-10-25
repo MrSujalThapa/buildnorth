@@ -2,8 +2,7 @@ import re
 from pathlib import Path
 
 REQUIRED_FILES = 24
-# PR #33 owns 0023_social_marketplace.sql. This branch must not occupy 0023.
-RESERVED_GAPS = {"0023_"}
+RESERVED_GAPS: set[str] = set()
 REQUIRED = {
     "goals",
     "source_connections",
@@ -27,6 +26,9 @@ REQUIRED = {
     "behavior_commitments",
     "behavior_commitment_observations",
     "workspace_seed_records",
+    "market_stars",
+    "user_follows",
+    "profile_activity_events",
 }
 
 

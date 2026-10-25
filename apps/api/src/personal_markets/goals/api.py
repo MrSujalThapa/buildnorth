@@ -13,11 +13,13 @@ from personal_markets.goals.publication import blocks_current_forecast
 from personal_markets.goals.service import GoalService
 from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
+from personal_markets.social.service import SocialService
 from personal_markets.what_if.service import WhatIfService
 from personal_markets.wiring import (
     get_agent_workflow,
     get_collection_service,
     get_goal_service,
+    get_social_service,
     get_what_if_service,
 )
 
@@ -42,6 +44,7 @@ async def dashboard(
     what_if: Annotated[WhatIfService, Depends(get_what_if_service)],
     collections: Annotated[CollectionService, Depends(get_collection_service)],
     workflow: Annotated[Any, Depends(get_agent_workflow)],
+    social: Annotated[SocialService, Depends(get_social_service)],
     principal: Annotated[Principal, Depends(get_invited_principal)],
 ) -> dict[str, Any]:
     started = time.perf_counter()
@@ -55,15 +58,20 @@ async def dashboard(
     )
     reads_ms = round((time.perf_counter() - parallel_started) * 1000)
     views = []
-    blocked = {goal_id for goal_id, snapshot in creations.items()
-               if blocks_current_forecast(snapshot)}
+    blocked = {
+        goal_id for goal_id, snapshot in creations.items() if blocks_current_forecast(snapshot)
+    }
     for row in rows:
         views.append(await collections.view(row, goals, histories, blocked))
     structlog.get_logger(__name__).info(
-        "dashboard_timing", goals_ms=goals_ms, reads_ms=reads_ms,
+        "dashboard_timing",
+        goals_ms=goals_ms,
+        reads_ms=reads_ms,
         total_ms=round((time.perf_counter() - started) * 1000),
-        goal_count=len(goals), collection_count=len(rows),
+        goal_count=len(goals),
+        collection_count=len(rows),
     )
+    social_stats = await social.owner_stats(principal.user_id, [goal.goal_id for goal in goals])
     return {
         "goals": [goal.model_dump(mode="json") for goal in goals],
         "histories": histories,
@@ -75,6 +83,7 @@ async def dashboard(
             for goal_id, snapshot in creations.items()
         },
         "collections": [item.model_dump(mode="json") for item in views],
+        "social": {key: value.model_dump(mode="json") for key, value in social_stats.items()},
     }
 
 

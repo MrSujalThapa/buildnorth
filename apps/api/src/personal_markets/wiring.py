@@ -1,6 +1,6 @@
 import asyncio
 from functools import lru_cache
-from typing import Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 from uuid import UUID, uuid4
 
 import structlog
@@ -50,6 +50,9 @@ from personal_markets.ports import (
     WorkflowRequest,
     WorkflowSnapshot,
 )
+
+if TYPE_CHECKING:
+    from personal_markets.social.service import SocialService
 
 
 class InMemoryGithubCursorStore:
@@ -261,6 +264,37 @@ def get_goal_repository() -> GoalRepository:
 
 def get_goal_service() -> GoalService:
     return GoalService(get_goal_repository())
+
+
+@lru_cache
+def get_social_repository() -> Any:
+    from personal_markets.social.adapters import InMemorySocialRepository
+    from personal_markets.social.postgres import PostgresSocialRepository
+    from personal_markets.social.repository import SocialRepository
+
+    repo: SocialRepository
+    if not _use_postgres():
+        memory = InMemorySocialRepository()
+        goals = get_goal_repository()
+        if isinstance(goals, InMemoryGoalRepository):
+            memory.bind_goals(goals)
+        repo = memory
+    else:
+        repo = PostgresSocialRepository(create_engine(get_settings().database_url or ""))
+    return repo
+
+
+def get_social_service() -> "SocialService":
+    from personal_markets.identity.factory import get_identity_service
+    from personal_markets.profile.photo_store import get_photo_store
+    from personal_markets.social.service import SocialService
+
+    return SocialService(
+        get_social_repository(),
+        get_goal_service(),
+        get_identity_service(),
+        photos=get_photo_store(),
+    )
 
 
 @lru_cache

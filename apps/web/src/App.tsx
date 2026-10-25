@@ -19,6 +19,8 @@ const PluginsRoute = lazy(() => import("./pages/PluginsRoute").then((module) => 
 const ProfileRoute = lazy(() => import("./pages/ProfileRoute").then((module) => ({ default: module.ProfileRoute })));
 const SettingsRoute = lazy(() => import("./pages/SettingsRoute").then((module) => ({ default: module.SettingsRoute })));
 const WhatIfRoute = lazy(() => import("./pages/WhatIfRoute").then((module) => ({ default: module.WhatIfRoute })));
+const PublicMarketRoute = lazy(() => import("./pages/PublicMarketRoute").then((module) => ({ default: module.PublicMarketRoute })));
+const PublicProfileRoute = lazy(() => import("./pages/PublicProfileRoute").then((module) => ({ default: module.PublicProfileRoute })));
 
 function AppRoutes() {
   return (
@@ -32,6 +34,9 @@ function AppRoutes() {
       <Route path="/collections/:collectionId" element={<CollectionDetailRoute />} />
       <Route path="/plugins" element={<PluginsRoute />} />
       <Route path="/social" element={<SocialPage />} />
+      <Route path="/marketplace" element={<SocialPage />} />
+      <Route path="/m/:goalId" element={<PublicMarketRoute />} />
+      <Route path="/u/:handle" element={<PublicProfileRoute />} />
       <Route path="/profile" element={<ProfileRoute />} />
       <Route path="/settings" element={<SettingsRoute />} />
       <Route path="/invite" element={<MarketsRoute />} />

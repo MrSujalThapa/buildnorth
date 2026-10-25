@@ -30,6 +30,9 @@ function mockApi(goals: unknown = []) {
     else if (url.includes("/history/")) payload = [];
     else if (url.includes("/plugins")) payload = { items: [], provider_status: "unavailable" };
     else if (url.includes("/goals/dashboard")) payload = { goals, histories: {}, collections: [] };
+    else if (url.includes("/public/markets")) payload = { items: [] };
+    else if (url.includes("/public/creators")) payload = { items: [] };
+    else if (url.includes("/public/profiles")) payload = { creator: { handle: "you", user_id: "1" }, follower_count: 0, following_count: 0, following: false, is_self: true, market_count: 0, contribution_total: 0, activity: [] };
     else if (url.includes("/profile")) payload = { account: { email: "judge@example.test", profile: {} }, goal_count: 0, collection_count: 0, radar: { dimensions: [] }, privacy: "private" };
     else if (url.includes("/goals/") && !url.endsWith("/goals")) payload = (goals as typeof seededGoals)[0] ?? {};
     else if (url.endsWith("/goals")) payload = goals;
@@ -75,6 +78,6 @@ test("Social is honest about unavailable sharing and does not invent probability
   renderApp();
   await screen.findByRole("heading", { name: "Your outcomes" });
   fireEvent.click(within(screen.getByRole("complementary")).getByRole("button", { name: "Social" }));
-  expect(await screen.findByRole("heading", { name: "No shared goals" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "No public markets" })).toBeInTheDocument();
   expect(screen.queryByText(/\+\d+(\.\d+)? pts/)).not.toBeInTheDocument();
 });

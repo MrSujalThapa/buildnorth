@@ -1,9 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { ParameterEditor } from "../components/behavior/ParameterEditor";
 import { ParameterRadar } from "../components/behavior/ParameterRadar";
 import { api } from "../api/client";
 import { useRefreshAccount } from "../auth/AuthGate";
+import ContributionHeatmap from "../components/social/ContributionHeatmap";
+import MarketRepoList from "../components/social/MarketRepoList";
+import "../components/social/social.css";
 import { saveProfileWithPhoto } from "./profileSave";
 
 async function cropPhoto(file: File, x: number, y: number): Promise<File> {
@@ -47,6 +51,9 @@ export function ProfileRoute() {
   const [pendingRemove, setPendingRemove] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingParameters, setEditingParameters] = useState(false);
+  const [tab, setTab] = useState<"overview" | "markets" | "stars">("overview");
+  const [marketQuery, setMarketQuery] = useState("");
+  const [visibility, setVisibility] = useState<"all" | "public" | "private">("all");
   useEffect(() => {
     if (!photo.data) { setPhotoUrl(null); return; }
     const url = URL.createObjectURL(photo.data);
@@ -80,14 +87,32 @@ export function ProfileRoute() {
     mutationFn: () => api.removeProfilePhoto(),
     onSuccess: () => { setSelectedPhoto(null); void queryClient.invalidateQueries({ queryKey: ["profile-photo"] }); },
   });
+  const account = profile.data?.account;
+  const fields = account?.profile ?? { display_name: null, username: null, bio: null, avatar_value: null, dimensions: [] };
+  const handle = fields.username || account?.user_id || account?.email?.split("@")[0] || "you";
+  const display = fields.display_name || handle;
+  const socialProfile = useQuery({
+    queryKey: ["public-profile", handle],
+    queryFn: ({ signal }) => api.publicProfile(handle, signal),
+    enabled: Boolean(profile.data && handle),
+  });
+  const ownMarkets = useQuery({
+    queryKey: ["own-profile-markets", handle, marketQuery, visibility],
+    queryFn: ({ signal }) => api.publicProfileMarkets(handle, {
+      q: marketQuery || undefined,
+      visibility: visibility === "all" ? undefined : visibility,
+    }, signal),
+    enabled: Boolean(profile.data && handle) && tab !== "stars",
+  });
+  const ownStars = useQuery({
+    queryKey: ["own-profile-stars", handle],
+    queryFn: ({ signal }) => api.publicProfileStars(handle, signal),
+    enabled: Boolean(profile.data && handle) && tab === "stars",
+  });
 
   if (profile.isLoading) return <main className="markets-page"><section className="markets-shell"><p role="status">Loading profile…</p></section></main>;
-  if (profile.isError || !profile.data) return <main className="markets-page"><section className="markets-shell"><p role="alert">Profile unavailable.</p></section></main>;
+  if (profile.isError || !profile.data || !account) return <main className="markets-page"><section className="markets-shell"><p role="alert">Profile unavailable.</p></section></main>;
 
-  const account = profile.data.account;
-  const fields = account.profile ?? { display_name: null, username: null, bio: null, avatar_value: null, dimensions: [] };
-  const handle = fields.username || account.email?.split("@")[0] || "you";
-  const display = fields.display_name || handle;
   const shownPhoto = pendingRemove ? null : previewUrl || photoUrl;
 
   function choosePhoto(file: File | undefined) {
@@ -113,19 +138,56 @@ export function ProfileRoute() {
           </div>
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
-        <div className="profile-radar-heading">
-          <h2>Your parameters</h2>
-          {profile.data.radar ? (
-            <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
-              Edit parameters
-            </button>
-          ) : null}
+        <div className="follow-counts">
+          {socialProfile.data ? (
+            <>
+              <Link to={`/u/${handle}`}>{socialProfile.data.follower_count} followers</Link>
+              <span>{socialProfile.data.following_count} following</span>
+            </>
+          ) : socialProfile.isError ? <span role="alert">Follow counts unavailable</span> : <span role="status">Loading follow counts&hellip;</span>}
         </div>
-        {profile.data.radar ? (
-          <ParameterRadar profile={profile.data.radar} />
-        ) : (
-          <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
-        )}
+        <nav className="profile-tabs" aria-label="Profile sections">
+          <button type="button" className={tab === "overview" ? "is-active" : ""} onClick={() => setTab("overview")}>Overview</button>
+          <button type="button" className={tab === "markets" ? "is-active" : ""} onClick={() => setTab("markets")}>Markets</button>
+          <button type="button" className={tab === "stars" ? "is-active" : ""} onClick={() => setTab("stars")}>Stars</button>
+        </nav>
+        {tab === "overview" ? (
+          <>
+            <div className="profile-radar-heading">
+              <h2>Your parameters</h2>
+              {profile.data.radar ? (
+                <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
+                  Edit parameters
+                </button>
+              ) : null}
+            </div>
+            {profile.data.radar ? (
+              <ParameterRadar profile={profile.data.radar} />
+            ) : (
+              <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
+            )}
+            {socialProfile.isError ? <p role="alert">Could not load activity. <button type="button" onClick={() => void socialProfile.refetch()}>Try again</button></p> : socialProfile.isLoading ? <p role="status">Loading activity&hellip;</p> : <ContributionHeatmap
+              days={socialProfile.data?.activity ?? []}
+              total={socialProfile.data?.contribution_total ?? 0}
+            />}
+          </>
+        ) : null}
+        {tab === "markets" ? (
+          <>
+            <div className="discover-tools">
+              <input className="repo-search" value={marketQuery} onChange={(event) => setMarketQuery(event.target.value)} placeholder="Find a market…" aria-label="Find a market" />
+              <select value={visibility} onChange={(event) => setVisibility(event.target.value as typeof visibility)} aria-label="Filter visibility">
+                <option value="all">All</option>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </select>
+            </div>
+            {ownMarkets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void ownMarkets.refetch()}>Try again</button></p> : ownMarkets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={ownMarkets.data?.items ?? []} empty="No markets match that filter." />}
+          </>
+        ) : null}
+        {tab === "stars" ? (
+          ownStars.isError ? <p role="alert">Could not load stars. <button type="button" onClick={() => void ownStars.refetch()}>Try again</button></p> : ownStars.isLoading ? <p role="status">Loading stars&hellip;</p> : <MarketRepoList items={ownStars.data?.items ?? []} empty="You have not starred a public market yet." />
+        ) : null}
       </section>
       {editing ? <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <form className="confirm-card profile-editor" onSubmit={(event) => {

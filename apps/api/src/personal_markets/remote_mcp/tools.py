@@ -2009,6 +2009,46 @@ class RemoteMcpTools:
             raise ToolFailure("internal_error", "Chart image could not be generated.")
         return view, png
 
+    async def search_public_markets(
+        self, caller: Caller, query: str | None, limit: int
+    ) -> dict[str, Any]:
+        self.require_scope(caller, READ)
+        from personal_markets.wiring import get_social_service
+
+        items = await get_social_service().search_markets(
+            query=query,
+            category=None,
+            sort="newest",
+            limit=min(limit, 25),
+            offset=0,
+            viewer_id=caller.user_id,
+        )
+        payload: dict[str, Any] = {"items": [item.model_dump(mode="json") for item in items]}
+        return payload
+
+    async def get_public_market(self, caller: Caller, goal_id: str) -> dict[str, Any]:
+        self.require_scope(caller, READ)
+        from personal_markets.wiring import get_social_service
+
+        try:
+            parsed = UUID(goal_id)
+        except ValueError as error:
+            raise ToolFailure("invalid_argument", "goal_id must be a UUID") from error
+        try:
+            detail = await get_social_service().public_market(parsed, caller.user_id)
+        except ResourceNotFoundError as error:
+            raise ToolFailure("not_found", "Market not found") from error
+        payload: dict[str, Any] = detail.model_dump(mode="json")
+        return payload
+
+    async def get_blueprint(self, caller: Caller, goal_id: str) -> dict[str, Any]:
+        detail = await self.get_public_market(caller, goal_id)
+        return {
+            "goal_id": detail["goal_id"],
+            "blueprint": detail["blueprint"],
+            "creator": detail["creator"],
+        }
+
 
 def candidates_with_policy(
     policy: ObservationPolicy, proposal: EvidenceAgentProposal

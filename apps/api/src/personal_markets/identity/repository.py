@@ -41,6 +41,8 @@ class IdentityRepository(Protocol):
 
     async def username_taken(self, username: str, user_id: UUID) -> bool: ...
 
+    async def get_user_id_by_username(self, username: str) -> UUID | None: ...
+
     async def grant_entitlement(
         self,
         user_id: UUID,

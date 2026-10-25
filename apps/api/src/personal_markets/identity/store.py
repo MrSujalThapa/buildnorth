@@ -145,6 +145,13 @@ class InMemoryIdentityRepository:
             for owner, row in self.profiles.items()
         )
 
+    async def get_user_id_by_username(self, username: str) -> UUID | None:
+        needle = username.lower()
+        for owner, row in self.profiles.items():
+            if (row.username or "").lower() == needle:
+                return owner
+        return None
+
     async def grant_entitlement(
         self,
         user_id: UUID,
@@ -596,6 +603,14 @@ class PostgresIdentityRepository:
                 )
             ).first()
         return row is not None
+
+    async def get_user_id_by_username(self, username: str) -> UUID | None:
+        async with autocommit_connection(self._engine) as connection:
+            value = await connection.scalar(
+                text("select id from app_users where lower(username) = lower(:username) limit 1"),
+                {"username": username},
+            )
+        return value if isinstance(value, UUID) else None
 
     @staticmethod
     def _to_principal(row: dict[str, Any]) -> Principal:

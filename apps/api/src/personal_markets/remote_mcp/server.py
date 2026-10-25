@@ -807,6 +807,27 @@ def _register_tools(
 
         return await run("get_odds_chart_image", _image)
 
+    @server.tool(annotations=_READ, title="Search public markets")
+    async def search_public_markets(
+        query: Annotated[str | None, Field(default=None, max_length=80)] = None,
+        limit: Annotated[int, Field(ge=1, le=25)] = 12,
+    ) -> dict[str, Any]:
+        """Search published PlayItOut markets. Returns public blueprint cards only."""
+        return await run(
+            "search_public_markets",
+            lambda who: tools.search_public_markets(who, query, limit),
+        )
+
+    @server.tool(annotations=_READ, title="Get public market")
+    async def get_public_market(goal_id: GoalId) -> dict[str, Any]:
+        """Read one public market and its approved blueprint. Private markets 404."""
+        return await run("get_public_market", lambda who: tools.get_public_market(who, goal_id))
+
+    @server.tool(annotations=_READ, title="Get blueprint")
+    async def get_blueprint(goal_id: GoalId) -> dict[str, Any]:
+        """Return the reusable public blueprint for a published market."""
+        return await run("get_blueprint", lambda who: tools.get_blueprint(who, goal_id))
+
 
 def _advertise_ui_on_handshake(server: MCPServer) -> None:
     """Handshake-era initialize (2025-06-18) sieves `capabilities.extensions`.
