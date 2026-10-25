@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from personal_markets.goals.domain import GoalContract, GoalType
+from personal_markets.core.errors import ConflictError
+from personal_markets.goals.domain import GoalContract, GoalType, ResourceConstraints
 from personal_markets.social.domain import PublicBlueprint, PublicForecastState, PublicHistoryPoint
 
 PUBLIC_SUCCESS_KEYS = frozenset(
@@ -123,7 +124,7 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
 def history_points(rows: list[dict[str, Any]]) -> list[PublicHistoryPoint]:
     points: list[PublicHistoryPoint] = []
     for row in rows:
-        if str(row.get("source_kind") or "published_forecast") == "synthetic_demo":
+        if str(row.get("source_kind") or "published_forecast") != "published_forecast":
             continue
         probability = row.get("probability")
         created = row.get("created_at")
@@ -146,9 +147,9 @@ def fork_goal(
         chosen_deadline = chosen_deadline.replace(tzinfo=UTC)
     if chosen_deadline <= datetime.now(UTC):
         chosen_deadline = datetime.now(UTC) + timedelta(days=90)
-    success = public_success_definition(source.success_definition) or dict(
-        source.success_definition
-    )
+    success = public_success_definition(source.success_definition)
+    if not success:
+        raise ConflictError("This blueprint has no public success criteria to fork")
     requirements = public_model_configuration(source.model_requirements)
     return GoalContract(
         goal_id=new_goal_id,
@@ -157,7 +158,7 @@ def fork_goal(
         success_definition=success,
         deadline=chosen_deadline,
         target_probability=None,
-        resource_constraints=source.resource_constraints,
+        resource_constraints=ResourceConstraints(),
         state_dimensions=list(source.state_dimensions),
         model_requirements=requirements,
         forecast_status=source.forecast_status.__class__("EXPLORATORY"),

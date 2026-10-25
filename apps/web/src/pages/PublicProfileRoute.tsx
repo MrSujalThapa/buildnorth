@@ -39,7 +39,7 @@ export function PublicProfileRoute() {
       if (!profile.data) return;
       return profile.data.following ? api.unfollowProfile(handle) : api.followProfile(handle);
     },
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["public-profile", handle] }); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["public-profile", handle] }); void queryClient.invalidateQueries({ queryKey: ["public-follow-graph", handle] }); },
   });
 
   if (profile.isLoading) return <main className="profile-social"><section className="profile-social-shell"><p role="status">Loading profile…</p></section></main>;
@@ -54,7 +54,7 @@ export function PublicProfileRoute() {
       <section className="profile-social-shell">
         <header className="profile-head">
           <div className="profile-card" style={{ width: "100%" }}>
-            <div className="profile-avatar">{display.slice(0, 1).toUpperCase()}</div>
+            <div className="profile-avatar">{creator.has_photo ? <img src={api.publicPhotoUrl(creator.handle)} alt="" width={96} height={96} /> : display.slice(0, 1).toUpperCase()}</div>
             <div className="profile-identity">
               <h2>{display}</h2>
               <span>@{creator.handle}</span>
@@ -72,6 +72,7 @@ export function PublicProfileRoute() {
               </button>
             )}
           </div>
+          {follow.isError ? <p role="alert">Could not update follow. Try again.</p> : null}
         </header>
         <nav className="profile-tabs" aria-label="Profile sections">
           <button type="button" className={tab === "overview" ? "is-active" : ""} onClick={() => setTab("overview")}>Overview</button>
@@ -82,17 +83,17 @@ export function PublicProfileRoute() {
           <>
             <ContributionHeatmap days={profile.data.activity} total={profile.data.contribution_total} />
             <h2>Public markets</h2>
-            <MarketRepoList items={markets.data?.items ?? []} empty="No public markets yet." />
+            {markets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void markets.refetch()}>Try again</button></p> : markets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={markets.data?.items ?? []} empty="No public markets yet." />}
           </>
         ) : null}
         {tab === "markets" ? (
           <>
             <input className="repo-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a market…" aria-label="Find a market" />
-            <MarketRepoList items={markets.data?.items ?? []} empty="No public markets match that search." />
+            {markets.isError ? <p role="alert">Could not load markets. <button type="button" onClick={() => void markets.refetch()}>Try again</button></p> : markets.isLoading ? <p role="status">Loading markets&hellip;</p> : <MarketRepoList items={markets.data?.items ?? []} empty="No public markets match that search." />}
           </>
         ) : null}
         {tab === "stars" ? (
-          <MarketRepoList items={stars.data?.items ?? []} empty="No public starred markets." />
+          stars.isError ? <p role="alert">Could not load stars. <button type="button" onClick={() => void stars.refetch()}>Try again</button></p> : stars.isLoading ? <p role="status">Loading stars&hellip;</p> : <MarketRepoList items={stars.data?.items ?? []} empty="No public starred markets." />
         ) : null}
       </section>
       {graph ? (
@@ -108,7 +109,7 @@ export function PublicProfileRoute() {
                 </li>
               ))}
             </ul>
-            {!people.data?.items.length && !people.isLoading ? <p className="quiet-copy">No one here yet.</p> : null}
+            {people.isError ? <p role="alert">Could not load people. <button type="button" onClick={() => void people.refetch()}>Try again</button></p> : people.isLoading ? <p role="status">Loading people&hellip;</p> : !people.data?.items.length ? <p className="quiet-copy">No one here yet.</p> : null}
             <button type="button" className="secondary" onClick={() => setGraph(null)}>Close</button>
           </div>
         </div>

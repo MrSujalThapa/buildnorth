@@ -152,3 +152,88 @@ def test_share_requires_public_visibility() -> None:
     with TestClient(app) as client:
         share = client.get(f"/api/v1/social/markets/{goal.goal_id}/share")
         assert share.json()["shareable"] is False
+
+
+def test_public_heatmap_excludes_private_goal_activity() -> None:
+    import asyncio
+
+    app = isolated_app()
+    owner = app.state.auth_bypass_principal
+    visitor = invited_principal("heatmap-visitor")
+    _register(visitor)
+    asyncio.run(
+        get_identity_repository().upsert_profile(
+            owner.user_id, UserProfile(username="heatmap-owner", display_name="Owner")
+        )
+    )
+    public_goal = _goal("Public training")
+    private_goal = _goal("Private training")
+    asyncio.run(app.state.goal_repository.create(public_goal, owner.user_id))
+    asyncio.run(app.state.goal_repository.create(private_goal, owner.user_id))
+    today = datetime.now(UTC).date()
+    asyncio.run(
+        app.state.social_repository.record_activity(
+            owner.user_id, "evidence_accepted", today, public_goal.goal_id
+        )
+    )
+    asyncio.run(
+        app.state.social_repository.record_activity(
+            owner.user_id, "evidence_accepted", today, private_goal.goal_id
+        )
+    )
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                f"/api/v1/social/markets/{public_goal.goal_id}/visibility",
+                json={"visibility": "public"},
+            ).status_code
+            == 200
+        )
+        own = client.get("/api/v1/public/profiles/heatmap-owner").json()
+        assert own["contribution_total"] == 3
+        app.state.auth_bypass_principal = visitor
+        other = client.get("/api/v1/public/profiles/heatmap-owner").json()
+        assert other["contribution_total"] == 2
+        assert other["activity"][0]["count"] == 2
+        app.state.auth_bypass_principal = owner
+        assert (
+            client.post(
+                f"/api/v1/social/markets/{public_goal.goal_id}/visibility",
+                json={"visibility": "private"},
+            ).status_code
+            == 200
+        )
+        app.state.auth_bypass_principal = visitor
+        assert client.get("/api/v1/public/profiles/heatmap-owner").json()["contribution_total"] == 0
+
+
+def test_fork_cannot_copy_private_source_contract_fields() -> None:
+    from personal_markets.core.errors import ConflictError
+    from personal_markets.social.blueprint import fork_goal
+
+    source = _goal()
+    source.resource_constraints.hours_per_week = 37
+    source.success_definition = {"private_journal": "Sensitive details"}
+    try:
+        fork_goal(source, owner_title=None, deadline=None, new_goal_id=uuid4())
+    except ConflictError:
+        pass
+    else:
+        raise AssertionError("Fork copied private contract fields")
+
+    source.success_definition = {"event": "signed_offer", "private_journal": "Sensitive details"}
+    forked = fork_goal(source, owner_title=None, deadline=None, new_goal_id=uuid4())
+    assert forked.success_definition == {"event": "signed_offer"}
+    assert forked.resource_constraints.hours_per_week is None
+
+
+def test_public_history_only_uses_published_forecasts() -> None:
+    from personal_markets.social.blueprint import history_points
+
+    stamp = datetime.now(UTC)
+    rows = [
+        {"source_kind": "published_forecast", "probability": 0.4, "created_at": stamp},
+        {"source_kind": "synthetic_demo", "probability": 0.9, "created_at": stamp},
+        {"source_kind": "scenario", "probability": 0.8, "created_at": stamp},
+    ]
+    assert [point.probability for point in history_points(rows)] == [0.4]

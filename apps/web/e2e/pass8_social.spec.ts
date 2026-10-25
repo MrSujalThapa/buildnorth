@@ -59,3 +59,22 @@ test("marketplace and public market stay honest with real chart data", async ({ 
   await expect(page.getByText("Your parameters")).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("public-profile-mobile.png"), fullPage: true });
 });
+
+
+test("social errors are not presented as empty content and can recover", async ({ page }, testInfo) => {
+  let failed = true;
+  await page.route("**/api/v1/public/markets*", async (route) => {
+    if (failed) return route.fulfill({ status: 503, json: { detail: "Unavailable" } });
+    return route.fulfill({ json: { items: [market] } });
+  });
+  await page.route("**/api/v1/public/creators", (route) => route.fulfill({ json: { items: [] } }));
+  await page.goto("/social");
+  await expect(page.getByRole("alert")).toContainText("Could not load markets");
+  await expect(page.getByText("No public markets")).toHaveCount(0);
+  failed = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByRole("heading", { name: market.title })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("discover-recovered.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("discover-recovered-mobile.png"), fullPage: true });
+});

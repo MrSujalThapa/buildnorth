@@ -492,19 +492,26 @@ class PostgresSocialRepository:
                 },
             )
 
-    async def activity_counts(self, user_id: UUID, start: date, end: date) -> dict[date, int]:
+    async def activity_counts(
+        self, user_id: UUID, start: date, end: date, *, public_only: bool = False
+    ) -> dict[date, int]:
         async with autocommit_connection(self._engine) as connection:
             rows = (
                 await connection.execute(
                     text(
                         """
                         select occurred_on, count(*)::int as n
-                        from profile_activity_events
-                        where user_id = :user_id and occurred_on between :start and :end
+                        from profile_activity_events a
+                        where a.user_id = :user_id and a.occurred_on between :start and :end
+                          and (not :public_only or exists (
+                            select 1 from goals g where g.id = a.goal_id
+                              and g.user_id = a.user_id and g.visibility = 'public'
+                              and g.status = 'active'
+                          ))
                         group by occurred_on
                         """
                     ),
-                    {"user_id": user_id, "start": start, "end": end},
+                    {"user_id": user_id, "start": start, "end": end, "public_only": public_only},
                 )
             ).all()
             return {row[0]: int(row[1]) for row in rows}

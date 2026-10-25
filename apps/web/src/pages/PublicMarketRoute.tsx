@@ -64,7 +64,7 @@ export function PublicMarketRoute() {
       if (!market.data) return;
       return market.data.starred ? api.unstarMarket(goalId) : api.starMarket(goalId);
     },
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["public-market", goalId] }); },
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: ["public-market", goalId] }); void queryClient.invalidateQueries({ queryKey: ["public-markets"] }); void queryClient.invalidateQueries({ queryKey: ["public-profile-stars"] }); void queryClient.invalidateQueries({ queryKey: ["own-profile-stars"] }); },
   });
   const fork = useMutation({
     mutationFn: () => api.forkMarket(goalId, {
@@ -118,6 +118,7 @@ export function PublicMarketRoute() {
           </button>
           {isOwner ? <Link className="ui-button ui-button-secondary" to={`/goals/${item.goal_id}`}>Open as owner</Link> : null}
         </div>
+        {star.isError ? <p role="alert">Could not update star. Try again.</p> : null}
         <section className="market-quote">
           {item.forecast.status === "withheld" ? (
             <><div className="market-price">Withheld</div><div className="market-price-hint">The public forecast is withheld.</div></>
@@ -128,7 +129,7 @@ export function PublicMarketRoute() {
           )}
         </section>
         {history.length ? (
-          <OddsExplorer history={history} ranges={ODDS_EXPLORER_RANGES} />
+          <OddsExplorer history={history} ranges={ODDS_EXPLORER_RANGES} initialRange={ODDS_EXPLORER_RANGES.at(-1)} />
         ) : (
           <p className="quiet-copy" role="status">No published chart history.</p>
         )}

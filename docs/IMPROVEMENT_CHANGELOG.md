@@ -1133,3 +1133,10 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Spur GLM 5.3 estimates changed from the previously unverified $2.50/$15 per million tokens to the published $0.30/$1.00 rates. Historical ledger entries were not altered. Settings now displays spent and reserved amounts and a safe unavailable reason.
 - Local mocked entitlement and authorization tests pass. Live Spur inference and the production account row have not yet been verified; no paid provider call was made in this run.
 - Scheduled and MCP inference now requires a fresh Clerk verification for each internal owner lookup, failing closed when Clerk cannot confirm the current account. The production watch-runtime group was confirmed linked only to `playitout-source-watch`; it received the existing Clerk secret, existing admin email allowlist, and verified immutable admin ID. The web service received only the verified ID. Values remain masked. These configuration changes trigger Render redeploys; live entitlement and provider behavior remain to be checked after the code merge.
+
+## Social and Profile product audit (PR #33 child branch)
+
+- Inspected Social, public/private Profile, public blueprints and Pass 9A/9B contracts in an isolated worktree. Rendered desktop/mobile fixture journeys exposed silent API-error-as-empty states, missing public photos, an awkward mobile public identity card, and sparse chart presentation.
+- Fixed public activity aggregation to exclude private-goal events for other viewers. Added two-principal regression coverage, including unpublishing. Fixed fork contract fallback that could copy private success fields and personal resources. Public chart history now excludes non-published source kinds.
+- Added visible retry states, social cache invalidation, photo display and mobile identity styling. The public chart now opens at All history; the two-point fixture still reveals a sparse-chart visual defect to resolve before shipment.
+- No production data or inference used. Mocked browser and in-memory HTTP tests do not establish live Clerk/PostgreSQL behavior. Full findings: `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.

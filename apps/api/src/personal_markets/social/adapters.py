@@ -308,9 +308,17 @@ class InMemorySocialRepository:
             return
         self._activity.append(key)
 
-    async def activity_counts(self, user_id: UUID, start: date, end: date) -> dict[date, int]:
+    async def activity_counts(
+        self, user_id: UUID, start: date, end: date, *, public_only: bool = False
+    ) -> dict[date, int]:
         counts: dict[date, int] = {}
-        for owner, _type, day, _goal in self._activity:
+        for owner, _type, day, goal_id in self._activity:
+            if public_only and (
+                goal_id is None
+                or self._visibility.get(goal_id) != "public"
+                or not self._goals._active(goal_id)
+            ):
+                continue
             if owner == user_id and start <= day <= end:
                 counts[day] = counts.get(day, 0) + 1
         return counts

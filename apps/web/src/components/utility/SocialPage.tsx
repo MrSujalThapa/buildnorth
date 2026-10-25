@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type PublicMarketCard } from "../../api/client";
@@ -26,7 +26,6 @@ export default function SocialPage() {
   });
   const items = markets.data?.items ?? [];
   const people = creators.data?.items ?? [];
-  const empty = useMemo(() => !markets.isLoading && items.length === 0, [markets.isLoading, items.length]);
 
   return (
     <main className="discover-page">
@@ -59,13 +58,17 @@ export default function SocialPage() {
                 className="creator-chip"
                 onClick={() => { void navigate(`/u/${creator.handle}`); }}
               >
-                <span className="mini-avatar">{(creator.display_name || creator.handle).slice(0, 1).toUpperCase()}</span>
+                <span className="mini-avatar">{creator.has_photo ? <img src={api.publicPhotoUrl(creator.handle)} alt="" width={28} height={28} loading="lazy" /> : (creator.display_name || creator.handle).slice(0, 1).toUpperCase()}</span>
                 {creator.display_name || creator.handle}
               </button>
             ))}
           </div>
         ) : null}
-        {empty ? (
+        {markets.isError ? (
+          <div className="empty-social" role="alert"><h2>Could not load markets</h2><button type="button" className="secondary" onClick={() => void markets.refetch()}>Try again</button></div>
+        ) : markets.isLoading ? (
+          <p role="status">Loading public markets&hellip;</p>
+        ) : items.length === 0 ? (
           <div className="empty-social" role="status">
             <h2>No public markets</h2>
             <p>Publish a market from its page to make a blueprint discoverable. Nothing here is invented.</p>

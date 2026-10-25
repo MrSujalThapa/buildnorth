@@ -17,6 +17,7 @@ type Props = {
   overlay?: ChartPoint[];
   emptyMessage?: string;
   interactive?: boolean;
+  initialRange?: MarketRange;
   onSelectionChange?: (selection: ChartSelection | null) => void;
 };
 
@@ -28,10 +29,11 @@ export default function OddsExplorer({
   overlay = [],
   emptyMessage = "No published forecast yet. Play It Out will not invent a series.",
   interactive = true,
+  initialRange,
   onSelectionChange,
 }: Props) {
   const [selectedRange, setSelectedRange] = useState<MarketRange | null>(null);
-  const activeRange = selectedRange ?? ranges[Math.min(2, Math.max(ranges.length - 1, 0))];
+  const activeRange = selectedRange ?? initialRange ?? ranges[Math.min(2, Math.max(ranges.length - 1, 0))];
   const chartData = useMemo(
     () => (activeRange ? filterHistoryForRange(history, activeRange) : history),
     [activeRange, history],

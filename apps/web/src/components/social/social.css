@@ -127,6 +127,26 @@
   gap: 8px;
   color: inherit;
   text-decoration: none;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  min-height: 44px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.creator-chip:hover,
+.creator-chip:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.discover-card:focus-visible,
+.repo-row:focus-visible,
+.profile-tabs button:focus-visible,
+.follow-counts button:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 3px;
 }
 
 .creator-chip img,
@@ -139,6 +159,11 @@
   display: grid;
   place-items: center;
   font-size: 12px;
+}
+
+.mini-avatar img {
+  width: 100%;
+  height: 100%;
 }
 
 .profile-tabs {
@@ -370,5 +395,39 @@
   .profile-social-shell,
   .discover-shell {
     padding-bottom: 140px;
+  }
+}
+
+/* A public profile is a person, not a nested settings card. */
+.profile-social .profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 16px;
+}
+
+.profile-social .follow-counts {
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.profile-social .follow-counts button {
+  padding: 0;
+  min-height: 32px;
+}
+
+@media (max-width: 520px) {
+  .profile-social .profile-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .profile-social .profile-card > .secondary {
+    grid-column: 2;
+    justify-self: start;
   }
 }
