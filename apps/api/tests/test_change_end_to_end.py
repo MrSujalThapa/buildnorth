@@ -247,6 +247,8 @@ async def test_career_deadline_simulation_uses_domain_probability() -> None:
     evidence = await evidence_repo.list_for_goal(goal.goal_id)
     baseline = build_baseline_state(goal, evidence)
     assert baseline.priced
+    assert baseline.priceability is not None
+    assert baseline.priceability.status == "PRICED"
     parsed = parse_intervention_text("10 applications per week")
     request = WhatIfRequest.model_validate(
         {

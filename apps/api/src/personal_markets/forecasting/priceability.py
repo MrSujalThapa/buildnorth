@@ -202,6 +202,8 @@ def describe_priceability(
     resolution = resolve_state(requirements, evidence, overrides=overrides)
 
     target = resolve_target(goal)
+    if target is None and goal.goal_type == "deadline_event":
+        return build_report(model_family=family, requirements=requirements, resolution=resolution)
     if target is None:
         return build_report(
             model_family=family,
