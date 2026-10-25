@@ -731,7 +731,9 @@ async function watchThread(snapshot: WorkflowSnapshot, signal?: AbortSignal): Pr
   return current;
 }
 
-async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
+async function request<T>(
+  path: string, init?: RequestInit, signal?: AbortSignal, notFoundValue?: T,
+): Promise<T> {
   const token = await currentAccessToken();
   const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
   const response = await fetch(`${baseUrl}${path}`, {
@@ -743,6 +745,7 @@ async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal
       ...(init?.headers || {}),
     },
   });
+  if (response.status === 404 && notFoundValue !== undefined) return notFoundValue;
   if (!response.ok) {
     let detail = `status ${response.status}`;
     try {
@@ -896,7 +899,9 @@ export const api = {
   getThread: (threadId: string, signal?: AbortSignal) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
   goalEvidenceContinuation: (goalId: string, signal?: AbortSignal) =>
-    request<WorkflowSnapshot | null>(`/api/v1/goals/${goalId}/evidence/continuation`, undefined, signal),
+    request<WorkflowSnapshot | null>(
+      `/api/v1/goals/${goalId}/evidence/continuation`, undefined, signal, null,
+    ),
   retryGoalEvidence: (threadId: string) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/evidence/retry`, { method: "POST" }),
   resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>

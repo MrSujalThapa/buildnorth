@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from math import isfinite
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -108,6 +110,8 @@ class ParameterProfile(BaseModel):
 def _compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synthetic: bool) -> bool:
     if row.metric not in (spec.metric, *spec.aliases) or row.numeric_value is None:
         return False
+    if not isfinite(row.numeric_value) or row.numeric_value < 0:
+        return False
     if row.provenance.parsing_status != "ok" or row.provenance.conflict_status != "none":
         return False
     if not synthetic and row.source_quality in {"demo_fixture", "synthetic_demo"}:
@@ -124,7 +128,7 @@ def _compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synthetic: bool
         return False
     unit = (row.unit or "").lower().replace(" ", "")
     if spec.id == "monthly_savings":
-        return unit.endswith("/month") or unit.endswith("/mo")
+        return bool(re.fullmatch(r"(?:[a-z]{3}|currency)/(?:month|mo)", unit))
     allowed = {
         "weekly_applications": {
             "applications/week",
@@ -136,6 +140,43 @@ def _compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synthetic: bool
         "weekly_running_km": {"km/week", "kilometers/week", "kilometres/week"},
     }
     return unit in allowed.get(spec.id, set())
+
+
+def _increment_compatible(row: NormalizedEvidence, spec: ParameterSpec, *, synthetic: bool) -> bool:
+    """Recognize dated activity without treating a cumulative snapshot as a weekly event."""
+    if row.numeric_value is None or not isfinite(row.numeric_value) or row.numeric_value < 0:
+        return False
+    if row.provenance.parsing_status != "ok" or row.provenance.conflict_status != "none":
+        return False
+    if not synthetic and row.source_quality in {"demo_fixture", "synthetic_demo"}:
+        return False
+    if row.provenance.observation_kind not in {"increment", "event"}:
+        return False
+    unit = (row.unit or "").lower().replace(" ", "")
+    if spec.id == "weekly_applications":
+        return row.metric == "applications_submitted" and unit in {
+            "count",
+            "application",
+            "applications",
+        }
+    if spec.id == "weekly_study_hours":
+        return row.metric in {"study_hours", "practice_hours", "focused_hours"} and unit in {
+            "hour",
+            "hours",
+            "hr",
+            "hrs",
+        }
+    if spec.id == "weekly_running_km":
+        return row.metric == "weekly_distance_km" and unit in {
+            "km",
+            "kilometer",
+            "kilometers",
+            "kilometre",
+            "kilometres",
+        }
+    if spec.id == "monthly_savings":
+        return row.metric == "monthly_contribution" and bool(re.fullmatch(r"[a-z]{3}", unit))
+    return False
 
 
 def parameter_profile(
@@ -154,13 +195,38 @@ def parameter_profile(
         if spec is None:
             continue
         cutoff = stamp - timedelta(days=spec.window_days)
-        rows = [
+        period_rows = [
             row
             for row in evidence
             if _compatible(row, spec, synthetic=synthetic)
             and row.observed_at is not None
             and cutoff <= row.observed_at <= stamp
         ]
+        increment_window = 30 if spec.id == "monthly_savings" else 7
+        increment_cutoff = stamp - timedelta(days=increment_window)
+        increment_rows = [
+            row
+            for row in evidence
+            if _increment_compatible(row, spec, synthetic=synthetic)
+            and row.observed_at is not None
+            and increment_cutoff <= row.observed_at <= stamp
+        ]
+        # A later period reading supersedes component activity. Otherwise use
+        # the explicitly dated increments in the corresponding rolling window.
+        latest_period = max(
+            (row.observed_at for row in period_rows if row.observed_at is not None),
+            default=None,
+        )
+        latest_increment = max(
+            (row.observed_at for row in increment_rows if row.observed_at is not None),
+            default=None,
+        )
+        use_increments = bool(increment_rows) and (
+            latest_period is None
+            or latest_increment is not None
+            and latest_increment > latest_period
+        )
+        rows = increment_rows if use_increments else period_rows
         # One normalized observation may be linked to multiple owned goals.
         distinct = {
             str(row.provenance.event_identity or row.evidence_id or row.fingerprint): row
@@ -173,9 +239,12 @@ def parameter_profile(
         ):
             rows = []  # CAD and USD are not interchangeable.
         used.update(str(row.evidence_id or row.fingerprint) for row in rows)
+        effective_aggregation: Aggregation = (
+            "sum_increments" if use_increments else spec.aggregation
+        )
         raw = (
             sum(row.numeric_value or 0 for row in rows)
-            if spec.aggregation == "sum_increments" and rows
+            if effective_aggregation == "sum_increments" and rows
             else rows[-1].numeric_value
             if rows
             else None
@@ -185,10 +254,15 @@ def parameter_profile(
                 id=spec.id,
                 name=spec.name,
                 metric=spec.metric,
-                unit=(rows[-1].unit if spec.id == "monthly_savings" and rows else spec.unit)
-                or spec.unit,
-                window_days=spec.window_days,
-                aggregation=spec.aggregation,
+                unit=(
+                    f"{rows[-1].unit}/30 days"
+                    if spec.id == "monthly_savings" and rows and use_increments
+                    else rows[-1].unit
+                    if spec.id == "monthly_savings" and rows
+                    else spec.unit
+                ) or spec.unit,
+                window_days=increment_window if use_increments else spec.window_days,
+                aggregation=effective_aggregation,
                 normalization=(
                     f"clamp(value / {spec.scale_max:g}, 0, 1); display scale, not goal odds"
                 ),
