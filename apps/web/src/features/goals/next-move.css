@@ -1,0 +1,59 @@
+.next-move {
+  margin: 24px 0;
+  padding: 20px 22px;
+  border: 1px solid var(--app-line, rgba(0, 0, 0, 0.08));
+  border-radius: 14px;
+  background: var(--app-surface, #fff);
+}
+
+.next-move header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.next-move-kicker {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--app-muted);
+}
+
+.next-move-card h2,
+.next-move-empty {
+  margin: 10px 0 6px;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.next-move-empty {
+  font-weight: 500;
+  color: var(--app-muted);
+}
+
+.next-move-card p {
+  margin: 4px 0;
+  max-width: 68ch;
+  line-height: 1.5;
+}
+
+.next-move-status {
+  margin-top: 10px;
+  color: #1f8f86;
+  font-weight: 600;
+}
+
+.next-move-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.next-move-note {
+  margin: 14px 0 0;
+  font-size: 0.85rem;
+  color: var(--app-muted);
+}

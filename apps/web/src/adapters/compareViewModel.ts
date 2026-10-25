@@ -2,6 +2,7 @@ import type {
   PathComparisonResult,
   ScenarioDistribution,
   TargetSearchResult,
+  WhatIfAssumption,
   WhatIfBaselineState,
 } from "../api/client";
 import { formatOutcome } from "./outcomeFormat";
@@ -98,6 +99,56 @@ export function toPathStrategies(targetSearch: TargetSearchResult | undefined): 
     onFrontier: index < Math.min(3, sorted.length),
     variants: [],
   }));
+}
+
+/**
+ * Reverse-mode frontier from a lever sweep: x is the actual lever setting the model priced.
+ * The target-search answer, when one exists, is listed first.
+ */
+export function toLeverFrontier(
+  lever: WhatIfAssumption,
+  sweep: PathComparisonResult,
+  search: TargetSearchResult | null,
+  format: (lever: WhatIfAssumption, value: number) => string,
+): PathStrategy[] {
+  const priced = sweep.paths
+    .map((path) => ({ path, value: Number(path.id.split("-").pop()) }))
+    .filter((item) => item.path.primary_goal_probability != null && Number.isFinite(item.value))
+    .sort((a, b) => a.value - b.value);
+  let best = -Infinity;
+  const points: PathStrategy[] = priced.map(({ path, value }) => {
+    const odds = (path.primary_goal_probability ?? 0) * 100;
+    const onFrontier = odds > best + 1e-9;
+    best = Math.max(best, odds);
+    return {
+      id: path.id,
+      label: path.label,
+      odds,
+      requirement: `Set ${lever.name === "weekly_application_rate" ? "weekly applications" : "monthly contribution"} to ${format(lever, value)}; everything else stays at the current evidence.`,
+      subpaths: [],
+      cost: value,
+      fragility: fragilityLabel(path.fragility_pp),
+      onFrontier,
+      variants: [],
+    };
+  });
+  const answer = search?.feasible ? search.paths[0] : undefined;
+  const solved = answer?.assumptions?.find((item) => item.name === lever.name)?.value;
+  if (!answer || solved == null) return points;
+  return [
+    {
+      id: "target-search",
+      label: `${format(lever, solved)} reaches the target`,
+      odds: answer.resulting_probability * 100,
+      requirement: `Smallest setting found by search. ${answer.valid_because}`,
+      subpaths: [],
+      cost: solved,
+      fragility: fragilityLabel(answer.fragility_pp),
+      onFrontier: true,
+      variants: [],
+    },
+    ...points,
+  ];
 }
 
 export type FutureScenario = {

@@ -1,4 +1,4 @@
-import type { ParsedInterventionChange, WhatIfBaselineState } from "../api/client";
+import type { ParsedInterventionChange, WhatIfAssumption, WhatIfBaselineState } from "../api/client";
 
 type InterventionPayload = Record<string, unknown>;
 type AnalysisDepth = "simple" | "deep";
@@ -71,20 +71,86 @@ export function buildWhatIfRequestFromBaseline(
   };
 }
 
+/** Assumptions the backend reprices when set directly: flow and weekly application rate. */
+const LEVER_NAMES = ["weekly_application_rate", "flow"] as const;
+
+export function primaryLever(baseline: WhatIfBaselineState | undefined): WhatIfAssumption | null {
+  if (!baseline?.priced) return null;
+  for (const name of LEVER_NAMES) {
+    const found = baseline.assumptions.find((item) => item.name === name && item.editable !== false);
+    if (found && found.maximum > found.minimum) return found;
+  }
+  return null;
+}
+
+export function leverUnitLabel(lever: WhatIfAssumption): string {
+  if (lever.name === "weekly_application_rate") return "applications/week";
+  return lever.unit.replace("currency/month", "/month").replace("units/period", "/period");
+}
+
+export function leverAxisTitle(lever: WhatIfAssumption): string {
+  if (lever.unit.startsWith("currency")) return "Monthly contribution ($)";
+  return leverUnitLabel(lever).replace(/^./, (first) => first.toUpperCase());
+}
+
+export function formatLeverValue(lever: WhatIfAssumption, value: number): string {
+  const rounded = Math.abs(value) >= 100 ? Math.round(value).toLocaleString() : String(Math.round(value * 10) / 10);
+  if (lever.unit.startsWith("currency")) return `$${rounded}/month`;
+  return `${rounded} ${leverUnitLabel(lever)}`;
+}
+
+function snap(lever: WhatIfAssumption, value: number): number {
+  const step = lever.step > 0 ? lever.step : 1;
+  const clamped = Math.min(lever.maximum, Math.max(lever.minimum, value));
+  return Math.round(clamped / step) * step;
+}
+
+/** Distinct lever settings between the current value and the assumption's maximum. */
+export function leverLadder(lever: WhatIfAssumption, count: number): number[] {
+  const start = Math.max(lever.minimum, lever.value * 0.5);
+  const span = lever.maximum - start;
+  const values = Array.from({ length: count }, (_, index) => snap(lever, start + (span * index) / Math.max(1, count - 1)));
+  values.push(snap(lever, lever.value));
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
+export function leverChange(lever: WhatIfAssumption, value: number): ParsedInterventionChange {
+  return {
+    metric: lever.name,
+    operation: "set",
+    value,
+    unit: lever.unit,
+    frequency: null,
+    scope: "goal",
+    provenance: "EXPLORATION_ASSUMPTION",
+  };
+}
+
+export function leverPaths(lever: WhatIfAssumption, values: number[]) {
+  return values.map((value) => ({
+    id: `lever-${lever.name}-${value}`,
+    label: Math.abs(value - lever.value) < 1e-9 ? `${formatLeverValue(lever, value)} (current)` : formatLeverValue(lever, value),
+    parsed_changes: [leverChange(lever, value)],
+  }));
+}
+
+export function defaultCompareValues(lever: WhatIfAssumption): number[] {
+  const current = snap(lever, lever.value);
+  const values = [current, snap(lever, lever.value * 1.5 || lever.step * 4), snap(lever, lever.value * 2 || lever.step * 8)];
+  return [...new Set(values)];
+}
+
 export function buildCompareRequest(
   goalId: string,
   baseline: WhatIfBaselineState,
   extraPaths: { id: string; label: string; parsed_changes: ParsedInterventionChange[] }[] = [],
   view: AnalysisDepth = "simple",
 ) {
-  const catalog = extraPaths.length
-    ? []
-    : baseline.compare_candidates.map((candidate) => ({
-        id: candidate.id,
-        label: candidate.title,
-        intervention: candidate.intervention,
-        parsed_changes: [],
-      }));
+  const lever = primaryLever(baseline);
+  const catalog = extraPaths.length || !lever ? [] : leverPaths(lever, defaultCompareValues(lever)).map((path) => ({
+    ...path,
+    intervention: fallbackIntervention(baseline, path.label),
+  }));
   const custom = extraPaths.map((path) => ({
     id: path.id,
     label: path.label,
@@ -95,6 +161,22 @@ export function buildCompareRequest(
   return {
     base: buildWhatIfRequestFromBaseline(goalId, baseline, null, view),
     paths,
+  };
+}
+
+export function buildLeverSweepRequest(
+  goalId: string,
+  baseline: WhatIfBaselineState,
+  lever: WhatIfAssumption,
+  values: number[],
+  view: AnalysisDepth = "simple",
+) {
+  return {
+    base: buildWhatIfRequestFromBaseline(goalId, baseline, null, view),
+    paths: leverPaths(lever, values).map((path) => ({
+      ...path,
+      intervention: fallbackIntervention(baseline, path.label),
+    })),
   };
 }
 

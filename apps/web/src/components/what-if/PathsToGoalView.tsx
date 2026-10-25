@@ -24,6 +24,8 @@ type Props = {
   selectedSimulation: SimulationPoint | null;
   onSelectSimulation: (point: SimulationPoint | null) => void;
   onFind?: () => void;
+  /** When set, `path.cost` is the real lever setting named here and the x-axis fits the data. */
+  xAxisLabel?: string;
 };
 
 export default function PathsToGoalView({
@@ -41,10 +43,26 @@ export default function PathsToGoalView({
   onTargetOddsChange,
   onSeeFutures,
   onFind,
+  xAxisLabel,
 }: Props) {
   const paths = pathsProp ?? [];
   const loadingPaths = loading;
-  const axes = pathAxes(market);
+  const baseAxes = pathAxes(market);
+  const leverValues = paths.map((path) => path.cost);
+  const leverMin = leverValues.length ? Math.min(...leverValues) : 0;
+  const leverMax = leverValues.length ? Math.max(...leverValues) : 1;
+  const leverPad = Math.max((leverMax - leverMin) * 0.06, 0.5);
+  const axes = xAxisLabel
+    ? {
+        x: {
+          label: xAxisLabel,
+          format: (value: number) => (Math.abs(value) >= 1000 ? `${Math.round(value / 100) / 10}k` : `${Math.round(value * 10) / 10}`),
+          min: Math.max(0, leverMin - leverPad),
+          max: leverMax + leverPad,
+        },
+        y: { ...baseAxes.y, min: 0, max: 100 },
+      }
+    : baseAxes;
   const selected = paths.find((path) => path.id === selectedPathId) ?? paths[0];
   const [finding, setFinding] = useState(false);
   useEffect(() => {
@@ -128,7 +146,7 @@ export default function PathsToGoalView({
         {view === "simple" ? (
           <div className="paths-simple">
             <div className="paths-answer">
-              <span>Highest modeled odds</span>
+              <span>{paths[0]?.id === "target-search" ? `Smallest change that reaches ${targetOdds}%` : "Highest modeled odds"}</span>
               <strong>{paths[0]?.label ?? "—"}</strong>
               <em>{paths[0]?.odds == null ? "—" : `${paths[0].odds.toFixed(0)}%`}</em>
             </div>
@@ -139,11 +157,16 @@ export default function PathsToGoalView({
                     <span className="path-rank">{index + 1}</span>
                     <div><h3>{path.label}</h3><p>{path.requirement}</p></div>
                     <strong>{path.odds == null ? "—" : `${path.odds.toFixed(0)}%`}</strong>
-                    <small>Relative effort {path.cost}</small>
+                    {path.odds != null && path.odds >= targetOdds ? <small>Clears {targetOdds}%</small> : <small>Below target</small>}
                   </button>
                 </li>
               ))}
             </ol>
+            {selected ? (
+              <button type="button" className="primary-action" onClick={() => onSeeFutures(selected)}>
+                See how this could play out
+              </button>
+            ) : null}
           </div>
         ) : (
           <>
@@ -160,7 +183,7 @@ export default function PathsToGoalView({
             <div className="panel-head tight">
               <div>
                 <p className="section-label">Strategy frontier</p>
-                <h2>Each point is a path you could take, not a random simulation</h2>
+                <h2>{xAxisLabel ? `Each point is a ${xAxisLabel.toLowerCase()} setting the model priced` : "Each point is a path you could take, not a random simulation"}</h2>
               </div>
             </div>
             <SimulationCloud
@@ -237,7 +260,7 @@ export default function PathsToGoalView({
               </p>
               <p>{selected.requirement}</p>
               <p className="quiet-copy">
-                Effort {selectedVariant?.cost ?? selected.cost} · Fragility {selected.fragility}
+                {xAxisLabel ? `${xAxisLabel}: ${selected.cost.toLocaleString()}` : `Effort ${selectedVariant?.cost ?? selected.cost}`} · Fragility {selected.fragility}
                 {selected.onFrontier ? " · On the frontier" : " · Dominated by a cheaper or stronger path"}
               </p>
 
@@ -271,7 +294,7 @@ export default function PathsToGoalView({
           <div className="deep-secondary paths-deep-extra">
             <article>
               <p className="section-label">Constraints</p>
-              <p>Resource budget is relative. Paths to the right demand more time, reputation, or runway than paths to the left.</p>
+              <p>{xAxisLabel ? `Points further right need a higher ${xAxisLabel.toLowerCase()}. A point is dominated when a lower setting already prices as high.` : "Resource budget is relative. Paths to the right demand more time, reputation, or runway than paths to the left."}</p>
             </article>
             <article>
               <p className="section-label">Robustness</p>

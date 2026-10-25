@@ -3,6 +3,8 @@
 export type ChartPoint = {
   timestamp: number;
   value: number;
+  /** A held value (standing forecast carried to a window edge), not a publication. */
+  carried?: boolean;
 };
 
 export type MarketEvent = {

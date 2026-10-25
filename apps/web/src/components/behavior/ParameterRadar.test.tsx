@@ -22,6 +22,7 @@ const profile: ParameterProfile = {
       observation_count: 2,
       source_types: ["manual"],
       evidence_ids: ["e1"],
+      last_observed_at: "2026-10-20T12:00:00Z",
       status: "measured",
     },
     {
@@ -57,13 +58,20 @@ const profile: ParameterProfile = {
   ],
 };
 
-test("groups measured parameters by life area instead of mixing every axis", () => {
+test("draws every measured life area at once and leaves unmeasured areas empty", () => {
   render(<ParameterRadar profile={profile} />);
-  expect(screen.getByRole("tab", { name: /Career/ })).toBeVisible();
-  expect(screen.getByRole("tab", { name: /Fitness/ })).toBeVisible();
-  expect(screen.getAllByText("Applications / week").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Running / week")).toBeNull();
-  fireEvent.click(screen.getByRole("tab", { name: /Fitness/ }));
-  expect(screen.getAllByText("Running / week").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Applications / week")).toBeNull();
+  expect(screen.queryByRole("tab")).toBeNull();
+  expect(screen.getByTestId("life-series-weekly_applications")).toBeInTheDocument();
+  expect(screen.getByTestId("life-series-weekly_running_km")).toBeInTheDocument();
+  expect(screen.queryByTestId("life-series-reading_minutes")).toBeNull();
+  expect(screen.getByText("Not measured")).toBeVisible();
+});
+
+test("tooltip shows measurement, unit, source and observation date", () => {
+  render(<ParameterRadar profile={profile} />);
+  fireEvent.mouseEnter(screen.getByTestId("life-series-weekly_applications"));
+  const tooltip = screen.getByRole("status");
+  expect(tooltip).toHaveTextContent("8 applications/week");
+  expect(tooltip).toHaveTextContent("Source: manual");
+  expect(tooltip).toHaveTextContent("Last observed");
 });

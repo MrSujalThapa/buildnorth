@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type ScenarioDistribution } from "../api/client";
-import { toCompareOptions, toPathStrategies } from "../adapters/compareViewModel";
+import { toCompareOptions, toLeverFrontier } from "../adapters/compareViewModel";
 import { toMarketDetail } from "../adapters/marketViewModel";
 import type { PathStrategy } from "../adapters/simulations";
 import type { CompareOption, WhatIfMode, WhatIfPlan, WhatIfView } from "../adapters/templateTypes";
@@ -14,9 +14,28 @@ import {
 import {
   buildCompareRequest,
   buildFuturesRequest,
+  buildLeverSweepRequest,
   buildTargetSearchRequest,
+  formatLeverValue,
+  leverAxisTitle,
+  leverLadder,
+  primaryLever,
 } from "../adapters/whatIfRequests";
 import WhatIfPage from "../components/what-if/WhatIfPage";
+
+const PARSE_TIMEOUT_MS = 15_000;
+const INTERPRET_TIMEOUT_MS = 45_000;
+const SIMULATION_TIMEOUT_MS = 60_000;
+/** Lever settings priced for the Reverse frontier. */
+const FRONTIER_POINTS = 7;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, step: string): Promise<T> {
+  let timer = 0;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(`${step} took longer than ${Math.round(ms / 1000)}s. Try again.`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timer));
+}
 
 export function WhatIfRoute() {
   const { goalId = "" } = useParams();
@@ -86,12 +105,13 @@ export function WhatIfRoute() {
       if (!state?.priced) return null;
       const extraPaths = await Promise.all(
         (extra ?? []).map(async (path) => {
-          const parsed = await api.parseIntervention({ goal_id: goalId, text: path.label });
-          return {
-            id: path.id,
-            label: path.label,
-            parsed_changes: parsed.pricing_status === "PRICED" ? parsed.changes : [],
-          };
+          const stated = await withTimeout(api.parseDecision({ goal_id: goalId, text: path.label }), PARSE_TIMEOUT_MS, "Reading this option");
+          let changes = stated.changes ?? [];
+          if (!changes.length) {
+            const parsed = await withTimeout(api.parseIntervention({ goal_id: goalId, text: path.label }), INTERPRET_TIMEOUT_MS, "Interpreting this option");
+            changes = parsed.pricing_status === "PRICED" ? parsed.changes : [];
+          }
+          return { id: path.id, label: path.label, parsed_changes: changes };
         }),
       );
       const request = buildCompareRequest(goalId, state, extraPaths, viewRef.current);
@@ -104,7 +124,7 @@ export function WhatIfRoute() {
           run_id: null,
         };
       }
-      return api.comparePaths(request);
+      return withTimeout(api.comparePaths(request), SIMULATION_TIMEOUT_MS, "Comparing options");
     },
   });
 
@@ -112,10 +132,11 @@ export function WhatIfRoute() {
     mutationFn: async (decision: string) => {
       const state = baselineRef.current;
       if (!state?.priced) return null;
-      const [parsedDecision, parsedIntervention] = await Promise.all([
+      const parsedDecision = await withTimeout(
         api.parseDecision({ goal_id: goalId, text: decision }),
-        api.parseIntervention({ goal_id: goalId, text: decision }),
-      ]);
+        PARSE_TIMEOUT_MS,
+        "Reading the decision",
+      );
       if (!parsedDecision.scenario_labels.length) {
         return {
           priced: false,
@@ -127,26 +148,52 @@ export function WhatIfRoute() {
           run_id: null,
         };
       }
-      return api.possibleFutures(
-        buildFuturesRequest(
-          goalId,
-          state,
-          decision,
-          parsedDecision.scenario_labels,
-          parsedIntervention.changes,
-          viewRef.current,
+      return withTimeout(
+        api.possibleFutures(
+          buildFuturesRequest(
+            goalId,
+            state,
+            decision,
+            parsedDecision.scenario_labels,
+            parsedDecision.changes ?? [],
+            viewRef.current,
+          ),
         ),
+        SIMULATION_TIMEOUT_MS,
+        "Simulating futures",
       );
     },
   });
 
   const paths = useMutation({
-    mutationFn: (targetProbability: number) => {
+    mutationFn: async (targetProbability: number) => {
       const state = baselineRef.current;
-      if (!state?.priced) return Promise.resolve(null);
-      return api.targetSearch(
-        buildTargetSearchRequest(goalId, state, targetProbability, viewRef.current),
-      );
+      if (!state?.priced) return null;
+      const lever = primaryLever(state);
+      if (!lever) {
+        return {
+          search: null,
+          sweep: null,
+          lever: null,
+          message:
+            "This goal has no adjustable weekly quantity in its model, so there is nothing to solve for. Use Change to test a specific action.",
+        };
+      }
+      const [search, sweep] = await Promise.all([
+        withTimeout(
+          api.targetSearch(buildTargetSearchRequest(goalId, state, targetProbability, viewRef.current)),
+          SIMULATION_TIMEOUT_MS,
+          "Searching for paths",
+        ),
+        withTimeout(
+          api.comparePaths(
+            buildLeverSweepRequest(goalId, state, lever, leverLadder(lever, FRONTIER_POINTS), viewRef.current),
+          ),
+          SIMULATION_TIMEOUT_MS,
+          "Pricing lever settings",
+        ),
+      ]);
+      return { search, sweep, lever, message: search.message };
     },
   });
 
@@ -156,9 +203,22 @@ export function WhatIfRoute() {
   }, [baseline.data, compare.data]);
 
   const pathStrategies = useMemo<PathStrategy[] | undefined>(
-    () => toPathStrategies(paths.data ?? undefined),
+    () => (paths.data?.lever && paths.data.sweep ? toLeverFrontier(paths.data.lever, paths.data.sweep, paths.data.search, formatLeverValue) : undefined),
     [paths.data],
   );
+  const leverAxisLabel = paths.data?.lever ? leverAxisTitle(paths.data.lever) : null;
+
+  const resetAll = useRef<() => void>(() => undefined);
+  resetAll.current = () => {
+    compare.reset();
+    futures.reset();
+    paths.reset();
+  };
+  useEffect(() => {
+    resetAll.current();
+    setMode("impact");
+    setPlan(null);
+  }, [goalId]);
 
   const futuresDistribution = useMemo<ScenarioDistribution | undefined>(
     () => futures.data ?? undefined,
@@ -219,14 +279,16 @@ export function WhatIfRoute() {
       onPlanChange={setPlan}
       mode={mode}
       view={view}
-      onModeChange={setMode}
+      onModeChange={(nextMode) => {
+        if (nextMode === mode) return;
+        resetAll.current();
+        setMode(nextMode);
+      }}
       onViewChange={(nextView) => {
         if (nextView === view) return;
         // Results carry the draw count and sensitivity settings from the view
         // in which they ran. Never present a Simple result as Deeper analysis.
-        compare.reset();
-        futures.reset();
-        paths.reset();
+        resetAll.current();
         setView(nextView);
       }}
       baseline={baseline.data}
@@ -245,6 +307,15 @@ export function WhatIfRoute() {
       pathsLoading={paths.isPending}
       pathsError={paths.isError ? `Could not search for paths: ${paths.error instanceof Error ? paths.error.message : "try again"}` : null}
       pathsMessage={paths.data?.message ?? null}
+      pathsAxisLabel={leverAxisLabel}
+      futuresQuestionForPath={(path) => {
+        const lever = paths.data?.lever;
+        if (!lever) return `What if I take the ${path.label} path?`;
+        const value = Math.round(path.cost * 100) / 100;
+        return lever.name === "weekly_application_rate"
+          ? `What if I submit ${value} applications per week?`
+          : `What if I contribute $${Math.round(value)} per month?`;
+      }}
       onRunCompare={onRunCompare}
       onRunFutures={onRunFutures}
       onRunPaths={onRunPaths}

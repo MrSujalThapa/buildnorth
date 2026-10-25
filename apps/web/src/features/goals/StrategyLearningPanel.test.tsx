@@ -38,11 +38,20 @@ test("loads empty strategy history and records accept after generate", async () 
       <StrategyLearningPanel goalId="goal-1" />
     </QueryClientProvider>,
   );
-  expect(await screen.findByRole("heading", { name: "Strategy feedback" })).toBeInTheDocument();
-  fireEvent.click(await screen.findByRole("button", { name: "Suggest a next step" }));
-  expect(await screen.findByRole("button", { name: "I’ll try this" })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "I’ll try this" }));
+  vi.spyOn(api, "strategyRecommendationOutcome").mockImplementation(() => {
+    listed = { ...empty, past_trials: [{ ...generated, decision: "accepted", outcome_status: "attempted" }] };
+    return Promise.resolve({});
+  });
+  expect(await screen.findByRole("heading", { name: "No move suggested yet." })).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Suggest a next move" }));
+  expect(await screen.findByRole("heading", { name: "Contact one hiring team this week" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Accept" }));
   await waitFor(() =>
     expect(api.strategyRecommendationFeedback).toHaveBeenCalledWith("goal-1", "rec-1", "accepted"),
   );
+  fireEvent.click(await screen.findByRole("button", { name: "I did it" }));
+  await waitFor(() =>
+    expect(api.strategyRecommendationOutcome).toHaveBeenCalledWith("goal-1", "rec-1", true),
+  );
+  expect(await screen.findByRole("heading", { name: "Last move: Contact one hiring team this week" })).toBeInTheDocument();
 });
