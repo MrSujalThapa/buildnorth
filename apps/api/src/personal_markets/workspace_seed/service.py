@@ -81,7 +81,13 @@ def build_seed_goal(
         _proposal(seed, now), goal_id=seed_goal_id(owner_id, seed.key, generation)
     )
     return goal.model_copy(
-        update={"model_requirements": {**goal.model_requirements, "workspace_seed": SEED_VERSION}}
+        update={
+            "model_requirements": {
+                **goal.model_requirements,
+                "workspace_seed": SEED_VERSION,
+                "life_area": seed.domain,
+            }
+        }
     )
 
 

@@ -629,17 +629,17 @@
 
 .odds-pair {
   display: grid;
-  grid-template-columns: auto 28px auto;
+  grid-template-columns: auto 18px auto 18px auto;
   align-items: end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .odds-pair strong {
   display: block;
-  font-size: 44px;
+  font-size: 26px;
   line-height: 0.95;
   font-weight: 600;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
   font-family: "IBM Plex Mono", ui-monospace, monospace;
 }
@@ -1777,6 +1777,56 @@
 .what-if-chart-legend .comparison-baseline::before { background: #8a8680; }
 .what-if-chart-legend .hypothetical-positive::before { background: #188453; }
 .what-if-chart-legend .hypothetical-negative::before { background: #c44745; }
+.what-if-market-chart .range-control { gap: 4px; margin-top: 8px; }
+.what-if-market-chart .range-control button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.reverse-target { align-items: end; }
+.reverse-loading { margin: 12px 0; color: var(--what-if-muted); }
+.theme-dark .what-if-chart-legend { color: var(--app-ink); }
+.scenario-distribution button {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--what-if-border);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.scenario-distribution button i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--app-accent);
+}
+.scenario-distribution button.selected {
+  border-color: var(--app-accent);
+}
+.ranked-paths button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--what-if-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ranked-paths button.selected { color: var(--app-accent); }
 .scenario-plain { max-width: 68ch; margin: 0 0 1rem; font-size: 15px; line-height: 1.45; }
 .insight-list { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; gap: 14px; }
 .insight-card { padding: 12px 0; border-top: 1px solid var(--what-if-border); }

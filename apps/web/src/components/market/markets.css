@@ -458,6 +458,21 @@
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .profile-identity { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .profile-page-title { margin: 0 0 20px; font-size: clamp(32px, 4vw, 42px); line-height: 1.1; letter-spacing: -.045em; }
+.profile-page .profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 0 4px;
+  border: 0;
+  background: transparent;
+}
+.profile-page .follow-counts button {
+  color: var(--app-ink);
+  text-decoration: none;
+}
+.profile-page .follow-counts button:hover { color: var(--app-accent); }
+.markets-visibility-tools { margin-bottom: 8px; }
 .profile-identity h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; font-weight: 680; }
 .profile-identity span { color: var(--app-muted); }
 .profile-identity p { margin: 8px 0 0; max-width: 42ch; }

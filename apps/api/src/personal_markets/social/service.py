@@ -172,7 +172,10 @@ class SocialService:
                     description=str(blueprint_data.get("description") or "")
                     if isinstance(blueprint_data, dict)
                     else "",
-                    category=str(row["goal_type"]),
+                    category=str(
+                        (blueprint_data.get("category") if isinstance(blueprint_data, dict) else None)
+                        or row["goal_type"]
+                    ),
                     visibility="public" if row.get("visibility") == "public" else "private",
                     creator=creators[owner_id],
                     star_count=stars.get(row["id"], 0),

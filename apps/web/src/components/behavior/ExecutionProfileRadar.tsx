@@ -111,6 +111,7 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   const complete = dimensions.length >= 3 && dimensions.every(measured);
   const hasMeasurements = dimensions.some(measured);
+  const needsMore = dimensions.some((item) => !measured(item));
   const outline = complete
     ? dimensions
         .map((item, index) => {
@@ -127,9 +128,9 @@ export function ExecutionProfileRadar({ profile, compact = false }: Props) {
 
   return (
     <section className={`execution-profile${compact ? " compact" : ""}`}>
-      {hasMeasurements && !complete ? <p className="execution-empty">Some parameters need more observations.</p> : null}
+      {hasMeasurements && needsMore ? <p className="execution-empty">Some parameters need more observations.</p> : null}
       <div className="radar-stage">
-        {dimensions.length >= 3 ? (
+        {dimensions.length >= 1 ? (
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Parameter profile radar">
             <defs>
               <filter id={`${uid}-glow`} x="-20%" y="-20%" width="140%" height="140%">

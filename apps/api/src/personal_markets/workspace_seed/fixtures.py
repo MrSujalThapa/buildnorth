@@ -156,6 +156,22 @@ FDE_OFFER = SeedGoal(
             event_type="rejection",
         ),
         SeedObservation(4, "final_round_interviews", 1, "interviews", "Final round scheduled: 1"),
+        SeedObservation(
+            3,
+            "applications_submitted",
+            8,
+            "applications",
+            "Submitted 8 applications this week",
+            kind="event",
+        ),
+        SeedObservation(
+            2,
+            "study_hours",
+            4,
+            "hours",
+            "Interview preparation: 4 hours",
+            kind="increment",
+        ),
     ),
     commitments=_weekly(
         98,
@@ -353,11 +369,29 @@ READING = SeedGoal(
         "success_unit": "books",
         "primitive_kind": "cumulative_count",
     },
-    observations=_counts(
-        "books_read",
-        "books",
-        "Books finished",
-        [(110, 2), (88, 3), (70, 5), (52, 5), (38, 6), (21, 8), (5, 9)],
+    observations=(
+        *_counts(
+            "books_read",
+            "books",
+            "Books finished",
+            [(110, 2), (88, 3), (70, 5), (52, 5), (38, 6), (21, 8), (5, 9)],
+        ),
+        SeedObservation(
+            2,
+            "reading_minutes",
+            90,
+            "minutes",
+            "Read for 90 minutes",
+            kind="increment",
+        ),
+        SeedObservation(
+            5,
+            "reading_minutes",
+            45,
+            "minutes",
+            "Read for 45 minutes",
+            kind="increment",
+        ),
     ),
     commitments=_weekly(
         99,

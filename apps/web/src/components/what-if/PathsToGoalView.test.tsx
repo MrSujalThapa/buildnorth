@@ -25,5 +25,5 @@ it("stops loading when a completed search has no feasible paths", () => {
     />,
   );
   expect(screen.getByText("No feasible path was found within the current limits.")).toBeInTheDocument();
-  expect(screen.queryByText(/Searching backend paths/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Searching for paths/)).not.toBeInTheDocument();
 });
