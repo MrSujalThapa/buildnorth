@@ -2001,15 +2001,15 @@
 .strategy-amount-row input:focus-visible { outline: 2px solid var(--what-if-accent); outline-offset: 1px; }
 .strategy-unit { flex: 1; min-width: 0; font-size: 13px; color: var(--what-if-muted); }
 .strategy-quick { display: flex; gap: 6px; margin-top: 10px; }
-.strategy-quick button { min-width: 48px; height: 30px; padding: 0 10px; border: 1px solid var(--what-if-border); border-radius: 6px; background: transparent; color: var(--what-if-ink); font: 500 13px/1 var(--font-mono); cursor: pointer; transition: border-color var(--what-if-duration, .16s) var(--what-if-ease, ease), background var(--what-if-duration, .16s) var(--what-if-ease, ease); }
-.strategy-quick button:hover:not(:disabled) { border-color: var(--what-if-accent); }
-.strategy-quick button.is-selected { border-color: var(--what-if-accent); background: color-mix(in srgb, var(--what-if-accent) 14%, transparent); }
+.strategy-plan .strategy-quick button { min-width: 48px; height: 30px; padding: 0 10px; border: 1px solid var(--what-if-border); border-radius: 6px; background: transparent; color: var(--what-if-ink); font: 500 13px/1 var(--font-mono); cursor: pointer; transition: border-color var(--what-if-duration, .16s) var(--what-if-ease, ease), background var(--what-if-duration, .16s) var(--what-if-ease, ease); }
+.strategy-plan .strategy-quick button:hover:not(:disabled) { border-color: var(--what-if-accent); }
+.strategy-plan .strategy-quick button.is-selected { border-color: var(--what-if-accent); background: color-mix(in srgb, var(--what-if-accent) 14%, transparent); }
 .strategy-warning { margin: 8px 0 0; font-size: 12.5px; color: var(--what-if-negative); }
 .strategy-analysis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px 24px; margin: 18px 0 0; padding-top: 14px; border-top: 1px solid var(--what-if-border); }
 .strategy-analysis dt { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--what-if-muted); }
 .strategy-analysis dd { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--what-if-ink); }
 .strategy-footnote { margin: 14px 0 0; font-size: 12.5px; color: var(--what-if-muted); }
-.strategy-run { flex: none; height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--what-if-ink); color: var(--what-if-bg, #0b0b0c); font-family: inherit; font-size: 13.5px; font-weight: 600; line-height: 1; cursor: pointer; transition: opacity var(--what-if-duration, .16s) var(--what-if-ease, ease); }
-.strategy-run:hover:not(:disabled) { opacity: .86; }
-.strategy-run:disabled { opacity: .4; cursor: not-allowed; }
-.strategy-run:focus-visible { outline: 2px solid var(--what-if-accent); outline-offset: 2px; }
+.strategy-plan .strategy-run { flex: none; height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--what-if-ink); color: var(--what-if-bg, #0b0b0c); font-family: inherit; font-size: 13.5px; font-weight: 600; line-height: 1; cursor: pointer; transition: opacity var(--what-if-duration, .16s) var(--what-if-ease, ease); }
+.strategy-plan .strategy-run:hover:not(:disabled) { opacity: .86; }
+.strategy-plan .strategy-run:disabled { opacity: .4; cursor: not-allowed; }
+.strategy-plan .strategy-run:focus-visible { outline: 2px solid var(--what-if-accent); outline-offset: 2px; }
