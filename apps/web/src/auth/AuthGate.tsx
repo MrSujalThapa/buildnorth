@@ -256,7 +256,7 @@ function ClerkGate({ children }: Props) {
   if (!isLoaded || !ready) return <LoadingScreen slow={slow} />;
   if (!isSignedIn) {
     if (isPublicBrowsePath(location.pathname)) {
-      return <AccountProviders account={null} refresh={async () => undefined}>{children}</AccountProviders>;
+      return <AccountProviders account={null} refresh={() => Promise.resolve()}>{children}</AccountProviders>;
     }
     return (
       <main className="auth-screen">
