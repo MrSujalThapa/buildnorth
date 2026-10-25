@@ -65,10 +65,13 @@ class IdentityService:
                     "sub": stored.clerk_user_id,
                     "iss": "playitout-internal",
                 }
-            )
+            ),
+            fresh_verification=True,
         )
 
-    async def principal_from_claims(self, claims: TokenClaims) -> Principal:
+    async def principal_from_claims(
+        self, claims: TokenClaims, *, fresh_verification: bool = False
+    ) -> Principal:
         claims.pop("role", None)
         email = (claims.email or "").strip().lower() or None
         email_verified = claims.email_verified
@@ -79,7 +82,9 @@ class IdentityService:
             and claims.get("iss") != "playitout-test"
         ):
             looked_up, looked_verified = self._email_cache.resolve(
-                claims.clerk_user_id, self._settings.clerk_secret_key
+                claims.clerk_user_id,
+                self._settings.clerk_secret_key,
+                fresh=fresh_verification or email in admins,
             )
             # Clerk's current primary verified email is authoritative for privileges.
             email, email_verified = looked_up, looked_verified

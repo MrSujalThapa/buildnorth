@@ -215,6 +215,58 @@ async def test_deployed_admin_requires_both_immutable_id_and_verified_email() ->
     assert other.role == "user" and not other.hosted_enabled
 
 
+async def test_scheduled_admin_lookup_rechecks_clerk_and_fails_closed() -> None:
+    settings = Settings(
+        environment="production",
+        admin_emails=["admin@example.test"],
+        admin_clerk_user_ids=["trusted-id"],
+        clerk_secret_key="test-secret",
+    )
+    reads = 0
+
+    def clerk(_id: str, _secret: str) -> tuple[str | None, bool]:
+        nonlocal reads
+        reads += 1
+        return ("admin@example.test", reads == 1)
+
+    service = IdentityService(
+        InMemoryIdentityRepository(),
+        settings,
+        VerifiedEmailCache(lookup=clerk, ttl_seconds=3600),
+    )
+    initial = await service.principal_from_claims(
+        TokenClaims(
+            {
+                "sub": "trusted-id",
+                "iss": "https://clerk.example",
+                "email": "admin@example.test",
+                "email_verified": True,
+            }
+        )
+    )
+    assert initial.trusted_admin and initial.hosted_quota_usd == 100
+    refreshed = await service.principal_for_user_id(initial.user_id)
+    assert reads == 2
+    assert refreshed is not None and not refreshed.trusted_admin
+    assert not refreshed.hosted_enabled
+
+
+async def test_background_user_charge_never_uses_admin_allocation() -> None:
+    repo = InMemoryIdentityRepository()
+    service = IdentityService(repo, _settings())
+    store = InMemoryBudgetStore()
+    budget = InferenceBudgetService(store, _settings())
+    admin = await service.principal_from_claims(_claims("admin", "admin@example.test"))
+    other = await service.principal_from_claims(_claims("other", "other@example.test"))
+    invite = await service.create_invitation(admin)
+    await service.redeem_invitation(other, invite.token or "")
+    refreshed = await service.principal_for_user_id(other.user_id)
+    assert refreshed is not None and refreshed.user_id == other.user_id
+    await budget.reserve_research(refreshed, 4.0)
+    assert (await budget.usage_for(admin)).remaining_usd == 100
+    assert (await budget.usage_for(refreshed)).remaining_usd == 1
+
+
 def test_invalid_hosted_model_fails_before_a_provider_call() -> None:
     with pytest.raises(SemanticProviderError, match="unsupported"):
         hosted_allowlist("spur", "unknown-spur-model")

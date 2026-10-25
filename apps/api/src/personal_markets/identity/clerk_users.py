@@ -20,10 +20,12 @@ class VerifiedEmailCache:
         self._clock = clock
         self._entries: dict[str, tuple[float, str]] = {}
 
-    def resolve(self, clerk_user_id: str, secret: str) -> tuple[str | None, bool]:
+    def resolve(
+        self, clerk_user_id: str, secret: str, *, fresh: bool = False
+    ) -> tuple[str | None, bool]:
         now = self._clock()
         cached = self._entries.get(clerk_user_id)
-        if cached and cached[0] > now:
+        if not fresh and cached and cached[0] > now:
             return cached[1], True
         email, verified = self._lookup(clerk_user_id, secret)
         if email and verified:
