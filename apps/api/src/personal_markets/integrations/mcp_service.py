@@ -608,6 +608,10 @@ class IntegrationGatewayService:
         from personal_markets.integrations.mcp_domain import MCPToolDescriptor
         from personal_markets.integrations.source_presentation import SourcePreview
 
+        def _dump(preview: SourcePreview) -> dict[str, object]:
+            payload = preview.model_dump(mode="json")
+            return payload if isinstance(payload, dict) else {}
+
         owner = self._owner(user_id)
         connection = await self._repository.get_connection(owner, plugin_id)
         if connection is None or connection.status != "connected":
@@ -633,11 +637,13 @@ class IntegrationGatewayService:
         }
         plan = preview_plan(plugin_id, tools, resource_id, supplied)
         if not plan:
-            return SourcePreview(
-                resource_title=resource_title or resource_id,
-                resource_type=resource_type or "resource",
-                error="No safely scoped read is available for this source.",
-            ).model_dump(mode="json")
+            return _dump(
+                SourcePreview(
+                    resource_title=resource_title or resource_id,
+                    resource_type=resource_type or "resource",
+                    error="No safely scoped read is available for this source.",
+                )
+            )
         transport = self._transport_for(connection)
         preview = await self._execute_preview_plan(
             plugin_id=plugin_id,
@@ -651,7 +657,7 @@ class IntegrationGatewayService:
             transport=transport,
             supplied=supplied,
         )
-        return preview.model_dump(mode="json")
+        return _dump(preview)
 
     async def _execute_preview_plan(
         self,
