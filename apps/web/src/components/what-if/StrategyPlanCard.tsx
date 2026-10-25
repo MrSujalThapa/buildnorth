@@ -64,7 +64,7 @@ export default function StrategyPlanCard({ plan, question, busy, onRun }: Props)
               onChange={(event) => setAmount(Number(event.target.value))}
             />
             <span className="strategy-unit">{lever.unit_label}</span>
-            <button className="ui-button primary" type="submit" disabled={!valid || busy}>
+            <button className="strategy-run" type="submit" disabled={!valid || busy}>
               {plan.modeled ? "Re-run" : "Run scenario"}
             </button>
           </div>
