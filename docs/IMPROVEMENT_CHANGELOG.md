@@ -1117,3 +1117,10 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 ## 2026-10-24 — Generic Composio reads keep extra schema arguments
 
 - Connected apps without a provider adapter can list records, save one scoped read, and replay it. Extra schema-required arguments such as a spreadsheet range are collected in Evidence, validated against the live tool schema, and stored on the goal recipe. Change-feed tools are not used as resource catalogs. Headered value grids keep a date, metric, number, and unit only when those columns are present. Records stay unverified and do not publish a forecast by themselves. No Google Sheets adapter was added.
+
+## 2026-10-24 — Spur entitlement reconciliation and admission limits
+
+- A trusted, currently verified Clerk admin identity now reconciles to a cumulative $100 hosted allocation on sign-in. A deployed admin also requires an immutable Clerk user ID in `PM_ADMIN_CLERK_USER_IDS`, in addition to the verified-email allowlist. Redeemed ordinary accounts reconcile to at most $5; uninvited accounts receive no hosted allocation. Reconciliation changes only the entitlement, retaining spent and reserved counters and immutable ledger rows. Background and MCP lookups recheck identity rather than trusting a stored admin role.
+- Invitation requests are capped, and the budget service independently enforces effective user caps on inference and charged research tools. The default global application guardrail is $250, separate from per-account allocations. This does not impose an upstream Spur billing ceiling.
+- Spur GLM 5.3 estimates changed from the previously unverified $2.50/$15 per million tokens to the published $0.30/$1.00 rates. Historical ledger entries were not altered. Settings now displays spent and reserved amounts and a safe unavailable reason.
+- Local mocked entitlement and authorization tests pass. Live Spur inference and the production account row have not yet been verified; no paid provider call was made in this run.

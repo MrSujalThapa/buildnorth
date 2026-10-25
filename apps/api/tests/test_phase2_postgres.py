@@ -8,7 +8,8 @@ import pytest
 from sqlalchemy import text
 
 from helpers import POSTGRES_MIGRATION_SKIP, isolated_postgres_url
-from personal_markets.identity.budget import PostgresBudgetStore
+from personal_markets.core.config import Settings
+from personal_markets.identity.budget import InferenceBudgetService, PostgresBudgetStore
 from personal_markets.identity.credentials import (
     CredentialCipher,
     InferencePreference,
@@ -21,6 +22,33 @@ from personal_markets.persistence.research_store import ResearchStore
 from personal_markets.ports import ResearchArtifact
 
 pytestmark = pytest.mark.integration
+
+
+async def test_postgres_parallel_reservations_obey_five_dollar_cap() -> None:
+    url = isolated_postgres_url()
+    if not url:
+        pytest.skip("PM_TEST_DATABASE_URL is not configured")
+    engine = create_engine(url)
+    user = make_principal(
+        f"budget-race-{uuid4()}", invited=True, hosted=True, quota_usd=100, quota_tokens=1_000_000
+    )
+    try:
+        async with engine.begin() as conn:
+            if not await conn.scalar(text("select to_regclass('inference_reservations')")):
+                pytest.skip(POSTGRES_MIGRATION_SKIP)
+            await conn.execute(
+                text("insert into app_users (id, clerk_user_id) values (:id, :clerk)"),
+                {"id": user.user_id, "clerk": user.clerk_user_id},
+            )
+        store = PostgresBudgetStore(engine)
+        budget = InferenceBudgetService(store, Settings())
+        results = await asyncio.gather(
+            *[budget.reserve_research(user, 1.0) for _ in range(10)], return_exceptions=True
+        )
+        assert sum(not isinstance(item, Exception) for item in results) == 5
+        assert (await store.counters(str(user.user_id))).reserved_usd == 5.0
+    finally:
+        await engine.dispose()
 
 
 async def test_encrypted_credentials_preferences_ledger_and_research_reload() -> None:

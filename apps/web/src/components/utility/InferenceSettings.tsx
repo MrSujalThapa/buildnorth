@@ -74,7 +74,7 @@ export function InferenceSettings({
   }
 
   const hostedAvailable = hosted
-    ? hosted.hosted_available ?? (!hosted.kill_switch && hosted.remaining_usd > 0 && (hosted.global_remaining_usd == null || hosted.global_remaining_usd > 0) && Boolean(settings?.hosted_configured))
+    ? hosted.hosted_available ?? (hosted.enabled && !hosted.kill_switch && hosted.remaining_usd > 0 && (hosted.global_remaining_usd == null || hosted.global_remaining_usd > 0) && Boolean(settings?.hosted_configured))
     : false;
 
   return (
@@ -112,6 +112,10 @@ export function InferenceSettings({
                       : "Sign in to see your remaining credit."}
                   </dd>
                 </div>
+                {hosted ? <>
+                  <div><dt>Spent</dt><dd>${Number(hosted.spent_usd).toFixed(2)}</dd></div>
+                  <div><dt>Reserved</dt><dd>${Number(hosted.reserved_usd).toFixed(2)}</dd></div>
+                </> : null}
                 <div>
                   <dt>Availability</dt>
                   <dd>
@@ -119,9 +123,17 @@ export function InferenceSettings({
                       ? "Hosted inference disabled"
                       : !settings.hosted_configured
                         ? "Hosted provider not configured"
+                        : !hosted?.enabled
+                          ? "No hosted entitlement for this account"
+                          : hosted.remaining_usd <= 0
+                            ? "Personal credit exhausted"
+                            : hosted.remaining_tokens <= 0
+                              ? "Token allowance exhausted"
+                              : hosted.global_remaining_usd != null && hosted.global_remaining_usd <= 0
+                                ? "Platform allowance exhausted"
                         : hostedAvailable
                           ? "Hosted inference available"
-                          : "Hosted credit is unavailable for this account"}
+                          : "Hosted inference temporarily unavailable"}
                   </dd>
                 </div>
                 {isAdmin && hosted && hosted.global_remaining_usd != null ? (

@@ -22,6 +22,7 @@ class Principal(BaseModel):
     email: str | None = None
     email_verified: bool = False
     role: Role = "user"
+    trusted_admin: bool = Field(default=False, exclude=True)
     invited: bool = False
     hosted_enabled: bool = False
     hosted_quota_usd: float = 0.0

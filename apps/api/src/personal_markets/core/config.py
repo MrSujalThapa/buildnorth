@@ -93,12 +93,15 @@ class Settings(BaseSettings):
     )
     clerk_secret_key: str | None = Field(default=None, validation_alias="CLERK_SECRET_KEY")
     admin_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    admin_clerk_user_ids: Annotated[list[str], NoDecode] = Field(default_factory=list)
     test_auth_secret: str | None = None
     hosted_inference_enabled: bool = True
-    hosted_user_quota_usd: float = 5.0
+    hosted_user_quota_usd: float = Field(default=5.0, ge=0)
     hosted_user_quota_tokens: int = 5_000_000
-    hosted_global_quota_usd: float = 100.0
-    hosted_global_quota_tokens: int = 100_000_000
+    hosted_admin_quota_usd: float = Field(default=100.0, ge=0, le=100.0)
+    hosted_admin_quota_tokens: int = 100_000_000
+    hosted_global_quota_usd: float = 250.0
+    hosted_global_quota_tokens: int = 250_000_000
     hosted_user_rpm: int = 20
     hosted_ip_rpm: int = 60
     invite_ttl_hours: int = 72
@@ -197,7 +200,13 @@ class Settings(BaseSettings):
             return value.strip().lower() in {"1", "true", "yes", "on"}
         return value
 
-    @field_validator("admin_emails", "clerk_authorized_parties", "trusted_proxies", mode="before")
+    @field_validator(
+        "admin_emails",
+        "admin_clerk_user_ids",
+        "clerk_authorized_parties",
+        "trusted_proxies",
+        mode="before",
+    )
     @classmethod
     def _coerce_str_list(cls, value: object, info: ValidationInfo) -> object:
         items: list[str]

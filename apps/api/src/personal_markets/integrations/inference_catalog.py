@@ -61,11 +61,11 @@ MODELS = (
     ModelCapability(
         "spur",
         "spur-glm-5-3",
-        2.50,
-        15,
+        0.30,
+        1.00,
         tools=False,
         minimum_output_tokens=4096,
-        pricing_basis="conservative application ceiling; Spur price not verified",
+        pricing_basis="Spur published GLM 5.3 token pricing, checked 2026-10-24",
         display_name="Spur GLM 5.3",
         pricing_available=True,
     ),
@@ -99,7 +99,9 @@ def hosted_model_catalog(provider: str, configured_model: str | None) -> list[di
 
 def hosted_allowlist(provider: str, configured_model: str | None) -> set[str]:
     cataloged = {item.model for item in MODELS if item.provider == provider}
-    if configured_model and configured_model in cataloged:
+    if configured_model:
+        if configured_model not in cataloged:
+            raise SemanticProviderError("Configured hosted model is unsupported")
         return {configured_model}
     return cataloged
 
@@ -135,9 +137,7 @@ def classify_discovered(
             compatibility=COMPAT_INCOMPATIBLE,
             source="discovered",
         )
-    raise SemanticProviderError(
-        "Unsupported provider/model selection; choose a supported model"
-    )
+    raise SemanticProviderError("Unsupported provider/model selection; choose a supported model")
 
 
 def resolve_capability(provider: str, model: str) -> ModelCapability:

@@ -348,7 +348,7 @@ def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
     from personal_markets.identity.factory import (
         get_budget_store,
         get_credential_store,
-        get_identity_repository,
+          get_identity_service,
         get_inference_budget_service,
     )
     from personal_markets.identity.inference_audit import InferenceAudit
@@ -359,7 +359,7 @@ def build_inference(settings: Settings, usage_store: Any) -> InferenceProvider:
     del usage_store
     return InferenceRouter(
         settings, get_credential_store(), get_inference_budget_service(),
-        InferenceAudit(get_budget_store()), get_identity_repository().get_user,
+          InferenceAudit(get_budget_store()), get_identity_service().principal_for_user_id,
     )
 
 
