@@ -83,9 +83,18 @@ def composed_metric_units(goal: GoalContract) -> dict[str, str]:
 
 def allowed_metrics(goal: GoalContract) -> set[str]:
     composed = composed_metric_units(goal)
-    if composed:
-        return set(composed)
     domain = goal_domain(goal)
     metrics = set(KNOWN_METRICS["generic"])
     metrics.update(KNOWN_METRICS.get(domain, set()))
-    return metrics
+    if not composed:
+        return metrics
+    extras = set(composed)
+    if domain == "career":
+        extras.update(
+            {
+                "applications_per_week",
+                "applications_per_month",
+                "weekly_application_rate",
+            }
+        )
+    return extras

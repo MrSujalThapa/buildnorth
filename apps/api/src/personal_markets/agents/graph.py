@@ -38,6 +38,21 @@ from personal_markets.ports import (
 )
 
 
+def _observation_kind_from_answer(answer: str) -> str | None:
+    text = answer.strip().lower()
+    if not text:
+        return None
+    if any(token in text for token in ("current", "total", "stock", "already have")):
+        return "current_total"
+    if any(token in text for token in ("additional", "increment", "delta", "more this")):
+        return "period_increment"
+    if any(token in text for token in ("per week", "period", "rate", "weekly")):
+        return "period_measurement"
+    if any(token in text for token in ("event", "distinct", "happened", "occurred", "observed")):
+        return "distinct_event"
+    return None
+
+
 class LangGraphAgentWorkflow:
     def __init__(self, deps: AgentDependencies, checkpointer: BaseCheckpointSaver[Any]) -> None:
         self._deps = deps
@@ -149,10 +164,13 @@ class LangGraphAgentWorkflow:
         resume_value: dict[str, object]
         if payload.cancelled:
             resume_value = {"cancelled": True}
-        elif payload.answers:
-            resume_value = dict(payload.answers)
         else:
-            resume_value = {"confirmed": bool(payload.confirmed)}
+            resume_value = {}
+            if payload.confirmed is not None:
+                resume_value["confirmed"] = bool(payload.confirmed)
+            resume_value.update(payload.answers)
+            if not resume_value:
+                resume_value = {"confirmed": False}
         async with asyncio.timeout(self._deps.settings.inference_run_timeout_seconds):
             result = await self._graph.ainvoke(
                 Command(resume=resume_value), self._config(thread_id)
@@ -246,6 +264,7 @@ class LangGraphAgentWorkflow:
             "user_id": state.get("user_id"),
             "steps": list(state.get("progress") or []),
             "goal_committed": bool(state.get("committed_goal_id")),
+            "committed_evidence_ids": list(state.get("committed_evidence_ids") or []),
             "inference": dict(self._deps.last_inference),
         }
         return snapshot
@@ -334,7 +353,11 @@ class LangGraphAgentWorkflow:
         merged = dict(state.get("resume_answers") or {})
         if isinstance(answers, dict):
             merged.update(
-                {str(key): str(value) for key, value in answers.items() if key != "cancelled"}
+                {
+                    str(key): str(value)
+                    for key, value in answers.items()
+                    if key not in {"cancelled", "confirmed"}
+                }
             )
         return {
             "resume_answers": merged,
@@ -539,19 +562,41 @@ class LangGraphAgentWorkflow:
         result = interrupt(payload.model_dump(mode="json"))
         if isinstance(result, dict) and result.get("cancelled"):
             return {"cancelled": True, "status": "cancelled"}
-        retries = int(state.get("evidence_retries") or 0) + 1
+        confirmed = isinstance(result, dict) and bool(result.get("confirmed"))
         answers = dict(state.get("resume_answers") or {})
         if isinstance(result, dict):
-            answers.update({str(key): str(value) for key, value in result.items()})
-        return {
+            answers.update(
+                {
+                    str(key): str(value)
+                    for key, value in result.items()
+                    if key not in {"confirmed", "cancelled"}
+                }
+            )
+        update: dict[str, Any] = {
             "resume_answers": answers,
-            "evidence_retries": retries,
+            "evidence_confirmed": confirmed,
             "current_step": "interrupt_evidence",
         }
+        if confirmed:
+            mapped = _observation_kind_from_answer(answers.get("observation_kind", ""))
+            events = []
+            for event in proposal.events:
+                if mapped and event.observation_kind in {None, "uncertain"}:
+                    events.append(event.model_copy(update={"observation_kind": mapped}))
+                else:
+                    events.append(event)
+            update["evidence_proposal"] = proposal.model_copy(
+                update={"events": events, "ambiguities": []}
+            ).model_dump(mode="json")
+        else:
+            update["evidence_retries"] = int(state.get("evidence_retries") or 0) + 1
+        return update
 
     def _after_interrupt_evidence(self, state: AgentGraphState) -> str:
         if state.get("cancelled"):
             return END
+        if state.get("evidence_confirmed"):
+            return "commit_evidence"
         proposal = EvidenceAgentProposal.model_validate(
             state.get("evidence_proposal") or {"events": []}
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal, NamedTuple
 
 from personal_markets.goals.domain import GoalContract
 from personal_markets.ports import (
@@ -17,13 +18,65 @@ _APPLICATION_QUANTITY = re.compile(
     r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+jobs?\b",
     re.I,
 )
+_APPS_FROM_TO = re.compile(
+    r"applications?\s+from\s+(\d+(?:\.\d+)?)\s*"
+    r"(?:per\s+week|/week|a\s+week|weekly)?\s+to\s+(\d+(?:\.\d+)?)",
+    re.I,
+)
+_FROM_TO = re.compile(
+    r"from\s+(\d+(?:\.\d+)?)\s*(?:per\s+week|/week|a\s+week|weekly)?"
+    r"(?:\s+applications?)?\s+to\s+(\d+(?:\.\d+)?)",
+    re.I,
+)
+_INSTEAD = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:applications?\s*)?(?:per\s+week|/week|a\s+week)?"
+    r"\s+instead\s+of\s+(\d+(?:\.\d+)?)",
+    re.I,
+)
+_INSTEAD_LEADING = re.compile(
+    r"instead\s+of\s+(\d+(?:\.\d+)?).{0,80}?\b(?:do|make\s+it|set)\s+(\d+(?:\.\d+)?)",
+    re.I,
+)
+_INCREASE_BY = re.compile(
+    r"(?:increase|raise)\b.{0,80}?\bby\s+(\d+(?:\.\d+)?)",
+    re.I,
+)
+_WEEK = re.compile(r"\b(?:week|weekly|/week)\b", re.I)
+_UNMODELED_WITH_APPS = re.compile(r"\b(?:cold\s+emails?|network\w*|leetcode|study|gym)\b", re.I)
+
+
+class WeeklyApplicationIntent(NamedTuple):
+    value: float
+    operation: Literal["set", "add"]
+
+
+def parse_weekly_application_intent(text: str) -> WeeklyApplicationIntent | None:
+    """Map stated weekly application language onto SET(new rate) vs ADD(delta)."""
+    if _WEEK.search(text) is None:
+        return None
+    from_to = _APPS_FROM_TO.search(text) or _FROM_TO.search(text)
+    if from_to is not None:
+        return WeeklyApplicationIntent(float(from_to.group(2)), "set")
+    leading = _INSTEAD_LEADING.search(text)
+    if leading is not None:
+        return WeeklyApplicationIntent(float(leading.group(2)), "set")
+    instead = _INSTEAD.search(text)
+    if instead is not None:
+        return WeeklyApplicationIntent(float(instead.group(1)), "set")
+    increase_by = _INCREASE_BY.search(text)
+    if increase_by is not None:
+        return WeeklyApplicationIntent(float(increase_by.group(1)), "add")
+    match = _APPLICATION_QUANTITY.search(text)
+    if match is None:
+        return None
+    value = float(match.group(1) or match.group(2))
+    is_delta = bool(re.search(r"\b(?:more|additional|extra)\b", text, re.I))
+    return WeeklyApplicationIntent(value, "add" if is_delta else "set")
 
 
 def _stated_application_quantity(text: str) -> float | None:
-    match = _APPLICATION_QUANTITY.search(text)
-    if match is None or re.search(r"\b(?:week|weekly)\b", text, re.I) is None:
-        return None
-    return float(match.group(1) or match.group(2))
+    intent = parse_weekly_application_intent(text)
+    return None if intent is None else intent.value
 
 
 def _is_probability_like(metric: str, unit: str) -> bool:
@@ -57,37 +110,30 @@ def critique_intervention(
                     "A completed application count is evidence, not a future What If action."
                 )
                 continue
-            if re.search(r"\band\b", source_text, re.I) and re.search(
-                r"\b(?:cold\s+emails?|network\w*|leetcode|study|gym)\b", source_text, re.I
+            if re.search(r"\band\b", source_text, re.I) and _UNMODELED_WITH_APPS.search(
+                source_text
             ):
                 issues.append(
                     "This question combines a modeled application change with an "
                     "unmodeled action; ask about the application change separately."
                 )
                 continue
-            if (
-                re.search(r"\binstead\s+of\b", source_text, re.I)
-                and len(re.findall(r"\d+(?:\.\d+)?", source_text)) > 1
-            ):
-                issues.append(
-                    "The previous and proposed application rates are ambiguous; "
-                    "state the new applications-per-week rate explicitly."
-                )
+            intent = parse_weekly_application_intent(source_text)
+            if intent is None:
+                if _UNMODELED_WITH_APPS.search(source_text):
+                    issues.append(
+                        "Cold emails and networking are not measured applications; "
+                        "state an application count per week to model this change."
+                    )
+                else:
+                    issues.append(
+                        "State a numeric applications-per-week rate to model this change."
+                    )
                 continue
-            stated = _stated_application_quantity(source_text)
-            if stated is None:
-                issues.append(
-                    "Cold emails and networking are not measured applications; "
-                    "state an application count per week to model this change."
-                )
-                continue
-            if abs(stated - change.value) > 1e-9:
+            if abs(intent.value - change.value) > 1e-9:
                 issues.append("The proposed weekly application count differs from your question.")
                 continue
-            is_delta = bool(re.search(r"\b(?:more|additional|extra)\b", source_text, re.I))
-            if (is_delta and change.operation != "add") or (
-                not is_delta and change.operation != "set"
-            ):
+            if intent.operation != change.operation:
                 issues.append("Application changes must distinguish a new rate from an increase.")
                 continue
         if source_text is not None and change.provenance in {

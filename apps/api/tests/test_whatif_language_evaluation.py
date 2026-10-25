@@ -40,7 +40,14 @@ QUESTIONS = [
         "add",
     ),
     ("career", "what if i do 10 applications a week", "priced", "applications_per_week", 10, "set"),
-    ("career", "instead of 2 applications a week what if i do 10", "clarify", None, None, None),
+    (
+        "career",
+        "instead of 2 applications a week what if i do 10",
+        "priced",
+        "applications_per_week",
+        10,
+        "set",
+    ),
     ("career", "what if i stop applying for 2 weeks", "clarify", None, None, None),
     ("career", "what if i do 3 mock interviews a week", "unpriced", None, None, None),
     (

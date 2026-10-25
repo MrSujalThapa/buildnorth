@@ -210,7 +210,10 @@ class InferenceRouter:
                 "anthropic": self._settings.anthropic_api_key,
             }.get(provider)
             if not hosted_key:
-                raise ProviderNotConfiguredError("Selected hosted provider is not configured")
+                raise ProviderNotConfiguredError(
+                    "Selected hosted provider is not configured "
+                    f"(provider={provider}, key_present=false, step=hosted_key)"
+                )
             key = hosted_key
         adapter = self._adapter_factory(provider, key)
         reservation = None

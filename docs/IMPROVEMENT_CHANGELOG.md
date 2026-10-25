@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Close remaining Spur E2E blockers (confirm, 8→15 critic, hosted key)
+
+**Hypothesis:** Live Spur inference was proven, but consumer acceptance still stopped at `needs_input`, dropped a valid 8→15 applications/week SET, and Chromium hit `ProviderNotConfiguredError` because a blank `PM_SPUR_API_KEY` process env masked `.env`. GitHub typecheck failed on `test_last_scenario.py` returning `Any`.
+
+**Changes:** Type-narrow `_scripted_goal`. Confirming evidence commits the reviewed proposal (resume keeps `confirmed` plus answers) instead of re-invoking the evidence agent. Critic parses `from N to M` / `instead of` as SET of the new weekly rate and `increase by` as ADD; composed career specs still allow hiring-funnel rate aliases. Blank process env secrets no longer hide dotenv keys. Live complete-journey assertions require committed evidence IDs, simulation, and a second receipt. No Pass 9, Social, forecast-coefficient, or production-quota changes.
+
+**Measured result:** Local mypy baseline clean (363 historical). Targeted API tests green. Live complete career journey: 6 Spur calls, ~$0.008, `weekly_application_rate` SET 15, scenario probability 0.588, evidence confirmed and committed, published history 1→2 (0.207 → 0.342). Chromium hosted Spur not re-run this pass (call budget). Not merged.
+
 ## 2026-10-25 — Real Spur consumer acceptance and lossless fingerprint uniqueness
 
 **Hypothesis:** Scripted E2E only proved HTTP/Postgres/browser wiring. Empty evidence continuation after confirm was invoking the evidence agent and surfacing `evidence_continuation_failed`. Fingerprint uniqueness numbered `0023` collided with PR #33, and deleting duplicate evidence rows would break dependents.

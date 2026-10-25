@@ -927,18 +927,16 @@ def _intervention(payload: dict[str, Any]) -> dict[str, Any]:
             {"variable": "applications_submitted", "description": "Higher application throughput"},
             {"variable": "interview_funnel", "description": "More opportunities enter the funnel"},
         ]
-        quantity = re.search(
-            r"\b(\d+(?:\.\d+)?)\s+(?:additional |more |extra )?(?:job )?applications?\b"
-            r"|\bappl(?:y|ied|ying)\s+to\s+(\d+(?:\.\d+)?)\s+jobs?\b",
-            text,
-        )
-        if quantity and re.search(r"\b(?:week|weekly)\b", text):
-            is_delta = bool(re.search(r"\b(?:more|additional|extra)\b", text))
+        from personal_markets.agents.intervention_critic import parse_weekly_application_intent
+
+        intent = parse_weekly_application_intent(text)
+        if intent is not None:
             add_change(
                 "applications_per_week",
-                float(quantity.group(1) or quantity.group(2)),
+                intent.value,
                 "applications/week",
-                operation="add" if is_delta else "set", frequency="weekly",
+                operation=intent.operation,
+                frequency="weekly",
             )
             pricing_status = "PRICED"
         else:

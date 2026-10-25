@@ -48,7 +48,11 @@ def _scripted_goal(client: TestClient) -> str:
     confirmed = client.post(
         f"/api/v1/agent/threads/{thread_id}/resume", json={"confirmed": True}
     ).json()
-    return confirmed["goal"]["goal_id"]
+    goal = confirmed["goal"]
+    assert isinstance(goal, dict)
+    goal_id = goal["goal_id"]
+    assert isinstance(goal_id, str)
+    return goal_id
 
 
 def test_http_follow_up_reuses_last_scenario_for_same_owner_goal() -> None:

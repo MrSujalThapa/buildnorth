@@ -117,6 +117,14 @@ def test_cold_email_cannot_become_unmeasured_application_uplift() -> None:
         ("what if i send 5 more applications every week", 5, "add"),
         ("what if i apply to 20 jobs next week", 20, "set"),
         ("what if i do 10 applications a week", 10, "set"),
+        (
+            "What if I increase applications from 8 per week to 15 per week "
+            "for the next two months?",
+            15,
+            "set",
+        ),
+        ("What if I increase from 8/week by 7/week?", 7, "add"),
+        ("What if I do 15 applications/week instead of 8?", 15, "set"),
     ],
 )
 def test_explicit_weekly_application_changes_survive_critique(
@@ -149,6 +157,8 @@ def test_explicit_weekly_application_changes_survive_critique(
         ("What if I send 5 more applications each week?", 5, "set"),
         ("What if I submit 5 applications each week?", 5, "add"),
         ("What if I apply to 20 jobs next week?", 15, "set"),
+        ("I completed 15 applications yesterday", 15, "set"),
+        ("What if I send 15 additional applications?", 15, "add"),
     ],
 )
 def test_application_critic_rejects_unstated_or_wrong_semantics(
@@ -185,6 +195,75 @@ def test_study_hours_cannot_invent_a_daily_practice_quantity() -> None:
         pricing_status="PRICED",
     )
     critic = critique_intervention(career_goal(), proposal, "What if I study 10 hours tomorrow?")
+    assert not critic.approved
+    assert not critic.validated_changes
+
+
+def _composed_career_goal() -> GoalContract:
+    goal = career_goal()
+    return goal.model_copy(
+        update={
+            "model_requirements": {
+                "forecast_spec": {
+                    "family": "composed_growth",
+                    "primitives": [
+                        {
+                            "id": "primary",
+                            "kind": "growth",
+                            "config": {"time_unit": "week"},
+                            "unit": "count",
+                        }
+                    ],
+                }
+            }
+        }
+    )
+
+
+def test_composed_career_spec_still_accepts_application_rate() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Increase applications to 15 per week",
+        changes=[
+            InterventionStateChange(
+                metric="applications_per_week",
+                operation="set",
+                value=15,
+                unit="applications/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(
+        _composed_career_goal(),
+        proposal,
+        "What if I increase my applications from 8 per week to 15 per week "
+        "for the next two months?",
+    )
+    assert critic.approved
+    assert critic.validated_changes[0].value == 15
+    assert critic.validated_changes[0].operation == "set"
+
+
+def test_composed_career_spec_rejects_unmodeled_mock_interviews() -> None:
+    proposal = InterventionAgentProposal(
+        understood_action="Four mock interviews",
+        changes=[
+            InterventionStateChange(
+                metric="mock_interviews_per_week",
+                operation="set",
+                value=4,
+                unit="count/week",
+                provenance="EXPLORATION_ASSUMPTION",
+            )
+        ],
+        pricing_status="PRICED",
+    )
+    critic = critique_intervention(
+        _composed_career_goal(),
+        proposal,
+        "What if I do four mock interviews per week?",
+    )
     assert not critic.approved
     assert not critic.validated_changes
 

@@ -118,6 +118,16 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment,
         deployed=settings.is_deployed(),
     )
+    from personal_markets.identity.inference_router import hosted_provider
+
+    structlog.get_logger("personal_markets").info(
+        "api_inference",
+        scripted=settings.scripted_inference,
+        hosted_provider=hosted_provider(settings),
+        spur_key_configured=bool(settings.spur_api_key),
+        inference_model=settings.inference_model
+        or (settings.resolved_spur_model() if settings.inference_provider == "spur" else None),
+    )
     structlog.get_logger("personal_markets").warning(
         "single_worker_required",
         reason="MCP rate limits and goal write locks are process-local asyncio state",

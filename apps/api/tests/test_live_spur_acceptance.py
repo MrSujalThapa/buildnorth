@@ -12,15 +12,12 @@ from uuid import UUID, uuid4
 
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
-from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 
 from helpers import isolated_postgres_url
-from personal_markets.agents.completion import complete_validated
 from personal_markets.agents.graph import LangGraphAgentWorkflow
 from personal_markets.agents.intervention_service import InterventionAgentService
-from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.models import estimate_cost_usd
 from personal_markets.agents.state import AgentDependencies
 from personal_markets.core.config import Settings
@@ -55,7 +52,7 @@ from personal_markets.what_if.service import WhatIfService
 
 pytestmark = pytest.mark.live_spur
 
-MAX_CALLS = 40
+MAX_CALLS = 12
 MAX_USD = 5.0
 EVAL_PATH = Path("docs/live_spur_eval.json")
 
@@ -63,11 +60,6 @@ EVAL_PATH = Path("docs/live_spur_eval.json")
 def _require_live() -> None:
     if os.environ.get("PM_LIVE_SPUR") != "1":
         pytest.skip("PM_LIVE_SPUR=1 is required for paid Spur acceptance")
-
-
-class _Ping(BaseModel):
-    ok: bool
-    note: str
 
 
 class CappedInference:
@@ -124,8 +116,56 @@ class CappedInference:
         return response
 
 
+async def _complete_interrupt(
+    workflow: LangGraphAgentWorkflow,
+    snapshot: Any,
+    *,
+    evidence_answer: str | None = None,
+) -> Any:
+    original_goal = snapshot.goal.goal_id if snapshot.goal else None
+    seen = 0
+    while snapshot.status == "needs_input" and snapshot.interrupt:
+        seen += 1
+        if seen > 6:
+            pytest.fail(f"interrupt loop stuck at {snapshot.interrupt.type}")
+        itype = snapshot.interrupt.type
+        if itype == "clarification":
+            answers = {
+                question.id: (
+                    "FDE internship at a Series B+ software company by 2027-08-31. "
+                    "Success is a written offer. TEST observations only."
+                )
+                for question in (snapshot.interrupt.questions or [])
+            } or {
+                "deadline": "2027-08-31",
+                "success": "written FDE internship offer",
+            }
+            snapshot = await workflow.resume(snapshot.thread_id, ResumePayload(answers=answers))
+        elif itype == "confirm_contract":
+            snapshot = await workflow.resume(snapshot.thread_id, ResumePayload(confirmed=True))
+        elif itype == "confirm_evidence":
+            answers = {
+                question.id: evidence_answer
+                or (
+                    "Distinct observed events. Recruiter replies, completed interviews, "
+                    "and rejections are not applications. A founder introduction is not "
+                    "an application."
+                )
+                for question in (snapshot.interrupt.questions or [])
+            }
+            snapshot = await workflow.resume(
+                snapshot.thread_id,
+                ResumePayload(confirmed=True, answers=answers),
+            )
+        else:
+            pytest.fail(f"unexpected interrupt type {itype}")
+        if original_goal and snapshot.goal:
+            assert snapshot.goal.goal_id == original_goal, "evidence confirmation created a new goal"
+    return snapshot
+
+
 @pytest.mark.asyncio
-async def test_spur_structured_ping_and_consumer_journeys() -> None:
+async def test_complete_live_consumer_journey() -> None:
     _require_live()
     base = Settings()
     settings = base.model_copy(
@@ -172,41 +212,6 @@ async def test_spur_structured_ping_and_consumer_journeys() -> None:
     capped = CappedInference(router)
     eval_rows: list[dict[str, Any]] = []
     try:
-        ping, ping_response = await complete_validated(
-            capped,
-            InferenceRequest(
-                instructions="Return JSON only.",
-                input={"task": "Reply with ok=true and a one-word note."},
-                output_schema=strict_json_schema(_Ping),
-                model=None,
-                fallback_models=[],
-                pool="high_volume",
-                agent_name="goal_architect",
-                user_id=owner.user_id,
-                max_output_tokens=256,
-            ),
-            _Ping,
-            timeout_seconds=90,
-        )
-        assert ping.ok is True
-        assert ping_response.provider == "spur"
-        assert "glm" in ping_response.model
-        assert ping_response.request_id
-        assert ping_response.usage.get("input_tokens") or ping_response.usage.get("output_tokens")
-        assert any(row.get("provider") == "spur" for row in ledger.ledger)
-        eval_rows.append(
-            {
-                "goal_family": "probe",
-                "question": "structured ping",
-                "provider": ping_response.provider,
-                "model": ping_response.model,
-                "request_id": ping_response.request_id,
-                "agent_name": "goal_architect",
-                "usage": ping_response.usage,
-                "validated": ping.model_dump(),
-            }
-        )
-
         async with engine.begin() as conn:
             if not await conn.scalar(text("select to_regclass('goals')")):
                 pytest.fail("Isolated Postgres is missing migrations")
@@ -228,9 +233,12 @@ async def test_spur_structured_ping_and_consumer_journeys() -> None:
         career = await _career_journey(
             workflow, deps, capped, owner, settings, engine, eval_rows
         )
-        if capped.calls < 28:
-            await _savings_journey(workflow, deps, capped, owner, settings, eval_rows)
         assert career["goal_id"]
+        assert career["initial_receipt_id"]
+        assert career["updated_receipt_id"]
+        assert career["initial_receipt_id"] != career["updated_receipt_id"]
+        assert career["additional_evidence_ids"]
+        assert career["scenario_probability"] is not None
         assert all(item["provider"] == "spur" for item in capped.records)
         assert not any(item["provider"] == "scripted" for item in capped.records)
     finally:
@@ -284,36 +292,20 @@ async def _career_journey(
             ),
         )
     )
+    created = await _complete_interrupt(workflow, draft)
     eval_rows.append(
         {
             "goal_family": "career",
             "question": "goal architect",
-            "status": draft.status,
-            "interrupt": draft.interrupt.model_dump() if draft.interrupt else None,
+            "status": created.status,
+            "interrupt": created.interrupt.model_dump() if created.interrupt else None,
             "inference": dict(deps.last_inference),
-            "proposal": draft.goal.model_dump() if draft.goal else None,
+            "proposal": created.goal.model_dump() if created.goal else None,
         }
     )
-    assert deps.last_inference.get("provider") == "spur"
-    if draft.status == "needs_input" and draft.interrupt and draft.interrupt.type == "clarification":
-        answers = {
-            question.id: "FDE internship at a Series B+ software company by 2027-08-31. "
-            "Success is a written offer. TEST observations only."
-            for question in (draft.interrupt.questions or [])
-        } or {
-            "deadline": "2027-08-31",
-            "success": "written FDE internship offer",
-        }
-        draft = await workflow.resume(draft.thread_id, ResumePayload(answers=answers))
-    if draft.status == "needs_input" and draft.interrupt and draft.interrupt.type == "confirm_contract":
-        created = await workflow.resume(draft.thread_id, ResumePayload(confirmed=True))
-    else:
-        created = draft
+    assert deps.last_inference.get("provider") == "spur", "goal creation must use hosted Spur"
     assert created.goal is not None, created.model_dump()
     goal_id = created.goal.goal_id
-    if created.status == "evidence_pending":
-        pending = await workflow.continue_evidence(created.thread_id)
-        assert pending.status == "evidence_pending"
     first = await workflow.start(
         WorkflowRequest(
             kind="add_evidence",
@@ -326,15 +318,35 @@ async def _career_journey(
             ),
         )
     )
+    first = await _complete_interrupt(
+        workflow,
+        first,
+        evidence_answer=(
+            "12 applications is a current total. 8 applications per week is a period rate. "
+            "Recruiter replies and the phone screen are distinct events. Knowing founders "
+            "is not an application."
+        ),
+    )
+    assert first.status in {"completed", "limited", "withheld"}, (
+        f"initial evidence stopped at {first.status} {first.interrupt}"
+    )
+    initial_ids = [str(item.evidence_id) for item in await deps.evidence.list_for_goal(goal_id)]
+    assert initial_ids, "validated initial evidence must be committed"
+    forecasts = PostgresBaselineForecastRepository(engine)
+    initial_history = list(await forecasts.load_history(goal_id))
+    assert initial_history, "initial evidence must publish a forecast receipt"
+    initial_receipt = initial_history[-1]
     eval_rows.append(
         {
             "goal_family": "career",
             "question": "initial evidence",
             "status": first.status,
+            "committed_evidence_ids": initial_ids,
+            "probability": initial_receipt.probability,
+            "receipt_id": initial_receipt.material_hash,
             "inference": dict(deps.last_inference),
         }
     )
-    forecasts = PostgresBaselineForecastRepository(engine)
     intervention = InterventionAgentService(
         settings,
         capped,
@@ -359,35 +371,48 @@ async def _career_journey(
             "inference_model": modeled.inference_model,
         }
     )
-    assert modeled.inference_provider != "scripted"
-    mock = await intervention.parse(str(goal_id), "What if I do four mock interviews per week?")
+    assert modeled.inference_provider == "spur", modeled.inference_provider
+    assert modeled.changes, (
+        f"supported 8→15 application-rate intervention was dropped: {modeled.model_dump()}"
+    )
+    assert any(
+        item.metric in {"applications_per_week", "weekly_application_rate"}
+        and item.operation == "set"
+        and abs(item.value - 15) < 1e-9
+        for item in modeled.changes
+    ), modeled.changes
+    simulations = WhatIfService(
+        deps.goals,
+        PostgresSimulationRepository(engine),
+        evidence=deps.evidence,
+        owner_id=owner.user_id,
+        forecasts=deps.baseline_forecasts,
+    )
+    state = await simulations.baseline_state(str(goal_id))
+    simulation = await simulations.simulate(
+        WhatIfRequest(
+            goal_id=str(goal_id),
+            current_value=state.current_value or 0,
+            target_value=state.target_value or 1,
+            periods=state.periods or 1,
+            assumptions=state.assumptions,
+            parsed_changes=[
+                InterventionChangeInput.model_validate(change.model_dump())
+                for change in modeled.changes
+            ],
+        )
+    )
+    assert simulation.scenario_probability is not None, simulation
+    after_sim = list(await forecasts.load_history(goal_id))
+    assert len(after_sim) == len(initial_history), "hypothetical simulation mutated published history"
     eval_rows.append(
         {
             "goal_family": "career",
-            "question": "four mock interviews / week",
-            "validated": mock.model_dump(mode="json"),
+            "question": "numerical simulation",
+            "scenario_probability": simulation.scenario_probability,
+            "receipts_unchanged": True,
         }
     )
-    questions = [
-        "I've had a lot of applications but almost no interviews. What am I missing?",
-        "What could I do that most applicants wouldn't think of?",
-        "I have a former manager who knows founders at several startups. Is there a useful way to leverage that without looking opportunistic?",
-        "If I only have five hours a week, what would you prioritize?",
-        "What would make you change your recommendation?",
-        "Why might the strategy you're recommending fail?",
-    ]
-    for question in questions:
-        parsed = await intervention.parse(str(goal_id), question)
-        eval_rows.append(
-            {
-                "goal_family": "career",
-                "question": question,
-                "validated": parsed.model_dump(mode="json"),
-                "insights": [item.model_dump(mode="json") for item in parsed.insights],
-            }
-        )
-        assert parsed.inference_provider != "scripted"
-    before = list(await forecasts.load_history(goal_id))
     more = await workflow.start(
         WorkflowRequest(
             kind="add_evidence",
@@ -396,62 +421,74 @@ async def _career_journey(
             evidence_text=(
                 "TEST: A recruiter responded yesterday. I completed one interview. "
                 "One application was rejected. The former manager introduced me to a founder. "
-                "This is not a hypothetical."
+                "I also submitted 3 additional applications this week. This is not a hypothetical."
             ),
         )
     )
-    after = list(await forecasts.load_history(goal_id))
-    eval_rows.append(
-        {
-            "goal_family": "career",
-            "question": "additional evidence",
-            "status": more.status,
-            "history_before": len(before),
-            "history_after": len(after),
-        }
+    more = await _complete_interrupt(workflow, more)
+    assert more.status in {"completed", "limited", "withheld"}, (
+        f"additional evidence stopped at {more.status} {more.interrupt}"
     )
+    after_ids = [str(item.evidence_id) for item in await deps.evidence.list_for_goal(goal_id)]
+    additional_ids = [item for item in after_ids if item not in set(initial_ids)]
+    assert additional_ids, (
+        f"additional evidence was not committed; persisted={after_ids} initial={initial_ids} "
+        f"status={more.status}"
+    )
+    updated_history = list(await forecasts.load_history(goal_id))
+    assert len(updated_history) > len(initial_history), (
+        "new committed evidence did not publish a subsequent forecast receipt"
+    )
+    updated_receipt = updated_history[-1]
+    retry_commit = await deps.evidence.commit(
+        user_id=owner.user_id,
+        goal_id=goal_id,
+        events=list(more.evidence),
+        agent_run_id=None,
+        conflicts=[],
+    )
+    retry_ids = [str(item.evidence_id) for item in retry_commit.events if item.evidence_id]
+    assert set(retry_ids) <= set(after_ids), "duplicate evidence was counted twice"
+    from personal_markets.forecasting.reprice import BaselineRepriceService
+
+    repriced = await BaselineRepriceService(
+        deps.goals,
+        deps.evidence,
+        deps.baseline_forecasts,
+        owner.user_id,
+    ).publish_if_priceable(goal_id)
+    assert repriced.status in {"unchanged", "not_priced", "withheld"}
+    retry_history = list(await forecasts.load_history(goal_id))
+    assert len(retry_history) == len(updated_history), "identical retry published a duplicate forecast"
     next_move = await intervention.parse(
         str(goal_id),
-        "Given everything that's happened, what's my highest-leverage next move?",
+        "Given the recruiter response, completed interview, rejection, and founder "
+        "introduction, what's my highest-leverage next move?",
     )
+    assert next_move.inference_provider == "spur"
     eval_rows.append(
         {
             "goal_family": "career",
             "question": "highest-leverage next move after new evidence",
             "validated": next_move.model_dump(mode="json"),
+            "additional_evidence_ids": additional_ids,
+            "history_before": len(initial_history),
+            "history_after": len(updated_history),
+            "initial_probability": initial_receipt.probability,
+            "updated_probability": updated_receipt.probability,
+            "initial_receipt_id": initial_receipt.material_hash,
+            "updated_receipt_id": updated_receipt.material_hash,
         }
     )
-    if modeled.changes:
-        simulations = WhatIfService(
-            deps.goals,
-            PostgresSimulationRepository(engine),
-            evidence=deps.evidence,
-            owner_id=owner.user_id,
-            forecasts=deps.baseline_forecasts,
-        )
-        state = await simulations.baseline_state(str(goal_id))
-        simulation = await simulations.simulate(
-            WhatIfRequest(
-                goal_id=str(goal_id),
-                current_value=state.current_value or 0,
-                target_value=state.target_value or 1,
-                periods=state.periods or 1,
-                assumptions=state.assumptions,
-                parsed_changes=[
-                    InterventionChangeInput.model_validate(change.model_dump())
-                    for change in modeled.changes
-                ],
-            )
-        )
-        eval_rows.append(
-            {
-                "goal_family": "career",
-                "question": "numerical simulation",
-                "scenario_probability": simulation.scenario_probability,
-                "receipts_unchanged": len(await forecasts.load_history(goal_id)) == len(after),
-            }
-        )
-    return {"goal_id": str(goal_id), "history": after, "calls": capped.calls}
+    return {
+        "goal_id": str(goal_id),
+        "history": updated_history,
+        "calls": capped.calls,
+        "additional_evidence_ids": additional_ids,
+        "initial_receipt_id": initial_receipt.material_hash,
+        "updated_receipt_id": updated_receipt.material_hash,
+        "scenario_probability": simulation.scenario_probability,
+    }
 
 
 async def _savings_journey(

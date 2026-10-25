@@ -66,6 +66,7 @@ class AgentGraphState(TypedDict, total=False):
     evidence_retries: int
     research_needed: bool
     resume_answers: dict[str, str]
+    evidence_confirmed: bool
     cancelled: bool
     committed_goal_id: str
     committed_evidence_ids: list[str]
