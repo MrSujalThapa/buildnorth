@@ -272,6 +272,32 @@ export interface CourseGradeResult {
   writes_evidence: boolean;
 }
 
+export interface SourcePreviewRecord {
+  kind: "measurement" | "activity" | "message" | "document" | "record";
+  title: string;
+  subtitle?: string | null;
+  timestamp?: string | null;
+  metric?: string | null;
+  numeric_value?: number | null;
+  unit?: string | null;
+  text?: string | null;
+  actor?: string | null;
+  metrics?: { label: string; value: number; unit?: string | null }[];
+}
+
+export interface SourcePreview {
+  resource_title: string;
+  resource_type: string;
+  tool_name: string;
+  arguments: Record<string, string>;
+  fields: { key: string; label: string; role: string }[];
+  measurements: { id: string; label: string; detail: string; unit?: string | null; ambiguous: boolean }[];
+  records: SourcePreviewRecord[];
+  validation_status: "unverified";
+  promotes_to_verified_outcome: false;
+  error?: string | null;
+}
+
 export interface SourceResourceSelection {
   resource_id: string;
   label: string;
@@ -1015,6 +1041,15 @@ export const api = {
       undefined,
       signal,
     ),
+  previewPluginSource: (
+    pluginId: string,
+    body: { resource_id: string; resource_title?: string; resource_type?: string; arguments?: Record<string, string> },
+  ) =>
+    request<SourcePreview>(`/api/v1/plugins/${pluginId}/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   behaviorProfile: (goalId: string, signal?: AbortSignal) =>
     request<BehaviorProfile>(`/api/v1/goals/${goalId}/behavior-profile`, undefined, signal),
   disconnectPlugin: (pluginId: string) =>

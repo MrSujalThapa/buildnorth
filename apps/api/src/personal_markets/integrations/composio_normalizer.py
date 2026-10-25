@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -107,6 +108,65 @@ def normalize_tool_result(
     return records
 
 
+_COLUMN_ROLES = {
+    "date": "observed_at",
+    "observed_at": "observed_at",
+    "timestamp": "observed_at",
+    "metric": "metric",
+    "measurement": "metric",
+    "value": "numeric_value",
+    "amount": "numeric_value",
+    "quantity": "numeric_value",
+    "unit": "unit",
+    "units": "unit",
+}
+
+
+def _column_role(header: str) -> str | None:
+    key = re.sub(r"[^a-z0-9]+", "_", header.strip().lower()).strip("_")
+    return _COLUMN_ROLES.get(key)
+
+
+def _parse_number(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and re.fullmatch(r"-?\d+(?:\.\d+)?", value.strip().replace(",", "")):
+        return float(value.strip().replace(",", ""))
+    return None
+
+
+def _tabular_value_rows(values: list[Any]) -> list[dict[str, Any]] | None:
+    """Map a headered value grid onto date, metric, number, and unit when those columns exist."""
+    if len(values) < 2 or not all(isinstance(row, list) for row in values):
+        return None
+    header = values[0]
+    if not header or not all(isinstance(cell, str) and cell.strip() for cell in header):
+        return None
+    roles = [_column_role(str(cell)) for cell in header]
+    if not any(roles):
+        return None
+    records: list[dict[str, Any]] = []
+    for index, cells in enumerate(values[1:], start=1):
+        if not isinstance(cells, list):
+            continue
+        record: dict[str, Any] = {"row_index": index, "values": cells[:20]}
+        for role, cell in zip(roles, cells, strict=False):
+            if role == "observed_at" and cell not in (None, ""):
+                record["date"] = str(cell)
+            elif role == "metric" and cell not in (None, ""):
+                record["metric"] = str(cell)
+            elif role == "numeric_value":
+                number = _parse_number(cell)
+                if number is not None:
+                    record["numeric_value"] = number
+            elif role == "unit" and cell not in (None, ""):
+                record["unit"] = str(cell)
+        records.append(record)
+    return records or None
+
+
 def _extract_rows(payload: dict[str, Any]) -> list[Any]:
     # Some read tools return one document alongside an empty ``data`` list.
     # A page body is still a source record even when it has no child rows.
@@ -130,6 +190,10 @@ def _extract_rows(payload: dict[str, Any]) -> list[Any]:
     ):
         value = payload.get(key)
         if isinstance(value, list):
+            if key == "values":
+                tabular = _tabular_value_rows(value)
+                if tabular is not None:
+                    return tabular[:100]
             return value[:100]
         if isinstance(value, dict):
             for nested_key in (
@@ -146,6 +210,10 @@ def _extract_rows(payload: dict[str, Any]) -> list[Any]:
             ):
                 if isinstance(value.get(nested_key), list):
                     nested: list[Any] = value[nested_key]
+                    if nested_key == "values":
+                        tabular = _tabular_value_rows(nested)
+                        if tabular is not None:
+                            return tabular[:100]
                     return nested[:100]
     return [payload] if payload and not payload.get("has_more") else []
 
@@ -201,7 +269,15 @@ def _generic_observations(
     metric: str | None = None
     numeric_value: float | None = None
     unit: str | None = None
-    if classification == "observed_activity":
+    measured_number = row.get("numeric_value")
+    measured = isinstance(measured_number, (int, float)) and not isinstance(measured_number, bool)
+    if isinstance(measured_number, (int, float)) and not isinstance(measured_number, bool):
+        numeric_value = float(measured_number)
+        if row.get("metric"):
+            metric = str(row["metric"])
+        if isinstance(row.get("unit"), str) and row["unit"]:
+            unit = str(row["unit"])
+    elif classification == "observed_activity":
         for key, inferred_unit in (
             ("distance_meters", "m"),
             ("distance_km", "km"),
@@ -218,8 +294,15 @@ def _generic_observations(
             ):
                 metric, numeric_value, unit = "distance", float(value), str(candidate_unit)
                 break
+    if measured and metric and numeric_value is not None:
+        summary_text = f"{metric}: {numeric_value:g}"
+        if unit:
+            summary_text = f"{summary_text} {unit}"
+    else:
+        summary_text = None
     summary = str(
-        row.get("title")
+        summary_text
+        or row.get("title")
         or row.get("summary")
         or row.get("name")
         or row.get("subject")

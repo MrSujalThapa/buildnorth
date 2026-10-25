@@ -2,6 +2,10 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — Universal source preview
+
+Connected sources now preview through one presentation model. A record is a measurement, activity, message, document, or plain record based on the fields that were actually returned. The evidence screen uses that model for resource cards, proposed measurements, and unverified previews. No provider-specific screen was added. Preview reads are not stored. No forecast was published.
+
 ## 2026-10-24 — Route recovery during Vercel deployment
 
 - Signed-in production navigation to Profile and Settings twice failed to fetch an old lazy route chunk while Vercel replaced the deployment. A manual reload restored both routes without changing forecast data.
@@ -1089,3 +1093,7 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 ## 2026-10-24 — Current forecast status across Markets and goal views
 
 - Dashboard now batch-reads the owner's latest creation workflow states and returns their status and critic decision alongside goal histories. Cards retain immutable historical chart points but suppress stale current odds during withheld, pending, or failed evidence interpretation. Goal Detail and Evidence use the same status precedence. Collections exclude those members from current portfolio odds while retaining their historical series. This changes presentation only; no forecasts or evidence were written. Isolated owner-isolation, collection, and web adapter regression tests cover the old 15% versus Withheld mismatch.
+
+## 2026-10-24 — Generic Composio reads keep extra schema arguments
+
+- Connected apps without a provider adapter can list records, save one scoped read, and replay it. Extra schema-required arguments such as a spreadsheet range are collected in Evidence, validated against the live tool schema, and stored on the goal recipe. Change-feed tools are not used as resource catalogs. Headered value grids keep a date, metric, number, and unit only when those columns are present. Records stay unverified and do not publish a forecast by themselves. No Google Sheets adapter was added.

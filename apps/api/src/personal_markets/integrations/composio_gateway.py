@@ -21,6 +21,25 @@ _tool_cache: dict[tuple[str, str, str, str], tuple[float, list[MCPToolDescriptor
 _tool_locks: dict[tuple[str, str, str, str], asyncio.Lock] = {}
 
 
+def _looks_like_resources(rows: list[Any]) -> bool:
+    sample = [item for item in rows[:5] if isinstance(item, dict)]
+    return bool(sample) and any(
+        any(key in item for key in ("id", "name", "title", "full_name")) for item in sample
+    )
+
+
+def _resource_row_candidates(payload: dict[str, Any]) -> list[list[Any]]:
+    found: list[list[Any]] = []
+    for value in payload.values():
+        if isinstance(value, list) and _looks_like_resources(value):
+            found.append(value)
+        elif isinstance(value, dict):
+            for nested in value.values():
+                if isinstance(nested, list) and _looks_like_resources(nested):
+                    found.append(nested)
+    return found
+
+
 def _resource_rows(payload: dict[str, Any]) -> list[Any]:
     rows = (
         payload.get("records")
@@ -48,7 +67,31 @@ def _resource_rows(payload: dict[str, Any]) -> list[Any]:
             or rows.get("data")
             or []
         )
-    return rows if isinstance(rows, list) else []
+    if isinstance(rows, list) and rows:
+        return rows
+    found = _resource_row_candidates(payload)
+    if not found:
+        return []
+    found.sort(
+        key=lambda candidate: (
+            sum(
+                1
+                for item in candidate[:5]
+                if isinstance(item, dict) and (item.get("name") or item.get("title"))
+            ),
+            len(candidate),
+        ),
+        reverse=True,
+    )
+    return found[0]
+
+
+def _continuation_token(payload: dict[str, Any]) -> str:
+    for key in ("next_cursor", "next_page_token", "nextPageToken"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
 
 
 _toolkit_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
@@ -494,7 +537,8 @@ class ComposioIntegrationGateway:
         pages = [payload]
         # Notion search commonly returns a short first page. Consult the actual
         # action schema before passing a cursor; never guess provider arguments.
-        if (toolkit_slug == "notion" or discovered_tool is not None) and payload.get("next_cursor"):
+        continuation = _continuation_token(payload)
+        if (toolkit_slug == "notion" or discovered_tool is not None) and continuation:
             try:
                 tools = await self.list_tools(
                     user_id, toolkit_slug, limit=500, connected_account_id=connected_account_id
@@ -511,7 +555,7 @@ class ComposioIntegrationGateway:
                 schema = schema["parameters"]
             properties = schema.get("properties") or {}
             if isinstance(properties, dict):
-                cursor = str(payload["next_cursor"])
+                cursor = continuation
                 seen_cursors: set[str] = set()
                 for _ in range(_RESOURCE_DISCOVERY_PAGE_LIMIT - 1):
                     if cursor in seen_cursors:
@@ -536,7 +580,7 @@ class ComposioIntegrationGateway:
                     discovered_count = sum(len(_resource_rows(item)) for item in pages)
                     if discovered_count >= _RESOURCE_DISCOVERY_RESULT_LIMIT:
                         break
-                    cursor = str(page.get("next_cursor") or "")
+                    cursor = _continuation_token(page)
                     if not cursor:
                         break
         resources: list[MCPResourceDescriptor] = []
@@ -611,7 +655,12 @@ class ComposioIntegrationGateway:
                 if key in {"full_name", "default_branch", "parent", "database_id", "spreadsheet_id"}
                 and value is not None
             }
-            raw_url = row.get("url") or row.get("public_url") or row.get("href")
+            raw_url = (
+                row.get("url")
+                or row.get("public_url")
+                or row.get("href")
+                or row.get("webViewLink")
+            )
             if isinstance(raw_url, str) and raw_url.startswith(("http://", "https://")):
                 metadata["url"] = raw_url
             provider_id = row.get("id")

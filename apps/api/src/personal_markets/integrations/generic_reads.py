@@ -59,8 +59,17 @@ _PAGE_KEYS = frozenset(
     }
 )
 _TIME_KEYS = frozenset({"since", "updatedMin", "updated_min", "after", "from_date", "start_date"})
-_SCOPE_KEYS = frozenset({"range", "sheet_range", "fields"})
+_SCOPE_KEYS = frozenset({"range", "ranges", "sheet_range", "fields"})
 _READ_WORDS = frozenset({"list", "get", "read", "fetch", "search", "query", "retrieve", "find"})
+_CHANGE_FEED_TOKENS = frozenset(
+    {"change", "changes", "delta", "watch", "monitor", "checkpoint", "webhook"}
+)
+_FORMATTED_ENUM_PREFERENCES = {
+    "date_time_render_option": "FORMATTED_STRING",
+    "dateTimeRenderOption": "FORMATTED_STRING",
+    "value_render_option": "FORMATTED_VALUE",
+    "valueRenderOption": "FORMATTED_VALUE",
+}
 
 
 def safe_read_tool(plugin_id: str, tool: MCPToolDescriptor) -> bool:
@@ -73,6 +82,29 @@ def safe_read_tool(plugin_id: str, tool: MCPToolDescriptor) -> bool:
     if not properties and required_argument_names(tool.input_schema):
         return False
     return all(isinstance(value, dict) for value in properties.values())
+
+
+def is_catalog_read(tool: MCPToolDescriptor) -> bool:
+    """Skip change feeds and monitors. Those reads do not list selectable records."""
+    tokens = set(re.split(r"[^a-z0-9]+", tool.name.lower()))
+    if tokens & _CHANGE_FEED_TOKENS:
+        return False
+    description = tool.description.lower()
+    return "without listing" not in description and "change monitor" not in description
+
+
+def formatted_value_defaults(tool: MCPToolDescriptor) -> dict[str, str]:
+    """Prefer schema enum values that keep dates and numbers readable."""
+    defaults: dict[str, str] = {}
+    for name, preferred in _FORMATTED_ENUM_PREFERENCES.items():
+        spec = schema_properties(tool.input_schema).get(name)
+        if not isinstance(spec, dict) or spec.get("type") not in (None, "string"):
+            continue
+        choices = spec.get("enum")
+        if isinstance(choices, list) and preferred not in choices:
+            continue
+        defaults[name] = preferred
+    return defaults
 
 
 def read_kind(tool: MCPToolDescriptor) -> str:
@@ -88,11 +120,14 @@ def read_kind(tool: MCPToolDescriptor) -> str:
 
 def allowed_required(tool: MCPToolDescriptor) -> bool:
     properties = schema_properties(tool.input_schema)
-    return all(
-        name in properties
-        and name in _RESOURCE_KEYS | _QUERY_KEYS | _PAGE_KEYS | _TIME_KEYS | _SCOPE_KEYS
-        for name in required_argument_names(tool.input_schema)
-    )
+    allowed = _RESOURCE_KEYS | _QUERY_KEYS | _PAGE_KEYS | _TIME_KEYS | _SCOPE_KEYS
+    for name in required_argument_names(tool.input_schema):
+        spec = properties.get(name)
+        if not isinstance(spec, dict) or name not in allowed:
+            return False
+        if name in _SCOPE_KEYS and spec.get("type") not in (None, "string"):
+            return False
+    return True
 
 
 def discovery_tool(plugin_id: str, tools: list[MCPToolDescriptor]) -> MCPToolDescriptor | None:
@@ -101,6 +136,7 @@ def discovery_tool(plugin_id: str, tools: list[MCPToolDescriptor]) -> MCPToolDes
         tool
         for tool in tools
         if safe_read_tool(plugin_id, tool)
+        and is_catalog_read(tool)
         and read_kind(tool) in {"list", "search"}
         and not required_argument_names(tool.input_schema)
     ]
@@ -119,10 +155,59 @@ def goal_read_tools(plugin_id: str, tools: list[MCPToolDescriptor]) -> list[MCPT
         tool
         for tool in tools
         if safe_read_tool(plugin_id, tool)
+        and is_catalog_read(tool)
         and read_kind(tool) in {"list", "record", "search"}
         and allowed_required(tool)
         and any(key in _RESOURCE_KEYS | _QUERY_KEYS for key in schema_properties(tool.input_schema))
     ]
+
+
+def bounded_scope_defaults(tool: MCPToolDescriptor) -> dict[str, str]:
+    """Fill a required string window, such as a range, with a small preview bound."""
+    defaults: dict[str, str] = {}
+    properties = schema_properties(tool.input_schema)
+    for name in required_argument_names(tool.input_schema):
+        if name not in {"range", "sheet_range"}:
+            continue
+        spec = properties.get(name)
+        if not isinstance(spec, dict) or spec.get("type") not in (None, "string"):
+            continue
+        defaults[name] = "A1:Z8"
+    return defaults
+
+
+def preview_call(
+    plugin_id: str,
+    tools: list[MCPToolDescriptor],
+    target: str,
+    extras: dict[str, Any] | None = None,
+) -> tuple[MCPToolDescriptor, dict[str, Any]] | None:
+    """Pick one schema-valid read of the selected resource. Search listings stay last."""
+    provided = {key: value for key, value in (extras or {}).items() if value not in ("", None)}
+    matches: list[tuple[MCPToolDescriptor, dict[str, Any]]] = []
+    for tool in goal_read_tools(plugin_id, tools):
+        arguments = arguments_for_selection(
+            tool, target, {**bounded_scope_defaults(tool), **provided}
+        )
+        if arguments is None:
+            continue
+        matches.append((tool, arguments))
+    if not matches:
+        return None
+
+    def rank(item: tuple[MCPToolDescriptor, dict[str, Any]]) -> tuple[bool, bool, bool, int, str]:
+        tool = item[0]
+        required = required_argument_names(tool.input_schema)
+        return (
+            read_kind(tool) == "search",
+            read_kind(tool) != "record",
+            not any(name in _SCOPE_KEYS for name in required),
+            len(schema_properties(tool.input_schema)),
+            tool.name,
+        )
+
+    matches.sort(key=rank)
+    return matches[0]
 
 
 def arguments_for_selection(
@@ -134,7 +219,11 @@ def arguments_for_selection(
     provided = {key: value for key, value in (extras or {}).items() if value not in ("", None)}
     if any(key not in properties for key in provided):
         return None
-    binding = [key for key in required if key in _RESOURCE_KEYS | _QUERY_KEYS and key not in provided]
+    binding = [
+        key
+        for key in required
+        if key in _RESOURCE_KEYS | _QUERY_KEYS and key not in provided
+    ]
     if not binding:
         optional = [
             key for key in properties if key in _RESOURCE_KEYS | _QUERY_KEYS and key not in provided
@@ -143,14 +232,17 @@ def arguments_for_selection(
             binding = optional
     if len(binding) > 1 or any(key not in properties for key in required):
         return None
+    defaults = formatted_value_defaults(tool)
     if not binding:
-        return provided if all(key in provided for key in required) else None
+        if not all(key in provided for key in required):
+            return None
+        return {**defaults, **provided}
     key = binding[0]
     if not target or len(target) > 500 or properties[key].get("type") not in (None, "string"):
         return None
     if any(name not in provided and name != key and name not in _PAGE_KEYS for name in required):
         return None
-    return {**provided, key: target}
+    return {**defaults, **provided, key: target}
 
 
 def bound_page_arguments(

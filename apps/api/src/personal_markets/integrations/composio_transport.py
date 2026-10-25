@@ -70,6 +70,11 @@ class ComposioTransport:
             or payload.get("data")
             or payload.get("commits")
             or payload.get("repositories")
+            or payload.get("messages")
+            or payload.get("activities")
+            or payload.get("events")
+            or payload.get("files")
+            or payload.get("values")
             or []
         )
         return {"records": records, "raw": payload}

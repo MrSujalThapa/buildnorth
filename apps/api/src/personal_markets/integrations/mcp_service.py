@@ -532,6 +532,26 @@ class IntegrationGatewayService:
         if not rows and connection.status == "connected":
             await self._discover_and_persist(connection)
             rows = await self._repository.list_capabilities(connection.id)
+        if plugin_id not in {"github", "notion", "calendar"}:
+            from personal_markets.integrations.generic_reads import goal_read_tools
+            from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+
+            offered = {
+                tool.name
+                for tool in goal_read_tools(
+                    plugin_id,
+                    [
+                        MCPToolDescriptor(
+                            name=row.tool_name or "",
+                            description=row.label,
+                            input_schema=row.input_schema,
+                        )
+                        for row in rows
+                        if row.tool_name
+                    ],
+                )
+            }
+            rows = [row for row in rows if row.tool_name in offered]
         return [row.model_dump(mode="json") for row in rows]
 
     async def list_resources(
@@ -548,6 +568,85 @@ class IntegrationGatewayService:
         transport = self._transport_for(connection)
         resources = await transport.list_resources()
         return [item.model_dump(mode="json") for item in resources]
+
+    async def preview_source(
+        self,
+        plugin_id: str,
+        *,
+        resource_id: str,
+        resource_title: str,
+        resource_type: str,
+        arguments: dict[str, Any] | None = None,
+        user_id: UUID | None = None,
+    ) -> dict[str, object]:
+        """Read one selected resource for display. Nothing is stored."""
+        from personal_markets.integrations.generic_reads import preview_call
+        from personal_markets.integrations.mcp_domain import MCPToolDescriptor
+        from personal_markets.integrations.source_presentation import SourcePreview, present_source
+
+        owner = self._owner(user_id)
+        connection = await self._repository.get_connection(owner, plugin_id)
+        if connection is None or connection.status != "connected":
+            raise ValueError("Reconnect this integration before reading sources.")
+        if len(resource_id) > 500:
+            raise ValueError("Choose a shorter resource identifier.")
+        if not await self._repository.list_capabilities(connection.id):
+            await self._discover_and_persist(connection)
+        rows = await self._repository.list_capabilities(connection.id)
+        tools = [
+            MCPToolDescriptor(
+                name=row.tool_name or "",
+                description=row.label,
+                input_schema=row.input_schema,
+            )
+            for row in rows
+            if row.tool_name
+        ]
+        supplied = {
+            key: value
+            for key, value in (arguments or {}).items()
+            if isinstance(value, str) and value.strip() and len(value) <= 500
+        }
+        chosen = preview_call(plugin_id, tools, resource_id, supplied)
+        if chosen is None:
+            return SourcePreview(
+                resource_title=resource_title or resource_id,
+                resource_type=resource_type or "resource",
+                error="No safely scoped read is available for this source.",
+            ).model_dump(mode="json")
+        tool, call_arguments = chosen
+        transport = self._transport_for(connection)
+        try:
+            payload = await asyncio.wait_for(
+                transport.call_tool(tool.name, call_arguments),
+                timeout=_SYNC_TOOL_TIMEOUT_SECONDS,
+            )
+        except IntegrationProviderError:
+            return SourcePreview(
+                resource_title=resource_title or resource_id,
+                resource_type=resource_type or "resource",
+                tool_name=tool.name,
+                arguments={key: str(value) for key, value in call_arguments.items()},
+                error="This source could not be read. Adjust the required fields and try again.",
+            ).model_dump(mode="json")
+        raw_payload = payload.get("raw") if isinstance(payload.get("raw"), dict) else payload
+        normalized = normalize_tool_result(
+            plugin_id=plugin_id,
+            plugin_connection_id=connection.id,
+            sync_run_id=uuid4(),
+            tool_name=tool.name,
+            payload=raw_payload if isinstance(raw_payload, dict) else {"records": raw_payload},
+            user_id=str(owner),
+            recipe_step=None,
+        )
+        preview = present_source(
+            resource_title=resource_title or resource_id,
+            resource_type=resource_type or "resource",
+            tool_name=tool.name,
+            arguments=call_arguments,
+            payloads=[row.payload for row in normalized],
+        )
+        return preview.model_dump(mode="json")
 
     async def list_descendants(
         self, plugin_id: str, parent_id: str, *, user_id: UUID | None = None

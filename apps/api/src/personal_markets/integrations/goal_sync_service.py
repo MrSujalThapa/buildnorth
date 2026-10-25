@@ -233,5 +233,3 @@ class GoalSyncService:
 
 def _supported_goal_step(plugin_id: str, tool_name: str | None) -> bool:
     return get_adapter(plugin_id).is_supported_goal_read(tool_name)
-
-\n

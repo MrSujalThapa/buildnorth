@@ -110,7 +110,10 @@ async def test_unknown_provider_connects_selects_reads_deduplicates_and_reuses_r
             description="Read selected record",
             input_schema={
                 "type": "object",
-                "properties": {field: {"type": "string"}, **({"range": {"type": "string"}} if extras else {})},
+                "properties": {
+                    field: {"type": "string"},
+                    **({"range": {"type": "string"}} if extras else {}),
+                },
                 "required": [field, *extras],
             },
         ),
@@ -210,6 +213,140 @@ async def test_unknown_provider_connects_selects_reads_deduplicates_and_reuses_r
     assert len(transport.calls) == 2
 
 
+def test_discovery_skips_change_feeds_for_a_catalog_search() -> None:
+    tools = [
+        MCPToolDescriptor(
+            name="GOOGLESHEETS_LIST_DRIVE_CHANGES",
+            description="Start a Drive change monitor without listing historical files.",
+            input_schema={"type": "object", "properties": {"page_token": {"type": "string"}}},
+        ),
+        MCPToolDescriptor(
+            name="GOOGLESHEETS_SEARCH_SPREADSHEETS",
+            description="Search for spreadsheets by name.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "max_results": {"type": "integer"},
+                },
+            },
+        ),
+    ]
+    discovered = discovery_tool("googlesheets", tools)
+    assert discovered is not None and discovered.name == "GOOGLESHEETS_SEARCH_SPREADSHEETS"
+    assert "GOOGLESHEETS_LIST_DRIVE_CHANGES" not in {
+        tool.name for tool in goal_read_tools("googlesheets", tools)
+    }
+
+
+def test_required_range_is_persisted_with_formatted_date_default() -> None:
+    tool = MCPToolDescriptor(
+        name="GOOGLESHEETS_VALUES_GET",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "spreadsheet_id": {"type": "string"},
+                "range": {"type": "string"},
+                "date_time_render_option": {
+                    "type": "string",
+                    "enum": ["SERIAL_NUMBER", "FORMATTED_STRING"],
+                },
+            },
+            "required": ["spreadsheet_id", "range"],
+        },
+    )
+    assert arguments_for_selection(tool, "sheet-1", {}) is None
+    assert arguments_for_selection(tool, "sheet-1", {"range": "A1:D4"}) == {
+        "spreadsheet_id": "sheet-1",
+        "range": "A1:D4",
+        "date_time_render_option": "FORMATTED_STRING",
+    }
+
+
+def test_tabular_values_preserve_dates_measurements_units_and_deduplicate() -> None:
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+    from personal_markets.integrations.mcp_domain import SyncRecipeStep
+
+    payload = {
+        "range": "Sheet1!A1:D4",
+        "values": [
+            ["Date", "Metric", "Value", "Unit"],
+            ["2026-10-20", "Study hours", "3", "hours"],
+            ["2026-10-21", "Study hours", "4", "hours"],
+            ["2026-10-22", "Study hours", "2", "hours"],
+        ],
+    }
+    step = SyncRecipeStep(
+        capability_id="cap",
+        tool_name="GOOGLESHEETS_VALUES_GET",
+        resource_uri="composio://googlesheets/sheet-1",
+        arguments={"spreadsheet_id": "sheet-1", "range": "A1:D4"},
+    )
+
+    connection_id = uuid4()
+
+    def read() -> list[Any]:
+        return normalize_tool_result(
+            plugin_id="googlesheets",
+            plugin_connection_id=connection_id,
+            sync_run_id=uuid4(),
+            tool_name="GOOGLESHEETS_VALUES_GET",
+            payload=payload,
+            user_id="user",
+            recipe_step=step,
+        )
+
+    first = read()
+    second = read()
+    assert len(first) == 3
+    event = first[0].payload["events"][0]
+    assert event["observed_at"] == "2026-10-20"
+    assert event["metric"] == "Study hours"
+    assert event["numeric_value"] == 3
+    assert event["unit"] == "hours"
+    assert event["validation_status"] == "unverified"
+    assert event["provenance"]["promotes_to_verified_outcome"] is False
+    assert [item.payload_hash for item in first] == [item.payload_hash for item in second]
+
+
+@pytest.mark.asyncio
+async def test_value_grid_reaches_the_transport_raw_payload() -> None:
+    from personal_markets.integrations.composio_transport import ComposioTransport
+
+    transport = ComposioTransport(
+        Settings(environment="test", composio_enabled=True, composio_api_key="test"),
+        plugin_id="googlesheets",
+        user_id=uuid4(),
+        connected_account_id="ca-1",
+    )
+
+    async def execute(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        return {
+            "range": "Sheet1!A1:D2",
+            "values": [
+                ["Date", "Metric", "Value", "Unit"],
+                ["2026-10-20", "Study hours", "3", "hours"],
+            ],
+        }
+
+    transport._gateway.execute_tool = execute  # type: ignore[method-assign]
+    result = await transport.call_tool("GOOGLESHEETS_VALUES_GET", {"range": "A1:D4"})
+    assert result["records"][1][2] == "3"
+    assert result["raw"]["values"][1][3] == "hours"
+
+
+def test_resource_discovery_reads_an_unnamed_object_collection() -> None:
+    from personal_markets.integrations.composio_gateway import _resource_rows
+
+    rows = _resource_rows(
+        {
+            "total_found": 1,
+            "spreadsheets": [{"id": "abc", "name": "Study hours"}],
+        }
+    )
+    assert rows[0]["name"] == "Study hours"
+
+
 def test_unsafe_and_ambiguous_tools_are_not_selected() -> None:
     tools = [
         MCPToolDescriptor(name="UNKNOWN_DELETE_ITEMS", read_only_hint=False),
@@ -277,3 +414,199 @@ async def test_unknown_provider_discovers_bounded_resources_without_adapter(
     monkeypatch.setattr(gateway, "list_tools", no_tools)
     with pytest.raises(IntegrationProviderError, match="no supported resource discovery"):
         await gateway.list_resources(owner, "new_provider_xyz", connected_account_id="ca-1")
+
+
+def test_preview_prefers_a_bounded_record_read_and_presents_real_rows() -> None:
+    from personal_markets.integrations.generic_reads import preview_call
+    from personal_markets.integrations.source_presentation import present_source
+
+    tools = [
+        MCPToolDescriptor(
+            name="ACME_SEARCH_RECORDS",
+            description="Search records",
+            input_schema={"type": "object", "properties": {"query": {"type": "string"}}},
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_RECORD",
+            description="Read one record",
+            input_schema={
+                "type": "object",
+                "properties": {"resource_id": {"type": "string"}},
+                "required": ["resource_id"],
+            },
+        ),
+        MCPToolDescriptor(
+            name="ACME_GET_VALUES",
+            description="Read a bounded range",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "resource_id": {"type": "string"},
+                    "range": {"type": "string", "description": "A1 notation"},
+                },
+                "required": ["resource_id", "range"],
+            },
+        ),
+    ]
+    chosen = preview_call("acme", tools, "item-1", {})
+    assert chosen is not None
+    tool, arguments = chosen
+    assert tool.name == "ACME_GET_VALUES"
+    assert arguments["range"] == "A1:Z8"
+    assert arguments["resource_id"] == "item-1"
+
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+
+    payload = {
+        "values": [
+            ["Date", "Metric", "Value", "Unit"],
+            ["2026-10-20", "Study hours", "3", "hours"],
+            ["2026-10-21", "Study hours", "4", "hours"],
+        ]
+    }
+    rows = normalize_tool_result(
+        plugin_id="acme",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name=tool.name,
+        payload=payload,
+        user_id="user",
+    )
+    preview = present_source(
+        resource_title="Field notes",
+        resource_type="spreadsheet",
+        tool_name=tool.name,
+        arguments=arguments,
+        payloads=[row.payload for row in rows],
+    )
+    assert [record.timestamp for record in preview.records] == ["2026-10-20", "2026-10-21"]
+    assert preview.records[0].kind == "measurement"
+    assert preview.records[0].numeric_value == 3
+    assert preview.records[0].unit == "hours"
+    assert preview.measurements[0].label == "Study hours"
+    assert preview.measurements[0].ambiguous is False
+    assert preview.promotes_to_verified_outcome is False
+
+
+def test_preview_shapes_follow_the_record_not_the_provider() -> None:
+    from personal_markets.integrations.source_presentation import present_source
+
+    preview = present_source(
+        resource_title="Inbox",
+        resource_type="message",
+        tool_name="ACME_GET_ITEM",
+        arguments={},
+        payloads=[
+            {
+                "from": "Ada",
+                "subject": "Update",
+                "snippet": "Finished the session.",
+                "date": "2026-10-21",
+                "events": [{"observed_at": "2026-10-21", "summary": "Update"}],
+            },
+            {
+                "name": "Morning session",
+                "status": "completed",
+                "distance_meters": 5000,
+                "events": [
+                    {
+                        "event_type": "source_activity",
+                        "metric": "distance",
+                        "numeric_value": 5000,
+                        "unit": "m",
+                        "observed_at": "2026-10-20",
+                        "summary": "Morning session",
+                    }
+                ],
+            },
+            {
+                "title": "Notes",
+                "plain_text": (
+                    "A long note from the connected account that should stay a document preview."
+                ),
+                "events": [{"summary": "Notes"}],
+            },
+        ],
+    )
+    assert [record.kind for record in preview.records] == ["message", "activity", "document"]
+    assert preview.records[0].actor == "Ada"
+    assert preview.records[1].metrics[0].unit == "m"
+    assert preview.records[2].text is not None
+    assert preview.records[2].text.startswith("A long note")
+
+
+@pytest.mark.asyncio
+async def test_preview_reads_without_storing_records() -> None:
+    from personal_markets.integrations.mcp_domain import ReadCapabilityRecord
+
+    owner, connection_id = uuid4(), uuid4()
+    repository = InMemoryIntegrationRepository()
+    await repository.upsert_connection(
+        PluginConnectionRecord(
+            id=connection_id,
+            user_id=owner,
+            plugin_id="acme",
+            connection_type=ConnectionType.MANAGED_GATEWAY,
+            gateway_provider="composio",
+            status="connected",
+            created_at=datetime.now(UTC),
+            account_metadata={"connected_account_id": "ca-1"},
+        )
+    )
+    await repository.save_capabilities(
+        connection_id,
+        [
+            ReadCapabilityRecord(
+                id=uuid4(),
+                plugin_connection_id=connection_id,
+                capability_id="acme-values",
+                label="Read values",
+                operation="read",
+                tool_name="ACME_GET_VALUES",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "resource_id": {"type": "string"},
+                        "range": {"type": "string"},
+                    },
+                    "required": ["resource_id", "range"],
+                },
+                approved=True,
+            )
+        ],
+    )
+    service = IntegrationGatewayService(
+        repository=repository,
+        settings=Settings(environment="test"),
+        default_user_id=owner,
+    )
+
+    class Transport:
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+            assert name == "ACME_GET_VALUES"
+            assert arguments["resource_id"] == "item-1"
+            assert arguments["range"] == "A1:Z8"
+            return {
+                "raw": {
+                    "values": [
+                        ["Date", "Metric", "Value", "Unit"],
+                        ["2026-10-22", "Study hours", "2", "hours"],
+                    ]
+                }
+            }
+
+    service._transport_for = lambda _connection: Transport()  # type: ignore[assignment,method-assign,return-value]
+    preview = await service.preview_source(
+        "acme",
+        resource_id="item-1",
+        resource_title="Field notes",
+        resource_type="spreadsheet",
+        user_id=owner,
+    )
+    records = preview["records"]
+    assert isinstance(records, list)
+    first = records[0]
+    assert isinstance(first, dict)
+    assert first["numeric_value"] == 2
+    assert first["timestamp"] == "2026-10-22"
+    assert repository.raw_records == []
