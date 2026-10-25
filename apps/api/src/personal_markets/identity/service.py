@@ -59,18 +59,27 @@ class IdentityService:
                     }
                 )
             )
+        if not self._settings.clerk_secret_key:
+            raise ForbiddenError("Current account verification is unavailable")
+        email, verified = self._email_cache.resolve(
+            stored.clerk_user_id, self._settings.clerk_secret_key, fresh=True
+        )
+        if not email or not verified:
+            raise ForbiddenError("Current account verification failed")
         return await self.principal_from_claims(
             TokenClaims(
                 {
                     "sub": stored.clerk_user_id,
                     "iss": "playitout-internal",
+                    "email": email,
+                    "email_verified": True,
                 }
             ),
-            fresh_verification=True,
+            clerk_verified=True,
         )
 
     async def principal_from_claims(
-        self, claims: TokenClaims, *, fresh_verification: bool = False
+        self, claims: TokenClaims, *, clerk_verified: bool = False
     ) -> Principal:
         claims.pop("role", None)
         email = (claims.email or "").strip().lower() or None
@@ -80,11 +89,12 @@ class IdentityService:
             (not email or email in admins)
             and self._settings.clerk_secret_key
             and claims.get("iss") != "playitout-test"
+            and not clerk_verified
         ):
             looked_up, looked_verified = self._email_cache.resolve(
                 claims.clerk_user_id,
                 self._settings.clerk_secret_key,
-                fresh=fresh_verification or email in admins,
+                fresh=email in admins,
             )
             # Clerk's current primary verified email is authoritative for privileges.
             email, email_verified = looked_up, looked_verified

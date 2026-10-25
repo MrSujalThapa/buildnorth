@@ -229,8 +229,9 @@ async def test_scheduled_admin_lookup_rechecks_clerk_and_fails_closed() -> None:
         reads += 1
         return ("admin@example.test", reads == 1)
 
+    repo = InMemoryIdentityRepository()
     service = IdentityService(
-        InMemoryIdentityRepository(),
+        repo,
         settings,
         VerifiedEmailCache(lookup=clerk, ttl_seconds=3600),
     )
@@ -245,10 +246,10 @@ async def test_scheduled_admin_lookup_rechecks_clerk_and_fails_closed() -> None:
         )
     )
     assert initial.trusted_admin and initial.hosted_quota_usd == 100
-    refreshed = await service.principal_for_user_id(initial.user_id)
+    with pytest.raises(ForbiddenError, match="verification failed"):
+        await service.principal_for_user_id(initial.user_id)
     assert reads == 2
-    assert refreshed is not None and not refreshed.trusted_admin
-    assert not refreshed.hosted_enabled
+    assert (await repo.get_user(initial.user_id)).hosted_quota_usd == 100
 
 
 async def test_background_user_charge_never_uses_admin_allocation() -> None:
@@ -265,6 +266,19 @@ async def test_background_user_charge_never_uses_admin_allocation() -> None:
     await budget.reserve_research(refreshed, 4.0)
     assert (await budget.usage_for(admin)).remaining_usd == 100
     assert (await budget.usage_for(refreshed)).remaining_usd == 1
+
+
+async def test_scheduled_ordinary_inference_fails_closed_during_clerk_outage() -> None:
+    repo = InMemoryIdentityRepository()
+    user = make_principal("ordinary", invited=True, hosted=True, quota_usd=5)
+    await repo.upsert_user(user)
+    service = IdentityService(
+        repo,
+        Settings(environment="production", clerk_secret_key="test-secret"),
+        VerifiedEmailCache(lookup=lambda _id, _secret: (None, False)),
+    )
+    with pytest.raises(ForbiddenError, match="verification failed"):
+        await service.principal_for_user_id(user.user_id)
 
 
 def test_invalid_hosted_model_fails_before_a_provider_call() -> None:
