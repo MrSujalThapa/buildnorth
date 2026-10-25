@@ -8,8 +8,7 @@ import sys
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
-from uuid import UUID
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from PIL import Image
