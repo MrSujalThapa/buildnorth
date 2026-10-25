@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Literal
 
 from personal_markets.what_if.domain import (
     BlueprintAction,
@@ -289,6 +290,7 @@ def detect_plateau(
         or (start.conditional is not None and start.conditional >= SATURATED_CONDITIONAL)
     )
     where = format_lever_value(lever, start.value)
+    cause: Literal["follow_through", "saturation"]
     if capped_by_follow_through:
         assert follow_through is not None
         modeled = f"follow-through is modeled at {_pct(follow_through)}"

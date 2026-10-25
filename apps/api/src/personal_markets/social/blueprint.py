@@ -201,7 +201,8 @@ def public_forecast_spec(model_requirements: dict[str, Any]) -> dict[str, Any] |
     if not isinstance(spec, dict) or not spec:
         return None
     cleaned = {key: value for key, value in spec.items() if key not in FORECAST_SPEC_PRIVATE_KEYS}
-    return _public_value(_strip_evidence(cleaned))
+    public = _public_value(_strip_evidence(cleaned))
+    return public if isinstance(public, dict) else None
 
 
 def _blueprint_from_parts(
