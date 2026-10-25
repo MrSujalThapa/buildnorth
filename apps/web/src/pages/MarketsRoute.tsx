@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { absoluteUrl, shareLink } from "../features/social/share";
 import { toMarketCard } from "../adapters/marketViewModel";
 import MarketsPage from "../components/market/MarketsPage";
 
@@ -84,6 +85,19 @@ export function MarketsRoute() {
       onMoveToCollection={(collectionId, goalIds) =>
         moveGoals.mutateAsync({ collectionId, goalIds }).then(() => undefined)
       }
+      onShareMarkets={async (goalIds) => {
+        const goalId = goalIds[0];
+        if (!goalId) return;
+        const result = await api.shareMarket(goalId);
+        if (!result.shareable) {
+          window.alert(result.reason ?? "Publish this market before sharing a public link.");
+          return;
+        }
+        await shareLink({
+          url: result.url ?? absoluteUrl(`/m/${goalId}`),
+          title: markets.find((market) => market.id === goalId)?.title ?? "PlayItOut market",
+        });
+      }}
     />
   );
 }

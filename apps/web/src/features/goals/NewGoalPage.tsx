@@ -56,6 +56,7 @@ export function NewGoalPage() {
       setSnapshot(data);
       sessionStorage.setItem(PENDING_GOAL_THREAD, data.thread_id);
       setThreadId(data.thread_id);
+      queryClient.setQueryData(["new-goal-thread", data.thread_id], data);
       setError(null);
       if (data.status === "failed") {
         setError(failureMessage(data));
@@ -79,6 +80,7 @@ export function NewGoalPage() {
       setSnapshot(data);
       sessionStorage.setItem(PENDING_GOAL_THREAD, data.thread_id);
       setThreadId(data.thread_id);
+      queryClient.setQueryData(["new-goal-thread", data.thread_id], data);
       setError(null);
       setAnswers({});
       if (data.status === "failed") {

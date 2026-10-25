@@ -34,6 +34,13 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
+if (typeof URL.createObjectURL !== "function") {
+  URL.createObjectURL = () => "blob:test";
+}
+if (typeof URL.revokeObjectURL !== "function") {
+  URL.revokeObjectURL = () => {};
+}
+
 HTMLCanvasElement.prototype.getContext = function getContext() {
   return {
     setTransform() {},

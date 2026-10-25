@@ -244,7 +244,7 @@ class GoalDetail(GoalSummary):
 
 class ForecastView(BaseModel):
     goal_id: str
-    status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     probability: float | None = None
     probability_basis: str | None = None
     forecast_status: str | None = None
@@ -253,6 +253,7 @@ class ForecastView(BaseModel):
     compiler_version: str | None = None
     published_at: str | None = None
     evidence_watermark: str | None = None
+    receipt_id: str | None = None
     assumptions: list[Any] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     diagnostics: dict[str, Any] = Field(default_factory=dict)
@@ -268,6 +269,7 @@ class HistoryPoint(BaseModel):
     model_family: str
     model_version: str
     evidence_watermark: str
+    receipt_id: str
     published_at: str | None = None
 
 
@@ -285,6 +287,7 @@ class EvidenceItem(BaseModel):
     unit: str | None
     observation_kind: str | None
     observed_at: str | None
+    received_at: str | None = None
     source_type: str
     verification_status: str | None
     corroborating_sources: int = 0
@@ -384,7 +387,7 @@ class ForecastCompare(BaseModel):
 class ForecastReadiness(BaseModel):
     goal_id: str
     priced: bool
-    publication_status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    publication_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     contract_forecast_status: str
     spec_status: str | None = None
     model_family: str | None = None
@@ -431,7 +434,8 @@ class StructuredRow(BaseModel):
 class OddsChartView(BaseModel):
     goal_id: str
     title: str
-    status: Literal["PUBLISHED", "NOT_PUBLISHED"]
+    status: Literal["PUBLISHED", "NOT_PUBLISHED", "HISTORY_UNAVAILABLE"]
+    current_forecast_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"]
     range: str
     points: list[dict[str, Any]] = Field(default_factory=list)
     evidence_markers: list[dict[str, Any]] = Field(default_factory=list)
@@ -657,11 +661,51 @@ class RemoteMcpTools:
     async def _published(self, goal: GoalContract) -> list[Any]:
         return await self._deps().baseline_forecasts.published_history(goal.goal_id)
 
+    @staticmethod
+    def _current_withheld(goal: GoalContract, latest: Any) -> bool:
+        publication = goal.model_requirements.get("last_publication")
+        if not isinstance(publication, dict) or publication.get("status") != "withheld":
+            return False
+        recorded_at = publication.get("recorded_at")
+        try:
+            recorded = parse_when(recorded_at if isinstance(recorded_at, str) else None)
+        except ValueError:
+            recorded = None
+        published = publication_time(latest)
+        return recorded is None or published is None or recorded >= published
+
     async def _forecast(self, caller: Caller, goal: GoalContract) -> ForecastView:
         history = await self._published(goal)
         if not history:
+            workflow = self._workflow_api()
+            if workflow is not None:
+                snapshot = await workflow.creation_for_goal(goal.goal_id, caller.user_id)
+                if snapshot is not None:
+                    if snapshot.status in {"evidence_pending", "evidence_running"}:
+                        return ForecastView(
+                            goal_id=str(goal.goal_id), status="PENDING",
+                            message=("Goal evidence processing is pending. "
+                                     "No forecast has been published yet."),
+                        )
+                    if snapshot.status == "evidence_failed":
+                        return ForecastView(
+                            goal_id=str(goal.goal_id), status="FAILED",
+                            message=("Goal evidence processing failed. Retry the saved "
+                                     "continuation; no forecast was published."),
+                        )
             return await self._unpublished(goal)
-        latest = history[-1]
+        latest = sort_history(history)[-1]
+        if self._current_withheld(goal, latest):
+            return ForecastView(
+                goal_id=str(goal.goal_id),
+                status="WITHHELD",
+                probability=None,
+                published_points=len(history),
+                message=(
+                    "Current odds are withheld. Earlier published receipts remain "
+                    "available through get_forecast_history and show_odds_chart."
+                ),
+            )
         receipt = latest.receipt or {}
         calibrated = receipt.get("calibrated_probability")
         return ForecastView(
@@ -675,6 +719,7 @@ class RemoteMcpTools:
             compiler_version=receipt.get("compiler_version"),
             published_at=latest.published_at.isoformat() if latest.published_at else None,
             evidence_watermark=latest.evidence_watermark,
+            receipt_id=str(latest.material_hash),
             assumptions=_clip_list(receipt.get("assumptions")),
             limitations=_clip_list(receipt.get("limitations")),
             diagnostics={
@@ -734,6 +779,7 @@ class RemoteMcpTools:
                 model_family=item.model_family,
                 model_version=item.model_version,
                 evidence_watermark=item.evidence_watermark,
+                receipt_id=str(item.material_hash),
                 published_at=item.published_at.isoformat() if item.published_at else None,
             )
             for item in history[-limit:]
@@ -751,6 +797,9 @@ class RemoteMcpTools:
             unit=item.unit,
             observation_kind=provenance.observation_kind,
             observed_at=item.observed_at.isoformat() if item.observed_at else None,
+            received_at=(
+                provenance.submission.received_at.isoformat() if provenance.submission else None
+            ),
             source_type=provenance.source_type,
             verification_status=provenance.verification_status,
             corroborating_sources=len(provenance.corroborating_sources),
@@ -978,7 +1027,19 @@ class RemoteMcpTools:
             except Exception:
                 await self._store.finish_submission(caller.user_id, key, "failed", {})
                 raise
-            publication = await self._reprice(caller, goal.goal_id)
+            if any(item.evidence_id not in before for item in commit.events):
+                publication = await self._reprice(caller, goal.goal_id)
+            else:
+                current = await self._forecast(caller, goal)
+                publication = PublicationView(
+                    status="unchanged",
+                    priced=current.status == "PUBLISHED",
+                    probability=current.probability,
+                    reason=(
+                        "All submitted observations corroborated existing evidence; "
+                        "no new receipt was published."
+                    ),
+                )
         result = SubmissionResult(
             status="committed",
             goal_id=str(goal.goal_id),
@@ -1976,20 +2037,35 @@ class RemoteMcpTools:
                     "kind": "event_observed_at",
                 }
             )
-        status: Literal["PUBLISHED", "NOT_PUBLISHED"] = (
-            "PUBLISHED" if points else "NOT_PUBLISHED"
+        status: Literal["PUBLISHED", "NOT_PUBLISHED", "HISTORY_UNAVAILABLE"] = (
+            "PUBLISHED" if points else "HISTORY_UNAVAILABLE" if history else "NOT_PUBLISHED"
         )
+        current_status: Literal["PUBLISHED", "NOT_PUBLISHED", "WITHHELD", "PENDING", "FAILED"] = (
+            "PUBLISHED" if history else (await self._forecast(caller, goal)).status
+        )
+        if history and self._current_withheld(goal, sort_history(history)[-1]):
+            current_status = "WITHHELD"
         return goal, OddsChartView(
             goal_id=str(goal.goal_id),
             title=_clip(goal.title, 200),
             status=status,
+            current_forecast_status=current_status,
             range=range_key,
             points=points,
             evidence_markers=markers,
             interactive_host_required=True,
-            message=None
-            if points
-            else "No published forecast receipts. PlayItOut will not invent a series.",
+            message=(
+                "Historical published odds only; current odds are withheld."
+                if current_status == "WITHHELD"
+                else None if points
+                else "Published receipts lack valid dated probabilities; chart unavailable."
+                if history
+                else "Goal evidence processing is pending; no published odds exist yet."
+                if current_status == "PENDING"
+                else "Goal evidence processing failed; no published odds exist yet."
+                if current_status == "FAILED"
+                else "No published forecast receipts. PlayItOut will not invent a series."
+            ),
         )
 
     async def show_odds_chart(
@@ -2008,6 +2084,46 @@ class RemoteMcpTools:
         if not is_png(png):
             raise ToolFailure("internal_error", "Chart image could not be generated.")
         return view, png
+
+    async def search_public_markets(
+        self, caller: Caller, query: str | None, limit: int
+    ) -> dict[str, Any]:
+        self.require_scope(caller, READ)
+        from personal_markets.wiring import get_social_service
+
+        items = await get_social_service().search_markets(
+            query=query,
+            category=None,
+            sort="newest",
+            limit=min(limit, 25),
+            offset=0,
+            viewer_id=caller.user_id,
+        )
+        payload: dict[str, Any] = {"items": [item.model_dump(mode="json") for item in items]}
+        return payload
+
+    async def get_public_market(self, caller: Caller, goal_id: str) -> dict[str, Any]:
+        self.require_scope(caller, READ)
+        from personal_markets.wiring import get_social_service
+
+        try:
+            parsed = UUID(goal_id)
+        except ValueError as error:
+            raise ToolFailure("invalid_argument", "goal_id must be a UUID") from error
+        try:
+            detail = await get_social_service().public_market(parsed, caller.user_id)
+        except ResourceNotFoundError as error:
+            raise ToolFailure("not_found", "Market not found") from error
+        payload: dict[str, Any] = detail.model_dump(mode="json")
+        return payload
+
+    async def get_blueprint(self, caller: Caller, goal_id: str) -> dict[str, Any]:
+        detail = await self.get_public_market(caller, goal_id)
+        return {
+            "goal_id": detail["goal_id"],
+            "blueprint": detail["blueprint"],
+            "creator": detail["creator"],
+        }
 
 
 def candidates_with_policy(

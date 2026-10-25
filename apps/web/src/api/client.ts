@@ -53,6 +53,33 @@ export type InvitationRecord = {
   token?: string | null;
 };
 
+export type StrategyDecision = "pending" | "accepted" | "declined" | "ignored";
+
+export type StrategyTrial = {
+  recommendation_id: string;
+  strategy_key: string;
+  action: string;
+  recommended_at: string;
+  decision: StrategyDecision;
+  expected?: { metric: string; unit: string; direction: string; target?: number | null };
+  next_step?: string;
+  why_now?: string;
+  outcome_status?: string;
+};
+
+export type StrategyLearningContext = {
+  goal_id: string;
+  as_of: string;
+  past_trials: StrategyTrial[];
+  note: string;
+};
+
+export type StrategyRecommendation = StrategyTrial & {
+  why_now: string;
+  next_step: string;
+  evidence_to_collect?: string;
+};
+
 export interface Goal {
   goal_id: string;
   title: string;
@@ -398,6 +425,93 @@ export interface GoalsDashboard {
   histories: Record<string, MarketHistoryPoint[]>;
   creation_states?: Record<string, { status: string; critic_decision: string | null }>;
   collections?: CollectionView[];
+  social?: Record<string, OwnerMarketSocial>;
+}
+
+export type MarketVisibility = "private" | "public";
+
+export interface PublicCreator {
+  user_id: string;
+  handle: string;
+  username: string | null;
+  display_name: string | null;
+  bio: string | null;
+  has_photo: boolean;
+}
+
+export interface PublicHistoryPoint {
+  created_at: string;
+  probability: number;
+}
+
+export interface PublicForecastState {
+  status: "published" | "withheld" | "unpublished" | "exploratory";
+  category?: string | null;
+}
+
+export interface PublicBlueprint {
+  title: string;
+  description: string;
+  category: string;
+  deadline?: string | null;
+  success_criteria: Record<string, unknown>;
+  milestones: unknown[];
+  strategies: string[];
+  evidence_types: string[];
+  suggested_integrations: string[];
+  model_configuration: Record<string, unknown>;
+  forecast: PublicForecastState;
+}
+
+export interface PublicMarketCard {
+  goal_id: string;
+  title: string;
+  description: string;
+  category: string;
+  visibility: MarketVisibility;
+  creator: PublicCreator;
+  star_count: number;
+  fork_count: number;
+  starred: boolean;
+  published_at: string | null;
+  updated_at: string | null;
+  latest_probability: number | null;
+  forecast: PublicForecastState;
+  history: PublicHistoryPoint[];
+  fork: {
+    source_goal_id: string;
+    source_user_id: string;
+    source_handle: string | null;
+    source_title: string | null;
+    source_public: boolean;
+    forked_at: string;
+  } | null;
+}
+
+export interface PublicMarketDetail extends PublicMarketCard {
+  blueprint: PublicBlueprint;
+  share_path: string;
+}
+
+export interface OwnerMarketSocial {
+  goal_id: string;
+  visibility: MarketVisibility;
+  published_at: string | null;
+  star_count: number;
+  fork_count: number;
+  starred: boolean;
+  public_preview?: PublicBlueprint | null;
+}
+
+export interface PublicProfile {
+  creator: PublicCreator;
+  follower_count: number;
+  following_count: number;
+  following: boolean;
+  is_self: boolean;
+  market_count: number;
+  contribution_total: number;
+  activity: { day: string; count: number }[];
 }
 
 export type TraitForecastUse = "execution_probability" | "exploratory";
@@ -753,7 +867,9 @@ async function watchThread(snapshot: WorkflowSnapshot, signal?: AbortSignal): Pr
   return current;
 }
 
-async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal): Promise<T> {
+async function request<T>(
+  path: string, init?: RequestInit, signal?: AbortSignal, notFoundValue?: T,
+): Promise<T> {
   const token = await currentAccessToken();
   const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
   const response = await fetch(`${baseUrl}${path}`, {
@@ -765,6 +881,7 @@ async function request<T>(path: string, init?: RequestInit, signal?: AbortSignal
       ...(init?.headers || {}),
     },
   });
+  if (response.status === 404 && notFoundValue !== undefined) return notFoundValue;
   if (!response.ok) {
     let detail = `status ${response.status}`;
     try {
@@ -880,6 +997,80 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goal_ids: goalIds }),
     }),
+  publicMarkets: (params?: { q?: string; category?: string; sort?: string; limit?: number; offset?: number }, signal?: AbortSignal) => {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.category) search.set("category", params.category);
+    if (params?.sort) search.set("sort", params.sort);
+    if (params?.limit != null) search.set("limit", String(params.limit));
+    if (params?.offset != null) search.set("offset", String(params.offset));
+    const suffix = search.toString() ? `?${search}` : "";
+    return request<{ items: PublicMarketCard[]; total: number; limit: number; offset: number }>(`/api/v1/public/markets${suffix}`, undefined, signal);
+  },
+  publicMarket: (goalId: string, signal?: AbortSignal) =>
+    request<PublicMarketDetail>(`/api/v1/public/markets/${goalId}`, undefined, signal),
+  publicProfile: (handle: string, signal?: AbortSignal) =>
+    request<PublicProfile>(`/api/v1/public/profiles/${encodeURIComponent(handle)}`, undefined, signal),
+  publicProfileMarkets: (handle: string, params?: { q?: string; visibility?: string }, signal?: AbortSignal) => {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.visibility) search.set("visibility", params.visibility);
+    const suffix = search.toString() ? `?${search}` : "";
+    return request<{ items: PublicMarketCard[] }>(
+      `/api/v1/public/profiles/${encodeURIComponent(handle)}/markets${suffix}`,
+      undefined,
+      signal,
+    );
+  },
+  publicProfileStars: (handle: string, signal?: AbortSignal) =>
+    request<{ items: PublicMarketCard[] }>(
+      `/api/v1/public/profiles/${encodeURIComponent(handle)}/stars`,
+      undefined,
+      signal,
+    ),
+  publicFollowGraph: (handle: string, kind: "followers" | "following", signal?: AbortSignal) =>
+    request<{ items: { creator: PublicCreator; created_at: string }[] }>(
+      `/api/v1/public/profiles/${encodeURIComponent(handle)}/${kind}`,
+      undefined,
+      signal,
+    ),
+  publicCreators: (signal?: AbortSignal) =>
+    request<{ items: PublicCreator[] }>("/api/v1/public/creators", undefined, signal),
+  publicPhotoUrl: (handle: string) => {
+    const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL, window.location);
+    return `${baseUrl}/api/v1/public/profiles/${encodeURIComponent(handle)}/photo`;
+  },
+  marketSocial: (goalId: string, signal?: AbortSignal) =>
+    request<OwnerMarketSocial>(`/api/v1/social/markets/${goalId}`, undefined, signal),
+  setMarketVisibility: (goalId: string, visibility: MarketVisibility) =>
+    request<OwnerMarketSocial>(`/api/v1/social/markets/${goalId}/visibility`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility }),
+    }),
+  starMarket: (goalId: string) =>
+    request<{ starred: boolean; star_count: number }>(`/api/v1/social/markets/${goalId}/star`, { method: "POST" }),
+  unstarMarket: (goalId: string) =>
+    request<{ starred: boolean; star_count: number }>(`/api/v1/social/markets/${goalId}/star`, { method: "DELETE" }),
+  forkMarket: (goalId: string, body: { title?: string; deadline?: string; idempotency_key?: string }) =>
+    request<{ goal_id: string; created: boolean; visibility: string; forked_from: string }>(
+      `/api/v1/social/markets/${goalId}/fork`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    ),
+  shareMarket: (goalId: string) =>
+    request<{ shareable: boolean; url?: string; title?: string; reason?: string }>(
+      `/api/v1/social/markets/${goalId}/share`,
+    ),
+  followProfile: (handle: string) =>
+    request<{ following: boolean; follower_count: number }>(
+      `/api/v1/social/profiles/${encodeURIComponent(handle)}/follow`,
+      { method: "POST" },
+    ),
+  unfollowProfile: (handle: string) =>
+    request<{ following: boolean; follower_count: number }>(
+      `/api/v1/social/profiles/${encodeURIComponent(handle)}/follow`,
+      { method: "DELETE" },
+    ),
   profile: (signal?: AbortSignal) => request<ProfilePayload>("/api/v1/profile", undefined, signal),
   profilePhoto,
   uploadProfilePhoto: (file: File) => {
@@ -918,7 +1109,9 @@ export const api = {
   getThread: (threadId: string, signal?: AbortSignal) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}`, undefined, signal),
   goalEvidenceContinuation: (goalId: string, signal?: AbortSignal) =>
-    request<WorkflowSnapshot | null>(`/api/v1/goals/${goalId}/evidence/continuation`, undefined, signal),
+    request<WorkflowSnapshot | null>(
+      `/api/v1/goals/${goalId}/evidence/continuation`, undefined, signal, null,
+    ),
   retryGoalEvidence: (threadId: string) =>
     request<WorkflowSnapshot>(`/api/v1/agent/threads/${threadId}/evidence/retry`, { method: "POST" }),
   resumeThread: async (threadId: string, body: { answers?: Record<string, string>; confirmed?: boolean; cancelled?: boolean }) =>
@@ -1116,4 +1309,18 @@ export const api = {
     ),
   latestEvidenceSourceSync: (goalId: string, signal?: AbortSignal) =>
     request<GoalSyncJob | null>(`/api/v1/goals/${goalId}/evidence/sources/sync`, undefined, signal),
+  strategyLearning: (goalId: string, signal?: AbortSignal) =>
+    request<StrategyLearningContext>(`/api/v1/goals/${goalId}/strategy-recommendations`, undefined, signal),
+  generateStrategyRecommendation: (goalId: string) =>
+    request<StrategyRecommendation>(`/api/v1/goals/${goalId}/strategy-recommendations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }),
+  strategyRecommendationFeedback: (goalId: string, recommendationId: string, decision: Exclude<StrategyDecision, "pending">) =>
+    request<StrategyRecommendation>(`/api/v1/goals/${goalId}/strategy-recommendations/${recommendationId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    }),
 };

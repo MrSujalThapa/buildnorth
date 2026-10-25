@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from personal_markets.core.errors import SemanticProviderError
 from personal_markets.integrations.goal_sync_jobs import InMemoryGoalSyncJobStore
 from personal_markets.integrations.goal_sync_service import GoalSyncService
 from personal_markets.integrations.mcp_domain import GoalSyncRecipeRecord, SyncRecipeStep
@@ -161,7 +162,12 @@ async def test_parent_watch_reads_only_discovered_children_and_rechecks_revocati
     )
     service = GoalSyncService(
         settings=None, gateway=gateway,
-        repository=SimpleNamespace(list_goal_recipes=AsyncMock(return_value=[recipe])),
+        repository=SimpleNamespace(
+            list_goal_recipes=AsyncMock(return_value=[recipe]),
+            get_connection=AsyncMock(return_value=SimpleNamespace(
+                id=connection_id, status="connected"
+            )),
+        ),
         goals=SimpleNamespace(get_goal_by_string=AsyncMock(return_value=SimpleNamespace(goal_id=goal_id))),
         workflow=None, evidence=None, owner_id=owner_id,
         watch_resource_uris=[f"composio://notion/{parent_id}"],
@@ -206,7 +212,12 @@ async def test_resource_watch_does_not_require_a_parent(
     )
     service = GoalSyncService(
         settings=None, gateway=gateway,
-        repository=SimpleNamespace(list_goal_recipes=AsyncMock(return_value=[recipe])),
+        repository=SimpleNamespace(
+            list_goal_recipes=AsyncMock(return_value=[recipe]),
+            get_connection=AsyncMock(return_value=SimpleNamespace(
+                id=connection_id, status="connected"
+            )),
+        ),
         goals=SimpleNamespace(get_goal_by_string=AsyncMock(return_value=SimpleNamespace(goal_id=goal_id))),
         workflow=None, evidence=None, owner_id=owner_id,
         watch_resource_uris=[f"composio://notion/{page_id}"],
@@ -215,3 +226,86 @@ async def test_resource_watch_does_not_require_a_parent(
     gateway.list_descendants.assert_not_awaited()
     steps = gateway.sync.await_args.kwargs["steps"]
     assert [step.resource_uri for step in steps] == [f"composio://notion/{page_id}"]
+
+
+@pytest.mark.asyncio
+async def test_github_watch_does_not_read_recipe_from_another_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = InMemorySourceWatchStore()
+    monkeypatch.setattr(
+        "personal_markets.integrations.goal_sync_service.get_source_watch_store",
+        lambda: store,
+    )
+    owner_id, goal_id = uuid4(), uuid4()
+    watched_connection, stale_recipe_connection = uuid4(), uuid4()
+    resource_id = "owner/repo"
+    await store.save(SourceWatch(
+        owner_id=owner_id, goal_id=goal_id,
+        plugin_connection_id=watched_connection,
+        plugin_id="github", resource_id=resource_id,
+    ))
+    recipe = GoalSyncRecipeRecord(
+        goal_id=goal_id, plugin_connection_id=stale_recipe_connection,
+        plugin_id="github", label="Commits", approved=True,
+        steps=[SyncRecipeStep(
+            capability_id="read-commits", tool_name="GITHUB_LIST_COMMITS",
+            resource_uri=f"composio://github/{resource_id}",
+            arguments={"owner": "owner", "repo": "repo"},
+        )],
+    )
+    gateway = SimpleNamespace(sync=AsyncMock())
+    service = GoalSyncService(
+        settings=None, gateway=gateway,
+        repository=SimpleNamespace(list_goal_recipes=AsyncMock(return_value=[recipe])),
+        goals=SimpleNamespace(get_goal_by_string=AsyncMock(
+            return_value=SimpleNamespace(goal_id=goal_id)
+        )),
+        workflow=None, evidence=None, owner_id=owner_id,
+        watch_resource_uris=[f"composio://github/{resource_id}"],
+    )
+    assert (await service.sync_goal_sources(str(goal_id)))["status"] == "no_recipes"
+    gateway.sync.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("connection_status", ["error", "not_connected"])
+async def test_watch_rejects_expired_or_revoked_connection(
+    monkeypatch: pytest.MonkeyPatch, connection_status: str
+) -> None:
+    store = InMemorySourceWatchStore()
+    monkeypatch.setattr(
+        "personal_markets.integrations.goal_sync_service.get_source_watch_store",
+        lambda: store,
+    )
+    owner_id, goal_id, connection_id = uuid4(), uuid4(), uuid4()
+    await store.save(SourceWatch(
+        owner_id=owner_id, goal_id=goal_id, plugin_connection_id=connection_id,
+        plugin_id="github", resource_id="owner/repo",
+    ))
+    recipe = GoalSyncRecipeRecord(
+        goal_id=goal_id, plugin_connection_id=connection_id, plugin_id="github",
+        label="Commits", approved=True, steps=[SyncRecipeStep(
+            capability_id="read-commits", tool_name="GITHUB_LIST_COMMITS",
+            resource_uri="composio://github/owner/repo",
+            arguments={"owner": "owner", "repo": "repo"},
+        )],
+    )
+    gateway = SimpleNamespace(sync=AsyncMock())
+    service = GoalSyncService(
+        settings=None, gateway=gateway,
+        repository=SimpleNamespace(
+            list_goal_recipes=AsyncMock(return_value=[recipe]),
+            get_connection=AsyncMock(return_value=SimpleNamespace(
+                id=connection_id, status=connection_status,
+            )),
+        ),
+        goals=SimpleNamespace(get_goal_by_string=AsyncMock(
+            return_value=SimpleNamespace(goal_id=goal_id)
+        )),
+        workflow=None, evidence=None, owner_id=owner_id,
+        watch_resource_uris=["composio://github/owner/repo"],
+    )
+    with pytest.raises(SemanticProviderError, match="changed or expired"):
+        await service.sync_goal_sources(str(goal_id))
+    gateway.sync.assert_not_awaited()

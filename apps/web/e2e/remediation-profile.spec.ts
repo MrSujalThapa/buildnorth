@@ -44,6 +44,13 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
       ? route.fulfill({ status: 200, contentType: "image/png", body: avatar })
       : route.fulfill({ status: 404, body: "" });
   });
+  await page.route("**/api/v1/public/profiles/reader", (route) => route.fulfill({ json: {
+    creator: { user_id: "10000000-0000-0000-0000-000000000001", handle: "reader", username: "reader", display_name: fields.display_name, bio: fields.bio, has_photo: false },
+    follower_count: 0, following_count: 0, following: false, is_self: true, market_count: 0,
+    contribution_total: 0, activity: [],
+  } }));
+  await page.route("**/api/v1/public/profiles/reader/markets*", (route) => route.fulfill({ json: { items: [] } }));
+  await page.route("**/api/v1/public/profiles/reader/stars", (route) => route.fulfill({ json: { items: [] } }));
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [goal] }));
   await page.route("**/api/v1/profile", async (route) => {
     if (route.request().method() === "PATCH") {
@@ -80,6 +87,7 @@ test("profile editing, photo, and execution areas work at desktop and mobile wid
   await page.getByRole("button", { name: /Reading time, 45 minutes/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator(".trait-readout-value")).toHaveText("45 minutes/30 days");
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
   await page.screenshot({ path: `test-results/remediation-profile-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Edit parameters" }).click();
   await expect(page.getByRole("dialog", { name: "Edit parameters" })).toBeVisible();

@@ -9,6 +9,7 @@ from __future__ import annotations
 import struct
 import zlib
 from datetime import datetime, timedelta
+from math import isfinite
 from typing import Any, Literal
 
 from personal_markets.forecasting.repository import PublishedBaseline
@@ -73,6 +74,8 @@ def series_from_history(history: list[PublishedBaseline]) -> list[dict[str, Any]
         if published is None:
             continue
         if item.source_kind == "synthetic_demo":
+            continue
+        if not isfinite(item.probability) or not 0 <= item.probability <= 1:
             continue
         points.append(
             {

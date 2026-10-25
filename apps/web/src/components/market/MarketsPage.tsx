@@ -16,6 +16,7 @@ type Props = {
   onArchiveGoals: (goalIds: string[]) => Promise<void>;
   onDeleteCollections: (collectionIds: string[]) => Promise<void>;
   onMoveToCollection: (collectionId: string, goalIds: string[]) => Promise<void>;
+  onShareMarkets?: (goalIds: string[]) => Promise<void>;
 };
 
 export default function MarketsPage({
@@ -27,6 +28,7 @@ export default function MarketsPage({
   onArchiveGoals,
   onDeleteCollections,
   onMoveToCollection,
+  onShareMarkets,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -176,7 +178,13 @@ export default function MarketsPage({
         <div className="markets-actionbar" role="toolbar" aria-label="Selection actions">
           <strong>{selected.length + selectedCollections.length} selected</strong>
           <button type="button" className="danger" disabled={!selected.length && !selectedCollections.length} onClick={() => setConfirmDelete(true)}>Delete / Archive</button>
-          <button type="button" disabled title="Coming soon">Share</button>
+          <button
+            type="button"
+            disabled={!selected.length || !onShareMarkets}
+            onClick={() => { if (onShareMarkets) void onShareMarkets(selected); }}
+          >
+            Share
+          </button>
           <div className="selection-more">
             <button type="button" aria-label="More selection actions" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>···</button>
             {moreOpen ? <div className="selection-more-menu" role="menu">

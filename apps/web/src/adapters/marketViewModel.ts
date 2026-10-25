@@ -16,12 +16,23 @@ export function marketCategory(goal: Goal): string {
 }
 
 export function publishedHistoryPoints(points: MarketHistoryPoint[]): MarketHistoryPoint[] {
-  return points.filter((point) => point.source_kind !== "synthetic_demo");
+  const valid = points.filter((point) => point.source_kind !== "synthetic_demo"
+    && typeof point.created_at === "string"
+    && Number.isFinite(Date.parse(point.created_at))
+    && typeof point.probability === "number"
+    && Number.isFinite(point.probability)
+    && point.probability >= 0 && point.probability <= 1);
+  valid.sort((a, b) => Date.parse(a.created_at!) - Date.parse(b.created_at!)
+    || (a.id ?? "").localeCompare(b.id ?? ""));
+  const byReceipt = new Map<string, MarketHistoryPoint>();
+  valid.forEach((point, index) => byReceipt.set(point.id || `missing-id-${index}`, point));
+  return [...byReceipt.values()].sort((a, b) => Date.parse(a.created_at!) - Date.parse(b.created_at!)
+    || (a.id ?? "").localeCompare(b.id ?? ""));
 }
 
 function historyToChart(points: MarketHistoryPoint[]): ChartPoint[] {
-  return publishedHistoryPoints(points).map((point, index) => ({
-    timestamp: point.created_at ? Date.parse(point.created_at) : index,
+  return publishedHistoryPoints(points).map((point) => ({
+    timestamp: Date.parse(point.created_at!),
     value: point.probability * 100,
   }));
 }
@@ -86,6 +97,7 @@ export function toMarketCard(
     totalReturn,
     events: [],
     history: chart,
+    historyUnavailable: history.some((point) => point.source_kind !== "synthetic_demo") && chart.length === 0,
   };
 }
 

@@ -62,6 +62,56 @@ test("expired goal thread reports a timeout after reload", async () => {
   expect(sessionStorage.getItem("playitout:pending-goal-thread")).toBeNull();
 });
 
+test("async resume after clarification keeps polling until confirm", async () => {
+  const threadId = "resume-thread";
+  const running = { thread_id: threadId, status: "running", progress: ["Understanding goal"] } as unknown as WorkflowSnapshot;
+  const clarification = {
+    thread_id: threadId,
+    status: "needs_input",
+    progress: ["Understanding goal"],
+    interrupt: {
+      type: "clarification",
+      message: "A few details are needed.",
+      questions: [{ id: "q1", question: "Target company?", why_needed: "scope" }],
+    },
+  } as unknown as WorkflowSnapshot;
+  const resuming = {
+    thread_id: threadId,
+    status: "running",
+    progress: ["Understanding goal", "Continuing the agent workflow"],
+  } as unknown as WorkflowSnapshot;
+  const confirm = {
+    thread_id: threadId,
+    status: "needs_input",
+    progress: ["Understanding goal", "Continuing the agent workflow"],
+    interrupt: {
+      type: "confirm_contract",
+      proposal: {
+        title: "Receive an FDE offer",
+        goal_type: "career",
+        success_metric: "offer",
+        success_operator: ">=",
+        success_target: "1",
+        deadline: "2027-08-01",
+      },
+    },
+  } as unknown as WorkflowSnapshot;
+  vi.spyOn(api, "startThreadAsync").mockResolvedValue(running);
+  vi.spyOn(api, "getThread").mockResolvedValueOnce(clarification).mockResolvedValue(confirm);
+  vi.spyOn(api, "resumeThreadAsync").mockResolvedValue(resuming);
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><NewGoalPage /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByLabelText("What should happen?"), { target: { value: "Receive an FDE offer by August 2027" } });
+  fireEvent.click(screen.getByRole("button", { name: "Create market" }));
+  expect(await screen.findByRole("button", { name: "Continue" })).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "Target company set" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(await screen.findByRole("button", { name: "Confirm" }, { timeout: 5000 })).toBeInTheDocument();
+});
+
 test("provider timeout after commit links to the saved goal", async () => {
   sessionStorage.setItem("playitout:pending-goal-thread", "saved-thread");
   const failed = {

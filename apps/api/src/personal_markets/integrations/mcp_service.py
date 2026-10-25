@@ -955,6 +955,7 @@ class IntegrationGatewayService:
         run = await self._repository.start_run(connection.id)
         records_read = 0
         raw_rows: list[RawSourceRecord] = []
+        pending_cursors: list[SyncCursorRecord] = []
         last_tool: str | None = None
         argument_keys: list[str] = []
         try:
@@ -1168,7 +1169,7 @@ class IntegrationGatewayService:
                         arguments = next_arguments
                 next_cursor = payload.get("next_cursor")
                 if next_cursor and plugin_id in {"github", "notion", "calendar"}:
-                    await self._repository.put_cursor(
+                    pending_cursors.append(
                         SyncCursorRecord(
                             plugin_connection_id=connection.id,
                             capability_id=step.capability_id,
@@ -1177,6 +1178,9 @@ class IntegrationGatewayService:
                         )
                     )
             inserted_rows = await self._repository.append_raw_records(raw_rows)
+            # A cursor must not advance past observations that failed to persist.
+            for pending_cursor in pending_cursors:
+                await self._repository.put_cursor(pending_cursor)
             records_new = len(inserted_rows)
             await self._repository.finish_run(
                 run.id,

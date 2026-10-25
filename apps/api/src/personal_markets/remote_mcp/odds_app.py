@@ -90,6 +90,10 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
     let overlay = [];
     let range = "ALL";
     let hostReady = false;
+    let activeGoalId = null;
+    let expectedGoalId = null;
+    let currentForecastStatus = "NOT_PUBLISHED";
+    let chartMessage = "No published forecast receipts yet.";
 
     function post(message) {
       try { window.parent.postMessage(message, "*"); } catch (error) {}
@@ -121,18 +125,46 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
 
     function unwrap(payload) {
       if (!payload) return null;
-      if (payload.structuredContent || payload.structured_content) return payload.structuredContent || payload.structured_content;
+      if (payload.structuredContent || payload.structured_content) return unwrap(payload.structuredContent || payload.structured_content);
       if (payload.result) return unwrap(payload.result);
       if (payload.toolResult) return unwrap(payload.toolResult);
       if (payload.toolOutput) return unwrap(payload.toolOutput);
-      if (Array.isArray(payload.points) || payload.status) return payload;
+      if (typeof payload.goal_id === "string" && Array.isArray(payload.points)) return payload;
       return null;
     }
 
     function ingest(payload) {
       const data = unwrap(payload);
       if (!data) return;
-      series = Array.isArray(data.points) ? data.points : [];
+      if (expectedGoalId && data.goal_id !== expectedGoalId) return;
+      if (activeGoalId && data.goal_id !== activeGoalId && !expectedGoalId) return;
+      const valid = data.points.filter((point) =>
+        point && Number.isFinite(point.timestamp_ms) &&
+        Number.isFinite(point.probability_pct) &&
+        point.probability_pct >= 0 && point.probability_pct <= 100
+      );
+      const seen = new Set();
+      const incoming = valid.filter((point) => {
+        const key = point.receipt_id || JSON.stringify([point.timestamp_ms, point.probability_pct]);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).sort((a, b) => a.timestamp_ms - b.timestamp_ms ||
+        String(a.receipt_id || "").localeCompare(String(b.receipt_id || "")));
+      if (activeGoalId === data.goal_id && series.length && incoming.length < series.length) {
+        // Published receipts are immutable. A shorter same-goal response is a
+        // stale or narrower range result; keep the fuller series while applying
+        // any newer current-status label from the server.
+        currentForecastStatus = data.current_forecast_status || currentForecastStatus;
+        chartMessage = data.message || chartMessage;
+        draw();
+        return;
+      }
+      series = incoming;
+      activeGoalId = data.goal_id;
+      expectedGoalId = null;
+      currentForecastStatus = data.current_forecast_status || data.status;
+      chartMessage = data.message || "No published forecast receipts yet.";
       markers = Array.isArray(data.evidence_markers) ? data.evidence_markers : [];
       overlay = Array.isArray(data.overlay) ? data.overlay : [];
       draw();
@@ -183,7 +215,7 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
       document.getElementById("overlay").innerHTML = "";
       if (!points.length) {
         price.textContent = "Not priced";
-        hint.textContent = "No published forecast receipts yet.";
+        hint.textContent = chartMessage;
         inspect.textContent = "PlayItOut will not invent a series for an unpublished goal.";
         area.setAttribute("d", "");
         line.setAttribute("d", "");
@@ -191,9 +223,10 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
       }
       const shown = active || points[points.length - 1];
       price.textContent = Number(shown.probability_pct).toFixed(1) + "%";
-      hint.textContent = new Date(shown.timestamp_ms).toLocaleString("en-CA", {
+      const publishedTime = new Date(shown.timestamp_ms).toLocaleString("en-CA", {
         month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit"
       });
+      hint.textContent = (currentForecastStatus === "WITHHELD" ? "Historical odds · Current withheld · " : "Published · ") + publishedTime;
       const nearby = markerNear(points, shown);
       inspect.textContent = nearby && nearby.label
         ? ("Evidence: " + nearby.label)
@@ -276,7 +309,22 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
         sendInitialized();
       }
       if (data.method === "ui/notifications/tool-result") ingest(data.params);
-      if (data.method === "ui/notifications/tool-input") return;
+      if (data.method === "ui/notifications/tool-input") {
+        const input = data.params && (data.params.arguments || data.params.input || data.params);
+        if (input && typeof input.goal_id === "string" && input.goal_id !== activeGoalId) {
+          expectedGoalId = input.goal_id;
+          series = [];
+          markers = [];
+          overlay = [];
+          currentForecastStatus = "NOT_PUBLISHED";
+          chartMessage = "No published forecast receipts yet.";
+          document.getElementById("price").textContent = "—";
+          document.getElementById("hint").textContent = "Waiting for authorized forecast history.";
+          document.getElementById("line").setAttribute("d", "");
+          document.getElementById("area").setAttribute("d", "");
+        }
+        return;
+      }
       if (data.method === "ui/notifications/host-context-changed") {
         applyHostStyles(data.params || {});
         ingest(data.params);

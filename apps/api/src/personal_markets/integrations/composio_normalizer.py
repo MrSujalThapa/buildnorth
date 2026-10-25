@@ -93,7 +93,13 @@ def normalize_tool_result(
                     for event in raw_events
                 ]
             fingerprint = payload_hash(hash_body)
-        if plugin_id == "notion" or plugin_id not in {"github", "calendar"}:
+        # GitHub commits are immutable by SHA. Issues and PRs are mutable, so an
+        # edit must get a new raw identity while a repeated read stays idempotent.
+        if (
+            (plugin_id == "github" and not row.get("sha"))
+            or plugin_id == "notion"
+            or plugin_id not in {"github", "calendar"}
+        ):
             external_id = f"{external_id}:{fingerprint[:16]}"
         records.append(
             RawSourceRecord(

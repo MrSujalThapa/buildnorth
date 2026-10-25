@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Async clarification resume polls until Confirm
+
+**Hypothesis:** After Continue on goal clarification, `resumeThreadAsync` returned `running` but React Query still cached `needs_input`, so refetch stopped and Confirm never appeared.
+
+**Changes:** `NewGoalPage` writes the resume/start snapshot into the thread query cache. Playwright fills clarification Continue before waiting for Confirm.
+
+**Measured result:** Unit test covers poll-until-Confirm. Live Chromium journey was still in progress at ship time; no forecast coefficients changed.
+
 ## 2026-10-25 — Chromium hosted Spur: env PASS, browser agent BLOCKED on budget
 
 **Hypothesis:** After blank-`PM_SPUR_API_KEY` masking was fixed, the Chromium app could reach hosted Spur if the FastAPI process loaded `.env` and the isolated DB had inference preference tables.
@@ -53,6 +61,14 @@ This file is both an engineering log and a hackathon deliverable.
 **Changes:** Endpoint comparison beside published yellow history; no deadline-length forecast line. Request kinds distinguish quantitative scenarios, evidence, strategy, and current odds. Strategy insights stay unpriced unless a modeled lever is stated. Skip-link is focus-only. No forecast math, Details radar, or Spur entitlements changed.
 
 **Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Historical changelog probabilities were not rewritten.
+
+## 2026-10-25 — Social markets, public profiles, and marketplace
+
+**Hypothesis:** GitHub-style visibility, stars, follows, forks, and a Notion-like public marketplace can sit on the existing goal/market object without a second blueprint catalog or invented odds.
+
+**Changes:** Markets default to private. Publishing writes an allowlisted public blueprint and can list the authorized chart history. Stars, follows, fork provenance, and daily contribution events persist. Forks create independent private goals without evidence or probability copy. Sharing uses `navigator.share` with clipboard fallback and only public URLs. Remote MCP adds read-only public market/blueprint tools. Forecast math is unchanged. Multi-market collection blueprints were deferred.
+
+**Measured result:** No forecast score was recomputed. Isolation, publish/revoke, duplicate star/follow, and idempotent fork coverage are in API tests.
 
 ## 2026-10-24 — MCP Apps Odds Explorer handshake
 
@@ -1177,3 +1193,32 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 - Spur GLM 5.3 estimates changed from the previously unverified $2.50/$15 per million tokens to the published $0.30/$1.00 rates. Historical ledger entries were not altered. Settings now displays spent and reserved amounts and a safe unavailable reason.
 - Local mocked entitlement and authorization tests pass. Live Spur inference and the production account row have not yet been verified; no paid provider call was made in this run.
 - Scheduled and MCP inference now requires a fresh Clerk verification for each internal owner lookup, failing closed when Clerk cannot confirm the current account. The production watch-runtime group was confirmed linked only to `playitout-source-watch`; it received the existing Clerk secret, existing admin email allowlist, and verified immutable admin ID. The web service received only the verified ID. Values remain masked. These configuration changes trigger Render redeploys; live entitlement and provider behavior remain to be checked after the code merge.
+
+## Social and Profile product audit (PR #33 child branch)
+
+- Inspected Social, public/private Profile, public blueprints and Pass 9A/9B contracts in an isolated worktree. Rendered desktop/mobile fixture journeys exposed silent API-error-as-empty states, missing public photos, an awkward mobile public identity card, and sparse chart presentation.
+- Fixed public activity aggregation to exclude private-goal events for other viewers. Added two-principal regression coverage, including unpublishing. Fixed fork contract fallback that could copy private success fields and personal resources. Public chart history now excludes non-published source kinds.
+- Added visible retry states, social cache invalidation, photo display and mobile identity styling. The public chart now opens at All history; the two-point fixture still reveals a sparse-chart visual defect to resolve before shipment.
+- No production data or inference used. Mocked browser and in-memory HTTP tests do not establish live Clerk/PostgreSQL behavior. Full findings: `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+
+## Social/Profile audit follow-up (PR #37)
+
+- Replaced sparse public probability lines with source-backed dated observations; retained the established interactive chart for three or more points. Captured desktop/mobile snapshots.
+- Added API-backed Discover pagination with total count, stable tie ordering, deduplication, query reset and page-error retry.
+- Bound public blueprint display and private forking to the reviewed publication snapshot, preventing later private goal edits from appearing publicly or entering a visitor's fork.
+- Clarified heatmap event scope and mobile month labels. No inference, production writes or migration changes. Tests and limitations are recorded in `docs/audits/SOCIAL_PROFILE_PRODUCT_AUDIT.md`.
+
+### 2026-10-25 Social/Profile PostgreSQL acceptance boundary (PR #37)
+
+- Added a disposable PostgreSQL integration test for public market persistence, follow/star, private fork ownership, reviewed blueprint stability and activity revocation after unpublish. It uses test identities; genuine Clerk authentication remains unverified.
+- Characterized offset pagination under concurrent publication: a new market can shift the next page and repeat an ID. The frontend deduplicates repeats, but a refresh is needed to see the new market. No cursor change was made.
+- Existing production data and published forecasts were not touched. No inference was called. This is verification work, not a measured forecasting improvement.
+
+## 2026-10-25 — Pass 9B personal strategy learning and synthetic offline experiment
+
+- **Hypothesis:** Structured prior strategy attempts and measured outcomes can inform a later recommendation without conflating execution reliability, evidence, causation or published forecast probability.
+- **Changes:** Added owner-scoped, additive strategy recommendation/outcome/evidence-link tables; typed learning service and pollable API; existing inference router integration; deterministic fact/citation/relationship and probability-claim guards; synthetic-fixture exclusion from authentic evidence links; optional reviewed-blueprint port. The service feeds a bounded history of prior observed results into the next structured inference request. No What If, radar, source-watch, or marketplace code was modified.
+- **Tested:** Isolated migrated PostgreSQL records a first recommendation, acceptance, linked unsuccessful interview observation, and a second recommendation whose controlled inference input contains that earlier outcome. Duplicate submissions and cross-owner access are checked. No real user data or paid inference was used.
+- **Offline result:** Fixed synthetic-only 400-user, user-disjoint 247/73/80 train/validation/test split. Test Brier reference 0.221679 vs candidate 0.204225; log loss 0.635602 vs 0.598781; ECE-10 0.047438 vs 0.081008. The candidate's calibration is worse and the fixture is synthetic, so this does **not** justify a production model change. See `benchmarks/strategy_learning_v1/results.json` and `docs/STRATEGY_LEARNING.md`.
+

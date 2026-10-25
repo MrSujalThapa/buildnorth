@@ -293,6 +293,18 @@ class IdentityService:
     async def profile_for(self, principal: Principal) -> UserProfile:
         return await self._repository.get_profile(principal.user_id)
 
+    async def profile_for_user(self, user_id: UUID) -> UserProfile:
+        return await self._repository.get_profile(user_id)
+
+    async def user_id_for_handle(self, handle: str) -> UUID | None:
+        found = await self._repository.get_user_id_by_username(handle)
+        if found is not None:
+            return found
+        try:
+            return UUID(handle)
+        except ValueError:
+            return None
+
     async def account_view(
         self, principal: Principal, usage: HostedUsage, profile: UserProfile | None = None
     ) -> AccountView:

@@ -50,6 +50,21 @@ async def get_invited_principal(
     return require_invited(principal)
 
 
+async def get_optional_principal(
+    request: Request,
+    identity: Annotated[IdentityService, Depends(get_identity_service)],
+) -> Principal | None:
+    if (
+        not _bearer_token(request)
+        and getattr(request.app.state, "auth_bypass_principal", None) is None
+    ):
+        return None
+    try:
+        return await get_principal(request, identity)
+    except UnauthorizedError:
+        return None
+
+
 async def get_admin_principal(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Principal:

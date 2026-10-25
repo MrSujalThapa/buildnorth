@@ -77,15 +77,29 @@ _T = TypeVar("_T")
 
 INSTRUCTIONS = """PlayItOut prices personal goals with deterministic models.
 Probabilities come from the model, never from you or from PlayItOut's agents.
-Typical flow: create_goal (clarify/confirm) -> get_forecast_readiness ->
-get_observation_policy -> submit_structured_evidence or submit_structured_rows ->
-get_forecast -> compare_forecasts -> compare_scenarios / simulate_intervention ->
-show_odds_chart.
+Choose tools from the user's intent before calling one. "I did X" is an observation:
+list_goals/get_goal to identify the owned goal, get_observation_policy for units and
+snapshot/increment semantics, then confirm a write before submitting it. "What if I
+did X" is hypothetical: use simulate_intervention or compare_scenarios only if the
+user supplied a quantified change matching a model parameter; never submit evidence.
+For "odds before X", read get_evidence_summary to identify the observation and use
+compare_forecasts with evidence_id. For actual-versus-simulated, read get_forecast
+and compare_forecasts separately from SimulationView; hypothetical odds are not receipts.
+For missing evidence, use get_forecast_readiness and get_observation_policy.
+Do not infer a goal from a vague request when multiple goals match. Ask which goal.
+Do not guess missing quantities, units, relative dates, or the scope of a follow-up.
+The current MCP tools do not search public blueprints or interpret unquantified
+natural-language What If actions. Say so rather than fabricating an answer.
+Repeated reports of the same observation should be inspected with
+get_evidence_summary before writing. Reuse the same idempotency key for a retry;
+a fresh key can represent a new increment. Never turn a source mention into proof
+of an interview, offer, or rejection without a supported observation.
 Progress is evidence, not a contract edit. Title, deadline, and success definition
 cannot be rewritten here. Prefer structured evidence: it needs no model call.
 Do not fetch private URLs. Evidence is agent-reported; you cannot mark it verified.
 compare_forecasts reads published receipts only and will say when none exists.
-Scenarios are hypothetical and never change the published forecast. Interactive
+Observation, receipt publication, and hypothetical times are distinct. Scenarios
+never change the published forecast. Interactive
 charts require an MCP Apps host; otherwise call get_odds_chart_image for a static PNG."""
 
 _READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False)
@@ -463,15 +477,17 @@ def _register_tools(
 
     @server.tool(annotations=_READ, title="Get forecast")
     async def get_forecast(goal_id: GoalId) -> ForecastView:
-        """Latest published forecast with model version, assumptions, evidence watermark and
-        limitations. Returns NOT_PUBLISHED, never an invented number, when none exists."""
+        """Latest stored published receipt: probability, receipt ID, publication time,
+        model version, evidence watermark and limitations. Check get_goal for the
+        goal's current forecast status. Returns NOT_PUBLISHED when no receipt exists."""
         return await run("get_forecast", lambda who: tools.get_forecast(who, goal_id))
 
     @server.tool(annotations=_READ, title="Get forecast history")
     async def get_forecast_history(
         goal_id: GoalId, limit: Annotated[int, Field(ge=1, le=100)] = 30
     ) -> ForecastHistory:
-        """Published forecast points for a goal, oldest first."""
+        """Stored published receipts for one owned goal, oldest first. Each point has a
+        receipt ID, model version, evidence watermark and publication timestamp."""
         return await run(
             "get_forecast_history", lambda who: tools.get_forecast_history(who, goal_id, limit)
         )
@@ -480,7 +496,8 @@ def _register_tools(
     async def get_evidence_summary(
         goal_id: GoalId, limit: Annotated[int, Field(ge=1, le=50)] = 20
     ) -> EvidenceSummary:
-        """Recent evidence for a goal with its source and verification status."""
+        """Recent observations for one owned goal: source, verification status,
+        observed_at and agent receipt time. Read before resubmitting a possible duplicate."""
         return await run(
             "get_evidence_summary", lambda who: tools.get_evidence_summary(who, goal_id, limit)
         )
@@ -518,9 +535,12 @@ def _register_tools(
         supporting_reference: OptionalRef = None,
         note: Annotated[str | None, Field(default=None, max_length=200)] = None,
     ) -> SubmissionResult:
-        """Commit one typed observation. No model call. Validated against
+        """Write a confirmed real observation, never a proposed What If action.
+        Call get_observation_policy first. No model call. Validated against
         get_observation_policy, de-duplicated, then the forecast is republished if the model
-        can price it. Returns the publication status or why repricing did not happen."""
+        can price it. An identical snapshot may corroborate without a new receipt;
+        increments need a stable key on retries or they can double count. Returns
+        the publication status or why repricing did not happen."""
         return await run(
             "submit_structured_evidence",
             lambda who: tools.submit_structured_evidence(
@@ -550,7 +570,9 @@ def _register_tools(
         source_identifier: OptionalRef = None,
         supporting_reference: OptionalRef = None,
     ) -> SubmissionResult:
-        """Interpret free text with PlayItOut's Evidence Agent, then commit it like structured
+        """Write confirmed past or current evidence described in free text, never a
+        hypothetical question. Interpret with PlayItOut's Evidence Agent, then commit like
+        structured
         evidence. Uses the account's model credits or its own provider key and needs the
         inference:use permission. Ambiguous text is not committed; clarifying questions are
         returned instead."""
@@ -574,10 +596,12 @@ def _register_tools(
         goal_id: GoalId,
         changes: Annotated[list[ChangeInput], Field(min_length=1, max_length=5)],
     ) -> SimulationView:
-        """Run a hypothetical What If with explicit parameter changes (for example
+        """Read-only hypothetical What If with explicit quantified parameter changes (for example
         applications_per_week add 3). Returns the published baseline, scenario probability and
         delta in percentage points. Never changes the published forecast. Changes that map to
-        no model parameter return NOT_PRICED with causal_status unmapped_intervention."""
+        no model parameter return NOT_PRICED with causal_status unmapped_intervention.
+        This tool does not parse free text or accept a duration; ask for missing quantities
+        and do not silently reinterpret 'stop for a month' as a permanent zero rate."""
         return await run(
             "simulate_intervention",
             lambda who: tools.simulate_intervention(who, goal_id, changes),
@@ -806,6 +830,27 @@ def _register_tools(
             )
 
         return await run("get_odds_chart_image", _image)
+
+    @server.tool(annotations=_READ, title="Search public markets")
+    async def search_public_markets(
+        query: Annotated[str | None, Field(default=None, max_length=80)] = None,
+        limit: Annotated[int, Field(ge=1, le=25)] = 12,
+    ) -> dict[str, Any]:
+        """Search published PlayItOut markets. Returns public blueprint cards only."""
+        return await run(
+            "search_public_markets",
+            lambda who: tools.search_public_markets(who, query, limit),
+        )
+
+    @server.tool(annotations=_READ, title="Get public market")
+    async def get_public_market(goal_id: GoalId) -> dict[str, Any]:
+        """Read one public market and its approved blueprint. Private markets 404."""
+        return await run("get_public_market", lambda who: tools.get_public_market(who, goal_id))
+
+    @server.tool(annotations=_READ, title="Get blueprint")
+    async def get_blueprint(goal_id: GoalId) -> dict[str, Any]:
+        """Return the reusable public blueprint for a published market."""
+        return await run("get_blueprint", lambda who: tools.get_blueprint(who, goal_id))
 
 
 def _advertise_ui_on_handshake(server: MCPServer) -> None:

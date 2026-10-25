@@ -27,9 +27,39 @@ function mockApi(goals: unknown = []) {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     let payload: unknown = goals;
     if (url.endsWith("/health")) payload = { status: "ok", service: "api", version: "test" };
+    else if (url.includes("/api/v1/me") || url.endsWith("/me")) {
+      payload = {
+        user_id: "test-user",
+        clerk_user_id: "test-clerk",
+        email: "judge@example.test",
+        email_verified: true,
+        role: "user",
+        invited: true,
+        hosted: {
+          enabled: false,
+          quota_usd: 0,
+          quota_tokens: 0,
+          reserved_usd: 0,
+          spent_usd: 0,
+          reserved_tokens: 0,
+          spent_tokens: 0,
+          remaining_usd: 0,
+          remaining_tokens: 0,
+          global_remaining_usd: null,
+          kill_switch: false,
+          billing_note: "",
+        },
+      };
+    }
+    else if (url.includes("/profile/photo")) {
+      return Promise.resolve(new Response(null, { status: 404 }));
+    }
     else if (url.includes("/history/")) payload = [];
     else if (url.includes("/plugins")) payload = { items: [], provider_status: "unavailable" };
     else if (url.includes("/goals/dashboard")) payload = { goals, histories: {}, collections: [] };
+    else if (url.includes("/public/markets")) payload = { items: [] };
+    else if (url.includes("/public/creators")) payload = { items: [] };
+    else if (url.includes("/public/profiles")) payload = { creator: { handle: "you", user_id: "1" }, follower_count: 0, following_count: 0, following: false, is_self: true, market_count: 0, contribution_total: 0, activity: [] };
     else if (url.includes("/profile")) payload = { account: { email: "judge@example.test", profile: {} }, goal_count: 0, collection_count: 0, radar: { dimensions: [] }, privacy: "private" };
     else if (url.includes("/goals/") && !url.endsWith("/goals")) payload = (goals as typeof seededGoals)[0] ?? {};
     else if (url.endsWith("/goals")) payload = goals;
@@ -75,6 +105,6 @@ test("Social is honest about unavailable sharing and does not invent probability
   renderApp();
   await screen.findByRole("heading", { name: "Your outcomes" });
   fireEvent.click(within(screen.getByRole("complementary")).getByRole("button", { name: "Social" }));
-  expect(await screen.findByRole("heading", { name: "No shared goals" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "No public markets" })).toBeInTheDocument();
   expect(screen.queryByText(/\+\d+(\.\d+)? pts/)).not.toBeInTheDocument();
 });
