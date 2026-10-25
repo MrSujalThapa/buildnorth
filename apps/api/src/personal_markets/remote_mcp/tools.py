@@ -2023,7 +2023,8 @@ class RemoteMcpTools:
             offset=0,
             viewer_id=caller.user_id,
         )
-        return {"items": [item.model_dump(mode="json") for item in items]}
+        payload: dict[str, Any] = {"items": [item.model_dump(mode="json") for item in items]}
+        return payload
 
     async def get_public_market(self, caller: Caller, goal_id: str) -> dict[str, Any]:
         self.require_scope(caller, READ)
@@ -2037,7 +2038,8 @@ class RemoteMcpTools:
             detail = await get_social_service().public_market(parsed, caller.user_id)
         except ResourceNotFoundError as error:
             raise ToolFailure("not_found", "Market not found") from error
-        return detail.model_dump(mode="json")
+        payload: dict[str, Any] = detail.model_dump(mode="json")
+        return payload
 
     async def get_blueprint(self, caller: Caller, goal_id: str) -> dict[str, Any]:
         detail = await self.get_public_market(caller, goal_id)

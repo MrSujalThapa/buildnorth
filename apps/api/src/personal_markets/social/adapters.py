@@ -47,7 +47,7 @@ class InMemorySocialRepository:
         goal_id: UUID,
         owner_id: UUID,
         visibility: Visibility,
-        blueprint: dict,
+        blueprint: dict[str, Any],
         published_at: datetime | None,
     ) -> bool:
         if self._goals._owners.get(goal_id) != owner_id or not self._goals._active(goal_id):
@@ -105,7 +105,7 @@ class InMemorySocialRepository:
         sort: str,
         limit: int,
         offset: int,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         rows = [
             row
             for goal_id in self._goals._goals
@@ -116,7 +116,7 @@ class InMemorySocialRepository:
         stars = await self.star_counts([row["id"] for row in rows])
         forks = await self.fork_counts([row["id"] for row in rows])
 
-        def key(row: dict[str, Any]) -> tuple:
+        def key(row: dict[str, Any]) -> tuple[Any, ...]:
             if sort == "stars":
                 return (-stars.get(row["id"], 0), row["title"])
             if sort == "forks":
@@ -131,7 +131,7 @@ class InMemorySocialRepository:
 
     async def public_goals_for_user(
         self, user_id: UUID, *, query: str | None, limit: int, offset: int
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         rows = [
             row
             for goal_id, owner in self._goals._owners.items()
@@ -151,7 +151,7 @@ class InMemorySocialRepository:
         visibility: Visibility | None,
         limit: int,
         offset: int,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         rows = [
             row
             for goal_id, owner in self._goals._owners.items()
@@ -163,7 +163,7 @@ class InMemorySocialRepository:
         rows.sort(key=lambda row: row["title"])
         return rows[offset : offset + limit]
 
-    async def get_goal_row(self, goal_id: UUID) -> dict | None:
+    async def get_goal_row(self, goal_id: UUID) -> dict[str, Any] | None:
         return self._row(goal_id)
 
     async def create_fork(
@@ -173,15 +173,15 @@ class InMemorySocialRepository:
         owner_id: UUID,
         title: str,
         goal_type: str,
-        success_definition: dict,
+        success_definition: dict[str, Any],
         deadline: datetime,
-        resource_constraints: dict,
+        resource_constraints: dict[str, Any],
         state_dimensions: list[str],
-        model_requirements: dict,
+        model_requirements: dict[str, Any],
         source_goal_id: UUID,
         source_user_id: UUID,
         idempotency_key: str | None,
-    ) -> tuple[dict, bool]:
+    ) -> tuple[dict[str, Any], bool]:
         if idempotency_key:
             existing_id = self._idempotency.get((owner_id, idempotency_key))
             if existing_id and (row := self._row(existing_id)):
@@ -236,7 +236,7 @@ class InMemorySocialRepository:
 
     async def list_starred_public(
         self, user_id: UUID, *, viewer_id: UUID | None, limit: int, offset: int
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         rows = []
         for star_user, goal_id in self._stars:
             if star_user != user_id:
@@ -315,7 +315,7 @@ class InMemorySocialRepository:
                 counts[day] = counts.get(day, 0) + 1
         return counts
 
-    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict]]:
+    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]:
         return {goal_id: list(self._history.get(goal_id, [])) for goal_id in goal_ids}
 
     async def discover_creators(self, limit: int) -> list[UUID]:

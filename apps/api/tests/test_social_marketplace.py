@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from helpers import isolated_app
 from personal_markets.goals.domain import GoalContract, GoalType
-from personal_markets.identity.domain import UserProfile
+from personal_markets.identity.domain import Principal, UserProfile
 from personal_markets.identity.factory import get_identity_repository
 from personal_markets.identity.testing import invited_principal
 
@@ -24,7 +24,7 @@ def _goal(title: str = "Land an FDE offer") -> GoalContract:
     )
 
 
-def _register(principal) -> None:
+def _register(principal: Principal) -> None:
     repo = get_identity_repository()
     repo.users[principal.user_id] = principal
     repo.by_clerk[principal.clerk_user_id] = principal.user_id
@@ -43,7 +43,7 @@ def test_private_market_is_not_guessable_or_listed() -> None:
         listed = client.get("/api/v1/public/markets")
         assert listed.status_code == 200
         assert listed.json()["items"] == []
-        client.app.state.auth_bypass_principal = visitor
+        app.state.auth_bypass_principal = visitor
         hidden = client.get(f"/api/v1/public/markets/{goal.goal_id}")
         assert hidden.status_code == 404
         owner_only = client.get(f"/api/v1/goals/{goal.goal_id}")
@@ -96,7 +96,7 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         share = client.get(f"/api/v1/social/markets/{goal.goal_id}/share")
         assert share.json()["shareable"] is True
 
-        client.app.state.auth_bypass_principal = visitor
+        app.state.auth_bypass_principal = visitor
         public = client.get(f"/api/v1/public/markets/{goal.goal_id}")
         assert public.status_code == 200
         assert public.json()["title"] == goal.title
@@ -126,13 +126,13 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         assert mine.status_code == 200
         assert mine.json()["title"] == "My FDE path"
 
-        client.app.state.auth_bypass_principal = owner
+        app.state.auth_bypass_principal = owner
         private = client.post(
             f"/api/v1/social/markets/{goal.goal_id}/visibility",
             json={"visibility": "private"},
         )
         assert private.json()["visibility"] == "private"
-        client.app.state.auth_bypass_principal = visitor
+        app.state.auth_bypass_principal = visitor
         gone = client.get(f"/api/v1/public/markets/{goal.goal_id}")
         assert gone.status_code == 404
         still_listed = client.get("/api/v1/public/markets")

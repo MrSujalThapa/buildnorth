@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from personal_markets.social.domain import ActivityType, Visibility
@@ -17,7 +17,7 @@ class SocialRepository(Protocol):
         goal_id: UUID,
         owner_id: UUID,
         visibility: Visibility,
-        blueprint: dict,
+        blueprint: dict[str, Any],
         published_at: datetime | None,
     ) -> bool: ...
 
@@ -31,11 +31,11 @@ class SocialRepository(Protocol):
         sort: str,
         limit: int,
         offset: int,
-    ) -> list[dict]: ...
+    ) -> list[dict[str, Any]]: ...
 
     async def public_goals_for_user(
         self, user_id: UUID, *, query: str | None, limit: int, offset: int
-    ) -> list[dict]: ...
+    ) -> list[dict[str, Any]]: ...
 
     async def owner_goals(
         self,
@@ -45,9 +45,9 @@ class SocialRepository(Protocol):
         visibility: Visibility | None,
         limit: int,
         offset: int,
-    ) -> list[dict]: ...
+    ) -> list[dict[str, Any]]: ...
 
-    async def get_goal_row(self, goal_id: UUID) -> dict | None: ...
+    async def get_goal_row(self, goal_id: UUID) -> dict[str, Any] | None: ...
 
     async def create_fork(
         self,
@@ -56,15 +56,15 @@ class SocialRepository(Protocol):
         owner_id: UUID,
         title: str,
         goal_type: str,
-        success_definition: dict,
+        success_definition: dict[str, Any],
         deadline: datetime,
-        resource_constraints: dict,
+        resource_constraints: dict[str, Any],
         state_dimensions: list[str],
-        model_requirements: dict,
+        model_requirements: dict[str, Any],
         source_goal_id: UUID,
         source_user_id: UUID,
         idempotency_key: str | None,
-    ) -> tuple[dict, bool]: ...
+    ) -> tuple[dict[str, Any], bool]: ...
 
     async def star(self, user_id: UUID, goal_id: UUID) -> bool: ...
 
@@ -78,7 +78,7 @@ class SocialRepository(Protocol):
 
     async def list_starred_public(
         self, user_id: UUID, *, viewer_id: UUID | None, limit: int, offset: int
-    ) -> list[dict]: ...
+    ) -> list[dict[str, Any]]: ...
 
     async def fork_counts(self, goal_ids: list[UUID]) -> dict[UUID, int]: ...
 
@@ -104,6 +104,6 @@ class SocialRepository(Protocol):
 
     async def activity_counts(self, user_id: UUID, start: date, end: date) -> dict[date, int]: ...
 
-    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict]]: ...
+    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]: ...
 
     async def discover_creators(self, limit: int) -> list[UUID]: ...

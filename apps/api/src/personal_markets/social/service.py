@@ -14,6 +14,7 @@ from personal_markets.social.blueprint import (
     history_points,
 )
 from personal_markets.social.domain import (
+    ActivityDay,
     ForkProvenance,
     OwnerMarketSocial,
     PublicCreator,
@@ -256,7 +257,7 @@ class SocialService:
         today = datetime.now(UTC).date()
         start = today - timedelta(days=365)
         counts = await self._repository.activity_counts(user_id, start, today)
-        activity = [{"day": day, "count": count} for day, count in sorted(counts.items())]
+        activity = [ActivityDay(day=day, count=count) for day, count in sorted(counts.items())]
         return PublicProfile(
             creator=creator,
             follower_count=followers,

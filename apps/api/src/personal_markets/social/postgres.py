@@ -19,10 +19,11 @@ class PostgresSocialRepository:
 
     async def owner_id(self, goal_id: UUID) -> UUID | None:
         async with autocommit_connection(self._engine) as connection:
-            return await connection.scalar(
+            value = await connection.scalar(
                 text("select user_id from goals where id = :id and status = 'active'"),
                 {"id": goal_id},
             )
+        return value if isinstance(value, UUID) else None
 
     async def visibility(self, goal_id: UUID) -> Visibility | None:
         async with autocommit_connection(self._engine) as connection:
@@ -30,14 +31,18 @@ class PostgresSocialRepository:
                 text("select visibility from goals where id = :id and status = 'active'"),
                 {"id": goal_id},
             )
-        return value  # type: ignore[return-value]
+        if value == "public":
+            return "public"
+        if value == "private":
+            return "private"
+        return None
 
     async def set_visibility(
         self,
         goal_id: UUID,
         owner_id: UUID,
         visibility: Visibility,
-        blueprint: dict,
+        blueprint: dict[str, Any],
         published_at: datetime | None,
     ) -> bool:
         async with transaction(self._engine) as connection:
@@ -93,7 +98,7 @@ class PostgresSocialRepository:
         sort: str,
         limit: int,
         offset: int,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         star_order = "(select count(*) from market_stars s where s.goal_id = goals.id) desc"
         fork_order = "(select count(*) from goals f where f.forked_from_goal_id = goals.id) desc"
         order = {
@@ -120,7 +125,7 @@ class PostgresSocialRepository:
 
     async def public_goals_for_user(
         self, user_id: UUID, *, query: str | None, limit: int, offset: int
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         filters = "user_id = :user_id and visibility = 'public' and status = 'active'"
         params: dict[str, Any] = {"user_id": user_id, "limit": limit, "offset": offset}
         if query:
@@ -146,7 +151,7 @@ class PostgresSocialRepository:
         visibility: Visibility | None,
         limit: int,
         offset: int,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         filters = "user_id = :user_id and status = 'active'"
         params: dict[str, Any] = {"user_id": user_id, "limit": limit, "offset": offset}
         if visibility:
@@ -167,7 +172,7 @@ class PostgresSocialRepository:
             ).mappings()
             return [dict(row) for row in rows]
 
-    async def get_goal_row(self, goal_id: UUID) -> dict | None:
+    async def get_goal_row(self, goal_id: UUID) -> dict[str, Any] | None:
         async with autocommit_connection(self._engine) as connection:
             row = (
                 (
@@ -188,15 +193,15 @@ class PostgresSocialRepository:
         owner_id: UUID,
         title: str,
         goal_type: str,
-        success_definition: dict,
+        success_definition: dict[str, Any],
         deadline: datetime,
-        resource_constraints: dict,
+        resource_constraints: dict[str, Any],
         state_dimensions: list[str],
-        model_requirements: dict,
+        model_requirements: dict[str, Any],
         source_goal_id: UUID,
         source_user_id: UUID,
         idempotency_key: str | None,
-    ) -> tuple[dict, bool]:
+    ) -> tuple[dict[str, Any], bool]:
         if idempotency_key:
             async with autocommit_connection(self._engine) as connection:
                 existing = (
@@ -333,7 +338,7 @@ class PostgresSocialRepository:
 
     async def list_starred_public(
         self, user_id: UUID, *, viewer_id: UUID | None, limit: int, offset: int
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         access = "g.visibility = 'public'"
         params: dict[str, Any] = {
             "user_id": user_id,
@@ -504,8 +509,8 @@ class PostgresSocialRepository:
             ).all()
             return {row[0]: int(row[1]) for row in rows}
 
-    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict]]:
-        grouped: dict[UUID, list[dict]] = {goal_id: [] for goal_id in goal_ids}
+    async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]:
+        grouped: dict[UUID, list[dict[str, Any]]] = {goal_id: [] for goal_id in goal_ids}
         if not goal_ids:
             return grouped
         async with autocommit_connection(self._engine) as connection:
