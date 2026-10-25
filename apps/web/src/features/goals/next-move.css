@@ -57,3 +57,20 @@
   font-size: 0.85rem;
   color: var(--app-muted);
 }
+
+.next-move-details {
+  margin: 14px 0 0;
+  color: var(--app-muted);
+  font-size: 0.85rem;
+}
+
+.next-move-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.next-move-details p {
+  margin: 8px 0 0;
+  max-width: 68ch;
+  line-height: 1.45;
+}

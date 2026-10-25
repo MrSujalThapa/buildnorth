@@ -181,8 +181,8 @@ export default function ImpactWorkspace({
     preview.currentOdds != null && preview.scenarioOdds != null
       ? [
           {
-            id: "without-change",
-            label: "Without the change",
+            id: "original",
+            label: "Original",
             color: ORIGINAL_SERIES_COLOR,
             start: preview.currentOdds,
             end: preview.currentOdds,
@@ -201,13 +201,15 @@ export default function ImpactWorkspace({
   const changeChart = (
     <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
       <div className="panel-head tight"><div><h2>Original vs. what if</h2></div></div>
-      {history.length ? (
+      {history.length || changeBranches.length ? (
         <OddsExplorer
           history={history}
           ranges={ODDS_EXPLORER_RANGES}
+          initialRange={ODDS_EXPLORER_RANGES[ODDS_EXPLORER_RANGES.length - 1]}
           branches={changeBranches}
-          historyLabel="Original forecast"
+          historyLabel="Published history"
           historyColor={ORIGINAL_SERIES_COLOR}
+          showHistoryInLegend={false}
           lineOnly
           percentAxis
           scenarioRegionLabel="If you make this change"
@@ -217,7 +219,7 @@ export default function ImpactWorkspace({
       ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
       <p className="what-if-chart-caption">
         {changeBranches.length
-          ? "Both branches start from today's recalculated baseline. The engine returns a single probability for the scenario, so the branch shows where the odds land, not a day-by-day path."
+          ? "Original and hypothetical share today's recalculated baseline. The engine returns a terminal probability, so the colored branch shows where the odds land rather than a modeled daily path."
           : "Run a scenario to draw its branch next to the original forecast."}
       </p>
     </div>

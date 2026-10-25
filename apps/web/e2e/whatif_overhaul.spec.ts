@@ -6,7 +6,9 @@ const screenshotDir = "test-results/whatif-quality";
 
 async function capture(page: import("@playwright/test").Page, label: string) {
   await mkdir(screenshotDir, { recursive: true });
-  await page.screenshot({ path: `${screenshotDir}/${test.info().project.name}-${label}.png`, fullPage: true });
+  const named = `${screenshotDir}/${test.info().project.name}-${label}.png`;
+  await page.screenshot({ path: named, fullPage: true });
+  await page.screenshot({ path: test.info().outputPath(`${label}.png`), fullPage: true });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -25,7 +27,13 @@ test.beforeEach(async ({ page }) => {
     goal_id: GOAL, priced: true, status: "published", current_probability: 0.719,
     published_probability: 0.7646, current_value: 0, target_value: 1, target_unit: "event",
     periods: 44, direction: "at_least", model_family: "deadline_event_hazard",
-    model_version: "1.0.0", assumptions: [], config: { seed: 1 },
+    model_version: "1.0.0",
+    assumptions: [{
+      id: "weekly_application_rate", name: "weekly_application_rate",
+      description: "Applications per week", value: 8, minimum: 0, maximum: 50, step: 1,
+      source: "FITTED", unit: "applications/week", editable: true, scope: "pipeline_activity",
+    }],
+    config: { seed: 1 },
     compare_candidates: [], resource_constraints: { hours_per_week: 12, money: 0, energy: 1 },
     resource_budget: { hours_per_week: 12, money_per_month: 0 },
   } }));
@@ -55,9 +63,21 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/api/v1/what-if/target-search", (route) => {
     const target = (route.request().postDataJSON() as { target_probability: number }).target_probability;
-    return route.fulfill({ json: { target_probability: target, current_probability: 0.719,
-      gap_pp: (target - 0.719) * 100, feasible: false,
-      message: "No measured action reaches this target yet.", paths: [], search_method: "no_supported_levers" } });
+    return route.fulfill({ json: {
+      target_probability: target, current_probability: 0.719,
+      gap_pp: (target - 0.719) * 100, feasible: target <= 0.9,
+      message: target <= 0.9 ? "Minimum viable paths verified against the target." : "Target odds are not reachable under current constraints.",
+      search_method: "assumption_setpoints",
+      paths: target <= 0.9 ? [{
+        label: "12 applications / week",
+        action_ids: ["lever:weekly_application_rate:0.85"],
+        resulting_probability: 0.86,
+        resource_cost: { hours_per_week: 8, money: 0, energy: 0.4 },
+        assumptions: [{ name: "weekly_application_rate", value: 12 }],
+        fragility_pp: 4,
+        valid_because: "Modeled from the weekly application rate lever.",
+      }] : [],
+    } });
   });
   await page.route("**/api/v1/what-if/parse-decision", (route) => route.fulfill({ json: {
     scenario_labels: ["Offer", "No offer"], unsupported: [],
@@ -82,7 +102,7 @@ test.beforeEach(async ({ page }) => {
 
 test("Change reconciles published odds with a priced hypothetical", async ({ page }) => {
   await page.goto(`/goals/${GOAL}/what-if`);
-  await expect(page.getByText(/Published forecast: 76.46%/)).toBeVisible();
+  await expect(page.getByText("76.46%").first()).toBeVisible();
   await page.getByRole("button", { name: "Details" }).first().click();
   await expect(page.getByRole("dialog", { name: "Scenario details" })).toBeVisible();
   await expect(page.getByText(/No measured parameters yet|Parameter profile radar/)).toBeVisible();
@@ -94,15 +114,18 @@ test("Change reconciles published odds with a priced hypothetical", async ({ pag
   await expect(page.getByText("hypothetical change", { exact: true })).toBeVisible();
   await expect(page.getByText(/changes the comparison from 71.9% to 78%/i)).toBeVisible();
   await expect(page.getByText(/This is a modeled scenario, not a new published forecast/i)).toBeVisible();
-  await expect(page.getByText(/Hypothetical scenario: 78%/)).toBeVisible();
+  await expect(page.getByTestId("series-original")).toContainText("71.9%");
+  await expect(page.getByTestId("series-what-if")).toContainText("78%");
+  await expect(page.getByTestId("series-what-if")).toContainText("+6.1 pts");
   await expect(page.getByText("Outcome range unavailable")).toHaveCount(0);
-  await expect(page.locator(".what-if-market-chart .recharts-line")).toBeVisible();
-  await expect(page.locator(".what-if-market-chart .recharts-area-curve")).toBeVisible();
-  expect(await page.locator(".what-if-market-chart .recharts-area-curve").getAttribute("d"))
-    .toMatch(/^M\d/);
-  const linePath = await page.locator(".what-if-market-chart .recharts-line-curve").getAttribute("d");
-  const areaPath = await page.locator(".what-if-market-chart .recharts-area-curve").getAttribute("d");
-  expect((linePath ?? "").length).toBeLessThan((areaPath ?? "").length);
+  await expect(page.locator(".what-if-market-chart .recharts-line-curve")).toHaveCount(3);
+  await expect(page.locator(".what-if-market-chart .recharts-area-curve")).toHaveCount(0);
+  const whatIf = page.locator(".what-if-market-chart .recharts-line-curve").last();
+  await expect(whatIf).toHaveAttribute("stroke", "#2fb36d");
+  await page.getByRole("tab", { name: "Deeper analysis" }).click();
+  await page.getByRole("button", { name: "Run scenario" }).click();
+  await expect(page.getByTestId("series-original")).toContainText("71.9%");
+  await expect(page.getByTestId("series-what-if")).toContainText("78%");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await capture(page, "change-light");
   await page.emulateMedia({ colorScheme: "dark" });
@@ -115,11 +138,16 @@ test("unsupported study input stays unpriced and Reverse target is editable", as
   await page.getByPlaceholder(/What if/i).fill("What if I study 10 hours tomorrow?");
   await page.getByRole("button", { name: "Run scenario" }).click();
   await expect(page.getByRole("alert")).toContainText("No measured conversion");
-  await expect(page.locator(".what-if-chart-legend .hypothetical-positive, .what-if-chart-legend .hypothetical-negative")).toHaveCount(0);
+  await expect(page.getByTestId("series-what-if")).toHaveCount(0);
   await page.getByRole("tab", { name: "Reverse" }).click();
   await expect(page.getByLabel("Exact target odds")).toHaveValue("85");
+  await page.getByRole("button", { name: "Find feasible paths" }).click();
+  await expect(page.getByText(/12 applications\/week reaches the target/i).first()).toBeVisible();
+  await expect(page.getByText("86%").first()).toBeVisible();
   await page.getByLabel("Exact target odds").fill("90");
   await expect(page.getByRole("slider", { name: "Target odds" })).toHaveValue("90");
+  await page.getByRole("tab", { name: "Deeper analysis" }).click();
+  await expect(page.getByText("Strategy frontier")).toBeVisible();
   await capture(page, "reverse");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });
@@ -128,11 +156,10 @@ test("a lower modeled application rate makes a red negative scenario", async ({ 
   await page.goto(`/goals/${GOAL}/what-if`);
   await page.getByPlaceholder(/What if/i).fill("What if I submit 2 applications a week?");
   await page.getByRole("button", { name: "Run scenario" }).click();
-  await expect(page.getByText("65%", { exact: true })).toBeVisible();
-  await expect(page.getByText("-6.9 pts")).toBeVisible();
-  await expect(page.locator(".what-if-market-chart .hypothetical-negative")).toContainText("65%");
-  await expect(page.locator(".what-if-market-chart .recharts-line-curve"))
-    .toHaveAttribute("stroke", "#c44745");
+  await expect(page.getByTestId("series-what-if")).toContainText("65%");
+  await expect(page.getByTestId("series-what-if")).toContainText("6.9 pts");
+  await expect(page.locator(".what-if-market-chart .recharts-line-curve").last())
+    .toHaveAttribute("stroke", "#e5534b");
   await capture(page, "change-negative");
 });
 
@@ -141,7 +168,15 @@ test("Futures does not show fractional event counts", async ({ page }) => {
   await page.getByRole("tab", { name: "Futures" }).click();
   await page.getByRole("button", { name: "Map futures" }).click();
   await expect(page.getByLabel("Possible future scenarios")).toContainText("76%");
+  await expect(page.getByTestId("series-outcome-0")).toContainText("76%");
+  await expect(page.getByTestId("series-outcome-1")).toContainText("24%");
+  await expect(page.locator(".futures-chart .recharts-line-curve")).toHaveCount(2);
   await expect(page.locator("body")).not.toContainText("0.76 event");
+  await page.getByRole("tab", { name: "Deeper analysis" }).click();
+  await page.getByRole("button", { name: "Map futures" }).click();
+  await expect(page.getByTestId("series-outcome-0")).toBeVisible();
+  await expect(page.getByTestId("series-outcome-1")).toBeVisible();
+  await expect(page.getByText(/offer\/no offer categories|Simulated result range per scenario/)).toBeVisible();
   await capture(page, "futures");
 });
 

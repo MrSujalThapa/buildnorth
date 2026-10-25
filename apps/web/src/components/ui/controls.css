@@ -1,3 +1,50 @@
+/* Always-on native control reset. Loaded from main.tsx so lazy routes cannot
+   flash default browser buttons, selects, or purple links before page CSS arrives. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+}
+
+button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+select {
+  min-height: 40px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--app-border, #292828);
+  border-radius: 8px;
+  background-color: var(--app-surface, #131314);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%239b9791' d='M1 1.5 L6 6.5 L11 1.5'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  color: var(--app-ink, #f3f1ed);
+}
+
+input[type="range"] {
+  accent-color: var(--app-accent, #5ec8bd);
+  height: 4px;
+  background: var(--app-border, #292828);
+  border-radius: 999px;
+}
+
 /* Shared form controls for the application surfaces. */
 .ui-field {
   min-height: 44px;

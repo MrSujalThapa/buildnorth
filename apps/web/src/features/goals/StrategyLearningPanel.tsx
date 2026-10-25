@@ -75,9 +75,12 @@ export function StrategyLearningPanel({ goalId }: { goalId: string }) {
       )}
       {generate.isError ? <p role="alert">{generate.error instanceof Error ? generate.error.message : "Could not suggest a move."}</p> : null}
       {feedback.isError || outcome.isError ? <p role="alert">Your answer could not be saved. Try again.</p> : null}
-      <p className="next-move-note">
-        {context.data?.note ?? "Recording what you tried helps PlayItOut learn which moves fit you. It is not proof that a move caused an outcome."}
-      </p>
+      <details className="next-move-details">
+        <summary>Details</summary>
+        <p>
+          {context.data?.note ?? "Recording what you tried helps PlayItOut learn which moves fit you. It is not proof that a move caused an outcome."}
+        </p>
+      </details>
     </section>
   );
 }

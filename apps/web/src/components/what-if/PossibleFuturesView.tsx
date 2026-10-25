@@ -51,6 +51,7 @@ function FuturesChart({
         id: scenario.id,
         label: scenario.label,
         color,
+        dashed: false,
         points: [
           { timestamp: 0, value: scenario.probability! },
           { timestamp: 1, value: scenario.probability! },
@@ -70,7 +71,7 @@ function FuturesChart({
           interactive={false}
           highlightedBranchId={selectedId}
           onBranchSelect={onSelect}
-          scenarioRegionLabel="Share of simulated futures"
+          scenarioRegionLabel="Goal deadline"
         />
       </div>
       <p className="what-if-chart-caption">

@@ -7,6 +7,7 @@ import { isCourseStandingGoal } from "../adapters/courseGrade";
 import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewModel";
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
+import VisibilityControl from "../components/market/VisibilityControl";
 import { StrategyLearningPanel } from "../features/goals/StrategyLearningPanel";
 import "../components/social/social.css";
 
@@ -123,6 +124,13 @@ export function GoalDetailRoute() {
         onBack={() => { void navigate("/markets"); }}
         onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
         onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}
+        visibilityControl={
+          <VisibilityControl
+            visibility={social.data?.visibility === "public" ? "public" : "private"}
+            onToggle={() => setPublishOpen(true)}
+            disabled={publish.isPending}
+          />
+        }
         onShare={() => {
           void api.shareMarket(goalId).then((result) => {
             if (!result.shareable) {
@@ -136,11 +144,6 @@ export function GoalDetailRoute() {
           }).catch(() => setShareNote("Could not share this market."));
         }}
       >
-        <div className="public-actions">
-          <button type="button" className="secondary-action" onClick={() => setPublishOpen(true)}>
-            {social.data?.visibility === "public" ? "Public" : "Private"} · Visibility
-          </button>
-        </div>
         {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
         {goalId ? <StrategyLearningPanel goalId={goalId} /> : null}
         {latestWorkflow?.status === "evidence_pending" || latestWorkflow?.status === "evidence_running" ? (

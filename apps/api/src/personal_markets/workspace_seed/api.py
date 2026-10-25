@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from personal_markets.behavior.commitments import get_commitment_store
 from personal_markets.collections.service import CollectionService
 from personal_markets.core.config import get_settings
-from personal_markets.identity.deps import get_admin_principal
+from personal_markets.identity.deps import get_admin_principal, get_invited_principal
 from personal_markets.identity.domain import Principal
 from personal_markets.persistence.database import create_engine
 from personal_markets.wiring import _use_postgres, _workflow_deps, get_collection_repository
@@ -16,6 +16,7 @@ from personal_markets.workspace_seed.registry import InMemorySeedRegistry, Postg
 from personal_markets.workspace_seed.service import SeedRegistry, WorkspaceSeedService
 
 router = APIRouter(prefix="/api/v1/admin/workspace-seed", tags=["admin"])
+owner_router = APIRouter(prefix="/api/v1/workspace-seed", tags=["workspace-seed"])
 
 
 @lru_cache
@@ -38,6 +39,7 @@ def get_workspace_seed_service(request: Request) -> WorkspaceSeedService:
 
 
 Admin = Annotated[Principal, Depends(get_admin_principal)]
+Owner = Annotated[Principal, Depends(get_invited_principal)]
 Service = Annotated[WorkspaceSeedService, Depends(get_workspace_seed_service)]
 
 
@@ -54,3 +56,13 @@ async def seed_workspace(principal: Admin, service: Service) -> dict[str, Any]:
 @router.delete("")
 async def remove_seed(principal: Admin, service: Service) -> dict[str, int]:
     return await service.remove(principal.user_id)
+
+
+@owner_router.get("")
+async def owner_seed_status(principal: Owner, service: Service) -> dict[str, Any]:
+    return await service.status(principal.user_id)
+
+
+@owner_router.post("")
+async def owner_seed_workspace(principal: Owner, service: Service) -> dict[str, Any]:
+    return await service.seed(principal.user_id)

@@ -90,6 +90,43 @@
     680px;
 }
 
+.market-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.visibility-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border, #292828);
+  border-radius: 999px;
+  background: var(--app-surface, #131314);
+  color: var(--app-ink, #f3f1ed);
+  font: 600 12px/1 var(--font-sans, inherit);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.visibility-control.is-private {
+  color: var(--app-muted, #9b9791);
+}
+
+.visibility-control.is-public {
+  border-color: color-mix(in srgb, var(--app-accent, #5ec8bd) 45%, transparent);
+  color: var(--app-accent, #5ec8bd);
+}
+
+.visibility-control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .market-eyebrow {
   margin-bottom:
     12px;
@@ -534,16 +571,14 @@
 }
 
 .secondary-action {
-  border:
-    1px
-    solid
-    #252622;
-
-  background:
-    transparent;
-
-  color:
-    #252622;
+  border: 1px solid var(--app-border, #292828);
+  background: var(--app-surface, #131314);
+  color: var(--app-ink, #f3f1ed);
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {

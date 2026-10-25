@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Ship pass: public browse, owner seed, control reset
+
+**Hypothesis:** Empty signed-in Profile/activity came from excluding the owner's own workspace seed, and raw HTML flashes came from unclassed native controls plus AuthGate blocking `/social` and `/m`.
+
+**Changes:** Always-on native control reset. Visibility control beside the market title. Unsigned browse of Discover/public pages. Invited-user `POST /api/v1/workspace-seed`. Owner Profile radar/activity use that owner's seeded measurements when no authentic observations exist. Reverse fills missing search levers from baseline state. Personal Agent methodology moved behind Details.
+
+**Measured result:** Backend seed/What If/profile tests passed. Desktop Playwright What If overhaul 7/7 (all 8 mode/depth combinations exercised). Production SHA still `eb24bcb` until this branch deploys; live signed-in Profile seed is therefore still unverified on the hosted site.
+
 ## 2026-10-25 — Desktop UI overhaul (Discover, Profile radar, What If)
 
 **Hypothesis:** Finishing visual hierarchy, marketplace density, Profile radar reuse, and What If layout would make the shipped product usable without changing numerical engines.

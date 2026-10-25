@@ -76,14 +76,7 @@ export function ParameterRadar({ profile }: { profile: ParameterProfile }) {
         <div className="life-radar-stage">
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`Life-area radar: ${measured.length} of ${total} areas measured`}>
             {[0.25, 0.5, 0.75, 1].map((ring) => (
-              <polygon
-                key={ring}
-                className="radar-ring"
-                points={parameters.map((_, index) => {
-                  const pt = polar(angleFor(index, total), ring);
-                  return `${pt.x},${pt.y}`;
-                }).join(" ")}
-              />
+              <circle key={ring} className="radar-ring" cx={CX} cy={CY} r={RADIUS * ring} />
             ))}
             {parameters.map((item, index) => {
               const edge = polar(angleFor(index, total), 1);
@@ -182,7 +175,9 @@ export function ParameterRadar({ profile }: { profile: ParameterProfile }) {
           })}
         </ul>
       </div>
-      <p className="life-radar-note">Each axis is scaled to its own display range, not to goal odds. Empty axes stay empty until a matching observation is stored.</p>
+      {measured.length ? null : (
+        <p className="life-radar-note">Empty axes stay empty until a matching observation is stored.</p>
+      )}
     </section>
   );
 }

@@ -24,6 +24,10 @@ type Props = {
   historyColor?: string;
   lineOnly?: boolean;
   percentAxis?: boolean;
+  showHistoryInLegend?: boolean;
+  highlightedBranchId?: string | null;
+  onBranchSelect?: (id: string) => void;
+  xTicks?: { value: number; label: string }[];
   scenarioRegionLabel?: string;
   showTimeAxis?: boolean;
   emptyMessage?: string;
@@ -45,6 +49,10 @@ export default function OddsExplorer({
   historyColor,
   lineOnly,
   percentAxis,
+  showHistoryInLegend,
+  highlightedBranchId,
+  onBranchSelect,
+  xTicks,
   scenarioRegionLabel,
   showTimeAxis = false,
   emptyMessage = "No published forecast yet. Play It Out will not invent a series.",
@@ -69,7 +77,7 @@ export default function OddsExplorer({
     onSelectionChange?.(null);
   }
 
-  if (history.length === 0) {
+  if (history.length === 0 && !branches?.length) {
     return (
       <section className="market-chart-section">
         <div className="market-chart-wrapper odds-empty" role="status">
@@ -93,28 +101,34 @@ export default function OddsExplorer({
           historyColor={historyColor}
           lineOnly={lineOnly}
           percentAxis={percentAxis}
+          showHistoryInLegend={showHistoryInLegend}
+          highlightedBranchId={highlightedBranchId}
+          onBranchSelect={onBranchSelect}
+          xTicks={xTicks}
           scenarioRegionLabel={scenarioRegionLabel}
           showTimeAxis={showTimeAxis}
           markers={markers}
           comparison={comparison}
-          interactive={interactive}
+          interactive={interactive && history.length > 0}
           onSelectionChange={onSelectionChange}
         />
       </div>
-      <div className="range-control" aria-label="Chart range">
-        {ranges.map((range) => (
-          <button
-            key={range.label}
-            type="button"
-            className={activeRange?.label === range.label ? "selected" : ""}
-            onClick={() => selectRange(range)}
-          >
-            {range.label}
-          </button>
-        ))}
-      </div>
+      {history.length ? (
+        <div className="range-control" aria-label="Chart range">
+          {ranges.map((range) => (
+            <button
+              key={range.label}
+              type="button"
+              className={activeRange?.label === range.label ? "selected" : ""}
+              onClick={() => selectRange(range)}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {standingNote ? <p className="chart-standing-note" role="status">{standingNote}</p> : null}
-      <div className="chart-help">Press and drag across the chart to compare odds.</div>
+      {history.length ? <div className="chart-help">Press and drag across the chart to compare odds.</div> : null}
     </section>
   );
 }
