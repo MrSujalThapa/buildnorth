@@ -8,6 +8,8 @@ import type { SimulationPoint } from "../../adapters/simulationTypes";
 import type { ChartPoint, Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
 import type { ParseInterventionResult, Priceability, StrategyInsight } from "../../api/client";
 import OddsExplorer from "../market/OddsExplorer";
+import type { ProbabilityBranch } from "../market/WealthsimpleAreaChart";
+import { BETTER_SERIES_COLOR, ORIGINAL_SERIES_COLOR, WORSE_SERIES_COLOR } from "./seriesColors";
 import { ODDS_EXPLORER_RANGES } from "../market/marketRanges";
 import MissingStatePanel from "./MissingStatePanel";
 import { ScenarioComposer } from "./ScenarioComposer";
@@ -174,14 +176,52 @@ export default function ImpactWorkspace({
     impact.followThroughPercent === null
       ? "—"
       : `${impact.followThroughPercent.toFixed(0)}%`;
-  const scenarioBranch =
+  const pointsDelta = preview.improvementPoints;
+  const changeBranches: ProbabilityBranch[] =
     preview.currentOdds != null && preview.scenarioOdds != null
-      ? {
-          comparisonBaseline: preview.currentOdds,
-          scenarioOdds: preview.scenarioOdds,
-          tone: resultPositive ? ("positive" as const) : ("negative" as const),
-        }
-      : null;
+      ? [
+          {
+            id: "without-change",
+            label: "Without the change",
+            color: ORIGINAL_SERIES_COLOR,
+            start: preview.currentOdds,
+            end: preview.currentOdds,
+            dashed: true,
+          },
+          {
+            id: "what-if",
+            label: question.trim() ? `What if: ${question.trim()}` : "What if",
+            color: resultPositive ? BETTER_SERIES_COLOR : WORSE_SERIES_COLOR,
+            start: preview.currentOdds,
+            end: preview.scenarioOdds,
+            note: pointsDelta == null ? undefined : `${pointsDelta >= 0 ? "+" : "−"}${Math.abs(pointsDelta).toFixed(1)} pts`,
+          },
+        ]
+      : [];
+  const changeChart = (
+    <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
+      <div className="panel-head tight"><div><h2>Original vs. what if</h2></div></div>
+      {history.length ? (
+        <OddsExplorer
+          history={history}
+          ranges={ODDS_EXPLORER_RANGES}
+          branches={changeBranches}
+          historyLabel="Original forecast"
+          historyColor={ORIGINAL_SERIES_COLOR}
+          lineOnly
+          percentAxis
+          scenarioRegionLabel="If you make this change"
+          showTimeAxis
+          interactive
+        />
+      ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
+      <p className="what-if-chart-caption">
+        {changeBranches.length
+          ? "Both branches start from today's recalculated baseline. The engine returns a single probability for the scenario, so the branch shows where the odds land, not a day-by-day path."
+          : "Run a scenario to draw its branch next to the original forecast."}
+      </p>
+    </div>
+  );
   const insights = parseResult?.insights ?? [];
   const qualitativeKind = parseResult?.request_kind && parseResult.request_kind !== "quantitative_scenario";
   const plainLanguage = scenarioPlainLanguage({ question, publishedOdds, preview });
@@ -274,28 +314,7 @@ export default function ImpactWorkspace({
           </aside>
 
           <section className="result-panel">
-            <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
-              <div className="panel-head tight"><div><h2>Your market</h2></div></div>
-              {history.length ? (
-                <OddsExplorer
-                  history={history}
-                  ranges={ODDS_EXPLORER_RANGES}
-                  scenarioBranch={scenarioBranch}
-                  overlayTone={resultPositive ? "positive" : "negative"}
-                  showTimeAxis
-                  interactive
-                />
-              ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
-              <div className="what-if-chart-legend">
-                <span className="published">Published forecast: {preciseOdds(publishedOdds)}</span>
-                {preview.currentOdds != null ? (
-                  <span className="comparison-baseline">Comparison baseline: {preciseOdds(preview.currentOdds)}</span>
-                ) : null}
-                {preview.scenarioOdds != null ? (
-                  <span className={resultPositive ? "hypothetical-positive" : "hypothetical-negative"}>Hypothetical scenario: {preciseOdds(preview.scenarioOdds)}</span>
-                ) : null}
-              </div>
-            </div>
+            {changeChart}
             {plainLanguage ? <p className="scenario-plain">{plainLanguage}</p> : null}
             {parseResult?.confirmation_needed ? (
               <p className="quiet-copy" role="status">This looks like real progress. Record it as evidence if you want the published forecast to consider it.</p>
@@ -371,6 +390,8 @@ export default function ImpactWorkspace({
               <strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong>
             </div>
           </div>
+
+          {changeChart}
 
           <div className="deep-primary">
             <div className="viz-block">

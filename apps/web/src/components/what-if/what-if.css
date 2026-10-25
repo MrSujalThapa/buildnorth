@@ -1834,3 +1834,9 @@
 .insight-card h3 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
 .insight-card em { font-style: normal; color: var(--what-if-muted); font-size: 12px; }
 .insight-card p { margin: 8px 0 0; max-width: 70ch; line-height: 1.45; }
+
+.futures-chart { margin: 4px 0 18px; }
+.futures-chart-plot { height: 300px; }
+.what-if-chart-caption { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted, #6b6b6b); max-width: 80ch; }
+.what-if-market-chart .ws-chart.ws-chart-multi { height: 340px; }
+.what-if-market-chart .market-chart-wrapper { height: auto; overflow: visible; }
