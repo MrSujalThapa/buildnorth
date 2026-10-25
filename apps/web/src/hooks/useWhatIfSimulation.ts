@@ -54,6 +54,7 @@ export function useWhatIfSimulation(
   });
   const [values, setValues] = useState<TuneValues | null>(null);
   const [interpretationMessage, setInterpretationMessage] = useState<string | null>(null);
+  const [lastParse, setLastParse] = useState<Awaited<ReturnType<typeof api.parseIntervention>> | null>(null);
   const pendingScenario = useRef<string | null>(null);
   const simulation = useMutation({ mutationFn: (body: Record<string, unknown>) => api.fastReprice(body) });
   const persistSimulation = useMutation({
@@ -157,12 +158,20 @@ export function useWhatIfSimulation(
     pendingScenario.current = null;
     setInterpretationMessage(null);
     parseIntervention.mutate(trimmed, {
-      onSuccess: (parsed) => {
-        if (!parsed.changes.length || parsed.pricing_status !== "PRICED") {
+        onSuccess: (parsed) => {
+        setLastParse(parsed);
+        const qualitative = parsed.request_kind && parsed.request_kind !== "quantitative_scenario";
+        if (qualitative || !parsed.changes.length || parsed.pricing_status !== "PRICED") {
           persistSimulation.reset();
+          if (parsed.insights?.length || parsed.confirmation_needed) {
+            setInterpretationMessage(null);
+            return;
+          }
           setInterpretationMessage(
-            parsed.unsupported[0] ?? parsed.limitations?.[0] ??
-            "This action has no measured link to the goal's forecast. Try a specific modeled quantity, such as applications per week.",
+            parsed.consumer_summary ||
+              parsed.unsupported[0] ||
+              parsed.limitations?.[0] ||
+              "This action has no measured link to the goal's forecast. Try a specific modeled quantity, such as applications per week.",
           );
           return;
         }
@@ -197,6 +206,7 @@ export function useWhatIfSimulation(
     persistSimulation,
     scenarioResult,
     interpretationMessage,
+    lastParse,
     preview,
     request,
     runScenario,

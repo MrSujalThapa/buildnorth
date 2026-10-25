@@ -82,16 +82,23 @@ test.beforeEach(async ({ page }) => {
 
 test("Change reconciles published odds with a priced hypothetical", async ({ page }) => {
   await page.goto(`/goals/${GOAL}/what-if`);
-  await expect(page.getByText(/Published forecast history: 76.46%/)).toBeVisible();
+  await expect(page.getByText(/Published forecast: 76.46%/)).toBeVisible();
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  await expect(skip).toHaveCSS("clip", /rect\(0(px)?, 0(px)?, 0(px)?, 0(px)?\)/);
   await page.getByPlaceholder(/What if/i).fill("What if I apply to 10 jobs each week?");
   await page.getByRole("button", { name: "Run scenario" }).click();
   await expect(page.getByText("hypothetical change", { exact: true })).toBeVisible();
-  await expect(page.getByText(/comparison recalculates a 71.9% baseline/i)).toBeVisible();
+  await expect(page.getByText(/changes the comparison from 71.9% to 78%/i)).toBeVisible();
+  await expect(page.getByText(/This is a modeled scenario, not a new published forecast/i)).toBeVisible();
   await expect(page.getByText(/Hypothetical scenario: 78%/)).toBeVisible();
+  await expect(page.getByText("Outcome range unavailable")).toHaveCount(0);
   await expect(page.locator(".what-if-market-chart .recharts-line")).toBeVisible();
   await expect(page.locator(".what-if-market-chart .recharts-area-curve")).toBeVisible();
   expect(await page.locator(".what-if-market-chart .recharts-area-curve").getAttribute("d"))
     .toMatch(/^M\d/);
+  const linePath = await page.locator(".what-if-market-chart .recharts-line-curve").getAttribute("d");
+  const areaPath = await page.locator(".what-if-market-chart .recharts-area-curve").getAttribute("d");
+  expect((linePath ?? "").length).toBeLessThan((areaPath ?? "").length);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await capture(page, "change-light");
   await page.emulateMedia({ colorScheme: "dark" });
@@ -104,7 +111,7 @@ test("unsupported study input stays unpriced and Reverse target is editable", as
   await page.getByPlaceholder(/What if/i).fill("What if I study 10 hours tomorrow?");
   await page.getByRole("button", { name: "Run scenario" }).click();
   await expect(page.getByRole("alert")).toContainText("No measured conversion");
-  await expect(page.getByText(/Hypothetical scenario: —/)).toBeVisible();
+  await expect(page.locator(".what-if-chart-legend .hypothetical-positive, .what-if-chart-legend .hypothetical-negative")).toHaveCount(0);
   await page.getByRole("tab", { name: "Reverse" }).click();
   await expect(page.getByLabel("Exact target odds")).toHaveValue("85");
   await page.getByLabel("Exact target odds").fill("90");
@@ -149,4 +156,35 @@ test("Compare ranks only modeled options and Deeper analysis remains navigable",
   await page.getByRole("tab", { name: "Deeper analysis" }).click();
   await expect(page.getByLabel("Option visibility")).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("strategic questions stay unpriced and still show useful ideas", async ({ page }) => {
+  await page.unroute("**/api/v1/what-if/parse-intervention");
+  await page.route("**/api/v1/what-if/parse-intervention", (route) => {
+    const text = (route.request().postDataJSON() as { text: string }).text;
+    return route.fulfill({
+      json: {
+        raw_text: text,
+        changes: [],
+        unsupported: [],
+        pricing_status: "NOT_PRICED",
+        request_kind: "opportunity_discovery",
+        insights: [{
+          title: "Ask that investor for a few targeted introductions",
+          description: "Use the existing VC relationship.",
+          why_it_might_help: "Warm paths reach founders without a calibrated coefficient.",
+          why_this_fits: "Authorized context mentions a VC.",
+          next_step: "Write a three-sentence ask.",
+          evidence_to_collect: "Introductions and interviews.",
+          model_status: "UNPRICED",
+        }],
+      },
+    });
+  });
+  await page.goto(`/goals/${GOAL}/what-if`);
+  await page.getByPlaceholder(/What if/i).fill("what's the smartest move I haven't tried yet?");
+  await page.getByRole("button", { name: "Run scenario" }).click();
+  await expect(page.getByText("Ask that investor for a few targeted introductions")).toBeVisible();
+  await expect(page.getByText("Probability impact not yet estimated")).toBeVisible();
+  await expect(page.getByText(/hypothetical change/)).toHaveCount(0);
 });

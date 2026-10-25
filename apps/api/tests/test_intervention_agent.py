@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -119,7 +120,7 @@ def test_cold_email_cannot_become_unmeasured_application_uplift() -> None:
     ],
 )
 def test_explicit_weekly_application_changes_survive_critique(
-    text: str, value: float, operation: str
+    text: str, value: float, operation: Literal["set", "add", "subtract"]
 ) -> None:
     proposal = InterventionAgentProposal(
         understood_action=text,
@@ -151,7 +152,7 @@ def test_explicit_weekly_application_changes_survive_critique(
     ],
 )
 def test_application_critic_rejects_unstated_or_wrong_semantics(
-    text: str, value: float, operation: str
+    text: str, value: float, operation: Literal["set", "add", "subtract"]
 ) -> None:
     proposal = InterventionAgentProposal(
         understood_action=text,

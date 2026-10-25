@@ -12,6 +12,7 @@ import {
   ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -32,10 +33,18 @@ export type ChartSelection = {
   percentChange: number;
 };
 
+export type ScenarioBranch = {
+  comparisonBaseline: number;
+  scenarioOdds: number;
+  tone: "positive" | "negative";
+};
+
 type Props = {
   data: ChartPoint[];
   overlay?: ChartPoint[];
   overlayTone?: "positive" | "negative";
+  scenarioBranch?: ScenarioBranch | null;
+  showTimeAxis?: boolean;
   markers?: ChartMarker[];
   comparison?: ChartPoint | null;
   interactive?: boolean;
@@ -86,6 +95,8 @@ export default function WealthsimpleAreaChart({
   data,
   overlay = [],
   overlayTone = "positive",
+  scenarioBranch = null,
+  showTimeAxis = false,
   markers = [],
   comparison = null,
   interactive = true,
@@ -131,6 +142,9 @@ export default function WealthsimpleAreaChart({
       ...data.map((point) => point.value),
       ...overlay.map((point) => point.value),
       ...(comparison ? [comparison.value] : []),
+      ...(scenarioBranch
+        ? [scenarioBranch.comparisonBaseline, scenarioBranch.scenarioOdds]
+        : []),
     ];
 
   const min =
@@ -153,10 +167,35 @@ export default function WealthsimpleAreaChart({
 
   const firstTimestamp = firstPoint.timestamp;
   const lastTimestamp = lastPoint.timestamp;
+  const histSpan = Math.max(lastTimestamp - firstTimestamp, 24 * 60 * 60 * 1000);
+  const branchPad = scenarioBranch ? histSpan * 0.22 : 0;
+  const branchX = lastTimestamp + branchPad * 0.72;
+  const branchEpsilon = Math.max(histSpan * 0.002, 60_000);
+  const xDomain: [number, number] = [firstTimestamp, lastTimestamp + branchPad];
   const chartData = [
     ...data.map((point) => ({ ...point, scenarioValue: undefined as number | undefined })),
-    ...overlay.map((point) => ({ timestamp: point.timestamp, value: undefined as number | undefined, scenarioValue: point.value })),
+    ...(scenarioBranch
+      ? [
+          {
+            timestamp: branchX,
+            value: undefined as number | undefined,
+            scenarioValue: scenarioBranch.comparisonBaseline,
+          },
+          {
+            timestamp: branchX + branchEpsilon,
+            value: undefined as number | undefined,
+            scenarioValue: scenarioBranch.scenarioOdds,
+          },
+        ]
+      : overlay.map((point) => ({
+          timestamp: point.timestamp,
+          value: undefined as number | undefined,
+          scenarioValue: point.value,
+        }))),
   ].sort((a, b) => a.timestamp - b.timestamp);
+  const scenarioStroke =
+    (scenarioBranch?.tone ?? overlayTone) === "negative" ? "#c44745" : "#188453";
+  const showScenarioLine = Boolean(scenarioBranch) || overlay.length > 1;
 
   function getIndexFromPointer(
     clientX: number,
@@ -397,8 +436,8 @@ export default function WealthsimpleAreaChart({
           data={chartData}
           margin={{
             top: 10,
-            right: 2,
-            bottom: 0,
+            right: scenarioBranch ? 12 : 2,
+            bottom: showTimeAxis ? 22 : 0,
             left: 2,
           }}
         >
@@ -433,11 +472,15 @@ export default function WealthsimpleAreaChart({
           <XAxis
             dataKey="timestamp"
             type="number"
-            domain={[
-              "dataMin",
-              "dataMax",
-            ]}
-            hide
+            domain={xDomain}
+            hide={!showTimeAxis}
+            tickCount={4}
+            tick={{ fontSize: 11, fill: "var(--market-text, #686664)" }}
+            tickFormatter={(value: number) =>
+              new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+            }
+            axisLine={false}
+            tickLine={false}
           />
 
           <YAxis
@@ -469,16 +512,40 @@ export default function WealthsimpleAreaChart({
             }
           />
 
-          {overlay.length > 1 ? (
+          {showScenarioLine ? (
             <Line
               type="linear"
               dataKey="scenarioValue"
-              stroke={overlayTone === "negative" ? "#c44745" : "#188453"}
+              stroke={scenarioStroke}
               strokeDasharray="5 4"
-              strokeWidth={2.2}
-              dot={{ r: 4 }}
+              strokeWidth={scenarioBranch ? 2 : 2.2}
+              dot={{ r: scenarioBranch ? 5 : 4 }}
+              connectNulls={false}
               activeDot={false}
               isAnimationActive={false}
+            />
+          ) : null}
+
+          {scenarioBranch ? (
+            <ReferenceLine
+              x={lastTimestamp}
+              stroke="var(--market-text, #20211f)"
+              strokeOpacity={0.28}
+              strokeDasharray="3 4"
+            />
+          ) : null}
+
+          {interactive ? (
+            <Tooltip
+              cursor={{ stroke: "var(--market-chart-accent, #299f96)", strokeWidth: 1 }}
+              formatter={(value) => [`${Number(value).toFixed(2)}%`, "Published odds"]}
+              labelFormatter={(value) =>
+                new Date(Number(value)).toLocaleString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              }
             />
           ) : null}
 

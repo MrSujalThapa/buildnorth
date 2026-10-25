@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — What If consumer chart honesty and request routing
+
+**Hypothesis:** Simple Change was unreadable because a fabricated future overlay stretched the x-axis to the deadline, and unpriced strategy questions were treated as failed calculations.
+
+**Changes:** Endpoint comparison beside published yellow history; no deadline-length forecast line. Request kinds distinguish quantitative scenarios, evidence, strategy, and current odds. Strategy insights stay unpriced unless a modeled lever is stated. Skip-link is focus-only. No forecast math, Details radar, or Spur entitlements changed.
+
+**Measured result:** Pending CI on `feat/whatif-consumer-overhaul`. Historical changelog probabilities were not rewritten.
+
 ## 2026-10-24 — MCP Apps Odds Explorer handshake
 
 **Hypothesis:** Grok Bot called `show_odds_chart` and received `ui://playitout/odds-explorer` without rendering because the view spoke a private handshake (`clientInfo`, data only on `hostContext.toolResult`) instead of MCP Apps `appInfo` / `ui/notifications/tool-result`.

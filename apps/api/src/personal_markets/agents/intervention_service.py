@@ -30,6 +30,8 @@ from personal_markets.what_if.intervention_registry import (
     composed_metric_units,
     goal_domain,
 )
+from personal_markets.what_if.request_intent import ClassifiedRequest, classify_what_if_request
+from personal_markets.what_if.strategy_insights import compose_strategy_insights, consumer_summary
 
 
 class InterventionAgentService:
@@ -57,12 +59,27 @@ class InterventionAgentService:
         evidence = await self._evidence.list_for_goal(UUID(goal_id))
         baseline = build_baseline_state(goal, evidence)
         thread_id = uuid4()
+        classified = classify_what_if_request(text)
+        summaries = [item.summary for item in evidence if item.summary]
+        qualitative = classified.kind not in {"quantitative_scenario"}
 
         if not self._settings.intervention_agent_enabled:
-            return self._regex_response(text, fallback_note="Intervention agent disabled.")
+            return self._finalize_parse(
+                text,
+                self._regex_response(text, fallback_note="Intervention agent disabled."),
+                goal,
+                classified,
+                summaries,
+                qualitative=qualitative,
+            )
 
         proposal, critic, agent_run_id = await self._run_agent(
-            thread_id, goal, baseline.model_dump(mode="json"), text
+            thread_id,
+            goal,
+            baseline.model_dump(mode="json"),
+            text,
+            summaries,
+            classified.kind,
         )
         changes = [
             InterventionChangeResponse(
@@ -77,46 +94,60 @@ class InterventionAgentService:
             for item in critic.validated_changes
         ]
 
-        if not changes and self._settings.intervention_regex_fallback:
+        if not qualitative and not changes and self._settings.intervention_regex_fallback:
             regex = parse_intervention_text(text)
             if regex.changes:
-                return ParseInterventionResponse(
-                    raw_text=text,
-                    changes=[
-                        InterventionChangeResponse(
-                            metric=item.metric,
-                            operation=item.operation,
-                            value=item.value,
-                            unit=item.unit,
-                            frequency=item.frequency,
-                            scope=item.scope,
-                            provenance=item.provenance,
-                        )
-                        for item in regex.changes
-                    ],
-                    unsupported=list(regex.unsupported),
-                    effect_assigned=False,
-                    understood_action=text,
-                    mechanism=[],
-                    pricing_status="PRICED",
-                    agent_run_id=None,
-                    limitations=[
-                        "Regex fast-path used after agent returned no defensible changes."
-                    ],
-                    research_claims=[],
+                return self._finalize_parse(
+                    text,
+                    ParseInterventionResponse(
+                        raw_text=text,
+                        changes=[
+                            InterventionChangeResponse(
+                                metric=item.metric,
+                                operation=item.operation,
+                                value=item.value,
+                                unit=item.unit,
+                                frequency=item.frequency,
+                                scope=item.scope,
+                                provenance=item.provenance,
+                            )
+                            for item in regex.changes
+                        ],
+                        unsupported=list(regex.unsupported),
+                        effect_assigned=False,
+                        understood_action=text,
+                        mechanism=[],
+                        pricing_status="PRICED",
+                        agent_run_id=None,
+                        limitations=[
+                            "Regex fast-path used after agent returned no defensible changes."
+                        ],
+                        research_claims=[],
+                    ),
+                    goal,
+                    classified,
+                    summaries,
+                    qualitative=False,
                 )
 
-        return ParseInterventionResponse(
-            raw_text=text,
-            changes=changes,
-            unsupported=list(proposal.unsupported) + critic.issues,
-            effect_assigned=False,
-            understood_action=proposal.understood_action,
-            mechanism=[step.model_dump() for step in proposal.mechanism],
-            pricing_status=critic.pricing_status,
-            agent_run_id=agent_run_id,
-            limitations=critic.limitations,
-            research_claims=proposal.research_claims,
+        return self._finalize_parse(
+            text,
+            ParseInterventionResponse(
+                raw_text=text,
+                changes=changes,
+                unsupported=list(proposal.unsupported) + critic.issues,
+                effect_assigned=False,
+                understood_action=proposal.understood_action,
+                mechanism=[step.model_dump() for step in proposal.mechanism],
+                pricing_status=critic.pricing_status,
+                agent_run_id=agent_run_id,
+                limitations=critic.limitations,
+                research_claims=proposal.research_claims,
+            ),
+            goal,
+            classified,
+            summaries,
+            qualitative=qualitative,
         )
 
     async def _run_agent(
@@ -125,6 +156,8 @@ class InterventionAgentService:
         goal: GoalContract,
         baseline: dict[str, object],
         text: str,
+        summaries: list[str],
+        request_kind: str,
     ) -> tuple[InterventionAgentProposal, object, str | None]:
         research = await self._research.search(
             ResearchQuery(
@@ -142,6 +175,8 @@ class InterventionAgentService:
             "goal_domain": goal_domain(goal),
             "research": research.model_dump(mode="json"),
             "state_dimensions": goal.state_dimensions,
+            "authorized_evidence_summaries": summaries[:20],
+            "request_kind": request_kind,
         }
         prompt = load_prompt("intervention")
         ladder = self._ladders["intervention"]
@@ -158,7 +193,9 @@ class InterventionAgentService:
             max_output_tokens=self._settings.intervention_max_output_tokens,
         )
         proposal, response = await complete_validated(
-            self._inference, request, InterventionAgentProposal,
+            self._inference,
+            request,
+            InterventionAgentProposal,
             timeout_seconds=self._settings.inference_run_timeout_seconds,
         )
         critic = critique_intervention(goal, proposal, text)
@@ -217,4 +254,64 @@ class InterventionAgentService:
             agent_run_id=None,
             limitations=[fallback_note],
             research_claims=[],
+        )
+
+    @staticmethod
+    def _finalize_parse(
+        text: str,
+        parsed: ParseInterventionResponse,
+        goal: GoalContract,
+        classified: ClassifiedRequest,
+        summaries: list[str],
+        *,
+        qualitative: bool,
+    ) -> ParseInterventionResponse:
+        kind = getattr(classified, "kind", "quantitative_scenario")
+        confirmation = bool(getattr(classified, "needs_confirmation", False))
+        insights = (
+            compose_strategy_insights(
+                goal,
+                question=text,
+                evidence_summaries=summaries,
+                research_claims=parsed.research_claims,
+            )
+            if qualitative
+            or kind in {"opportunity_discovery", "strategic_advice", "exploratory_hypothetical"}
+            else []
+        )
+        changes = [] if qualitative else parsed.changes
+        pricing = "NOT_PRICED" if qualitative else parsed.pricing_status
+        unsupported = list(parsed.unsupported)
+        if qualitative and kind == "evidence_report":
+            unsupported = [
+                getattr(classified, "reason", "")
+                or (
+                    "This looks like observed progress. "
+                    "Confirm it if you want it stored as evidence."
+                )
+            ] + unsupported
+        elif qualitative and kind == "follow_up":
+            unsupported = [
+                "This follow-up is missing the original action or baseline. "
+                "Restate the full change."
+            ] + unsupported
+        elif qualitative and kind == "current_odds":
+            unsupported = ["Showing published odds only; no scenario was run."] + unsupported
+        return parsed.model_copy(
+            update={
+                "changes": changes,
+                "pricing_status": pricing,
+                "request_kind": kind,
+                "confirmation_needed": confirmation,
+                "insights": insights,
+                "unsupported": unsupported,
+                "consumer_summary": consumer_summary(
+                    kind=kind,
+                    published_odds=None,
+                    comparison_odds=None,
+                    scenario_odds=None if qualitative else None,
+                    improvement_pp=None,
+                    question=text,
+                ),
+            }
         )

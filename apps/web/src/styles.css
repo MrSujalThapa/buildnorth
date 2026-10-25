@@ -87,17 +87,27 @@ img, svg { display: block; }
 
 .skip-link {
   position: absolute;
-  left: var(--space-4);
-  top: -4rem;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  position: fixed;
   z-index: 20;
+  left: var(--space-4);
+  top: var(--space-3);
+  width: auto;
+  height: auto;
+  clip: auto;
+  overflow: visible;
   padding: 0.55rem 0.9rem;
   background: var(--ink);
   color: var(--canvas);
   border-radius: var(--radius-control);
   text-decoration: none;
-}
-.skip-link:focus {
-  top: var(--space-3);
 }
 
 .crystal-field {
