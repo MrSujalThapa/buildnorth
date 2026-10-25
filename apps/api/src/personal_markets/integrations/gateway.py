@@ -1,3 +1,5 @@
+from typing import Any
+
 from personal_markets.integrations.mcp_service import IntegrationGatewayService
 from personal_markets.integrations.plugins import DirectIntegrationGateway, PluginView
 
@@ -50,8 +52,29 @@ class UnifiedIntegrationGateway:
     async def list_capabilities(self, plugin_id: str) -> list[dict[str, object]]:
         return await self._mcp.list_capabilities(plugin_id, user_id=self._user_id)
 
+    async def source_access(self, plugin_id: str) -> dict[str, object]:
+        return await self._mcp.source_access(plugin_id, user_id=self._user_id)
+
     async def list_resources(self, plugin_id: str) -> list[dict[str, object]]:
         return await self._mcp.list_resources(plugin_id, user_id=self._user_id)
+
+    async def preview_source(
+        self,
+        plugin_id: str,
+        *,
+        resource_id: str,
+        resource_title: str = "",
+        resource_type: str = "",
+        arguments: dict[str, Any] | None = None,
+    ) -> dict[str, object]:
+        return await self._mcp.preview_source(
+            plugin_id,
+            resource_id=resource_id,
+            resource_title=resource_title,
+            resource_type=resource_type,
+            arguments=arguments,
+            user_id=self._user_id,
+        )
 
     async def list_descendants(self, plugin_id: str, parent_id: str) -> list[str]:
         return await self._mcp.list_descendants(

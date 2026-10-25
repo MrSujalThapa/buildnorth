@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -17,6 +17,13 @@ class ConnectManagedRequest(BaseModel):
 class ConnectCustomMcpRequest(BaseModel):
     endpoint: str
     transport: str = Field(default="stdio", pattern="^(stdio|sse|http)$")
+
+
+class SourcePreviewRequest(BaseModel):
+    resource_id: str = Field(min_length=1, max_length=500)
+    resource_title: str = Field(default="", max_length=200)
+    resource_type: str = Field(default="", max_length=120)
+    arguments: dict[str, str] = Field(default_factory=dict)
 
 
 @router.get("")
@@ -61,6 +68,30 @@ async def plugin_capabilities(
     gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
 ) -> list[dict[str, object]]:
     return await gateway.list_capabilities(plugin_id)
+
+
+@router.post("/{plugin_id}/preview")
+async def preview_plugin_source(
+    plugin_id: str,
+    payload: SourcePreviewRequest,
+    gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
+) -> dict[str, object]:
+    supplied = cast(dict[str, Any], dict(payload.arguments))
+    return await gateway.preview_source(
+        plugin_id,
+        resource_id=payload.resource_id,
+        resource_title=payload.resource_title,
+        resource_type=payload.resource_type,
+        arguments=supplied,
+    )
+
+
+@router.get("/{plugin_id}/access")
+async def plugin_access(
+    plugin_id: str,
+    gateway: Annotated[UnifiedIntegrationGateway, Depends(get_integration_gateway)],
+) -> dict[str, object]:
+    return await gateway.source_access(plugin_id)
 
 
 @router.get("/{plugin_id}/resources")

@@ -7,15 +7,27 @@ import pytest
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
+from personal_markets.core.errors import ForbiddenError
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.integrations.goal_sync_jobs import (
     InMemoryGoalSyncJobStore,
     get_goal_sync_job_store,
 )
 from personal_markets.integrations.goal_sync_service import GoalSyncService
-from personal_markets.integrations.goal_sync_worker import execute_goal_sync_job, goal_sync_worker
+from personal_markets.integrations.goal_sync_worker import (
+    execute_goal_sync_job,
+    goal_sync_worker,
+    public_sync_error,
+)
 from personal_markets.integrations.mcp_domain import RawSourceRecord
 from personal_markets.integrations.mcp_repository import InMemoryIntegrationRepository
+
+
+def test_credit_failure_keeps_the_source_tracked_and_unverified() -> None:
+    message = public_sync_error(ForbiddenError("this account has no hosted inference entitlement"))
+    assert message.startswith("Source tracked — evidence interpretation pending")
+    assert "unverified" in message
+    assert "Reconnect" not in message
 
 
 @pytest.mark.asyncio

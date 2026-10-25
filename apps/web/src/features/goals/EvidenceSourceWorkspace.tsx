@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText } from "lucide-react";
+import { Blocks, Check, ExternalLink } from "lucide-react";
 import {
   api,
   type PluginView,
@@ -14,6 +14,8 @@ import { PluginBrandIcon } from "../../components/plugins/PluginBrandIcon";
 import { isPluginConnected, pluginViewToDisplay } from "../../components/plugins/pluginPresentation";
 import { AgentProgress } from "../agents/AgentProgress";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
+import { additionalRequiredArguments, schemaBody } from "./readArguments";
+import { ResourceMark, SourcePreviewView, sourceNoun } from "./SourcePreview";
 import "./evidence.css";
 
 type Props = {
@@ -125,6 +127,7 @@ export function EvidenceSourceWorkspace({
   const [selectedResources, setSelectedResources] = useState<Record<string, string[]>>({});
   const [resourceRefs, setResourceRefs] = useState<Record<string, string>>({});
   const [activityTypes, setActivityTypes] = useState<Record<string, string[]>>({});
+  const [readArguments, setReadArguments] = useState<Record<string, Record<string, string>>>({});
   const [snapshot, setSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -191,12 +194,14 @@ export function EvidenceSourceWorkspace({
       label: string;
       resourceIds: string[];
       activityTypes?: string[];
+      readArguments?: Record<string, string>;
     }) =>
       api.saveEvidenceSourceRecipe(goalId, body.pluginId, {
         label: body.label,
         resource_ids: body.resourceIds,
         approved: true,
         activity_types: body.activityTypes,
+        read_arguments: body.readArguments,
       }),
     onSuccess: () => {
       setSyncMessage("Source saved");
@@ -211,6 +216,7 @@ export function EvidenceSourceWorkspace({
 
   const toggleActivity = (pluginId: string, activity: string) => {
     setActivityTypes((current) => {
+      if (pluginId !== "github") return { ...current, [pluginId]: [activity] };
       const existing = new Set(current[pluginId] ?? []);
       if (existing.has(activity)) existing.delete(activity);
       else existing.add(activity);
@@ -226,14 +232,12 @@ export function EvidenceSourceWorkspace({
     }
     const base = selectedResources[pluginId] ?? [];
     if (pluginId === "notion") return base;
-    const ref = (resourceRefs[pluginId] ?? "").trim();
-    if (!ref) return base;
-    return base.map((resourceId) => (resourceId.includes("@") ? resourceId : `${resourceId}@${ref}`));
+    return (resourceRefs[pluginId] ?? "").trim() ? [(resourceRefs[pluginId] ?? "").trim()] : base;
   };
 
   const toggleResource = (pluginId: string, resourceId: string) => {
     setSelectedResources((current) => {
-      if (pluginId === "github") return { ...current, [pluginId]: [resourceId] };
+      if (pluginId !== "notion" && pluginId !== "calendar") return { ...current, [pluginId]: [resourceId] };
       const existing = new Set(current[pluginId] ?? []);
       if (existing.has(resourceId)) existing.delete(resourceId);
       else existing.add(resourceId);
@@ -349,17 +353,23 @@ export function EvidenceSourceWorkspace({
                           selectedResources={selectedResources[card.pluginId] ?? []}
                           resourceRef={resourceRefs[card.pluginId] ?? ""}
                           selectedActivities={activityTypes[card.pluginId] ?? []}
+                          readArguments={readArguments[card.pluginId] ?? {}}
                           onResourceRefChange={(value) =>
                             setResourceRefs((current) => ({ ...current, [card.pluginId]: value }))
                           }
                           onToggleActivity={(activity) => toggleActivity(card.pluginId, activity)}
+                          onArgumentChange={(key, value) => setReadArguments((current) => ({
+                            ...current,
+                            [card.pluginId]: { ...current[card.pluginId], [key]: value },
+                          }))}
                           onToggleResource={(resourceId) => toggleResource(card.pluginId, resourceId)}
-                          onApprove={(label) =>
+                          onApprove={(label, argumentsForRead) =>
                             saveRecipe.mutate({
                               pluginId: card.pluginId,
                               label: label || card.name,
                               resourceIds: buildResourceIds(card.pluginId),
                               activityTypes: activityTypes[card.pluginId],
+                              readArguments: argumentsForRead,
                             })
                           }
                           approvePending={saveRecipe.isPending}
@@ -584,13 +594,55 @@ function DatasetUpload({ goalId }: { goalId: string }) {
   );
 }
 
+function SelectedSourcePreview({
+  pluginId,
+  resourceId,
+  resourceTitle,
+  resourceType,
+}: {
+  pluginId: string;
+  resourceId: string;
+  resourceTitle: string;
+  resourceType: string;
+}) {
+  const [measurementId, setMeasurementId] = useState<string | null>(null);
+  const [trackingLabel, setTrackingLabel] = useState("");
+  const preview = useQuery({
+    queryKey: ["plugin-preview", pluginId, resourceId, {}],
+    queryFn: () => api.previewPluginSource(pluginId, {
+      resource_id: resourceId,
+      resource_title: resourceTitle,
+      resource_type: resourceType,
+      arguments: {},
+    }),
+    staleTime: 60_000,
+  });
+  return (
+    <div className="source-inline-preview">
+      {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+      {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+      {preview.data ? (
+        <SourcePreviewView
+          preview={preview.data}
+          selectedMeasurementId={measurementId}
+          trackingLabel={trackingLabel}
+          onSelectMeasurement={setMeasurementId}
+          onTrackingLabel={setTrackingLabel}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 function SourceResourcePanel({
   source,
   selectedResources,
   resourceRef,
   selectedActivities,
+  readArguments,
   onResourceRefChange,
   onToggleActivity,
+  onArgumentChange,
   onToggleResource,
   onApprove,
   approvePending,
@@ -599,10 +651,12 @@ function SourceResourcePanel({
   selectedResources: string[];
   resourceRef: string;
   selectedActivities: string[];
+  readArguments: Record<string, string>;
   onResourceRefChange: (value: string) => void;
   onToggleActivity: (activity: string) => void;
+  onArgumentChange: (key: string, value: string) => void;
   onToggleResource: (resourceId: string) => void;
-  onApprove: (label: string) => void;
+  onApprove: (label: string, readArguments: Record<string, string>) => void;
   approvePending: boolean;
 }) {
   const [resourceQuery, setResourceQuery] = useState("");
@@ -626,7 +680,18 @@ function SourceResourcePanel({
   ];
   const activityOptions = source.pluginId === "github"
     ? githubActivities.filter((activity) => (capabilities.data ?? []).some((item) => activity.tools.includes(item.tool_name ?? "")))
-    : [];
+    : ["notion", "calendar"].includes(source.pluginId) ? []
+    : (capabilities.data ?? []).filter((item) => {
+      const properties = item.input_schema?.parameters?.properties ?? item.input_schema?.properties ?? {};
+      return item.tool_name && (item.operation === "read" || item.operation.endsWith(".read"))
+        && Object.keys(properties).some((key) => /(^|_)(id|query|channel|q)$|calendarId|spreadsheetId/.test(key));
+    }).map((item) => ({ value: item.tool_name!, label: item.label, tools: [item.tool_name!] }));
+  const generic = !["github", "notion", "calendar"].includes(source.pluginId);
+  const selectedCapability = (capabilities.data ?? []).find((item) => item.tool_name === selectedActivities[0]);
+  const selectedSchema = schemaBody(selectedCapability?.input_schema);
+  const requiredFields = generic ? additionalRequiredArguments(selectedSchema) : [];
+  const schemaProperties = selectedSchema.properties ?? {};
+  const requiredArgumentsReady = requiredFields.every((key) => (readArguments[key] ?? "").trim());
   const options = (resources.data ?? [])
           .map((item) => {
             const resourceId = item.uri.replace(/^composio:\/\/[^/]+\//, "") || item.name;
@@ -648,13 +713,68 @@ function SourceResourcePanel({
           })
           .sort((left, right) => Number(right.recommended) - Number(left.recommended));
   const visibleOptions = options.filter((item) => item.label.toLowerCase().includes(resourceQuery.toLowerCase()));
+  const selectedOption = options.find((item) => selectedResources.includes(item.resource_id));
+  const noun = sourceNoun(options.map((item) => item.resource_type));
+  const [measurementId, setMeasurementId] = useState<string | null>(null);
+  const [trackingLabel, setTrackingLabel] = useState("");
+  const [previewArguments, setPreviewArguments] = useState<Record<string, string>>({});
+  const [queryText, setQueryText] = useState("");
+  const [committedQuery, setCommittedQuery] = useState("");
+  const access = useQuery({
+    queryKey: ["plugin-access", source.pluginId],
+    queryFn: ({ signal }) => api.pluginAccess(source.pluginId, signal),
+    enabled: source.connected,
+    staleTime: 60_000,
+  });
+  const queryMode = Boolean(access.data?.models.includes("query"));
+  const previewTarget = selectedOption?.resource_id || (queryMode ? committedQuery : "");
+  const preview = useQuery({
+    queryKey: ["plugin-preview", source.pluginId, previewTarget, previewArguments],
+    queryFn: () => api.previewPluginSource(source.pluginId, {
+      resource_id: previewTarget,
+      resource_title: selectedOption?.label || committedQuery,
+      resource_type: selectedOption?.resource_type || (queryMode ? "message" : "resource"),
+      arguments: previewArguments,
+    }),
+    enabled: Boolean(previewTarget),
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    setMeasurementId(null);
+    setTrackingLabel("");
+    setPreviewArguments({});
+  }, [selectedOption?.resource_id]);
+  useEffect(() => {
+    const data = preview.data;
+    if (!data?.tool_name || !generic) return;
+    if (selectedActivities[0] !== data.tool_name) onToggleActivity(data.tool_name);
+    for (const [key, value] of Object.entries(data.arguments)) {
+      const identifiesResource = /(^|_)(id|query|channel|q)$|calendarId|spreadsheetId/.test(key);
+      if (!identifiesResource && !(readArguments[key] ?? "").trim() && value) onArgumentChange(key, value);
+    }
+    const measurement = data.measurements[0];
+    if (measurement) {
+      setMeasurementId((current) => current ?? measurement.id);
+      setTrackingLabel((current) => current || measurement.label);
+    }
+  }, [preview.data, generic, onArgumentChange, onToggleActivity, readArguments, selectedActivities]);
 
   return (
     <div className="evidence-resource-panel">
-      <h3>{source.pluginId === "github" ? "GitHub evidence" : "Choose what counts as evidence"}</h3>
+      <div className="source-connect-row">
+        <span className="source-connect-mark" aria-hidden="true">
+          <PluginBrandIcon id={source.pluginId} logoUrl={source.logoUrl} Icon={Blocks} />
+        </span>
+        <span>
+          <strong>Connect a source</strong>
+          <small>{source.connected ? `${source.name} connected` : `${source.name} is not connected`}</small>
+        </span>
+        <span className={`evidence-pill ${source.connected ? "connected" : ""}`}>{source.connected ? "Connected" : "Not connected"}</span>
+      </div>
+      <h3>{options.length ? `Choose a ${noun}` : "Choose what counts as evidence"}</h3>
       {!source.connected ? <p className="field-hint">Reconnect {source.name} in <Link to="/plugins">Plugins</Link> to choose sources.</p> : null}
       {resources.isLoading ? <p className="field-hint">Loading resources…</p> : null}
-      {options.length ? <input className="evidence-resource-search ui-field" type="search" aria-label={`Search ${source.name} sources`} name={`search_${source.pluginId}_sources`} autoComplete="off" placeholder={source.pluginId === "github" ? "Search repositories" : "Search pages"} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
+      {options.length ? <input className="evidence-resource-search ui-field" type="search" aria-label={`Search ${source.name} sources`} name={`search_${source.pluginId}_sources`} autoComplete="off" placeholder={`Search ${noun === "source" ? "sources" : `${noun}s`}`} value={resourceQuery} onChange={(event) => setResourceQuery(event.target.value)} /> : null}
       {options.length ? (
         <ul className="evidence-resource-list">
           {visibleOptions.slice(0, visibleLimit).map((resource) => {
@@ -663,22 +783,48 @@ function SourceResourcePanel({
               <li key={resource.resource_id} className={checked ? "evidence-resource-row selected" : "evidence-resource-row"}>
                 <label className="evidence-resource-choice">
                   <input
-                    type={source.pluginId === "github" ? "radio" : "checkbox"}
+                    type={source.pluginId === "github" ? "radio" : generic ? "radio" : "checkbox"}
                     checked={checked}
                     onChange={() => onToggleResource(resource.resource_id)}
                   />
-                  {source.pluginId === "notion" ? <FileText size={19} aria-hidden="true" /> : null}
+                  <span className="source-resource-mark"><ResourceMark type={resource.resource_type} /></span>
                   <span className="evidence-resource-copy">
                     <strong>{resource.label}</strong>
-                    {resource.resource_type === "private" || resource.resource_type === "public"
-                      ? <small>{resource.resource_type === "private" ? "Private" : "Public"}</small>
-                      : null}
+                    <small>{source.name}</small>
                   </span>
+                  {checked ? <Check className="source-resource-check" aria-hidden="true" /> : null}
                 </label>
                 {resource.url ? (
                   <a className="evidence-resource-open" href={resource.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${resource.label} in ${source.name}`}>
                     <ExternalLink size={17} aria-hidden="true" />
                   </a>
+                ) : null}
+                {checked && resource.resource_id === selectedOption?.resource_id ? (
+                  <div className="source-inline-preview">
+                    {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+                    {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+                    {preview.data ? (
+                      <SourcePreviewView
+                        preview={preview.data}
+                        selectedMeasurementId={measurementId}
+                        trackingLabel={trackingLabel}
+                        onSelectMeasurement={(id) => {
+                          const measurement = preview.data?.measurements.find((item) => item.id === id);
+                          setMeasurementId(id);
+                          setTrackingLabel(measurement?.label ?? "");
+                        }}
+                        onTrackingLabel={setTrackingLabel}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+                {checked && resource.resource_id !== selectedOption?.resource_id ? (
+                  <SelectedSourcePreview
+                    pluginId={source.pluginId}
+                    resourceId={resource.resource_id}
+                    resourceTitle={resource.label}
+                    resourceType={resource.resource_type}
+                  />
                 ) : null}
               </li>
             );
@@ -687,17 +833,13 @@ function SourceResourcePanel({
       ) : null}
       {visibleOptions.length > visibleLimit ? (
         <button type="button" className="evidence-resource-more" onClick={() => setVisibleLimit((current) => current + 50)}>
-          Show more pages
+          Show more
         </button>
       ) : null}
-      {source.pluginId === "github" || source.pluginId === "google_sheets" ? (
+      {source.pluginId === "github" ? (
         <label className="evidence-ref-field">
           <span>
-            {source.pluginId === "github"
-              ? "Branch (optional)"
-              : source.pluginId === "google_sheets"
-                ? "Tab or range (optional)"
-                : "Range (optional)"}
+            Branch (optional)
           </span>
           <input
             className="ui-field"
@@ -711,14 +853,86 @@ function SourceResourcePanel({
           />
         </label>
       ) : null}
-      {activityOptions.length ? (
+      {queryMode ? (
+        <form className="evidence-ref-field" onSubmit={(event) => {
+          event.preventDefault();
+          const value = queryText.trim();
+          if (!value) return;
+          setCommittedQuery(value);
+          onResourceRefChange(value);
+          const key = access.data?.query_argument;
+          if (key) {
+            onArgumentChange(key, value);
+            setPreviewArguments({ [key]: value });
+          }
+        }}>
+          <span>{access.data?.query_label || "Search"}</span>
+          <input className="ui-field" value={queryText} maxLength={200}
+            onChange={(event) => setQueryText(event.target.value)}
+            placeholder="Describe the messages or records to include" />
+          <button type="submit" className="ui-button">Preview this search</button>
+          <small>Only this search is read. The rest of the account stays untouched.</small>
+        </form>
+      ) : null}
+      {queryMode && committedQuery && !selectedOption ? (
+        <div className="source-inline-preview">
+          {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+          {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+          {preview.data ? (
+            <SourcePreviewView
+              preview={preview.data}
+              selectedMeasurementId={measurementId}
+              trackingLabel={trackingLabel}
+              onSelectMeasurement={(id) => {
+                const measurement = preview.data?.measurements.find((item) => item.id === id);
+                setMeasurementId(id);
+                setTrackingLabel(measurement?.label ?? "");
+              }}
+              onTrackingLabel={setTrackingLabel}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {generic && !options.length && !queryMode ? (
+        <label className="evidence-ref-field">
+          <span>Authorized resource ID or bounded query</span>
+          <input className="ui-field" value={resourceRef} maxLength={500}
+            onChange={(event) => onResourceRefChange(event.target.value)}
+            placeholder="Enter the exact resource ID or search query" />
+          <small>An exact value here takes precedence over a selected resource. Only the chosen read action and this resource or query will be saved.</small>
+        </label>
+      ) : null}
+      {requiredFields.map((key) => {
+        const property = schemaProperties[key];
+        const choices = property?.enum ?? [];
+        return (
+          <label key={key} className="evidence-ref-field">
+            <span>{key === "range" ? "Rows to include" : key.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase())}</span>
+            {choices.length ? (
+              <select className="ui-field" value={readArguments[key] ?? ""} onChange={(event) => {
+                onArgumentChange(key, event.target.value);
+                setPreviewArguments((current) => ({ ...current, [key]: event.target.value }));
+              }}>
+                <option value="">Select</option>
+                {choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+              </select>
+            ) : (
+              <input className="ui-field" value={readArguments[key] ?? ""} maxLength={500} required
+                onChange={(event) => onArgumentChange(key, event.target.value)}
+                onBlur={(event) => setPreviewArguments((current) => ({ ...current, [key]: event.target.value.trim() }))}
+                placeholder={key === "range" ? "Window this read should include" : "Enter the value this read requires"} />
+            )}
+          </label>
+        );
+      })}
+      {activityOptions.length && !generic ? (
         <fieldset className="evidence-activity-fieldset">
           <legend>Read activity</legend>
           <div className="evidence-activity-options">
             {activityOptions.map((activity) => (
               <label key={activity.value} className="ui-choice">
                 <input
-                  type="checkbox"
+                  type={generic ? "radio" : "checkbox"}
                   checked={selectedActivities.includes(activity.value)}
                   onChange={() => onToggleActivity(activity.value)}
                 />
@@ -728,10 +942,16 @@ function SourceResourcePanel({
           </div>
         </fieldset>
       ) : null}
-      {resources.isError ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
-      {source.connected && resources.isSuccess && !options.length ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
-      <button type="button" className="ui-button" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length)} onClick={() => onApprove(options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", "))}>
-        {approvePending ? "Saving…" : `Save ${selectedResources.length === 1 ? "source" : `${selectedResources.length} sources`}`}
+      {resources.isError && !generic ? <p className="field-hint" role="alert">Could not load available sources. Check access and try again.</p> : null}
+      {generic && resources.isError ? <p className="field-hint" role="status">This connection has no safe resource listing. Enter an exact resource ID or bounded query for a compatible read action.</p> : null}
+      {source.connected && resources.isSuccess && !options.length && !generic ? <p className="field-hint">No accessible pages or repositories found. Check this connection's access.</p> : null}
+      {generic && capabilities.isSuccess && !activityOptions.length ? <p className="field-hint" role="status">No safely scoped read action is available for this connection and its current permissions.</p> : null}
+      <button type="button" className="ui-button source-track-action" disabled={approvePending || !source.connected || ((source.pluginId === "github" || source.pluginId === "notion") && !selectedResources.length) || (source.pluginId === "github" && !selectedActivities.length) || (generic && ((options.length ? !preview.data?.records.length || Boolean(preview.data.error) : !resourceRef.trim()) || selectedActivities.length !== 1 || !requiredArgumentsReady))} onClick={() => {
+        const chosen = preview.data?.measurements.find((item) => item.id === measurementId);
+        const resourceLabel = options.filter((item) => selectedResources.includes(item.resource_id)).map((item) => item.label).join(", ") || resourceRef.trim();
+        onApprove(chosen?.ambiguous && trackingLabel.trim() ? trackingLabel.trim() : resourceLabel, Object.fromEntries(Object.entries(readArguments).filter(([key, value]) => key in schemaProperties && value.trim())));
+      }}>
+        {approvePending ? "Saving…" : "Start tracking"}
       </button>
     </div>
   );

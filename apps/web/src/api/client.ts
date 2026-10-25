@@ -272,6 +272,35 @@ export interface CourseGradeResult {
   writes_evidence: boolean;
 }
 
+export interface SourcePreviewRecord {
+  kind: "measurement" | "activity" | "message" | "document" | "record";
+  title: string;
+  subtitle?: string | null;
+  timestamp?: string | null;
+  metric?: string | null;
+  numeric_value?: number | null;
+  unit?: string | null;
+  text?: string | null;
+  actor?: string | null;
+  metrics?: { label: string; value: number; unit?: string | null }[];
+  cells?: string[];
+}
+
+export interface SourcePreview {
+  resource_title: string;
+  resource_type: string;
+  tool_name: string;
+  arguments: Record<string, string>;
+  fields: { key: string; label: string; role: string }[];
+  columns?: string[];
+  measurements: { id: string; label: string; detail: string; unit?: string | null; ambiguous: boolean }[];
+  records: SourcePreviewRecord[];
+  notice?: string | null;
+  validation_status: "unverified";
+  promotes_to_verified_outcome: false;
+  error?: string | null;
+}
+
 export interface SourceResourceSelection {
   resource_id: string;
   label: string;
@@ -1004,8 +1033,14 @@ export const api = {
   refreshPluginConnection: (pluginId: string) =>
     request<PluginConnectResponse>(`/api/v1/plugins/${pluginId}/connect/refresh`, { method: "POST" }),
   pluginCapabilities: (pluginId: string, signal?: AbortSignal) =>
-    request<{ capability_id: string; label: string; operation: string; tool_name?: string | null }[]>(
+    request<{ capability_id: string; label: string; operation: string; tool_name?: string | null; input_schema?: { properties?: Record<string, { type?: string }>; required?: string[]; parameters?: { properties?: Record<string, { type?: string }>; required?: string[] } } }[]>(
       `/api/v1/plugins/${pluginId}/capabilities`,
+      undefined,
+      signal,
+    ),
+  pluginAccess: (pluginId: string, signal?: AbortSignal) =>
+    request<{ models: string[]; query_argument: string; query_label: string }>(
+      `/api/v1/plugins/${pluginId}/access`,
       undefined,
       signal,
     ),
@@ -1015,6 +1050,15 @@ export const api = {
       undefined,
       signal,
     ),
+  previewPluginSource: (
+    pluginId: string,
+    body: { resource_id: string; resource_title?: string; resource_type?: string; arguments?: Record<string, string> },
+  ) =>
+    request<SourcePreview>(`/api/v1/plugins/${pluginId}/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
   behaviorProfile: (goalId: string, signal?: AbortSignal) =>
     request<BehaviorProfile>(`/api/v1/goals/${goalId}/behavior-profile`, undefined, signal),
   disconnectPlugin: (pluginId: string) =>
@@ -1036,7 +1080,7 @@ export const api = {
   saveEvidenceSourceRecipe: (
     goalId: string,
     pluginId: string,
-    body: { label: string; resource_ids: string[]; approved?: boolean; activity_types?: string[] },
+    body: { label: string; resource_ids: string[]; approved?: boolean; activity_types?: string[]; read_arguments?: Record<string, string> },
   ) =>
     request<SourceRecipeRecord>(`/api/v1/goals/${goalId}/evidence/sources/${pluginId}/recipe`, {
       method: "POST",

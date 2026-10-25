@@ -1,6 +1,7 @@
 ﻿import { Check, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { PluginBrandIcon } from "./PluginBrandIcon";
+import { PluginResourcePreview } from "./PluginResourcePreview";
 import type { PluginDisplay } from "./PluginsPage";
 export default function PluginDetailPanel({
   plugin,
@@ -43,8 +44,8 @@ export default function PluginDetailPanel({
         <h2 id="plugin-title">{plugin.name}</h2>
         <p className="plugin-description">{plugin.description}</p>
         <p className="evidence-note">
-          {plugin.name} can contribute verified activity as evidence. Evidence may update a relevant goal
-          forecast.
+          Choose a specific authorized source in Evidence. Source records remain unverified until the
+          existing evidence and forecast checks process them.
         </p>
         {connected ? (
           <div className="account-block">
@@ -53,8 +54,9 @@ export default function PluginDetailPanel({
             {plugin.lastSyncLabel ? <span>{plugin.lastSyncLabel}</span> : null}
           </div>
         ) : null}
+        {connected ? <PluginResourcePreview pluginId={plugin.id} /> : null}
         <section>
-          <h3>What Play It Out can read</h3>
+          <h3>{connected ? "Available read actions" : "Potential reads after connection"}</h3>
           <ul>
             {plugin.reads.map((item) => (
               <li key={item}>

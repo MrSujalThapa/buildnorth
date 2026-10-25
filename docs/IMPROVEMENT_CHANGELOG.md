@@ -2,6 +2,22 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — Bounded content reads for unfamiliar providers
+
+Preview planning now prefers a content read over metadata and can make one follow-up read with identifiers the first response actually returned. A selected resource is not rewritten into a search. Declared base64 content is decoded before display. A message list can be followed by a bounded per-message read. Query-only connections offer a search instead of an empty source list. A bare number is not treated as progress unless a date and a unit or quantity name are present. No forecast was published. Hosted inference credit remains unavailable, so tracked rows stay unverified.
+
+## 2026-10-24 — Preview quality for any connected source
+
+The same preview now classifies records from their fields. Empty rows and provider-prefixed labels are omitted. A source with no numeric measurement says that no measurable progress was detected. The Plugins page and the goal evidence page both use that preview. No forecast was published.
+
+## 2026-10-24 — Compact source preview
+
+The selected resource now shows a short unverified preview of the records that were actually read. A missing hosted-inference entitlement leaves those records tracked and says interpretation is pending. Structured evidence was not used, because that path republishes a priceable model. No forecast was published.
+
+## 2026-10-24 — Universal source preview
+
+Connected sources now preview through one presentation model. A record is a measurement, activity, message, document, or plain record based on the fields that were actually returned. The evidence screen uses that model for resource cards, proposed measurements, and unverified previews. No provider-specific screen was added. Preview reads are not stored. No forecast was published.
+
 ## 2026-10-24 — Route recovery during Vercel deployment
 
 - Signed-in production navigation to Profile and Settings twice failed to fetch an old lazy route chunk while Vercel replaced the deployment. A manual reload restored both routes without changing forecast data.
@@ -1089,3 +1105,7 @@ The Settings AbortError came from React StrictMode aborting an initial read-only
 ## 2026-10-24 — Current forecast status across Markets and goal views
 
 - Dashboard now batch-reads the owner's latest creation workflow states and returns their status and critic decision alongside goal histories. Cards retain immutable historical chart points but suppress stale current odds during withheld, pending, or failed evidence interpretation. Goal Detail and Evidence use the same status precedence. Collections exclude those members from current portfolio odds while retaining their historical series. This changes presentation only; no forecasts or evidence were written. Isolated owner-isolation, collection, and web adapter regression tests cover the old 15% versus Withheld mismatch.
+
+## 2026-10-24 — Generic Composio reads keep extra schema arguments
+
+- Connected apps without a provider adapter can list records, save one scoped read, and replay it. Extra schema-required arguments such as a spreadsheet range are collected in Evidence, validated against the live tool schema, and stored on the goal recipe. Change-feed tools are not used as resource catalogs. Headered value grids keep a date, metric, number, and unit only when those columns are present. Records stay unverified and do not publish a forecast by themselves. No Google Sheets adapter was added.

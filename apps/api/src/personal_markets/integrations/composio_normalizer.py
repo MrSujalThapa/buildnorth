@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -25,22 +27,38 @@ def normalize_tool_result(
 
     adapter = get_adapter(plugin_id)
     for index, row in enumerate(rows):
+        if isinstance(row, list):
+            row = {"row_index": index, "values": row[:20]}
         if not isinstance(row, dict):
             continue
+        _decode_declared_encoding(row)
+        _attach_nested_text(row)
+        source_uri = recipe_step.resource_uri if recipe_step else None
         external_id = str(
             (row.get("sha") if plugin_id == "github" else None)
-            or row.get("id") or row.get("node_id") or f"{tool_name}:{index}"
+            or row.get("id")
+            or row.get("node_id")
+            or row.get("uuid")
+            or f"{source_uri or tool_name}:{index}"
         )
         events = adapter.observations(tool_name, row, recipe_step)
         if not events:
-            events = _generic_status_events(plugin_id, row)
+            if plugin_id == "notion":
+                events = _legacy_status_events(plugin_id, row)
+            elif plugin_id not in {"github", "calendar"}:
+                events = _generic_observations(
+                    plugin_id, tool_name, row, source_uri, str(plugin_connection_id), external_id
+                )
         body = {
             **row,
             "summary": _summary_for_row(plugin_id, tool_name, row),
             "events": events,
             "tool_name": tool_name,
             "provider": plugin_id,
+            "connected_account_id": str(plugin_connection_id),
+            "resource_uri": source_uri,
             "observed_at": _observed_at(row),
+            "ingested_at": datetime.now(UTC).isoformat(),
             "evidence_classification": (
                 events[0].get("classification") if events else "raw_content"
             ),
@@ -55,20 +73,27 @@ def normalize_tool_result(
             fingerprint = payload_hash({"sha": row["sha"]})
         else:
             hash_body = {
-                key: value for key, value in body.items()
-                if key not in {
-                    "request_id", "response_id", "trace_id", "retrieved_at", "ingested_at",
+                key: value
+                for key, value in body.items()
+                if key
+                not in {
+                    "request_id",
+                    "response_id",
+                    "trace_id",
+                    "retrieved_at",
+                    "ingested_at",
                 }
             }
             raw_events = hash_body.get("events")
             if isinstance(raw_events, list):
                 hash_body["events"] = [
                     {key: value for key, value in event.items() if key != "ingested_at"}
-                    if isinstance(event, dict) else event
+                    if isinstance(event, dict)
+                    else event
                     for event in raw_events
                 ]
             fingerprint = payload_hash(hash_body)
-        if plugin_id == "notion":
+        if plugin_id == "notion" or plugin_id not in {"github", "calendar"}:
             external_id = f"{external_id}:{fingerprint[:16]}"
         records.append(
             RawSourceRecord(
@@ -86,25 +111,219 @@ def normalize_tool_result(
     return records
 
 
+_COLUMN_ROLES = {
+    "date": "observed_at",
+    "observed_at": "observed_at",
+    "timestamp": "observed_at",
+    "metric": "metric",
+    "measurement": "metric",
+    "value": "numeric_value",
+    "amount": "numeric_value",
+    "quantity": "numeric_value",
+    "unit": "unit",
+    "units": "unit",
+}
+
+
+def _decode_declared_encoding(row: dict[str, Any]) -> None:
+    """Turn a declared base64 document into text. The encoding field is the signal."""
+    if str(row.get("encoding") or "").strip().lower() != "base64":
+        return
+    for key in ("content", "body", "text", "data"):
+        value = row.get(key)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        try:
+            compact = "".join(value.split())
+            decoded = base64.b64decode(compact, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if decoded.strip():
+            row["plain_text"] = decoded.strip()[:2000]
+            return
+
+
+def _attach_nested_text(row: dict[str, Any]) -> None:
+    """Lift readable nested text out of wrappers without treating ids as content."""
+    if isinstance(row.get("values"), list):
+        return
+    existing = ("markdown", "plain_text", "text", "content")
+    if any(isinstance(row.get(key), str) and str(row.get(key)).strip() for key in existing):
+        return
+    text = _nested_text(row)
+    if text:
+        row["plain_text"] = text[:2000]
+
+
+def _nested_text(value: Any, depth: int = 0) -> str:
+    if depth > 4:
+        return ""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if _looks_like_identifier(stripped):
+            return ""
+        return stripped
+    if isinstance(value, list):
+        parts = [_nested_text(item, depth + 1) for item in value[:30]]
+        return "\n".join(part for part in parts if part)
+    if isinstance(value, dict):
+        preferred = (
+            "markdown",
+            "plain_text",
+            "plaintext",
+            "paragraph",
+            "text",
+            "content",
+            "snippet",
+        )
+        for key in preferred:
+            if key in value:
+                found = _nested_text(value[key], depth + 1)
+                if found:
+                    return found
+        parts = []
+        for key, child in value.items():
+            if key in {
+                "id",
+                "object",
+                "type",
+                "created_time",
+                "last_edited_time",
+                "created_at",
+                "updated_at",
+                "request_id",
+                "parent",
+                "url",
+                "archived",
+            }:
+                continue
+            found = _nested_text(child, depth + 1)
+            if found:
+                parts.append(found)
+        return "\n".join(parts)
+    return ""
+
+
+def _looks_like_identifier(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            value,
+            re.IGNORECASE,
+        )
+        or re.fullmatch(r"[0-9a-f]{16,}", value, re.IGNORECASE)
+    )
+
+
+def _column_role(header: str) -> str | None:
+    key = re.sub(r"[^a-z0-9]+", "_", header.strip().lower()).strip("_")
+    return _COLUMN_ROLES.get(key)
+
+
+def _parse_number(value: Any) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str) and re.fullmatch(r"-?\d+(?:\.\d+)?", value.strip().replace(",", "")):
+        return float(value.strip().replace(",", ""))
+    return None
+
+
+def _tabular_value_rows(values: list[Any]) -> list[dict[str, Any]] | None:
+    """Map a headered value grid onto date, metric, number, and unit when those columns exist."""
+    if len(values) < 2 or not all(isinstance(row, list) for row in values):
+        return None
+    header = values[0]
+    if not header or not all(isinstance(cell, str) and cell.strip() for cell in header):
+        return None
+    roles = [_column_role(str(cell)) for cell in header]
+    if not any(roles):
+        return None
+    records: list[dict[str, Any]] = []
+    for index, cells in enumerate(values[1:], start=1):
+        if not isinstance(cells, list):
+            continue
+        record: dict[str, Any] = {"row_index": index, "values": cells[:20]}
+        for role, cell in zip(roles, cells, strict=False):
+            if role == "observed_at" and cell not in (None, ""):
+                record["date"] = str(cell)
+            elif role == "metric" and cell not in (None, ""):
+                record["metric"] = str(cell)
+            elif role == "numeric_value":
+                number = _parse_number(cell)
+                if number is not None:
+                    record["numeric_value"] = number
+            elif role == "unit" and cell not in (None, ""):
+                record["unit"] = str(cell)
+        records.append(record)
+    return records or None
+
+
 def _extract_rows(payload: dict[str, Any]) -> list[Any]:
     # Some read tools return one document alongside an empty ``data`` list.
     # A page body is still a source record even when it has no child rows.
-    if any(isinstance(payload.get(key), str) and payload[key].strip()
-           for key in ("markdown", "content", "text", "plain_text")):
+    if any(
+        isinstance(payload.get(key), str) and payload[key].strip()
+        for key in ("markdown", "content", "text", "plain_text")
+    ):
         return [payload]
-    for key in ("records", "items", "data", "commits", "repositories", "results"):
+    for key in (
+        "records",
+        "items",
+        "data",
+        "commits",
+        "repositories",
+        "results",
+        "messages",
+        "activities",
+        "events",
+        "files",
+        "values",
+    ):
         value = payload.get(key)
         if isinstance(value, list):
-            return value
+            if key == "values":
+                tabular = _tabular_value_rows(value)
+                if tabular is not None:
+                    return tabular[:100]
+            return value[:100]
         if isinstance(value, dict):
-            for nested_key in ("items", "repositories", "results", "commits", "data"):
+            for nested_key in (
+                "items",
+                "repositories",
+                "results",
+                "commits",
+                "data",
+                "messages",
+                "activities",
+                "events",
+                "files",
+                "values",
+            ):
                 if isinstance(value.get(nested_key), list):
-                    return value[nested_key]
+                    nested: list[Any] = value[nested_key]
+                    if nested_key == "values":
+                        tabular = _tabular_value_rows(nested)
+                        if tabular is not None:
+                            return tabular[:100]
+                    return nested[:100]
     return [payload] if payload and not payload.get("has_more") else []
 
 
 def _observed_at(row: dict[str, Any]) -> str:
-    for key in ("observed_at", "updated_at", "created_at", "date", "timestamp", "committed_date"):
+    for key in (
+        "observed_at",
+        "updated_at",
+        "created_at",
+        "date",
+        "timestamp",
+        "messageTimestamp",
+        "message_timestamp",
+        "sent_at",
+        "sentAt",
+        "committed_date",
+    ):
         value = row.get(key)
         if value:
             return str(value)
@@ -117,6 +336,10 @@ def _observed_at(row: dict[str, Any]) -> str:
 
 
 def _summary_for_row(plugin_id: str, tool_name: str, row: dict[str, Any]) -> str:
+    if isinstance(row.get("values"), list):
+        return f"{plugin_id} row: {' | '.join(str(value)[:40] for value in row['values'][:5])}"[
+            :160
+        ]
     if "commit" in row or tool_name.lower().find("commit") >= 0:
         message = (
             row.get("commit", {}).get("message")
@@ -130,45 +353,140 @@ def _summary_for_row(plugin_id: str, tool_name: str, row: dict[str, Any]) -> str
     return f"{plugin_id} observation via {tool_name}"
 
 
-def _generic_status_events(plugin_id: str, row: dict[str, Any]) -> list[dict[str, Any]]:
-    """Status and duration hints only. They are activity, never a verified outcome."""
-    events: list[dict[str, Any]] = []
-    observed = _observed_at(row)
-    status = str(row.get("status") or row.get("state") or row.get("outcome") or "").lower()
+def _generic_observations(
+    plugin_id: str,
+    tool_name: str,
+    row: dict[str, Any],
+    source_uri: str | None,
+    connected_account_id: str,
+    external_id: str,
+) -> list[dict[str, Any]]:
+    """Preserve source facts without promoting activity into a verified outcome."""
+    status = str(row.get("status") or row.get("state") or "").lower()
+    tokens = tool_name.lower()
+    scheduled = ("calendar" in tokens or "event" in tokens) and bool(row.get("start"))
+    activity = bool(
+        status in {"completed", "done", "sent", "merged", "closed"}
+        or any(word in tokens for word in ("activit", "commit", "message", "event"))
+    )
+    classification = "raw_content" if scheduled or not activity else "observed_activity"
+    metric: str | None = None
+    numeric_value: float | None = None
+    unit: str | None = None
+    measured_number = row.get("numeric_value")
+    measured = isinstance(measured_number, (int, float)) and not isinstance(measured_number, bool)
+    if isinstance(measured_number, (int, float)) and not isinstance(measured_number, bool):
+        numeric_value = float(measured_number)
+        if row.get("metric"):
+            metric = str(row["metric"])
+        if isinstance(row.get("unit"), str) and row["unit"]:
+            unit = str(row["unit"])
+    elif classification == "observed_activity":
+        for key, inferred_unit in (
+            ("distance_meters", "m"),
+            ("distance_km", "km"),
+            ("distance_miles", "mi"),
+            ("distance", None),
+        ):
+            value = row.get(key)
+            candidate_unit = inferred_unit or row.get("distance_unit") or row.get("unit")
+            if (
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and value >= 0
+                and candidate_unit in {"m", "km", "mi", "meters", "kilometers", "miles"}
+            ):
+                metric, numeric_value, unit = "distance", float(value), str(candidate_unit)
+                break
+    if measured and metric and numeric_value is not None:
+        summary_text = f"{metric}: {numeric_value:g}"
+        if unit:
+            summary_text = f"{summary_text} {unit}"
+    else:
+        summary_text = None
+    summary = str(
+        summary_text
+        or row.get("title")
+        or row.get("summary")
+        or row.get("name")
+        or row.get("subject")
+        or row.get("text")
+        or (
+            _summary_for_row(plugin_id, tool_name, row)
+            if isinstance(row.get("values"), list)
+            else None
+        )
+        or f"{plugin_id} record"
+    )[:160]
+    return [
+        {
+            "event_type": "scheduled_event"
+            if scheduled
+            else "source_activity"
+            if activity
+            else "source_content",
+            "domain": plugin_id,
+            "metric": metric,
+            "numeric_value": numeric_value,
+            "unit": unit,
+            "categorical_value": status or None,
+            "observed_at": _observed_at(row),
+            "summary": summary,
+            "provider": plugin_id,
+            "connected_account_id": connected_account_id,
+            "resource_id": source_uri,
+            "source_event_id": external_id,
+            "activity_type": "scheduled_event"
+            if scheduled
+            else "activity"
+            if activity
+            else "content",
+            "classification": classification,
+            "validation_status": "unverified",
+            "ingested_at": datetime.now(UTC).isoformat(),
+            "provenance": {
+                "tool": tool_name,
+                "raw_id": external_id,
+                "promotes_to_verified_outcome": False,
+            },
+        }
+    ]
+
+
+def _legacy_status_events(plugin_id: str, row: dict[str, Any]) -> list[dict[str, Any]]:
+    """Retain the existing Notion task fixture semantics without inferring outcomes."""
+    status = str(row.get("status") or row.get("state") or "").lower()
     planned = row.get("planned_duration") or row.get("duration_planned") or row.get("planned_hours")
     actual = row.get("actual_duration") or row.get("duration_actual") or row.get("hours")
     if status in {
-        "completed", "done", "attended", "kept", "missed", "skipped", "no-show", "cancelled"
+        "completed",
+        "done",
+        "attended",
+        "kept",
+        "missed",
+        "skipped",
+        "no-show",
+        "cancelled",
     }:
-        events.append(
-            {
-                "event_type": "source_activity",
-                "domain": str(row.get("domain") or plugin_id),
-                "metric": str(row.get("metric") or "activity_status"),
-                "numeric_value": actual,
-                "categorical_value": status,
-                "unit": str(row.get("unit") or "hours") if actual is not None else None,
-                "observed_at": observed,
-                "summary": str(row.get("title") or row.get("name") or "Source activity"),
-                "classification": "observed_activity",
-                "validation_status": "unverified",
-                "provenance": {"promotes_to_verified_outcome": False},
-            }
-        )
+        event_type, value, category = "source_activity", actual, status
     elif planned is not None:
-        events.append(
-            {
-                "event_type": "source_plan",
-                "domain": str(row.get("domain") or plugin_id),
-                "metric": str(row.get("metric") or "duration_planned"),
-                "numeric_value": planned,
-                "categorical_value": "planned",
-                "unit": str(row.get("unit") or "hours"),
-                "observed_at": observed,
-                "summary": str(row.get("title") or row.get("name") or "Source plan"),
-                "classification": "observed_activity",
-                "validation_status": "unverified",
-                "provenance": {"promotes_to_verified_outcome": False},
-            }
-        )
-    return events
+        event_type, value, category = "source_plan", planned, "planned"
+    else:
+        return []
+    return [
+        {
+            "event_type": event_type,
+            "domain": str(row.get("domain") or plugin_id),
+            "metric": str(
+                row.get("metric") or ("activity_status" if status else "duration_planned")
+            ),
+            "numeric_value": value,
+            "categorical_value": category,
+            "unit": str(row.get("unit") or "hours") if value is not None else None,
+            "observed_at": _observed_at(row),
+            "summary": str(row.get("title") or row.get("name") or "Source activity"),
+            "classification": "observed_activity",
+            "validation_status": "unverified",
+            "provenance": {"promotes_to_verified_outcome": False},
+        }
+    ]

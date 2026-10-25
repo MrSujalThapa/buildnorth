@@ -30,7 +30,10 @@ class ComposioTransport:
     async def list_tools(self) -> list[MCPToolDescriptor]:
         if not self._gateway.available:
             return await self._fallback.list_tools()
-        return await self._gateway.list_tools(self._user_id, self._plugin_id, limit=500)
+        return await self._gateway.list_tools(
+            self._user_id, self._plugin_id, limit=500,
+            connected_account_id=self._connected_account_id,
+        )
 
     async def list_resources(self) -> list[MCPResourceDescriptor]:
         if not self._gateway.available:
@@ -67,6 +70,11 @@ class ComposioTransport:
             or payload.get("data")
             or payload.get("commits")
             or payload.get("repositories")
+            or payload.get("messages")
+            or payload.get("activities")
+            or payload.get("events")
+            or payload.get("files")
+            or payload.get("values")
             or []
         )
         return {"records": records, "raw": payload}
