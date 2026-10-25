@@ -56,3 +56,13 @@
 .ws-readout div i { width: 8px; height: 8px; border-radius: 50%; }
 .ws-readout div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-readout strong { font-variant-numeric: tabular-nums; }
+
+/* Polymarket-style series header: each line's name with its current value, large and legible. */
+.ws-chart-multi .ws-legend { gap: 8px 22px; font-size: 13.5px; }
+.ws-chart-multi .ws-legend button, .ws-chart-multi .ws-legend-static { gap: 8px; max-width: 420px; }
+.ws-chart-multi .ws-legend-label { color: var(--app-ink, var(--market-text, #20211f)); font-weight: 500; }
+.ws-chart-multi .ws-legend strong { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.ws-chart-multi .ws-legend em { font-size: 12.5px; font-weight: 600; }
+.ws-chart-multi .ws-legend i { width: 11px; height: 11px; }
+.ws-chart-multi .recharts-cartesian-axis-tick text { font-size: 12px; }
+.theme-dark .ws-chart-multi { --market-scenario-region: rgba(255,255,255,.035); }

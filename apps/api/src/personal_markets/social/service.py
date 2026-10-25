@@ -12,6 +12,8 @@ from personal_markets.social.blueprint import (
     build_public_blueprint,
     fork_goal,
     history_points,
+    reviewed_blueprint,
+    success_summary,
 )
 from personal_markets.social.domain import (
     ActivityDay,
@@ -20,6 +22,7 @@ from personal_markets.social.domain import (
     PublicBlueprint,
     PublicCreator,
     PublicForecastState,
+    PublicHistoryPoint,
     PublicMarketCard,
     PublicMarketDetail,
     PublicProfile,
@@ -30,6 +33,33 @@ from personal_markets.social.repository import SocialRepository
 
 def _handle(user_id: UUID, profile: UserProfile) -> str:
     return profile.username or str(user_id)
+
+
+def _carried_fields(success: dict[str, Any], requirements: dict[str, Any]) -> list[str]:
+    fields = ["title", "deadline"]
+    if success:
+        fields.append("success_criteria")
+    for key, name in (
+        ("description", "description"),
+        ("milestones", "milestones"),
+        ("strategy", "strategy"),
+    ):
+        if success.get(key):
+            fields.append(name)
+    if requirements.get("life_area"):
+        fields.append("category")
+    if isinstance(requirements.get("forecast_spec"), dict):
+        fields.append("forecast_spec")
+    return fields
+
+
+def _forecast_with_history(
+    forecast: PublicForecastState, history: list[PublicHistoryPoint]
+) -> PublicForecastState:
+    """Published history implies a published market when no later decision exists."""
+    if forecast.status == "unpublished" and history:
+        return PublicForecastState(status="published")
+    return forecast
 
 
 class SocialService:
@@ -155,32 +185,15 @@ class SocialService:
             if owner_id not in creators:
                 creators[owner_id] = await self._creator(owner_id)
             history = history_points(histories.get(row["id"], []))
-            blueprint_data = row.get("public_blueprint_json") or {}
-            raw_forecast = (
-                blueprint_data.get("forecast") if isinstance(blueprint_data, dict) else None
-            )
-            try:
-                forecast = PublicForecastState.model_validate(
-                    raw_forecast or {"status": "unpublished"}
-                )
-            except Exception:
-                forecast = PublicForecastState(status="unpublished")
+            blueprint = self._blueprint_for_viewer(row, viewer_id)
+            forecast = _forecast_with_history(blueprint.forecast, history)
             latest = history[-1].probability if history and forecast.status == "published" else None
             cards.append(
                 PublicMarketCard(
                     goal_id=row["id"],
                     title=row["title"],
-                    description=str(blueprint_data.get("description") or "")
-                    if isinstance(blueprint_data, dict)
-                    else "",
-                    category=str(
-                        (
-                            blueprint_data.get("category")
-                            if isinstance(blueprint_data, dict)
-                            else None
-                        )
-                        or row["goal_type"]
-                    ),
+                    description=blueprint.description,
+                    category=blueprint.category or str(row["goal_type"]),
                     visibility="public" if row.get("visibility") == "public" else "private",
                     creator=creators[owner_id],
                     star_count=stars.get(row["id"], 0),
@@ -209,7 +222,11 @@ class SocialService:
             creator = await self._creator(source["user_id"])
             handle = creator.handle
             title = source["title"]
+        requirements = row.get("model_requirements_json")
+        metadata = requirements.get("forked_blueprint") if isinstance(requirements, dict) else None
+        carried = metadata.get("carried_fields") if isinstance(metadata, dict) else None
         return ForkProvenance(
+            carried_fields=[str(item) for item in carried] if isinstance(carried, list) else [],
             source_goal_id=source_id,
             source_user_id=source_user,
             source_handle=handle,
@@ -256,14 +273,12 @@ class SocialService:
 
     @staticmethod
     def _reviewed_blueprint(row: dict[str, Any]) -> PublicBlueprint:
-        stored = row.get("public_blueprint_json")
-        if isinstance(stored, dict) and stored:
-            return PublicBlueprint.model_validate(stored)
-        return PublicBlueprint(
-            title=str(row["title"]),
-            category=str(row["goal_type"]),
-            forecast=PublicForecastState(status="unpublished"),
-        )
+        return reviewed_blueprint(row, live=False)
+
+    @staticmethod
+    def _blueprint_for_viewer(row: dict[str, Any], viewer_id: UUID | None) -> PublicBlueprint:
+        owner_private = viewer_id == row["user_id"] and row.get("visibility") != "public"
+        return reviewed_blueprint(row, live=owner_private)
 
     async def public_market(self, goal_id: UUID, viewer_id: UUID | None) -> PublicMarketDetail:
         row = await self._repository.get_goal_row(goal_id)
@@ -274,7 +289,9 @@ class SocialService:
             raise ResourceNotFoundError("Market was not found")
         cards = await self._cards_from_rows([row], viewer_id)
         card = cards[0]
-        blueprint = self._reviewed_blueprint(row)
+        blueprint = self._blueprint_for_viewer(row, viewer_id).model_copy(
+            update={"forecast": card.forecast}
+        )
         return PublicMarketDetail(
             **card.model_dump(),
             blueprint=blueprint,
@@ -402,11 +419,28 @@ class SocialService:
         source = await self._goals.get_goal(source_goal_id)
         metric = blueprint.success_criteria.get("metric")
         state_dimensions = [metric] if isinstance(metric, str) and metric else ["progress"]
+        reviewed_requirements: dict[str, Any] = dict(blueprint.model_configuration)
+        if blueprint.category and blueprint.category != source.goal_type.value:
+            reviewed_requirements["life_area"] = blueprint.category
+        if "forecast_spec" in source.model_requirements:
+            reviewed_requirements["forecast_spec"] = source.model_requirements["forecast_spec"]
+        reviewed_success = dict(blueprint.success_criteria)
+        generated = success_summary(blueprint.success_criteria, blueprint.deadline)
+        if (
+            blueprint.description
+            and blueprint.description != generated
+            and not reviewed_success.get("description")
+        ):
+            reviewed_success["description"] = blueprint.description
+        if blueprint.milestones and not reviewed_success.get("milestones"):
+            reviewed_success["milestones"] = blueprint.milestones
+        if blueprint.strategies and not reviewed_success.get("strategy"):
+            reviewed_success["strategy"] = blueprint.strategies[0]
         reviewed_source = source.model_copy(
             update={
                 "title": blueprint.title,
-                "success_definition": blueprint.success_criteria,
-                "model_requirements": blueprint.model_configuration,
+                "success_definition": reviewed_success,
+                "model_requirements": reviewed_requirements,
                 "state_dimensions": state_dimensions,
             }
         )
@@ -414,6 +448,20 @@ class SocialService:
         reviewed_deadline = deadline or blueprint.deadline or datetime.now(UTC) + timedelta(days=90)
         forked = fork_goal(
             reviewed_source, owner_title=title, deadline=reviewed_deadline, new_goal_id=new_id
+        )
+        carried = _carried_fields(forked.success_definition, forked.model_requirements)
+        forked = forked.model_copy(
+            update={
+                "model_requirements": {
+                    **forked.model_requirements,
+                    "forked_blueprint": {
+                        "source_goal_id": str(source_goal_id),
+                        "source_title": blueprint.title,
+                        "carried_fields": carried,
+                        "forked_at": datetime.now(UTC).isoformat(),
+                    },
+                }
+            }
         )
         stored, created = await self._repository.create_fork(
             goal_id=forked.goal_id,
@@ -437,6 +485,7 @@ class SocialService:
             "created": created,
             "visibility": "private",
             "forked_from": str(source_goal_id),
+            "carried_fields": carried,
         }
 
     async def record_goal_created(self, user_id: UUID, goal_id: UUID) -> None:

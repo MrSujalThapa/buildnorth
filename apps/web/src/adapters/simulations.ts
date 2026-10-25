@@ -1,3 +1,4 @@
+import type { ReverseBlueprint } from "../api/client";
 import type { GoalPath, Market } from "./templateTypes";
 
 export type ClusterTone = "positive" | "neutral" | "negative";
@@ -59,6 +60,8 @@ export type PathStrategy = GoalPath & {
     odds: number;
     cost: number;
   }>;
+  /** Reverse search blueprint, carried on the first path of a search result. */
+  blueprint?: ReverseBlueprint | null;
 };
 
 export function pathAxes(market?: Market): { x: AxisSpec; y: AxisSpec } {

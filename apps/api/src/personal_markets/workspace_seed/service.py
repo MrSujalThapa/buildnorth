@@ -29,6 +29,7 @@ from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
 from personal_markets.ports import CriticArtifact, EvidenceEventProposal, GoalArchitectProposal
 from personal_markets.workspace_seed.fixtures import (
+    ACTIVITY_READINGS,
     MARKETPLACE_ONLY_GOALS,
     SEED_COLLECTIONS,
     SEED_GOALS,
@@ -164,7 +165,15 @@ class WorkspaceSeedService:
             )
             created[seed.key] = goal_id
             if goal_id in active_ids:
-                summary.append({"key": seed.key, "goal_id": str(goal_id), "status": "exists"})
+                readings = await self._record_activity(owner_id, goal_id, seed, clock)
+                summary.append(
+                    {
+                        "key": seed.key,
+                        "goal_id": str(goal_id),
+                        "status": "exists",
+                        "activity_readings": readings,
+                    }
+                )
                 continue
             goal = await self._goals.create_goal(
                 build_seed_goal(owner_id, seed, clock, generation), owner_id
@@ -176,12 +185,14 @@ class WorkspaceSeedService:
             except Exception:
                 await self._retire_goal(owner_id, goal.goal_id)
                 raise
+            readings = await self._record_activity(owner_id, goal.goal_id, seed, clock)
             summary.append(
                 {
                     "key": seed.key,
                     "goal_id": str(goal.goal_id),
                     "status": "created",
                     "history": points,
+                    "activity_readings": readings,
                 }
             )
         names = {row.name.casefold() for row in await self._collections.list_for(owner_id)}
@@ -263,6 +274,23 @@ class WorkspaceSeedService:
                 actual_quantity=item.actual,
                 observed_at=end + timedelta(days=item.resolved_late_days),
             )
+
+    async def _record_activity(
+        self, owner_id: UUID, goal_id: UUID, seed: SeedGoal, now: datetime
+    ) -> int:
+        """Commit current activity readings; identities are per seed day, so retries dedupe."""
+        readings = ACTIVITY_READINGS.get(seed.key, ())
+        if not readings:
+            return 0
+        prefix = f"seed:{SEED_VERSION}:{goal_id}:{seed.key}:activity:{now.date().isoformat()}"
+        events = [
+            _event(goal_id, seed, item, index, now).model_copy(
+                update={"event_identity": f"{prefix}:{index}"}
+            )
+            for index, item in enumerate(readings)
+        ]
+        await self._evidence.commit(owner_id, goal_id, events, None, [])
+        return len(events)
 
     async def _replay(
         self, owner_id: UUID, goal: GoalContract, seed: SeedGoal, now: datetime

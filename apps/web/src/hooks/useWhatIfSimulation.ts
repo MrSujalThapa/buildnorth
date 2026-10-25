@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   type Goal,
+  type ParsedInterventionChange,
+  type StrategyLever,
   type WhatIfAssumption,
   type WhatIfBaselineState,
   type WhatIfResult,
@@ -172,7 +174,7 @@ export function useWhatIfSimulation(
         const qualitative = parsed.request_kind && parsed.request_kind !== "quantitative_scenario";
         if (qualitative || !parsed.changes.length || parsed.pricing_status !== "PRICED") {
           persistSimulation.reset();
-          if (parsed.insights?.length || parsed.confirmation_needed) {
+          if (parsed.insights?.length || parsed.confirmation_needed || parsed.strategy_plan) {
             setInterpretationMessage(null);
             return;
           }
@@ -198,6 +200,35 @@ export function useWhatIfSimulation(
     });
   }
 
+  /** Runs a lever value the user picked from a strategy plan; the quantity is theirs, not inferred. */
+  function runPlannedChange(title: string, lever: StrategyLever, amount: number) {
+    if (!request || !(amount > 0)) return;
+    const change: ParsedInterventionChange = {
+      metric: lever.assumption,
+      operation: "add",
+      value: amount,
+      unit: lever.unit,
+      frequency: null,
+      scope: "goal_state",
+      provenance: "USER_ASSUMPTION",
+    };
+    setInterpretationMessage(null);
+    setLastParse((prior) =>
+      prior?.strategy_plan
+        ? {
+            ...prior,
+            changes: [change],
+            pricing_status: "PRICED",
+            strategy_plan: { ...prior.strategy_plan, modeled: true, stated_quantity: amount, needs: [] },
+          }
+        : prior,
+    );
+    persistSimulation.mutate(
+      { ...request, parsed_changes: [change], intervention: { ...request.intervention, title } },
+      { onSuccess: () => options?.onScenarioPersisted?.() },
+    );
+  }
+
   useEffect(() => {
     if (request && pendingScenario.current) {
       const text = pendingScenario.current;
@@ -219,6 +250,7 @@ export function useWhatIfSimulation(
     preview,
     request,
     runScenario,
+    runPlannedChange,
     assumptions,
   };
 }

@@ -29,11 +29,9 @@ from personal_markets.what_if.baseline_state import (
 )
 from personal_markets.what_if.domain import (
     ActionFrontierResult,
-    Assumption,
     ContinuousSearchVariable,
     DistributionBin,
     FrontierPoint,
-    InterventionChangeInput,
     MarketHistoryPointResponse,
     PathComparisonItem,
     PathComparisonRequest,
@@ -70,21 +68,14 @@ from personal_markets.what_if.resources import (
     execution_scale_for_budget,
     opportunity_cost_messages,
 )
+from personal_markets.what_if.reverse_blueprint import (
+    BlueprintInputs,
+    LeverSpec,
+    build_reverse_blueprint,
+)
+from personal_markets.what_if.reverse_search import REVERSE_LEVER_NAMES, ReverseSearch
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
-
-# Bisection steps over a lever's [minimum, maximum]; 12 resolves a 0–50/week range to ~0.01.
-TARGET_SEARCH_BISECTIONS = 12
-
-
-def _target_lever_label(assumption: Assumption, value: float) -> str:
-    if assumption.name == "flow" and assumption.unit == "currency/month":
-        return f"Contribute {value:,.0f} each month"
-    if assumption.name == "flow" and assumption.unit == "seconds/week":
-        return f"Change weekly pace trend to {value:,.1f} seconds"
-    if assumption.name == "weekly_application_rate":
-        return f"Submit {value:,.0f} applications each week"
-    return f"Set {assumption.name.replace('_', ' ')} to {value:.4g} {assumption.unit}"
 
 
 class WhatIfService:
@@ -913,6 +904,7 @@ class WhatIfService:
         current = baseline.baseline_probability or 0
         gap = max(0, (request.target_probability - current) * 100)
         request = await self._ensure_search_levers(request)
+        levers = self._search_levers(request)
         if current + request.probability_tolerance >= request.target_probability:
             return TargetSearchResult(
                 target_probability=request.target_probability,
@@ -920,6 +912,15 @@ class WhatIfService:
                 gap_pp=gap,
                 feasible=True,
                 message="Target odds are already satisfied under the current assumptions.",
+                blueprint=build_reverse_blueprint(
+                    BlueprintInputs(
+                        target=request.target_probability,
+                        baseline=current,
+                        tolerance=request.probability_tolerance,
+                        follow_through=baseline.execution_probability,
+                        levers=tuple(levers),
+                    )
+                ),
                 paths=[
                     TargetPath(
                         label="No change required",
@@ -943,12 +944,7 @@ class WhatIfService:
         supported_candidates = [
             candidate for candidate in request.candidates if candidate.effect_per_unit is not None
         ]
-        supported_assumptions = {
-            item.name
-            for item in request.base.assumptions
-            if item.name in {"flow", "weekly_application_rate"} and item.maximum > item.value
-        }
-        if not supported_candidates and not supported_assumptions:
+        if not supported_candidates and not levers:
             result = TargetSearchResult(
                 target_probability=request.target_probability,
                 current_probability=current,
@@ -963,12 +959,31 @@ class WhatIfService:
             )
             return await self._persist_target_search(request, result)
         request = request.model_copy(update={"candidates": supported_candidates})
-        paths = await self._discrete_target_paths(request, current)
-        paths.extend(await self._assumption_setpoint_paths(request, current))
-        if request.continuous_variable is not None:
-            continuous = await self._continuous_target_path(request)
-            if continuous is not None:
-                paths.append(continuous)
+        search = ReverseSearch(
+            simulate=lambda item: self._simulate(item, persist=False),
+            bundle_intervention=self._bundle_intervention,
+            limits=self._limits(request),
+            request=request,
+            current=current,
+        )
+        bundles = await search.price_bundles()
+        scans = [await search.scan(lever) for lever in levers]
+        scans = await search.solve_levers(scans)
+        await search.combine(scans, bundles)
+        blueprint = build_reverse_blueprint(
+            BlueprintInputs(
+                target=request.target_probability,
+                baseline=current,
+                tolerance=request.probability_tolerance,
+                options=tuple(search.options),
+                scans=tuple(scan for scan in scans if scan.points),
+                follow_through=search.follow_through
+                if search.follow_through is not None
+                else baseline.execution_probability,
+                levers=tuple(levers),
+            )
+        )
+        paths = search.feasible_paths()
         candidate_ids = {candidate.id for candidate in request.candidates}
         paths.sort(
             key=lambda item: (
@@ -989,6 +1004,7 @@ class WhatIfService:
             ),
             paths=paths[:3],
             search_method="bounded_enumeration_and_binary_search",
+            blueprint=blueprint,
         )
         return await self._persist_target_search(request, result)
 
@@ -1225,185 +1241,33 @@ class WhatIfService:
             return request
         return request.model_copy(update=updates)
 
-    async def _assumption_setpoint_paths(
-        self, request: TargetSearchRequest, current: float
-    ) -> list[TargetPath]:
-        paths: list[TargetPath] = []
-        for name in ("flow", "weekly_application_rate"):
-            assumption = next(
-                (item for item in request.base.assumptions if item.name == name),
-                None,
-            )
-            if assumption is None:
-                continue
-            span = assumption.maximum - assumption.value
-            if span <= 0:
-                continue
-            for fraction in (0.4, 0.85):
-                value = assumption.value + span * fraction
-                change = InterventionChangeInput(
-                    metric=name,
-                    operation="set",
-                    value=value,
-                    unit=assumption.unit,
-                    provenance="EXPLORATION_ASSUMPTION",
-                )
-                changed = apply_parsed_changes_to_assumptions(
-                    request.base.assumptions,
-                    [InterventionChangeResponse.model_validate(change.model_dump())],
-                )
-                priced = await self._simulate(
-                    request.base.model_copy(
-                        update={
-                            "assumptions": changed,
-                            "parsed_changes": [change],
-                            "intervention": None,
-                        }
-                    ),
-                    persist=False,
-                )
-                if priced.scenario_probability is None:
-                    continue
-                if priced.scenario_probability <= current + 1e-9:
-                    continue
-                if (
-                    priced.scenario_probability + request.probability_tolerance
-                    < request.target_probability
-                ):
-                    continue
-                paths.append(
-                    TargetPath(
-                        label=_target_lever_label(assumption, value),
-                        action_ids=[f"lever:{name}:{fraction}"],
-                        resulting_probability=priced.scenario_probability,
-                        resource_cost=ResourceCost(),
-                        assumptions=changed,
-                        fragility_pp=priced.fragility_pp,
-                        valid_because=(
-                            "This model-parameter setting reaches the target; "
-                            "required real-world effort is not estimated."
-                        ),
-                        model_provenance={
-                            "family": "assumption_lever",
-                            "version": "1.0.0",
-                        },
-                    )
-                )
-        return paths
-
-    async def _discrete_target_paths(
-        self, request: TargetSearchRequest, current: float
-    ) -> list[TargetPath]:
-        bundles = ActionOptimizer().enumerate(request.candidates, self._limits(request))
-        paths: list[TargetPath] = []
-        for bundle in bundles:
-            intervention = self._bundle_intervention(
-                bundle.actions, bundle.expected_effect, bundle.cost
-            )
-            priced = await self._simulate(
-                request.base.model_copy(update={"intervention": intervention}), persist=False
-            )
-            if priced.scenario_probability is None:
-                continue
-            if (
-                priced.scenario_probability + request.probability_tolerance
-                < request.target_probability
-            ):
-                continue
-            verified = await self._simulate(
-                request.base.model_copy(update={"intervention": intervention}), persist=False
-            )
-            if verified.scenario_probability is None:
-                continue
-            probability = verified.scenario_probability
-            if probability + request.probability_tolerance < request.target_probability:
-                continue
-            paths.append(
-                TargetPath(
-                    label=" + ".join(action.title for action in bundle.actions),
-                    action_ids=[action.id for action in bundle.actions],
-                    resulting_probability=probability,
-                    resource_cost=bundle.cost,
-                    assumptions=request.base.assumptions,
-                    fragility_pp=verified.fragility_pp,
-                    valid_because=(
-                        "Feasible bundle was re-simulated with the fixed seed and clears tolerance."
-                    ),
-                    model_provenance={
-                        "family": "continuous_target_transition",
-                        "version": "1.0.0",
-                    },
-                )
-            )
-        return paths
-
-    async def _continuous_target_path(self, request: TargetSearchRequest) -> TargetPath | None:
-        variable = request.continuous_variable
-        assert variable is not None
+    @staticmethod
+    def _search_levers(request: TargetSearchRequest) -> list[LeverSpec]:
+        """Searchable model levers, in the order the old search tried them."""
+        names = list(REVERSE_LEVER_NAMES)
+        if request.continuous_variable is not None and (
+            request.continuous_variable.assumption not in names
+        ):
+            names.append(request.continuous_variable.assumption)
         indexed = {item.name: item for item in request.base.assumptions}
-        assumption = indexed.get(variable.assumption)
-        if assumption is None:
-            return None
-        low, high = assumption.minimum, assumption.maximum
-        best: float | None = None
-
-        def setpoint(value: float) -> WhatIfRequest:
-            # Same semantics as setpoint paths and Compare: the lever is a scenario
-            # change subject to follow-through, not a rewritten baseline.
-            change = InterventionChangeInput(
-                metric=assumption.name,
-                operation="set",
-                value=value,
-                unit=assumption.unit,
-                provenance="EXPLORATION_ASSUMPTION",
-            )
-            changed = apply_parsed_changes_to_assumptions(
-                request.base.assumptions,
-                [InterventionChangeResponse.model_validate(change.model_dump())],
-            )
-            return request.base.model_copy(
-                update={"assumptions": changed, "parsed_changes": [change], "intervention": None}
-            )
-
-        for _ in range(TARGET_SEARCH_BISECTIONS):
-            midpoint = (low + high) / 2
-            priced = await self._simulate(setpoint(midpoint), persist=False)
-            if priced.scenario_probability is None:
-                low = midpoint
+        levers: list[LeverSpec] = []
+        for name in names:
+            assumption = indexed.get(name)
+            if assumption is None or not assumption.editable:
                 continue
-            reaches = (
-                priced.scenario_probability + request.probability_tolerance
-                >= request.target_probability
+            if assumption.maximum <= assumption.minimum:
+                continue
+            levers.append(
+                LeverSpec(
+                    lever_id=assumption.name,
+                    unit=assumption.unit,
+                    baseline=assumption.value,
+                    minimum=assumption.minimum,
+                    maximum=assumption.maximum,
+                    step=assumption.step,
+                )
             )
-            if reaches:
-                best = midpoint
-            if reaches == variable.increasing:
-                high = midpoint
-            else:
-                low = midpoint
-        if best is None:
-            return None
-        verified_request = setpoint(best)
-        changed = verified_request.assumptions
-        verified = await self._simulate(verified_request, persist=False)
-        probability = verified.scenario_probability
-        if probability is None:
-            return None
-        if probability + request.probability_tolerance < request.target_probability:
-            return None
-        return TargetPath(
-            label=_target_lever_label(assumption, best),
-            action_ids=[],
-            resulting_probability=probability,
-            resource_cost=ResourceCost(),
-            assumptions=changed,
-            fragility_pp=verified.fragility_pp,
-            valid_because="This modeled change came closest to your target in simulation.",
-            model_provenance={
-                "family": "continuous_target_transition",
-                "version": "1.0.0",
-            },
-        )
+        return levers
 
     @staticmethod
     def _bundle_intervention(

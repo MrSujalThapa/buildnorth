@@ -6,7 +6,7 @@ import { formatProbabilityPercent } from "../../adapters/formatProbability";
 import { formatOutcome } from "../../adapters/outcomeFormat";
 import type { SimulationPoint } from "../../adapters/simulationTypes";
 import type { ChartPoint, Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
-import type { ParseInterventionResult, Priceability, StrategyInsight } from "../../api/client";
+import type { ParseInterventionResult, Priceability, StrategyInsight, StrategyLever } from "../../api/client";
 import OddsExplorer from "../market/OddsExplorer";
 import type { ProbabilityBranch } from "../market/WealthsimpleAreaChart";
 import { BETTER_SERIES_COLOR, ORIGINAL_SERIES_COLOR, WORSE_SERIES_COLOR } from "./seriesColors";
@@ -15,6 +15,7 @@ import MissingStatePanel from "./MissingStatePanel";
 import { ScenarioComposer } from "./ScenarioComposer";
 import OutcomeDistribution from "./OutcomeDistribution";
 import OutcomeRangeChart from "./OutcomeRangeChart";
+import StrategyPlanCard from "./StrategyPlanCard";
 
 type TuneCopy = {
   effortLabel: string;
@@ -46,6 +47,7 @@ type Props = {
   publishedOdds?: number | null;
   history?: ChartPoint[];
   parseResult?: ParseInterventionResult | null;
+  onRunPlannedChange?: (title: string, lever: StrategyLever, amount: number) => void;
   onSubmitMissingState?: (
     entries: { key: string; label: string; value: number; unit: string }[],
   ) => void;
@@ -120,6 +122,11 @@ function preciseOdds(value: number | null | undefined): string {
   return value == null ? "—" : `${Number(value.toFixed(2))}%`;
 }
 
+function branchLabel(question: string): string {
+  const action = question.trim().replace(/^what\s*if\s*/i, "").replace(/\?$/, "");
+  return action ? `What if ${action}` : "What if";
+}
+
 function scenarioPlainLanguage(args: {
   question: string;
   publishedOdds?: number | null;
@@ -158,6 +165,7 @@ export default function ImpactWorkspace({
   publishedOdds,
   history = [],
   parseResult = null,
+  onRunPlannedChange,
   onSubmitMissingState,
   onAddEvidence,
   onConnectSource,
@@ -190,7 +198,7 @@ export default function ImpactWorkspace({
           },
           {
             id: "what-if",
-            label: question.trim() ? `What if: ${question.trim()}` : "What if",
+            label: branchLabel(question),
             color: resultPositive ? BETTER_SERIES_COLOR : WORSE_SERIES_COLOR,
             start: preview.currentOdds,
             end: preview.scenarioOdds,
@@ -225,7 +233,12 @@ export default function ImpactWorkspace({
     </div>
   );
   const insights = parseResult?.insights ?? [];
-  const qualitativeKind = parseResult?.request_kind && parseResult.request_kind !== "quantitative_scenario";
+  const strategyPlan = parseResult?.strategy_plan ?? null;
+  const qualitativeKind =
+    parseResult?.request_kind && parseResult.request_kind !== "quantitative_scenario" && !strategyPlan?.modeled;
+  const planCard = strategyPlan ? (
+    <StrategyPlanCard plan={strategyPlan} question={question} busy={running} onRun={onRunPlannedChange} />
+  ) : null;
   const plainLanguage = scenarioPlainLanguage({ question, publishedOdds, preview });
 
   const outcomeChart = (label: string) => (
@@ -240,7 +253,7 @@ export default function ImpactWorkspace({
   );
 
   let unpricedPanel;
-  if (insights.length) {
+  if (insights.length || (strategyPlan && !strategyPlan.modeled)) {
     unpricedPanel = null;
   } else if (priceability && priceability.status !== "PRICED" && onSubmitMissingState) {
     unpricedPanel = (
@@ -316,6 +329,7 @@ export default function ImpactWorkspace({
           </aside>
 
           <section className="result-panel">
+            {planCard}
             {changeChart}
             {plainLanguage ? <p className="scenario-plain">{plainLanguage}</p> : null}
             {parseResult?.confirmation_needed ? (
@@ -393,6 +407,7 @@ export default function ImpactWorkspace({
             </div>
           </div>
 
+          {planCard}
           {changeChart}
 
           <div className="deep-primary">

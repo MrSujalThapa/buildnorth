@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -18,6 +19,8 @@ PUBLIC_SUCCESS_KEYS = frozenset(
         "threshold",
         "unit",
         "target",
+        "value",
+        "amount",
         "description",
         "milestones",
         "strategy",
@@ -92,9 +95,126 @@ def forecast_state_from_requirements(requirements: dict[str, Any]) -> PublicFore
     return PublicForecastState(status="unpublished")
 
 
-def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicBlueprint:
-    success = public_success_definition(goal.success_definition)
-    requirements = public_model_configuration(goal.model_requirements)
+TARGET_KEYS = ("target", "target_value", "threshold", "value", "amount", "seconds")
+CURRENCY_UNITS = frozenset({"$", "usd", "cad", "dollars", "dollar"})
+OPERATOR_VERBS = {
+    ">=": "Reach",
+    "gte": "Reach",
+    "at_least": "Reach",
+    ">": "Exceed",
+    "gt": "Exceed",
+    "<=": "Stay at or under",
+    "lte": "Stay at or under",
+    "at_most": "Stay at or under",
+    "<": "Get under",
+    "lt": "Get under",
+    "==": "Hit",
+    "=": "Hit",
+    "eq": "Hit",
+}
+FORECAST_SPEC_PRIVATE_KEYS = frozenset(
+    {
+        "goal_id",
+        "owner_id",
+        "goal_contract_version",
+        "parameter_provenance",
+        "status",
+    }
+)
+FORECAST_SPEC_EVIDENCE_PARTS = ("evidence", "observation", "observed", "current_value")
+
+
+def forecast_units(model_requirements: dict[str, Any]) -> str | None:
+    spec = model_requirements.get("forecast_spec")
+    if not isinstance(spec, dict):
+        return None
+    units = spec.get("units")
+    if not isinstance(units, str):
+        return None
+    return units.strip()[:60] or None
+
+
+def _format_number(value: Any) -> str:
+    try:
+        number = float(str(value).replace(",", ""))
+    except ValueError:
+        return str(value)
+    if number.is_integer():
+        return f"{int(number):,}"
+    return f"{number:,.2f}".rstrip("0").rstrip(".")
+
+
+def _format_deadline(deadline: datetime) -> str:
+    return f"{deadline:%b} {deadline.day}, {deadline.year}"
+
+
+def success_summary(success: dict[str, Any], deadline: datetime | None) -> str:
+    """Deterministic, public-safe sentence describing the success contract."""
+    by = f" by {_format_deadline(deadline)}" if deadline else ""
+    metric = success.get("metric")
+    target = next((success[key] for key in TARGET_KEYS if success.get(key) is not None), None)
+    if isinstance(metric, str) and metric.strip() and target is not None:
+        words = metric.replace("_", " ").strip()
+        unit = str(success.get("unit") or "").strip()
+        amount = _format_number(target)
+        if unit.lower() in CURRENCY_UNITS:
+            phrase = f"${amount} in {words}"
+        elif unit and unit.lower() in words.lower():
+            phrase = f"{amount} {words}"
+        elif unit:
+            phrase = f"{amount} {unit} of {words}"
+        else:
+            phrase = f"{amount} {words}"
+        verb = OPERATOR_VERBS.get(str(success.get("operator") or "").strip().lower(), "Reach")
+        return f"{verb} {phrase}{by}"
+    event = success.get("event") or success.get("success_event")
+    if isinstance(event, str) and event.strip():
+        return f"Achieve {event.replace('_', ' ').strip()}{by}"
+    return ""
+
+
+def enriched_success_definition(
+    success_definition: dict[str, Any], model_requirements: dict[str, Any]
+) -> dict[str, Any]:
+    success = public_success_definition(success_definition)
+    units = forecast_units(model_requirements)
+    if units and not success.get("unit"):
+        success["unit"] = units
+    return success
+
+
+def _strip_evidence(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _strip_evidence(item)
+            for key, item in value.items()
+            if not any(part in str(key).lower() for part in FORECAST_SPEC_EVIDENCE_PARTS)
+        }
+    if isinstance(value, list):
+        return [_strip_evidence(item) for item in value]
+    return value
+
+
+def public_forecast_spec(model_requirements: dict[str, Any]) -> dict[str, Any] | None:
+    """Model specification without owner identity, lineage, or observed evidence."""
+    spec = model_requirements.get("forecast_spec")
+    if not isinstance(spec, dict) or not spec:
+        return None
+    cleaned = {key: value for key, value in spec.items() if key not in FORECAST_SPEC_PRIVATE_KEYS}
+    return _public_value(_strip_evidence(cleaned))
+
+
+def _blueprint_from_parts(
+    *,
+    title: str,
+    goal_type: str,
+    success_definition: dict[str, Any],
+    deadline: datetime | None,
+    model_requirements: dict[str, Any],
+    description: str = "",
+) -> PublicBlueprint:
+    success = enriched_success_definition(success_definition, model_requirements)
+    requirements = public_model_configuration(model_requirements)
     milestones = success.get("milestones") or requirements.get("milestones") or []
     if not isinstance(milestones, list):
         milestones = []
@@ -107,18 +227,87 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
     if not isinstance(integrations, list):
         integrations = []
     strategy = success.get("strategy") or requirements.get("strategy")
+    text = (
+        description
+        or str(success_definition.get("description") or "")
+        or success_summary(success, deadline)
+    )
     return PublicBlueprint(
-        title=goal.title,
-        description=description or str(goal.success_definition.get("description") or ""),
-        category=str(goal.model_requirements.get("life_area") or goal.goal_type.value),
-        deadline=goal.deadline,
+        title=title,
+        description=text[:2000],
+        category=str(model_requirements.get("life_area") or goal_type),
+        deadline=deadline,
         success_criteria=success,
         milestones=[item for item in milestones if isinstance(item, (str, dict))],
         strategies=[str(strategy)] if strategy else [],
         evidence_types=[str(item) for item in evidence_types],
         suggested_integrations=[str(item) for item in integrations],
         model_configuration=requirements,
-        forecast=forecast_state_from_requirements(goal.model_requirements),
+        forecast=forecast_state_from_requirements(model_requirements),
+    )
+
+
+def _json_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return {}
+    return value if isinstance(value, dict) else {}
+
+
+def blueprint_from_row(row: dict[str, Any]) -> PublicBlueprint:
+    """Live blueprint from goal columns; used for owner views and gap filling."""
+    deadline = row.get("deadline")
+    return _blueprint_from_parts(
+        title=str(row["title"]),
+        goal_type=str(row["goal_type"]),
+        success_definition=_json_dict(row.get("success_definition_json")),
+        deadline=deadline if isinstance(deadline, datetime) else None,
+        model_requirements=_json_dict(row.get("model_requirements_json")),
+    )
+
+
+def reviewed_blueprint(row: dict[str, Any], *, live: bool) -> PublicBlueprint:
+    """Owner (`live`) sees the current goal; visitors see the reviewed snapshot.
+
+    Gaps in an older snapshot are filled from public-safe goal columns, and the
+    forecast state always reflects the latest publication decision.
+    """
+    current = blueprint_from_row(row)
+    if live:
+        return current
+    stored = _json_dict(row.get("public_blueprint_json"))
+    if not stored:
+        return current
+    snapshot = PublicBlueprint.model_validate(stored)
+    updates: dict[str, Any] = {"forecast": current.forecast}
+    if not snapshot.success_criteria:
+        updates["success_criteria"] = current.success_criteria
+    elif not snapshot.success_criteria.get("unit") and current.success_criteria.get("unit"):
+        updates["success_criteria"] = {
+            **snapshot.success_criteria,
+            "unit": current.success_criteria["unit"],
+        }
+    if snapshot.deadline is None:
+        updates["deadline"] = current.deadline
+    if not snapshot.description:
+        criteria = updates.get("success_criteria", snapshot.success_criteria)
+        deadline = updates.get("deadline", snapshot.deadline)
+        updates["description"] = success_summary(criteria, deadline) or current.description
+    if not snapshot.milestones and current.milestones:
+        updates["milestones"] = current.milestones
+    return snapshot.model_copy(update=updates)
+
+
+def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicBlueprint:
+    return _blueprint_from_parts(
+        title=goal.title,
+        goal_type=goal.goal_type.value,
+        success_definition=goal.success_definition,
+        deadline=goal.deadline,
+        model_requirements=goal.model_requirements,
+        description=description,
     )
 
 
@@ -152,6 +341,17 @@ def fork_goal(
     if not success:
         raise ConflictError("This blueprint has no public success criteria to fork")
     requirements = public_model_configuration(source.model_requirements)
+    life_area = source.model_requirements.get("life_area")
+    if isinstance(life_area, str) and life_area.strip():
+        requirements["life_area"] = life_area.strip()[:80]
+    spec = public_forecast_spec(source.model_requirements)
+    if spec is not None:
+        requirements["forecast_spec"] = {
+            **spec,
+            "goal_id": str(new_goal_id),
+            "goal_contract_version": 1,
+            "deadline": chosen_deadline.isoformat(),
+        }
     return GoalContract(
         goal_id=new_goal_id,
         title=title[:200],

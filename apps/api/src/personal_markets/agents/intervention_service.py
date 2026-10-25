@@ -41,6 +41,7 @@ from personal_markets.what_if.intervention_registry import (
     goal_domain,
 )
 from personal_markets.what_if.last_scenario import LastInterventionStore, relative_scale
+from personal_markets.what_if.operationalize import operationalize_strategy, plan_summary
 from personal_markets.what_if.request_intent import ClassifiedRequest, classify_what_if_request
 from personal_markets.what_if.strategy_insights import (
     STRATEGY_KINDS,
@@ -48,6 +49,7 @@ from personal_markets.what_if.strategy_insights import (
     consumer_summary,
     validate_strategy_proposal,
 )
+from personal_markets.what_if.strategy_plan import StrategyPlan
 
 
 class InterventionAgentService:
@@ -85,11 +87,60 @@ class InterventionAgentService:
             resolved = self._resolve_follow_up(goal, text, classified, baseline)
             if resolved is not None:
                 return resolved
+        operational = (
+            operationalize_strategy(baseline, text)
+            if classified.kind in STRATEGY_KINDS or classified.kind == "quantitative_scenario"
+            else None
+        )
         if classified.kind in STRATEGY_KINDS:
-            return await self._parse_strategy(goal, baseline, text, classified, summaries)
+            parsed = await self._parse_strategy(goal, baseline, text, classified, summaries)
+            if operational is None:
+                return parsed
+            plan = operational[0].model_copy(
+                update={
+                    "modeled": False,
+                    "stated_quantity": None,
+                    "needs": [operational[0].levers[0].question],
+                }
+            )
+            summary = parsed.consumer_summary if parsed.insights else plan_summary(plan)
+            return parsed.model_copy(update={"strategy_plan": plan, "consumer_summary": summary})
+        if operational is not None and self.explicit_changes(goal, text) is None:
+            return self._operational_response(text, classified, baseline, *operational)
         if classified.kind != "quantitative_scenario":
             return self._factual_response(text, classified, baseline, summaries, evidence)
         return await self._parse_quantitative(goal, baseline, text, classified, summaries)
+
+    def _operational_response(
+        self,
+        text: str,
+        classified: ClassifiedRequest,
+        baseline: WhatIfBaselineState,
+        plan: StrategyPlan,
+        changes: list[InterventionChangeResponse],
+    ) -> ParseInterventionResponse:
+        if changes:
+            self._remember_changes(UUID(baseline.goal_id), text, changes)
+        return ParseInterventionResponse(
+            raw_text=text,
+            changes=changes,
+            unsupported=[],
+            effect_assigned=False,
+            understood_action=plan.interpretation,
+            mechanism=[],
+            pricing_status="PRICED" if changes else "NOT_PRICED",
+            agent_run_id=None,
+            limitations=[
+                "Mapped deterministically onto a modeled lever; no inference call and no "
+                "assumed effect size."
+            ],
+            research_claims=[],
+            request_kind="quantitative_scenario" if changes else classified.kind,
+            confirmation_needed=False,
+            insights=[],
+            consumer_summary=plan_summary(plan),
+            strategy_plan=plan,
+        )
 
     async def _with_published(
         self, goal_id: UUID, baseline: WhatIfBaselineState

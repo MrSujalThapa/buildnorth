@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ParameterEditor } from "../components/behavior/ParameterEditor";
-import { ParameterRadar } from "../components/behavior/ParameterRadar";
-import { api } from "../api/client";
+import { MeasuredParameterList } from "../components/behavior/MeasuredParameterList";
+import { TraitRadar } from "../components/behavior/TraitRadar";
+import { api, type ProfilePayload } from "../api/client";
 import { useRefreshAccount } from "../auth/AuthGate";
 import ContributionHeatmap from "../components/social/ContributionHeatmap";
 import MarketRepoList from "../components/social/MarketRepoList";
@@ -35,6 +36,13 @@ async function cropPhoto(file: File, x: number, y: number): Promise<File> {
   } finally {
     image.close();
   }
+}
+
+function traitSourceNote(sources: ProfilePayload["trait_sources"]): string | null {
+  if (!sources || sources.cohort === "authentic") return null;
+  return sources.cohort === "workspace_seed"
+    ? `Estimated from ${sources.workspace_seed_trials} commitments in your demo workspace. Your own commitments replace them as they are recorded.`
+    : `Includes ${sources.workspace_seed_trials} demo-workspace commitments alongside ${sources.authentic_trials} of your own.`;
 }
 
 export function ProfileRoute() {
@@ -129,6 +137,7 @@ export function ProfileRoute() {
   if (profile.isError || !profile.data || !account) return <main className="markets-page"><section className="markets-shell"><p role="alert">Profile unavailable.</p></section></main>;
 
   const shownPhoto = pendingRemove ? null : previewUrl || photoUrl;
+  const traitsMeasured = profile.data.traits.traits.some((item) => item.value != null);
 
   function choosePhoto(file: File | undefined) {
     if (!file) return;
@@ -169,7 +178,24 @@ export function ProfileRoute() {
         {tab === "overview" ? (
           <>
             <div className="profile-radar-heading">
-              <h2>Your parameters</h2>
+              <h2>Behavior profile</h2>
+              <span className="profile-radar-meta">
+                {profile.data.traits.trial_count} commitments · {profile.data.traits.evidence_count} observations
+              </span>
+            </div>
+            {traitsMeasured ? (
+              <TraitRadar
+                traits={profile.data.traits.traits}
+                series={profile.data.traits.series}
+                sourceNote={traitSourceNote(profile.data.trait_sources)}
+              />
+            ) : (
+              <p className="profile-radar-pending" role="status">
+                Behavior traits appear after a few planned-versus-done commitments are recorded.
+              </p>
+            )}
+            <div className="profile-radar-heading is-secondary">
+              <h2>Measured activity</h2>
               {profile.data.radar ? (
                 <button type="button" className="markets-select" onClick={() => setEditingParameters(true)}>
                   Edit parameters
@@ -177,11 +203,11 @@ export function ProfileRoute() {
               ) : null}
             </div>
             {profile.data.radar ? (
-              <ParameterRadar profile={profile.data.radar} />
+              <MeasuredParameterList profile={profile.data.radar} />
             ) : (
               <p className="profile-radar-pending" role="status">Measured parameters are unavailable right now.</p>
             )}
-            {(profile.data.radar?.evidence_count ?? 0) === 0 ? (
+            {!traitsMeasured || (profile.data.radar?.evidence_count ?? 0) === 0 ? (
               <div className="profile-seed-row">
                 <button
                   type="button"

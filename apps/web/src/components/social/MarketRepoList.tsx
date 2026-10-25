@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import type { PublicMarketCard } from "../../api/client";
 import { lifeCategoryFromTitle } from "../../features/goals/marketViewModel";
 import MarketSparkline from "../market/MarketSparkline";
+import { VisibilityBadge } from "../market/VisibilityControl";
 
 type Props = {
   items: PublicMarketCard[];
@@ -25,7 +26,7 @@ export default function MarketRepoList({ items, empty }: Props) {
           <div className="repo-copy">
             <h3>
               {market.title}{" "}
-              <span className="visibility-badge">{market.visibility === "public" ? "Public" : "Private"}</span>
+              <VisibilityBadge visibility={market.visibility === "public" ? "public" : "private"} />
             </h3>
             {market.description ? <p className="quiet-copy">{market.description}</p> : null}
             <div className="repo-meta">

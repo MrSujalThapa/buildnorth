@@ -134,16 +134,21 @@ export function toLeverFrontier(
   });
   const answer = search?.feasible ? search.paths[0] : undefined;
   const solved = answer?.assumptions?.find((item) => item.name === lever.name)?.value;
-  if (!answer || solved == null || !search) return points;
+  const blueprint = search?.blueprint ?? null;
+  if (!answer || solved == null || !search) {
+    const [first, ...rest] = points;
+    return blueprint && first ? [{ ...first, blueprint }, ...rest] : points;
+  }
   const clears = answer.resulting_probability >= search.target_probability;
   return [
     {
+      blueprint,
       id: "target-search",
-      label: clears ? `${format(lever, solved)} reaches the target` : `${format(lever, solved)} comes closest`,
+      label: clears ? `${format(lever, solved)} reaches the target` : `${format(lever, solved)} is within ${blueprint?.tolerance_pp ?? 1} pp of the target`,
       odds: answer.resulting_probability * 100,
       requirement: clears
         ? `Smallest setting found by search. ${answer.valid_because}`
-        : `Closest setting found by search; simulation noise keeps it just under the target. ${answer.valid_because}`,
+        : `Smallest setting found by search; it lands inside the search tolerance, just under the target. ${answer.valid_because}`,
       subpaths: [],
       cost: solved,
       fragility: fragilityLabel(answer.fragility_pp),

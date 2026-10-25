@@ -586,6 +586,41 @@ SEED_GOALS: tuple[SeedGoal, ...] = (
     FAMILY_DINNERS,
 )
 
+# Current activity-rate readings, dated relative to each seed call rather than the
+# original seed date, so the Profile's rolling windows (7/30/56 days) stay measured.
+# Committed as ordinary evidence; forecasts are not republished for them.
+ACTIVITY_READINGS: dict[str, tuple[SeedObservation, ...]] = {
+    "fde_offer": (
+        SeedObservation(
+            1, "applications_per_week", 8, "applications/week", "Applications this week: 8",
+            kind="period", domain="career",
+        ),
+        SeedObservation(
+            1, "study_hours_per_week", 11, "hours/week", "Interview prep this week: 11 hours",
+            kind="period", domain="career",
+        ),
+    ),
+    "run_10k": (
+        SeedObservation(
+            2, "weekly_distance_km", 31, "km/week", "Ran 31 km this week",
+            kind="period", domain="fitness",
+        ),
+    ),
+    "net_worth": (
+        SeedObservation(
+            3, "monthly_contribution", 1800, "USD/month", "Saved $1,800 this month",
+            kind="period", domain="finance",
+        ),
+    ),
+    "reading": tuple(
+        SeedObservation(
+            days, "reading_minutes", minutes, "minutes", f"Read for {minutes:g} minutes",
+            kind="increment", domain="reading",
+        )
+        for days, minutes in ((1, 40), (3, 55), (6, 35), (10, 60), (15, 45), (21, 50))
+    ),
+}
+
 # Published only by dedicated marketplace demo accounts, never the user's own workspace.
 MARKETPLACE_ONLY_GOALS: tuple[SeedGoal, ...] = (ML_COURSE, MEDITATION)
 

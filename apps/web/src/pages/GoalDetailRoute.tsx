@@ -8,6 +8,7 @@ import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewMod
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
 import VisibilityControl from "../components/market/VisibilityControl";
+import ForkedBlueprintPanel from "../components/social/ForkedBlueprintPanel";
 import { StrategyLearningPanel } from "../features/goals/StrategyLearningPanel";
 import "../components/social/social.css";
 
@@ -17,6 +18,7 @@ export function GoalDetailRoute() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const initialSnapshot = (location.state as { snapshot?: WorkflowSnapshot } | null)?.snapshot ?? null;
+  const justForked = new URLSearchParams(location.search).get("forked") === "1";
   const [workflowSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
   const [evidenceAnswers, setEvidenceAnswers] = useState<Record<string, string>>({});
   const [publishOpen, setPublishOpen] = useState(false);
@@ -144,6 +146,15 @@ export function GoalDetailRoute() {
           }).catch(() => setShareNote("Could not share this market."));
         }}
       >
+        {justForked && social.data?.fork ? (
+          <ForkedBlueprintPanel
+            fork={social.data.fork}
+            goal={goal.data}
+            onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}
+            onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
+            onDismiss={() => { void navigate(`/goals/${goalId}`, { replace: true }); }}
+          />
+        ) : null}
         {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
         {goalId ? <StrategyLearningPanel goalId={goalId} /> : null}
         {latestWorkflow?.status === "evidence_pending" || latestWorkflow?.status === "evidence_running" ? (
@@ -201,7 +212,7 @@ export function GoalDetailRoute() {
               >
                 {social.data?.visibility === "public" ? "Make private" : "Publish"}
               </button>
-              <button type="button" className="secondary" onClick={() => setPublishOpen(false)}>Cancel</button>
+              <button type="button" className="ui-button ui-button-secondary" onClick={() => setPublishOpen(false)}>Cancel</button>
             </div>
           </div>
         </div>

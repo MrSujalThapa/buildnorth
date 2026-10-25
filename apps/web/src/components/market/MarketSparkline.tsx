@@ -15,7 +15,13 @@ export default function MarketSparkline({ history, withheld = false }: Props) {
       </div>
     );
   }
-  if (history.length <= 2) return <SparsePublicHistory history={history} compact />;
+  if (history.length <= 2) {
+    return (
+      <div className="market-sparkline is-sparse">
+        <SparsePublicHistory history={history} compact />
+      </div>
+    );
+  }
   return (
     <div className="market-sparkline">
       <WealthsimpleAreaChart data={history} interactive={false} />

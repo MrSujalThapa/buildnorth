@@ -35,7 +35,13 @@ from personal_markets.identity.domain import (
 )
 from personal_markets.identity.factory import get_identity_service, get_inference_budget_service
 from personal_markets.identity.service import IdentityService
-from personal_markets.profile.parameters import BY_ID, DEFAULT_IDS, PRESETS, parameter_profile
+from personal_markets.profile.parameters import (
+    BY_ID,
+    DEFAULT_IDS,
+    PRESETS,
+    merge_parameter_profiles,
+    parameter_profile,
+)
 from personal_markets.profile.photo_store import get_photo_store
 from personal_markets.wiring import get_collection_service, get_evidence_service, get_goal_service
 
@@ -119,32 +125,48 @@ async def get_profile(
     account = await identity.account_view(principal, usage, profile)
     authentic_goals = behavior_cohort_goals(owned)
     fixture_goals = behavior_cohort_goals(owned, synthetic=True)
-    trials, rows = await owner_trials_and_evidence(
-        principal.user_id, [goal.goal_id for goal in authentic_goals], evidence
-    )
-    _, fixture_rows = await owner_trials_and_evidence(
-        principal.user_id,
-        [goal.goal_id for goal in fixture_goals],
-        evidence,
-        synthetic=True,
+    (trials, rows), (seed_trials, fixture_rows) = await asyncio.gather(
+        owner_trials_and_evidence(
+            principal.user_id, [goal.goal_id for goal in authentic_goals], evidence
+        ),
+        owner_trials_and_evidence(
+            principal.user_id,
+            [goal.goal_id for goal in fixture_goals],
+            evidence,
+            synthetic=True,
+        ),
     )
     custom = _custom_definitions(account.profile)
     # Behavior estimation remains a separate analytical contract. Parameter
     # choices do not change execution dimensions or What If follow-through.
     selected = list(DEFAULT_TRAIT_IDS)
+    # The owner's own seeded workspace is persisted, owner-scoped history. It only
+    # fills what authentic records leave empty and is labeled by cohort; forecasting
+    # cohorts stay authentic-only.
     traits = estimate_traits(trials, rows, selected=selected, custom=custom)
+    trait_cohort = "authentic"
+    if seed_trials and not any(item.value is not None for item in traits.traits):
+        traits = estimate_traits(
+            [*trials, *seed_trials], [*rows, *fixture_rows], selected=selected, custom=custom
+        )
+        trait_cohort = "workspace_seed" if not trials else "mixed"
     selected_ids = selected_parameter_ids(account.profile)
-    measured = parameter_profile(rows, selected_ids=selected_ids)
-    # An empty owner workspace can show the owner's own seeded measurements.
-    # Authentic observations still win as soon as any exist, so fixtures never
-    # overwrite a real radar.
-    if measured.evidence_count == 0 and fixture_rows:
-        measured = parameter_profile(fixture_rows, selected_ids=selected_ids)
+    measured = merge_parameter_profiles(
+        parameter_profile(rows, selected_ids=selected_ids),
+        parameter_profile(fixture_rows, selected_ids=selected_ids, synthetic=True)
+        if fixture_rows
+        else None,
+    )
     return {
         "account": account.model_dump(mode="json"),
         "goal_count": len(owned),
         "collection_count": len(collection_rows),
         "traits": traits.model_dump(mode="json"),
+        "trait_sources": {
+            "cohort": trait_cohort,
+            "authentic_trials": len(trials),
+            "workspace_seed_trials": len(seed_trials) if trait_cohort != "authentic" else 0,
+        },
         "radar": measured.model_dump(mode="json"),
         "selected_parameters": selected_parameter_ids(account.profile),
         "available_parameters": [

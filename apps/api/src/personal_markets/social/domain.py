@@ -52,6 +52,7 @@ class ForkProvenance(BaseModel):
     source_title: str | None = None
     source_public: bool = False
     forked_at: datetime
+    carried_fields: list[str] = Field(default_factory=list)
 
 
 class PublicMarketCard(BaseModel):

@@ -337,6 +337,79 @@ class TargetPath(BaseModel):
     model_provenance: dict[str, str]
 
 
+EffortLevel = Literal["none", "light", "moderate", "heavy"]
+
+
+class BlueprintLeverChange(BaseModel):
+    """One model lever moved from its evidence value to a searched setting."""
+
+    lever_id: str
+    label: str
+    unit: str
+    baseline_value: float
+    recommended_value: float
+    change: float
+    relative_change: float | None = None
+    range_used: float = Field(ge=0, le=1)
+    effort: EffortLevel
+    description: str
+
+
+class BlueprintAction(BaseModel):
+    action_id: str
+    title: str
+    hours_per_week: float = 0
+    money: float = 0
+
+
+class BlueprintPlateau(BaseModel):
+    """Where extra lever movement stops buying odds, and why."""
+
+    lever_id: str
+    plateau_probability: float = Field(ge=0, le=1)
+    starts_at_value: float | None = None
+    cause: Literal["follow_through", "saturation", "lever_range"]
+    explanation: str
+
+
+class BlueprintAlternative(BaseModel):
+    id: str
+    label: str
+    lever_changes: list[BlueprintLeverChange] = Field(default_factory=list)
+    actions: list[BlueprintAction] = Field(default_factory=list)
+    modeled_probability: float = Field(ge=0, le=1)
+    reaches_target: bool
+    effort_score: float
+    note: str | None = None
+
+
+class ReverseBlueprint(BaseModel):
+    """Recommended combination of changes for a target-odds search.
+
+    Every probability here is an engine price for the stated combination; the text
+    is template output from lever metadata, never generated free-form.
+    """
+
+    target_probability: float = Field(ge=0, le=1)
+    baseline_probability: float = Field(ge=0, le=1)
+    modeled_probability: float | None = Field(default=None, ge=0, le=1)
+    delta_pp: float | None = None
+    reachable: bool
+    already_satisfied: bool = False
+    headline: str
+    rationale: str
+    lever_changes: list[BlueprintLeverChange] = Field(default_factory=list)
+    actions: list[BlueprintAction] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
+    tradeoffs: list[str] = Field(default_factory=list)
+    follow_through_probability: float | None = Field(default=None, ge=0, le=1)
+    max_modeled_probability: float | None = Field(default=None, ge=0, le=1)
+    plateau: BlueprintPlateau | None = None
+    alternatives: list[BlueprintAlternative] = Field(default_factory=list)
+    tolerance_pp: float
+    method: str = "reverse_blueprint@1.0.0"
+
+
 class TargetSearchResult(BaseModel):
     contract_version: int = 1
     target_probability: float
@@ -346,6 +419,7 @@ class TargetSearchResult(BaseModel):
     message: str
     paths: list[TargetPath] = Field(default_factory=list)
     search_method: str
+    blueprint: ReverseBlueprint | None = None
     run_id: str | None = None
     receipt: dict[str, object] = Field(default_factory=dict)
 
