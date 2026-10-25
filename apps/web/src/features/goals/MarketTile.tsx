@@ -31,7 +31,7 @@ export function MarketTile({ goal }: { goal: Goal }) {
           <div className="market-card-odds">{market.odds == null ? "—" : `${market.odds.toFixed(0)}%`}</div>
         </div>
         <div className={`market-card-return ${(market.todayReturn ?? 0) >= 0 ? "positive" : "negative"}`}>
-          {signedReturn ?? "Needs more information"}
+          {market.historyUnavailable ? "Published history unavailable" : signedReturn ?? (market.odds === null && market.history.length > 0 ? "Current odds withheld" : "Needs more information")}
         </div>
         <div className="market-card-chart">
           <ProbabilityChart chartId={market.id} title={market.title} status={goal.forecast_status} series={market.history.map((point) => ({ t: point.timestamp, p: point.value / 100 }))} currentProbability={market.odds == null ? undefined : market.odds / 100}/>

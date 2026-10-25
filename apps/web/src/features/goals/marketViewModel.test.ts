@@ -47,4 +47,19 @@ describe("toMarketCardViewModel", () => {
     expect(toMarketCardViewModel(goal, points).odds).toBeNull();
     expect(toMarketCardViewModel(goal, points).history).toEqual([]);
   });
+
+  it("uses the latest dated receipt and keeps withheld history historical", () => {
+    const points = [
+      { id: "b", probability: 0.6, created_at: "2026-08-02T00:00:00Z" },
+      { id: "a", probability: 0.4, created_at: "2026-08-01T00:00:00Z" },
+      { id: "b", probability: 0.6, created_at: "2026-08-02T00:00:00Z" },
+      { id: "bad", probability: Number.NaN, created_at: "2026-08-03T00:00:00Z" },
+    ] as MarketHistoryPoint[];
+    const view = toMarketCardViewModel(goal, points);
+    expect(view.odds).toBe(60);
+    expect(view.history.map((point) => point.value)).toEqual([40, 60]);
+    const withheld = toMarketCardViewModel({ ...goal, model_requirements: { last_publication: { status: "withheld" } } }, points);
+    expect(withheld.odds).toBeNull();
+    expect(withheld.history).toEqual(view.history);
+  });
 });

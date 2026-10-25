@@ -54,36 +54,38 @@ class GoalSyncService:
         approved = [item for item in recipes if item.approved]
         if self._watch_resource_uris is not None:
             watch_store = get_source_watch_store()
-            active_uris = await watch_store.active_resource_uris(
+            watches = await watch_store.list_for_goal(
                 self._owner_id, goal.goal_id
             )
-            allowed_uris = self._watch_resource_uris & active_uris
+            active_watches = [
+                watch for watch in watches
+                if watch.status == "active"
+                and f"composio://{watch.plugin_id}/{watch.resource_id}"
+                in self._watch_resource_uris
+            ]
+            allowed = {
+                (watch.plugin_connection_id, f"composio://{watch.plugin_id}/{watch.resource_id}")
+                for watch in active_watches
+            }
             approved = [
                 item.model_copy(
                     update={
                         "steps": [
                             step
                             for step in item.steps
-                            if step.resource_uri in allowed_uris
+                            if (item.plugin_connection_id, step.resource_uri) in allowed
                         ]
                     }
                 )
                 for item in approved
             ]
             approved = [item for item in approved if item.steps]
-            watches = await watch_store.list_for_goal(
-                self._owner_id, goal.goal_id
-            )
             parent_ids = {
-                (watch.plugin_id, watch.resource_id)
-                for watch in watches
+                (watch.plugin_connection_id, watch.plugin_id, watch.resource_id)
+                for watch in active_watches
                 if watch.status == "active"
                 and watch.scope == "parent"
                 and get_adapter(watch.plugin_id).supports_parent_watch
-                and (
-                    f"composio://{watch.plugin_id}/{watch.resource_id}"
-                    in self._watch_resource_uris
-                )
             }
             if parent_ids:
                 expanded = []
@@ -94,7 +96,9 @@ class GoalSyncService:
                             parent_id = step.resource_uri.removeprefix(
                                 f"composio://{recipe.plugin_id}/"
                             )
-                            if (recipe.plugin_id, parent_id) not in parent_ids:
+                            if (
+                                recipe.plugin_connection_id, recipe.plugin_id, parent_id
+                            ) not in parent_ids:
                                 continue
                             argument_key = next(
                                 (key for key in ("block_id", "page_id") if key in step.arguments),
@@ -118,6 +122,19 @@ class GoalSyncService:
             return {"status": "no_recipes", "message": "No approved goal-specific sync recipes."}
 
         for recipe in approved:
+            if self._watch_resource_uris is not None:
+                connection = await self._repository.get_connection(
+                    self._owner_id, recipe.plugin_id
+                )
+                if (
+                    connection is None
+                    or connection.status != "connected"
+                    or connection.id != recipe.plugin_connection_id
+                ):
+                    raise SemanticProviderError(
+                        "The watched connection changed or expired. "
+                        "Reconnect and approve this source again."
+                    )
             if recipe.plugin_id not in {"github", "notion", "calendar"}:
                 connection = await self._repository.get_connection(
                     self._owner_id, recipe.plugin_id

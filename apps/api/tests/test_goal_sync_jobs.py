@@ -233,6 +233,32 @@ async def test_worker_completes_when_source_has_no_goal_impact(
 
 
 @pytest.mark.asyncio
+async def test_worker_records_withheld_forecast_as_successful_source_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    get_goal_sync_job_store.cache_clear()
+    app = isolated_app()
+    owner, goal_id = app.state.auth_bypass_principal.user_id, uuid4()
+    store = get_goal_sync_job_store()
+    queued = await store.enqueue(owner, goal_id)
+    claimed = await store.claim()
+    assert claimed is not None
+
+    async def withheld(
+        self: GoalSyncService, goal_id: str, *, on_stage: object = None
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            thread_id=uuid4(), status="withheld", evidence=[], pricing=None,
+        )
+
+    monkeypatch.setattr(GoalSyncService, "sync_goal_sources", withheld)
+    await execute_goal_sync_job(app, claimed)
+    completed = await store.get(owner, goal_id, queued.id)
+    assert completed is not None and completed.status == "completed"
+    assert completed.receipt["workflow_status"] == "withheld"
+
+
+@pytest.mark.asyncio
 async def test_worker_recovers_queued_job_after_start() -> None:
     get_goal_sync_job_store.cache_clear()
     app = isolated_app()
