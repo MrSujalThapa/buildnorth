@@ -24,14 +24,14 @@ test("loads empty strategy history and records accept after generate", async () 
     next_step: "Send one message",
   };
   let listed = empty;
-  vi.spyOn(api, "strategyLearning").mockImplementation(async () => listed);
-  vi.spyOn(api, "generateStrategyRecommendation").mockImplementation(async () => {
+  vi.spyOn(api, "strategyLearning").mockImplementation(() => Promise.resolve(listed));
+  vi.spyOn(api, "generateStrategyRecommendation").mockImplementation(() => {
     listed = { ...empty, past_trials: [generated] };
-    return generated;
+    return Promise.resolve(generated);
   });
-  vi.spyOn(api, "strategyRecommendationFeedback").mockImplementation(async () => {
+  vi.spyOn(api, "strategyRecommendationFeedback").mockImplementation(() => {
     listed = { ...empty, past_trials: [{ ...generated, decision: "accepted" }] };
-    return { ...generated, decision: "accepted" };
+    return Promise.resolve({ ...generated, decision: "accepted" });
   });
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
