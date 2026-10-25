@@ -830,3 +830,9 @@
     font-size: 30px;
   }
 }
+
+/* The translucent white panels above are tuned for light surfaces only. */
+.theme-dark .recent-events,
+.theme-dark .return-panel {
+  background: var(--app-surface, #131314);
+}

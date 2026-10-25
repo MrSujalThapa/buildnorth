@@ -2009,3 +2009,7 @@
 .strategy-analysis dt { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--what-if-muted); }
 .strategy-analysis dd { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--what-if-ink); }
 .strategy-footnote { margin: 14px 0 0; font-size: 12.5px; color: var(--what-if-muted); }
+.strategy-run { flex: none; height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--what-if-ink); color: var(--what-if-bg, #0b0b0c); font-family: inherit; font-size: 13.5px; font-weight: 600; line-height: 1; cursor: pointer; transition: opacity var(--what-if-duration, .16s) var(--what-if-ease, ease); }
+.strategy-run:hover:not(:disabled) { opacity: .86; }
+.strategy-run:disabled { opacity: .4; cursor: not-allowed; }
+.strategy-run:focus-visible { outline: 2px solid var(--what-if-accent); outline-offset: 2px; }
