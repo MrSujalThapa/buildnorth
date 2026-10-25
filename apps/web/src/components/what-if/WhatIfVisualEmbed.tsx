@@ -39,6 +39,7 @@ export type WhatIfVisualRequest = {
   view: WhatIfView;
   question: string;
   target_probability?: number;
+  alternatives?: string[];
 };
 
 export function WhatIfVisualEmbed({
@@ -63,9 +64,9 @@ export function WhatIfVisualEmbed({
   const impact = toImpactViewModel(preview, payload.scenario ?? undefined, payload.baseline);
   const options = toCompareOptions(payload.baseline, payload.comparison ?? undefined);
   const paths = toPathStrategies(payload.targetSearch ?? undefined);
-  const request = (mode: WhatIfMode, value: string, target_probability?: number) => onRequest?.({
+  const request = (mode: WhatIfMode, value: string, target_probability?: number, alternatives?: string[]) => onRequest?.({
     goal_id: payload.goal.goal_id, mode, view: payload.view,
-    question: value, target_probability,
+    question: value, target_probability, alternatives,
   });
 
   return (
@@ -107,7 +108,9 @@ export function WhatIfVisualEmbed({
           message={payload.message}
           selectedIds={selectedOptions.length >= 2 ? selectedOptions : options.slice(0, 2).map((item) => item.id)}
           onSelectedIdsChange={setSelectedOptions} isolatedId={isolatedOption} onIsolate={setIsolatedOption}
-          onComparePaths={(alternatives) => request("compare", alternatives.map((item) => item.label).join(" vs "))}
+          onComparePaths={(alternatives) => request(
+            "compare", "Compare these alternatives", undefined, alternatives.map((item) => item.label),
+          )}
         /> : null}
         {payload.mode === "paths" ? <PathsToGoalView
           market={market} view={payload.view} paths={paths}

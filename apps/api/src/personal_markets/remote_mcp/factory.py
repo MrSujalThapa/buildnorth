@@ -60,6 +60,7 @@ def mount_remote_mcp(application: FastAPI, settings: Settings) -> RemoteMcp:
             get_simulation_repository(),
             evidence=current.evidence,
             owner_id=principal.user_id,
+            forecasts=current.baseline_forecasts,
         )
 
     store = build_store(settings)

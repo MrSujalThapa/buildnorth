@@ -58,6 +58,7 @@ scripts/_phase0_db_receipts.py
 # Runtime artifacts
 /.phase2-*
 /artifacts/phase2/
+/.mcp-whatif-build/
 .artifacts/
 data/*.db
 data/uploads/

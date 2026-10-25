@@ -22,6 +22,9 @@ COPY scripts/db_migrate.py ./scripts/db_migrate.py
 
 RUN uv sync --frozen --no-dev
 
+# Mobile What If PNGs render the bundled React component privately in headless Chromium.
+RUN uv run playwright install --with-deps chromium
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

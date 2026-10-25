@@ -9,10 +9,13 @@ from the host as `ui/notifications/tool-result` after `ui/initialize`.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from mcp.server.apps import APP_MIME_TYPE, EXTENSION_ID, Apps, ResourceCsp
 
 ODDS_UI_LEGACY_URI = "ui://playitout/odds-explorer"
 ODDS_UI_URI = "ui://playitout/odds-explorer/v2"
+WHATIF_UI_URI = "ui://playitout/what-if/v1"
 ODDS_UI_MIME = APP_MIME_TYPE
 UI_EXTENSION_ID = EXTENSION_ID
 
@@ -314,6 +317,15 @@ def build_odds_apps() -> Apps:
         name="Odds Explorer (legacy URI)",
         title="PlayItOut Odds Explorer",
         description="Same Odds Explorer served at the original ui:// URI for cached hosts.",
+        csp=csp,
+    )
+    whatif_html = Path(__file__).with_name("whatif_app.html").read_text(encoding="utf-8")
+    apps.add_html_resource(
+        WHATIF_UI_URI,
+        whatif_html,
+        name="What If",
+        title="PlayItOut What If",
+        description="Actual PlayItOut What If components with owner-scoped numerical results.",
         csp=csp,
     )
     return apps
