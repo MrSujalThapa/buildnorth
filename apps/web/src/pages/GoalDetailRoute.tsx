@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../api/client";
+import { absoluteUrl, shareLink } from "../features/social/share";
 import { isCourseStandingGoal } from "../adapters/courseGrade";
 import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewModel";
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
+import "../components/social/social.css";
 
 export function GoalDetailRoute() {
   const { goalId = "" } = useParams();
@@ -15,6 +17,8 @@ export function GoalDetailRoute() {
   const initialSnapshot = (location.state as { snapshot?: WorkflowSnapshot } | null)?.snapshot ?? null;
   const [workflowSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
   const [evidenceAnswers, setEvidenceAnswers] = useState<Record<string, string>>({});
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const continuation = useQuery({
     queryKey: ["goal-evidence-continuation", goalId],
     queryFn: ({ signal }) => api.goalEvidenceContinuation(goalId, signal),
@@ -50,6 +54,19 @@ export function GoalDetailRoute() {
     queryKey: ["evidence", goalId],
     queryFn: ({ signal }) => api.evidence(goalId, signal),
     enabled: Boolean(goalId),
+  });
+  const social = useQuery({
+    queryKey: ["market-social", goalId],
+    queryFn: ({ signal }) => api.marketSocial(goalId, signal),
+    enabled: Boolean(goalId),
+  });
+  const publish = useMutation({
+    mutationFn: (visibility: "public" | "private") => api.setMarketVisibility(goalId, visibility),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["market-social", goalId] });
+      void queryClient.invalidateQueries({ queryKey: ["goals"] });
+      setPublishOpen(false);
+    },
   });
 
   if (goal.isLoading || history.isLoading) {
@@ -105,7 +122,24 @@ export function GoalDetailRoute() {
         onBack={() => { void navigate("/markets"); }}
         onWhatIf={() => { void navigate(`/goals/${goalId}/what-if`); }}
         onEvidence={() => { void navigate(`/goals/${goalId}/evidence`); }}
+        onShare={() => {
+          void api.shareMarket(goalId).then((result) => {
+            if (!result.shareable) {
+              setShareNote(result.reason ?? "Publish this market before sharing.");
+              setPublishOpen(true);
+              return;
+            }
+            return shareLink({ url: result.url ?? absoluteUrl(`/m/${goalId}`), title: market.title }).then((mode) => {
+              setShareNote(mode === "copied" ? "Link copied" : "Shared");
+            });
+          }).catch(() => setShareNote("Could not share this market."));
+        }}
       >
+        <div className="public-actions">
+          <button type="button" className="secondary-action" onClick={() => setPublishOpen(true)}>
+            {social.data?.visibility === "public" ? "Public" : "Private"} · Visibility
+          </button>
+        </div>
         {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
         {latestWorkflow?.status === "evidence_pending" || latestWorkflow?.status === "evidence_running" ? (
           <div role="status">
@@ -141,6 +175,33 @@ export function GoalDetailRoute() {
           </form>
         ) : null}
       </MarketDetailPage>
+      {publishOpen ? (
+        <div className="confirm-layer" role="dialog" aria-modal="true" aria-labelledby="publish-title">
+          <div className="confirm-card">
+            <h2 id="publish-title">{social.data?.visibility === "public" ? "Make this market private?" : "Publish this market?"}</h2>
+            {social.data?.visibility === "public" ? (
+              <p>Public links, marketplace listing, and profile appearance stop immediately. Existing forks stay independent.</p>
+            ) : (
+              <p>
+                Publishing shares the title, public blueprint, and authorized chart history. Private evidence, emails, uploads, and tokens stay private.
+              </p>
+            )}
+            {publish.isError ? <p role="alert">Visibility could not be updated.</p> : null}
+            <div className="composer-actions">
+              <button
+                type="button"
+                className="ui-button"
+                disabled={publish.isPending}
+                onClick={() => publish.mutate(social.data?.visibility === "public" ? "private" : "public")}
+              >
+                {social.data?.visibility === "public" ? "Make private" : "Publish"}
+              </button>
+              <button type="button" className="secondary" onClick={() => setPublishOpen(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {shareNote ? <div className="share-toast" role="status">{shareNote}</div> : null}
     </>
   );
 }

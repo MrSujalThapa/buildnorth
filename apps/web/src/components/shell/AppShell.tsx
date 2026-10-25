@@ -18,9 +18,9 @@ const items = [
 
 function activeFromPath(pathname: string) {
   if (pathname.startsWith("/plugins")) return "plugins";
-  if (pathname.startsWith("/social")) return "social";
+  if (pathname.startsWith("/social") || pathname.startsWith("/marketplace") || pathname.startsWith("/m/")) return "social";
   if (pathname.startsWith("/settings")) return "settings";
-  if (pathname.startsWith("/profile")) return "profile";
+  if (pathname.startsWith("/profile") || pathname.startsWith("/u/")) return "profile";
   return "market";
 }
 

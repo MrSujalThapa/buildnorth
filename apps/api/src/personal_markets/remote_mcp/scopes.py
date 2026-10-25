@@ -88,6 +88,9 @@ TOOL_SCOPES: dict[str, tuple[str, ...]] = {
     "submit_structured_evidence": (EVIDENCE_WRITE,),
     "submit_observation": (EVIDENCE_WRITE, INFERENCE),
     "simulate_intervention": (SIMULATE,),
+    "search_public_markets": (READ,),
+    "get_public_market": (READ,),
+    "get_blueprint": (READ,),
 }
 
 

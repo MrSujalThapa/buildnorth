@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 
-REQUIRED_FILES = 22
+REQUIRED_FILES = 23
 REQUIRED = {
     "goals",
     "source_connections",
@@ -25,6 +25,9 @@ REQUIRED = {
     "behavior_commitments",
     "behavior_commitment_observations",
     "workspace_seed_records",
+    "market_stars",
+    "user_follows",
+    "profile_activity_events",
 }
 
 

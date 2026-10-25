@@ -26,6 +26,9 @@ EXPECTED_TOOLS = {
     "submit_structured_evidence",
     "submit_observation",
     "simulate_intervention",
+    "search_public_markets",
+    "get_public_market",
+    "get_blueprint",
 }
 
 

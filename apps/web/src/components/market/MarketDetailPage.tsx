@@ -22,6 +22,8 @@ type Props = {
   onBack: () => void;
   onWhatIf: () => void;
   onEvidence?: () => void;
+  onShare?: () => void;
+  readOnly?: boolean;
   children?: ReactNode;
 };
 
@@ -114,6 +116,8 @@ export default function MarketDetailPage({
   onBack,
   onWhatIf,
   onEvidence,
+  onShare,
+  readOnly = false,
   children,
 }: Props) {
   const ranges = ODDS_EXPLORER_RANGES;
@@ -294,6 +298,7 @@ export default function MarketDetailPage({
           </div>
         </section>
 
+        {readOnly ? null : (
         <div className="market-actions">
           <button className="primary-action" type="button" onClick={onWhatIf}>
             What if
@@ -301,7 +306,13 @@ export default function MarketDetailPage({
           <button className="secondary-action" type="button" onClick={onEvidence}>
             Evidence
           </button>
+          {onShare ? (
+            <button className="secondary-action" type="button" onClick={onShare}>
+              Share
+            </button>
+          ) : null}
         </div>
+        )}
         {children}
       </section>
     </main>

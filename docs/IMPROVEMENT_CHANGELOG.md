@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Social markets, public profiles, and marketplace
+
+**Hypothesis:** GitHub-style visibility, stars, follows, forks, and a Notion-like public marketplace can sit on the existing goal/market object without a second blueprint catalog or invented odds.
+
+**Changes:** Markets default to private. Publishing writes an allowlisted public blueprint and can list the authorized chart history. Stars, follows, fork provenance, and daily contribution events persist. Forks create independent private goals without evidence or probability copy. Sharing uses `navigator.share` with clipboard fallback and only public URLs. Remote MCP adds read-only public market/blueprint tools. Forecast math is unchanged. Multi-market collection blueprints were deferred.
+
+**Measured result:** No forecast score was recomputed. Isolation, publish/revoke, duplicate star/follow, and idempotent fork coverage are in API tests.
+
 ## 2026-10-24 — MCP Apps Odds Explorer handshake
 
 **Hypothesis:** Grok Bot called `show_odds_chart` and received `ui://playitout/odds-explorer` without rendering because the view spoke a private handshake (`clientInfo`, data only on `hostContext.toolResult`) instead of MCP Apps `appInfo` / `ui/notifications/tool-result`.

@@ -264,6 +264,33 @@ def get_goal_service() -> GoalService:
 
 
 @lru_cache
+def get_social_repository():
+    from personal_markets.social.adapters import InMemorySocialRepository
+    from personal_markets.social.postgres import PostgresSocialRepository
+
+    if not _use_postgres():
+        repo = InMemorySocialRepository()
+        goals = get_goal_repository()
+        if isinstance(goals, InMemoryGoalRepository):
+            repo.bind_goals(goals)
+        return repo
+    return PostgresSocialRepository(create_engine(get_settings().database_url or ""))
+
+
+def get_social_service():
+    from personal_markets.identity.factory import get_identity_service
+    from personal_markets.profile.photo_store import get_photo_store
+    from personal_markets.social.service import SocialService
+
+    return SocialService(
+        get_social_repository(),
+        get_goal_service(),
+        get_identity_service(),
+        photos=get_photo_store(),
+    )
+
+
+@lru_cache
 def get_collection_repository():
     from personal_markets.collections.repository import (
         InMemoryCollectionRepository,
