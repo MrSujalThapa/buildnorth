@@ -58,7 +58,7 @@ describe("toMarketCardViewModel", () => {
     const view = toMarketCardViewModel(goal, points);
     expect(view.odds).toBe(60);
     expect(view.history.map((point) => point.value)).toEqual([40, 60]);
-    const withheld = toMarketCardViewModel({ ...goal, model_requirements: { last_publication: { status: "withheld" } } } as Goal, points);
+    const withheld = toMarketCardViewModel({ ...goal, model_requirements: { last_publication: { status: "withheld" } } }, points);
     expect(withheld.odds).toBeNull();
     expect(withheld.history).toEqual(view.history);
   });
