@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Real Spur consumer acceptance and lossless fingerprint uniqueness
+
+**Hypothesis:** Scripted E2E only proved HTTP/Postgres/browser wiring. Empty evidence continuation after confirm was invoking the evidence agent and surfacing `evidence_continuation_failed`. Fingerprint uniqueness numbered `0023` collided with PR #33, and deleting duplicate evidence rows would break dependents.
+
+**Changes:** Skip empty `continue_evidence` after contract confirm. Owner+goal What If last-scenario store for relative follow-ups (`half as` / `twice`). Fingerprint uniqueness is `0024` with a live partial unique index; duplicates are superseded, not deleted. Live Spur acceptance is opt-in (`PM_LIVE_SPUR=1` / `LIVE_SPUR_E2E=1`) and fails if `provider=scripted`. No Pass 9, Social, or forecast-coefficient changes.
+
+**Measured result:** Authorized live Spur (`spur` / `spur-glm-5-3`) completed a career+savings HTTP journey: 19 calls, ~$0.020 estimated, all `provider=scripted` absent. Prior failed attempts in the same pass added ~9 calls. Career 8→15 applications was understood but critic-empty (`NOT_PRICED`). Mock interviews stayed unpriced. Strategy answers varied by question. Additional NL evidence stayed `needs_input` so published history did not move. Chromium vs local JWT still blocked (`ProviderNotConfiguredError` / Clerk). No GitHub paid inference. Not merged.
+
 ## 2026-10-25 — Evidence fingerprint uniqueness and stricter strategy validation
 
 **Hypothesis:** Concurrent evidence commits can duplicate rows without a database unique key, and MODELED/citations were too easy to fake from prose.

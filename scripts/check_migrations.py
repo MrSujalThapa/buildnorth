@@ -1,7 +1,9 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
-REQUIRED_FILES = 23
+REQUIRED_FILES = 24
+# PR #33 owns 0023_social_marketplace.sql. This branch must not occupy 0023.
+RESERVED_GAPS = {"0023_"}
 REQUIRED = {
     "goals",
     "source_connections",
@@ -33,10 +35,23 @@ def main() -> int:
     migrations = sorted(directory.glob("*.sql"))
     names = [path.name for path in migrations]
     expected = [f"{index:04d}_" for index in range(1, REQUIRED_FILES + 1)]
-    missing_files = [
-        prefix for prefix in expected if not any(name.startswith(prefix) for name in names)
+    occupied_reserved = [
+        name for name in names if any(name.startswith(gap) for gap in RESERVED_GAPS)
     ]
-    if missing_files or len(migrations) != REQUIRED_FILES:
+    if occupied_reserved:
+        print(
+            "Migration 0023 is reserved for PR #33 social marketplace; "
+            f"found {', '.join(occupied_reserved)}. Fingerprint uniqueness belongs in 0024."
+        )
+        return 1
+    missing_files = [
+        prefix
+        for prefix in expected
+        if prefix not in RESERVED_GAPS
+        and not any(name.startswith(prefix) for name in names)
+    ]
+    expected_count = REQUIRED_FILES - len(RESERVED_GAPS)
+    if missing_files or len(migrations) != expected_count:
         print(
             f"Expected migrations 0001-{REQUIRED_FILES:04d} "
             f"({REQUIRED_FILES} files); found {len(migrations)}: {', '.join(names)}"

@@ -49,7 +49,12 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
             state_dimensions=["applications"],
         )
         await goals.create_goal(goal, DEFAULT_USER_ID)
-        migration = Path(__file__).resolve().parents[3] / "supabase" / "migrations" / "0023_evidence_fingerprint_unique.sql"
+        migration = (
+            Path(__file__).resolve().parents[3]
+            / "supabase"
+            / "migrations"
+            / "0024_evidence_fingerprint_unique.sql"
+        )
         sql = (
             migration.read_text(encoding="utf-8")
             .replace("begin;", "")
@@ -104,10 +109,10 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
             index = await conn.scalar(
                 text(
                     "select indexname from pg_indexes "
-                    "where indexname = 'evidence_events_user_fingerprint_idx'"
+                    "where indexname = 'evidence_events_user_fingerprint_live_idx'"
                 )
             )
-            assert index == "evidence_events_user_fingerprint_idx"
+            assert index == "evidence_events_user_fingerprint_live_idx"
             other_user = uuid4()
             await conn.execute(
                 text("insert into app_users (id, clerk_user_id) values (:id, :clerk)"),
@@ -133,5 +138,95 @@ async def test_postgres_concurrent_same_fingerprint_does_not_double_count() -> N
         other_rows = await evidence.list_for_goal(other_goal.goal_id)
         assert isolated.events[0].evidence_id != first.events[0].evidence_id
         assert {item.evidence_id for item in owner_rows} != {item.evidence_id for item in other_rows}
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_fingerprint_migration_keeps_duplicate_rows_as_superseded() -> None:
+    url = isolated_postgres_url()
+    if not url:
+        pytest.skip("PM_TEST_DATABASE_URL is not configured")
+    engine = create_engine(url)
+    owner = DEFAULT_USER_ID
+    keep_id = uuid4()
+    drop_id = uuid4()
+    goal_id = uuid4()
+    try:
+        async with engine.begin() as conn:
+            if not await conn.scalar(text("select to_regclass('evidence_events')")):
+                pytest.skip(POSTGRES_MIGRATION_SKIP)
+            await conn.execute(text("drop index if exists evidence_events_user_fingerprint_idx"))
+            await conn.execute(
+                text("drop index if exists evidence_events_user_fingerprint_live_idx")
+            )
+        goals = GoalService(PostgresGoalRepository(engine))
+        await goals.create_goal(
+            GoalContract(
+                goal_id=goal_id,
+                title="Keep historical duplicate evidence",
+                goal_type=GoalType.DEADLINE_EVENT,
+                success_definition={"metric": "offer_received", "target": "swe_offer"},
+                deadline=datetime.now(UTC) + timedelta(days=400),
+                state_dimensions=["applications"],
+            ),
+            owner,
+        )
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    """
+                    insert into evidence_events (
+                      id, user_id, event_type, domain, metric, numeric_value, unit,
+                      observed_at, source_quality, provenance_json, created_at
+                    ) values
+                    (:keep, :uid, 'manual_state_entry', 'user_state', 'applications', 4, 'count',
+                     now(), 'user_confirmed',
+                     jsonb_build_object('fingerprint', CAST(:fp AS text)), now() - interval '2 hours'),
+                    (:drop, :uid, 'manual_state_entry', 'user_state', 'applications', 4, 'count',
+                     now(), 'user_confirmed',
+                     jsonb_build_object('fingerprint', CAST(:fp AS text)), now())
+                    """
+                ),
+                {"keep": keep_id, "drop": drop_id, "uid": owner, "fp": f"hist-dup-{keep_id}"},
+            )
+            await conn.execute(
+                text(
+                    "insert into goal_evidence (goal_id, evidence_id) values (:gid, :keep), (:gid, :drop) "
+                    "on conflict do nothing"
+                ),
+                {"gid": goal_id, "keep": keep_id, "drop": drop_id},
+            )
+        migration = (
+            Path(__file__).resolve().parents[3]
+            / "supabase"
+            / "migrations"
+            / "0024_evidence_fingerprint_unique.sql"
+        )
+        sql = (
+            migration.read_text(encoding="utf-8")
+            .replace("begin;", "")
+            .replace("commit;", "")
+        )
+        cleaned = "\n".join(
+            line for line in sql.splitlines() if line.strip() and not line.strip().startswith("--")
+        )
+        statements = [part.strip() for part in cleaned.split(";") if part.strip()]
+        async with engine.begin() as conn:
+            for statement in statements:
+                await conn.exec_driver_sql(statement)
+            remaining = (
+                await conn.execute(
+                    text(
+                        "select id, supersedes_id from evidence_events "
+                        "where id = :keep or id = :drop"
+                    ),
+                    {"keep": keep_id, "drop": drop_id},
+                )
+            ).mappings().all()
+        ids = {row["id"]: row["supersedes_id"] for row in remaining}
+        assert keep_id in ids and drop_id in ids
+        assert ids[keep_id] is None
+        assert ids[drop_id] == keep_id
     finally:
         await engine.dispose()

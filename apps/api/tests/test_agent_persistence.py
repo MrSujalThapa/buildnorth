@@ -104,7 +104,7 @@ async def test_postgres_checkpointer_survives_new_workflow_instance() -> None:
             third = LangGraphAgentWorkflow(deps, checkpointer)
             completed = await third.continue_evidence(thread_id)
             assert completed.goal is not None and completed.goal.goal_id == goal_id
-            assert completed.status in {"limited", "completed", "withheld"}
+            assert completed.status == "evidence_pending"
     finally:
         if goal_id is not None:
             async with engine.begin() as connection:

@@ -328,11 +328,9 @@ async def test_clear_goal_interrupts_for_confirmation_then_completes() -> None:
     assert second.goal is not None
     assert second.pricing is None
     second = await runtime.continue_evidence(first.thread_id)
-    assert second.status in {"limited", "completed", "withheld"}
+    assert second.status == "evidence_pending"
     assert second.goal is not None
-    assert second.pricing is not None
-    assert second.pricing.raw_probability is None
-    assert second.critic is not None
+    assert second.pricing is None
     assert "Understanding goal" in second.progress
     if second.progress.count("Researching reference class"):
         assert "Reading evidence" not in second.progress

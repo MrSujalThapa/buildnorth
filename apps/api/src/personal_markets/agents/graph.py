@@ -159,10 +159,32 @@ class LangGraphAgentWorkflow:
             )
         return await self._to_snapshot(thread_id, result)
 
+    def _has_material_evidence(self, values: dict[str, Any]) -> bool:
+        if (values.get("evidence_text") or "").strip():
+            return True
+        if values.get("github_records") or values.get("mcp_records"):
+            return True
+        if (values.get("evidence_proposal") or {}).get("events"):
+            return True
+        proposal = values.get("goal_proposal")
+        if not proposal:
+            return False
+        try:
+            return bool(GoalArchitectProposal.model_validate(proposal).current_state_known)
+        except Exception:
+            return False
+
     async def continue_evidence(self, thread_id: UUID) -> WorkflowSnapshot:
         state = await self._graph.aget_state(self._config(thread_id))
         if not state.values or not state.values.get("committed_goal_id"):
             raise ResourceNotFoundError("No committed goal is awaiting evidence")
+        values = dict(state.values)
+        interrupts = getattr(state, "interrupts", ()) or ()
+        pending = bool(interrupts and interrupts[0].value.get("type") == "evidence_pending")
+        if pending and not self._has_material_evidence(values):
+            # Contract confirmation is not an evidence submission. Stay pending
+            # instead of invoking the evidence agent on an empty payload.
+            return await self._to_snapshot(thread_id, values, state)
         if state.interrupts:
             command: Any = Command(resume={"continue": True})
         elif state.next and "await_evidence" not in state.next:
@@ -224,6 +246,7 @@ class LangGraphAgentWorkflow:
             "user_id": state.get("user_id"),
             "steps": list(state.get("progress") or []),
             "goal_committed": bool(state.get("committed_goal_id")),
+            "inference": dict(self._deps.last_inference),
         }
         return snapshot
 

@@ -431,6 +431,12 @@ def get_intervention_service(
 ) -> InterventionAgentService:
     deps = _workflow_deps(request)
     settings = get_settings()
+    store = getattr(request.app.state, "last_intervention_store", None)
+    if store is None:
+        from personal_markets.what_if.last_scenario import LastInterventionStore
+
+        store = LastInterventionStore()
+        request.app.state.last_intervention_store = store
     return InterventionAgentService(
         settings=settings,
         inference=deps.inference,
@@ -440,6 +446,7 @@ def get_intervention_service(
         run_store=deps.run_store,
         owner_id=principal.user_id,
         forecasts=deps.baseline_forecasts,
+        last_store=store,
     )
 
 

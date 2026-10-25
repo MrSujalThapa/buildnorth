@@ -282,6 +282,27 @@ async def test_scheduled_ordinary_inference_fails_closed_during_clerk_outage() -
         await service.principal_for_user_id(user.user_id)
 
 
+async def test_local_test_principal_does_not_require_clerk_for_inference_lookup() -> None:
+    repo = InMemoryIdentityRepository()
+    user = make_principal("live-e2e-user", invited=True, hosted=True, quota_usd=5)
+    await repo.upsert_user(user)
+    service = IdentityService(
+        repo,
+        Settings(
+            environment="development",
+            test_auth_secret="phase1-test-secret-must-be-32b!!",
+            clerk_secret_key="unused",
+        ),
+        VerifiedEmailCache(
+            lookup=lambda _id, _secret: (_ for _ in ()).throw(AssertionError("clerk"))
+        ),
+    )
+    principal = await service.principal_for_user_id(user.user_id)
+    assert principal is not None
+    assert principal.hosted_enabled is True
+    assert principal.invited is True
+
+
 def test_invalid_hosted_model_fails_before_a_provider_call() -> None:
     with pytest.raises(SemanticProviderError, match="unsupported"):
         hosted_allowlist("spur", "unknown-spur-model")

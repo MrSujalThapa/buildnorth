@@ -32,10 +32,9 @@ def test_create_goal_and_resume_confirmation() -> None:
         assert resumed.json()["status"] == "evidence_pending"
         assert resumed.json()["pricing"] is None
         done = client.get(f"/api/v1/agent/threads/{thread_id}").json()
-        assert done["status"] in {"limited", "completed", "withheld"}
+        assert done["status"] == "evidence_pending"
         assert done["goal"]["title"]
-        assert done["pricing"]["raw_probability"] is None
-        assert done["critic"]["decision"] in {"publish", "publish_with_limitations", "withhold"}
+        assert done["pricing"] is None
         listed = client.get("/api/v1/goals")
         assert listed.status_code == 200
         assert any(goal["goal_id"] == done["goal"]["goal_id"] for goal in listed.json())

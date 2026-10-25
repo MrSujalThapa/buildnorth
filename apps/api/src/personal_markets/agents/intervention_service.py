@@ -39,6 +39,7 @@ from personal_markets.what_if.intervention_registry import (
     composed_metric_units,
     goal_domain,
 )
+from personal_markets.what_if.last_scenario import LastInterventionStore, relative_scale
 from personal_markets.what_if.request_intent import ClassifiedRequest, classify_what_if_request
 from personal_markets.what_if.strategy_insights import (
     STRATEGY_KINDS,
@@ -59,6 +60,7 @@ class InterventionAgentService:
         run_store: object,
         owner_id=None,
         forecasts: BaselineForecastService | None = None,
+        last_store: LastInterventionStore | None = None,
     ) -> None:
         self._settings = settings
         self._inference = inference
@@ -69,6 +71,7 @@ class InterventionAgentService:
         self._owner_id = owner_id
         self._forecasts = forecasts
         self._ladders = ladders(settings)
+        self._last = last_store
 
     async def parse(self, goal_id: str, text: str) -> ParseInterventionResponse:
         goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
@@ -77,6 +80,10 @@ class InterventionAgentService:
         baseline = await self._with_published(goal.goal_id, baseline)
         classified = classify_what_if_request(text)
         summaries = [item.summary for item in evidence if item.summary]
+        if classified.kind in {"follow_up", "clarification_needed"}:
+            resolved = self._resolve_follow_up(goal, text, classified, baseline)
+            if resolved is not None:
+                return resolved
         if classified.kind in STRATEGY_KINDS:
             return await self._parse_strategy(goal, baseline, text, classified, summaries)
         if classified.kind != "quantitative_scenario":
@@ -132,25 +139,28 @@ class InterventionAgentService:
             )
             for item in critic.validated_changes
         ]
+        self._remember_changes(goal.goal_id, text, changes)
         if not changes and self._settings.intervention_regex_fallback:
             regex = parse_intervention_text(text)
             if regex.changes:
+                regex_changes = [
+                    InterventionChangeResponse(
+                        metric=item.metric,
+                        operation=item.operation,
+                        value=item.value,
+                        unit=item.unit,
+                        frequency=item.frequency,
+                        scope=item.scope,
+                        provenance=item.provenance,
+                    )
+                    for item in regex.changes
+                ]
+                self._remember_changes(goal.goal_id, text, regex_changes)
                 return self._with_routing(
                     text,
                     ParseInterventionResponse(
                         raw_text=text,
-                        changes=[
-                            InterventionChangeResponse(
-                                metric=item.metric,
-                                operation=item.operation,
-                                value=item.value,
-                                unit=item.unit,
-                                frequency=item.frequency,
-                                scope=item.scope,
-                                provenance=item.provenance,
-                            )
-                            for item in regex.changes
-                        ],
+                        changes=regex_changes,
                         unsupported=list(regex.unsupported),
                         effect_assigned=False,
                         understood_action=text,
@@ -317,6 +327,8 @@ class InterventionAgentService:
             limitations=proposal.limitations + issues,
             research_claims=proposal.research_claims or claims[:4],
             request_kind=classified.kind,
+            inference_provider=response.provider,
+            inference_model=response.model,
             confirmation_needed=False,
             insights=insights,
             consumer_summary=consumer_summary(
@@ -470,6 +482,8 @@ class InterventionAgentService:
             timeout_seconds=self._settings.inference_run_timeout_seconds,
         )
         critic = critique_intervention(goal, proposal, text)
+        self._last_provider = response.provider
+        self._last_model = response.model
         await self._run_store.record(  # type: ignore[attr-defined]
             {
                 "id": run_id,
@@ -527,8 +541,8 @@ class InterventionAgentService:
             research_claims=[],
         )
 
-    @staticmethod
     def _with_routing(
+        self,
         text: str,
         parsed: ParseInterventionResponse,
         classified: ClassifiedRequest,
@@ -539,6 +553,10 @@ class InterventionAgentService:
                 "request_kind": classified.kind,
                 "confirmation_needed": False,
                 "insights": [],
+                "inference_provider": parsed.inference_provider
+                or getattr(self, "_last_provider", None),
+                "inference_model": parsed.inference_model
+                or getattr(self, "_last_model", None),
                 "consumer_summary": consumer_summary(
                     kind=classified.kind,
                     published_odds=baseline.published_probability,
@@ -548,4 +566,65 @@ class InterventionAgentService:
                     question=text,
                 ),
             }
+        )
+
+    def _remember_changes(
+        self, goal_id: UUID, text: str, changes: list[InterventionChangeResponse]
+    ) -> None:
+        if self._last is None or self._owner_id is None or not changes:
+            return
+        self._last.put(self._owner_id, goal_id, text, changes)
+
+    def _resolve_follow_up(
+        self,
+        goal: GoalContract,
+        text: str,
+        _classified: ClassifiedRequest,
+        baseline: WhatIfBaselineState,
+    ) -> ParseInterventionResponse | None:
+        if self._last is None or self._owner_id is None:
+            return None
+        scale = relative_scale(text)
+        prior = self._last.get(self._owner_id, goal.goal_id)
+        if scale is None or prior is None:
+            return None
+        previous_text, previous = prior
+        scaled = [
+            item.model_copy(
+                update={
+                    "value": item.value * scale,
+                    "provenance": "last_scenario_relative",
+                }
+            )
+            for item in previous
+        ]
+        self._remember_changes(goal.goal_id, text, scaled)
+        return ParseInterventionResponse(
+            raw_text=text,
+            changes=scaled,
+            unsupported=[],
+            effect_assigned=False,
+            understood_action=(
+                f"Apply {scale:g}× to the last quantitative scenario for this goal "
+                f"({previous_text})."
+            ),
+            mechanism=[],
+            pricing_status="PRICED" if scaled else "NOT_PRICED",
+            agent_run_id=None,
+            limitations=[
+                "Relative follow-up reused the last owner-and-goal scenario; "
+                "no additional inference call was made."
+            ],
+            research_claims=[],
+            request_kind="quantitative_scenario",
+            confirmation_needed=False,
+            insights=[],
+            consumer_summary=consumer_summary(
+                kind="quantitative_scenario",
+                published_odds=baseline.published_probability,
+                comparison_odds=baseline.current_probability,
+                scenario_odds=None,
+                improvement_pp=None,
+                question=text,
+            ),
         )

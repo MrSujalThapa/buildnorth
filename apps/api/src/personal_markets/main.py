@@ -184,6 +184,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.upload_service = UploadService(PostgresUploadStore(engine))
         application.state.github_cursor_store = PostgresGithubCursorStore(engine)
         application.state.checkpointer = checkpointer
+        from personal_markets.what_if.last_scenario import LastInterventionStore
+
+        application.state.last_intervention_store = LastInterventionStore()
     else:
         from personal_markets.wiring import build_in_memory_workflow, get_goal_repository
 
@@ -194,6 +197,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
         application.state.upload_service = UploadService(UploadStore())
         application.state.github_cursor_store = InMemoryGithubCursorStore()
+        from personal_markets.what_if.last_scenario import LastInterventionStore
+
+        application.state.last_intervention_store = LastInterventionStore()
     from personal_markets.integrations.goal_sync_worker import goal_sync_worker
 
     sync_stop = asyncio.Event()

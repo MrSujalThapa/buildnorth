@@ -48,17 +48,16 @@ class IdentityService:
             return None
         # Background/MCP inference must recheck the current Clerk identity instead
         # of trusting a possibly stale persisted admin role or entitlement.
-        if self._settings.environment in {"test", "pytest"}:
-            return await self.principal_from_claims(
-                TokenClaims(
-                    {
-                        "sub": stored.clerk_user_id,
-                        "iss": "playitout-test",
-                        "email": stored.email,
-                        "email_verified": stored.email_verified,
-                    }
-                )
-            )
+        # Local HS256 test tokens are not Clerk users; do not fail closed on a
+        # Clerk 404 when the process is not deployed.
+        clerk_shaped = stored.clerk_user_id.startswith("user_")
+        local_test_identity = self._settings.environment in {"test", "pytest"} or (
+            not self._settings.is_deployed()
+            and not clerk_shaped
+            and bool(self._settings.test_auth_secret)
+        )
+        if local_test_identity:
+            return stored
         if not self._settings.clerk_secret_key:
             raise ForbiddenError("Current account verification is unavailable")
         email, verified = self._email_cache.resolve(

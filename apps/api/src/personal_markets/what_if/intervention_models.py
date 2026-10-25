@@ -33,6 +33,8 @@ class ParseInterventionResponse(BaseModel):
     confirmation_needed: bool = False
     insights: list[StrategyInsight] = Field(default_factory=list)
     consumer_summary: str = ""
+    inference_provider: str | None = None
+    inference_model: str | None = None
 
 
 class ParseDecisionRequest(BaseModel):

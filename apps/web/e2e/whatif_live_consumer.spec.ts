@@ -25,7 +25,7 @@ async function createGoal(page: Page, intent: string): Promise<string> {
   await page.getByLabel(/What should happen/i).fill(intent);
   await page.getByRole("button", { name: /Create market/i }).click();
   const continueBtn = page.getByRole("button", { name: /^Continue$/ });
-  if (await continueBtn.isVisible({ timeout: 20000 }).catch(() => false)) {
+  if (await continueBtn.isVisible({ timeout: 90000 }).catch(() => false)) {
     const inputs = page.locator("form.composer-form input");
     const count = await inputs.count();
     for (let index = 0; index < count; index += 1) {
@@ -34,7 +34,7 @@ async function createGoal(page: Page, intent: string): Promise<string> {
     await continueBtn.click();
   }
   const confirm = page.getByRole("button", { name: /^Confirm$/ });
-  await expect(confirm).toBeVisible({ timeout: 30000 });
+  await expect(confirm).toBeVisible({ timeout: 90000 });
   await expect(confirm).toBeEnabled();
   const resume = page.waitForResponse(
     (response) => response.url().includes("/agent/threads/") && response.url().includes("/resume") && response.request().method() === "POST",
@@ -82,13 +82,37 @@ async function addEvidence(page: Page, goalId: string, text: string) {
 
 test.describe("live consumer What If (unmocked API)", () => {
   test.beforeEach(async ({ page }) => {
+    test.skip(process.env.LIVE_SPUR_E2E !== "1", "LIVE_SPUR_E2E=1 is required for paid Spur browser acceptance");
     test.skip(!(await apiReady()), `API is not running at ${apiBase}`);
     test.skip(!testToken, "LIVE_E2E_TOKEN is required for an invited test principal");
     await page.addInitScript((token) => sessionStorage.setItem("pm-test-token", token), testToken);
   });
 
   test("career goal create, evidence, market, What If, reprice", async ({ page }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(420_000);
+    const providers: string[] = [];
+    page.on("response", async (response) => {
+      if (!response.ok()) return;
+      const url = response.url();
+      if (
+        !url.includes("/agent/threads") &&
+        !url.includes("/parse-intervention") &&
+        !url.includes("/goals/") 
+      ) {
+        return;
+      }
+      if (!url.includes("/api/v1/")) return;
+      try {
+        const body = (await response.json()) as {
+          inference_provider?: string;
+          debug?: { inference?: { provider?: string } };
+        };
+        const provider = body.inference_provider ?? body.debug?.inference?.provider;
+        if (provider) providers.push(provider);
+      } catch {
+        return;
+      }
+    });
     const goalId = await createGoal(
       page,
       "I want to receive an FDE offer from a target company by August 2027.",
@@ -152,10 +176,12 @@ test.describe("live consumer What If (unmocked API)", () => {
     await page.emulateMedia({ colorScheme: "dark" });
     await page.goto(`/goals/${goalId}/what-if`);
     await capture(page, "whatif-dark");
+    expect(providers.length, "agent-dependent browser calls must record a provider").toBeGreaterThan(0);
+    expect(providers.every((item) => item === "spur"), `expected spur, got ${providers.join(",")}`).toBeTruthy();
   });
 
   test("savings goal does not force an unpriceable publish", async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     const goalId = await createGoal(page, "I want to reach $80,000 in savings by December 2028.");
     await addEvidence(page, goalId, "Current savings are 18000 CAD in a high-interest account.");
     await capture(page, "savings");

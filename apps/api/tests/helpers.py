@@ -104,4 +104,7 @@ def isolated_app(*, inference: Any | None = None) -> FastAPI:
     get_identity_repository().users[principal.user_id] = principal
     get_identity_repository().by_clerk[principal.clerk_user_id] = principal.user_id
     app.state.auth_bypass_principal = principal
+    from personal_markets.what_if.last_scenario import LastInterventionStore
+
+    app.state.last_intervention_store = LastInterventionStore()
     return app
