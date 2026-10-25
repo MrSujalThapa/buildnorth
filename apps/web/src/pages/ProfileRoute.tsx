@@ -139,8 +139,12 @@ export function ProfileRoute() {
           <button type="button" className="secondary" onClick={() => setEditing(true)}>Edit</button>
         </section>
         <div className="follow-counts">
-          <Link to={`/u/${handle}`}>{socialProfile.data?.follower_count ?? 0} followers</Link>
-          <span>{socialProfile.data?.following_count ?? 0} following</span>
+          {socialProfile.data ? (
+            <>
+              <Link to={`/u/${handle}`}>{socialProfile.data.follower_count} followers</Link>
+              <span>{socialProfile.data.following_count} following</span>
+            </>
+          ) : socialProfile.isError ? <span role="alert">Follow counts unavailable</span> : <span role="status">Loading follow counts&hellip;</span>}
         </div>
         <nav className="profile-tabs" aria-label="Profile sections">
           <button type="button" className={tab === "overview" ? "is-active" : ""} onClick={() => setTab("overview")}>Overview</button>
