@@ -82,6 +82,7 @@ from personal_markets.remote_mcp.temporal import (
     sort_history,
 )
 from personal_markets.remote_mcp.weighted import WeightedScoreRequest, compute_weighted_score
+from personal_markets.remote_mcp.whatif_visual import build_visual_payload
 from personal_markets.what_if.domain import InterventionChangeInput, WhatIfRequest, WhatIfResult
 from personal_markets.what_if.intervention_overrides import unmapped_change_metrics
 
@@ -587,9 +588,7 @@ class RemoteMcpTools:
         forecast = await self._forecast(caller, goal)
         spec = goal.model_requirements.get("forecast_spec") or {}
         reasons = [
-            str(item)
-            for item in (spec.get("unpriced_reasons") or [])
-            if isinstance(item, str)
+            str(item) for item in (spec.get("unpriced_reasons") or []) if isinstance(item, str)
         ][:_MAX_LIST]
         priced = forecast.status == "PUBLISHED"
         if priced:
@@ -1262,6 +1261,31 @@ class RemoteMcpTools:
 
     # --- What If ----------------------------------------------------------------------
 
+    async def show_what_if_visualization(
+        self,
+        caller: Caller,
+        goal_id: str,
+        mode: Literal["impact", "futures", "compare", "paths"],
+        view: Literal["simple", "deep"],
+        question: str,
+        target_probability: float | None,
+        request_id: str | None,
+        alternatives: list[str] | None = None,
+    ) -> dict[str, Any]:
+        self.require_scope(caller, SIMULATE)
+        goal = await self._goal(caller, goal_id)
+        service = self._what_if(caller.principal)
+        return await build_visual_payload(
+            goal=goal,
+            service=service,
+            mode=mode,
+            view=view,
+            question=question,
+            target_probability=target_probability,
+            request_id=request_id,
+            alternatives=alternatives,
+        )
+
     async def simulate_intervention(
         self, caller: Caller, goal_id: str, changes: list[ChangeInput]
     ) -> SimulationView:
@@ -1711,9 +1735,7 @@ class RemoteMcpTools:
         history_before = await self._published(goal)
         as_of_point = None
         if as_of or relative:
-            compared = await self.compare_forecasts(
-                caller, goal_id, as_of=as_of, relative=relative
-            )
+            compared = await self.compare_forecasts(caller, goal_id, as_of=as_of, relative=relative)
             as_of_point = compared.as_of_point or compared.latest
         views: list[SimulationView] = []
         for item in scenarios[:5]:
@@ -1948,9 +1970,7 @@ class RemoteMcpTools:
         if not normalized:
             raise ToolFailure("invalid_argument", "No numeric rows mapped to this goal's metrics.")
         submission = self._submission(caller, source_category, filename, None, idempotency_key)
-        return await self._commit(
-            caller, goal, idempotency_key, normalized, submission, None, 0
-        )
+        return await self._commit(caller, goal, idempotency_key, normalized, submission, None, 0)
 
     # --- charts -------------------------------------------------------------------
 
@@ -1976,9 +1996,7 @@ class RemoteMcpTools:
                     "kind": "event_observed_at",
                 }
             )
-        status: Literal["PUBLISHED", "NOT_PUBLISHED"] = (
-            "PUBLISHED" if points else "NOT_PUBLISHED"
-        )
+        status: Literal["PUBLISHED", "NOT_PUBLISHED"] = "PUBLISHED" if points else "NOT_PUBLISHED"
         return goal, OddsChartView(
             goal_id=str(goal.goal_id),
             title=_clip(goal.title, 200),

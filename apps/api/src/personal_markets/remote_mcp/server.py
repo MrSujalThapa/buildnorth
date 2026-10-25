@@ -9,7 +9,7 @@ import base64
 import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Annotated, Any, TypeVar, cast
+from typing import Annotated, Any, Literal, TypeVar, cast
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -45,6 +45,7 @@ from personal_markets.remote_mcp.oauth import RemoteMcpAuthorization
 from personal_markets.remote_mcp.odds_app import (
     ODDS_UI_URI,
     UI_EXTENSION_ID,
+    WHATIF_UI_URI,
     build_odds_apps,
 )
 from personal_markets.remote_mcp.policy import ObservationPolicy
@@ -612,9 +613,7 @@ def _register_tools(
         before a market is created."""
         return await run(
             "continue_goal_creation",
-            lambda who: tools.continue_goal_creation(
-                who, thread_id, answers, confirmed, cancelled
-            ),
+            lambda who: tools.continue_goal_creation(who, thread_id, answers, confirmed, cancelled),
             write=True,
             inference=True,
         )
@@ -666,9 +665,7 @@ def _register_tools(
         Unsupported causal claims stay NOT_PRICED."""
         return await run(
             "compare_scenarios",
-            lambda who: tools.compare_scenarios(
-                who, goal_id, scenarios, as_of, relative, weighted
-            ),
+            lambda who: tools.compare_scenarios(who, goal_id, scenarios, as_of, relative, weighted),
         )
 
     @server.tool(annotations=_WRITE, title="Submit structured rows")
@@ -747,6 +744,86 @@ def _register_tools(
             ),
             write=True,
         )
+
+    _WHATIF_META = {
+        "ui": {"resourceUri": WHATIF_UI_URI, "visibility": ["model", "app"]},
+        "ui/resourceUri": WHATIF_UI_URI,
+    }
+
+    @server.tool(annotations=_READ, title="Show What If", meta=_WHATIF_META)
+    async def show_what_if_visualization(
+        goal_id: GoalId,
+        mode: Literal["impact", "futures", "compare", "paths"],
+        view: Literal["simple", "deep"] = "simple",
+        question: Annotated[str, Field(max_length=1000)] = "",
+        target_probability: Annotated[float | None, Field(ge=0, le=1)] = None,
+        request_id: Annotated[str | None, Field(max_length=80)] = None,
+        alternatives: Annotated[list[str] | None, Field(max_length=5)] = None,
+    ) -> dict[str, Any]:
+        """Render the real PlayItOut What If view for an owned goal. All odds and
+        distributions come from existing numerical operations. For Change supply
+        an explicit measurable question; for Reverse supply a target probability.
+        Simple and deep rerun the engine with different draw configurations.
+        This tool never publishes a forecast or commits evidence."""
+        return await run(
+            "show_what_if_visualization",
+            lambda who: tools.show_what_if_visualization(
+                who,
+                goal_id,
+                mode,
+                view,
+                question,
+                target_probability,
+                request_id,
+                alternatives,
+            ),
+        )
+
+    @server.tool(annotations=_READ, title="Get What If mobile image")
+    async def get_what_if_visualization_image(
+        goal_id: GoalId,
+        mode: Literal["impact", "futures", "compare", "paths"],
+        view: Literal["simple", "deep"] = "simple",
+        question: Annotated[str, Field(max_length=1000)] = "",
+        target_probability: Annotated[float | None, Field(ge=0, le=1)] = None,
+        alternatives: Annotated[list[str] | None, Field(max_length=5)] = None,
+    ) -> CallToolResult:
+        """Private high-density mobile PNG rendered from the same React What If
+        component. Structured numerical results accompany the image."""
+
+        async def _image(who: Caller) -> CallToolResult:
+            from personal_markets.remote_mcp.whatif_image import render_whatif_mobile_png
+
+            payload = await tools.show_what_if_visualization(
+                who,
+                goal_id,
+                mode,
+                view,
+                question,
+                target_probability,
+                None,
+                alternatives,
+            )
+            png = await render_whatif_mobile_png(payload)
+            return CallToolResult(
+                content=[
+                    TextContent(type="text", text=json.dumps(payload)),
+                    ImageContent(
+                        type="image",
+                        data=base64.b64encode(png).decode("ascii"),
+                        mime_type="image/png",
+                    ),
+                ],
+                structured_content={
+                    **payload,
+                    "image_width_px": 1170,
+                    "mime_type": "image/png",
+                    "byte_size": len(png),
+                    "public_url": None,
+                },
+            )
+
+        return await run("get_what_if_visualization_image", _image)
 
     _CHART_META = {
         "ui": {"resourceUri": ODDS_UI_URI, "visibility": ["model", "app"]},

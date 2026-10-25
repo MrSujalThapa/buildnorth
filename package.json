@@ -12,7 +12,7 @@
     "typecheck": "npm run typecheck --workspace @personal-markets/web && uv run python scripts/check_mypy_baseline.py",
     "typecheck:strict": "uv run mypy",
     "test": "npm run test --workspace @personal-markets/web && uv run pytest",
-    "build": "npm run build --workspace @personal-markets/web",
+    "build": "npm run build --workspace @personal-markets/web && node scripts/build_mcp_whatif.mjs",
     "test:e2e:submission": "npm run test:e2e:submission --workspace @personal-markets/web",
     "test:e2e:live": "npm run test:e2e:live --workspace @personal-markets/web",
     "verify:submission": "uv run python scripts/verify_submission.py",

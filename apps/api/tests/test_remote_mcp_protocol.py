@@ -23,6 +23,8 @@ EXPECTED_TOOLS = {
     "submit_file_bytes",
     "show_odds_chart",
     "get_odds_chart_image",
+    "show_what_if_visualization",
+    "get_what_if_visualization_image",
     "submit_structured_evidence",
     "submit_observation",
     "simulate_intervention",

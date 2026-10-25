@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/whatif-consumer-overhaul]
   push:
     branches: [main]
 
@@ -45,6 +45,7 @@ jobs:
       - run: npm run db:migrate
       - run: npm run lint
       - run: npm run typecheck
+      - run: uv run playwright install --with-deps chromium
       - run: npm run test
       - run: npm run build
       - run: npm run check:architecture

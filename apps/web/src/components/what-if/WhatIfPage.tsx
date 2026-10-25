@@ -125,7 +125,7 @@ export function scenarioErrorMessage(error: unknown): string | null {
   return `Couldn't run this scenario: ${detail}`;
 }
 
-function tuneCopyForMarket(category: string) {
+export function tuneCopyForMarket(category: string) {
 
   if (category === "Career") {
 
