@@ -2,6 +2,18 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Chromium hosted Spur: env PASS, browser agent BLOCKED on budget
+
+**Hypothesis:** After blank-`PM_SPUR_API_KEY` masking was fixed, the Chromium app could reach hosted Spur if the FastAPI process loaded `.env` and the isolated DB had inference preference tables.
+
+**Changes:** No product-code change. Isolated `playitout_phase0_test` was missing `0011` `inference_preferences` / `provider_credentials` (schema_migrations had recorded 0011 without the tables). Those tables were applied on the isolated DB only. Started `python -m personal_markets` against that DB with process `PM_SPUR_API_KEY` unset so dotenv could load. No Pass 9, Social, Clerk, or quota-limit changes. Not merged.
+
+**Measured result:**
+- HTTP live consumer journey: **PASS** (prior SHA `0296758`, 6 Spur calls, SET 15 priced).
+- FastAPI hosted selection: **PASS** (unpaid). `api_inference` log `hosted_provider=spur`, `spur_key_configured=true`, `inference_model=spur-glm-5-3`. `GET /api/v1/settings/inference` 200, `hosted_configured=true`, preference `hosted`, `byok_usage.calls=0`. Isolated DB identity `127.0.0.1:54322/playitout_phase0_test`. Local JWT only; not Clerk.
+- Chromium agent-dependent Spur completion: **BLOCKED**. Cumulative authorized Spur completions are exhausted (~44 vs ~40 including retries; last green HTTP run 6 calls, plus 3+7 failed HTTP retries this branch, plus ~28 earlier). Remaining paid budget: **0**. Did not start Playwright create-goal.
+- Real Clerk browser login: **BLOCKED** (unchanged; local JWT is not Clerk).
+
 ## 2026-10-25 — Close remaining Spur E2E blockers (confirm, 8→15 critic, hosted key)
 
 **Hypothesis:** Live Spur inference was proven, but consumer acceptance still stopped at `needs_input`, dropped a valid 8→15 applications/week SET, and Chromium hit `ProviderNotConfiguredError` because a blank `PM_SPUR_API_KEY` process env masked `.env`. GitHub typecheck failed on `test_last_scenario.py` returning `Any`.
