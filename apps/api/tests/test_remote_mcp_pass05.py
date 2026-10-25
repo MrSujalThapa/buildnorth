@@ -8,7 +8,12 @@ import pytest
 
 from personal_markets.identity.testing import make_principal
 from personal_markets.remote_mcp.charting import is_png
-from personal_markets.remote_mcp.odds_app import ODDS_UI_MIME, ODDS_UI_URI, UI_EXTENSION_ID
+from personal_markets.remote_mcp.odds_app import (
+    ODDS_UI_LEGACY_URI,
+    ODDS_UI_MIME,
+    ODDS_UI_URI,
+    UI_EXTENSION_ID,
+)
 from remote_mcp_support import McpHarness, create_hiring_goal, register, structured
 
 NOW = datetime.now(UTC)
@@ -348,18 +353,30 @@ async def test_chart_tools_resource_and_static_png() -> None:
             chart = next(item for item in listed.tools if item.name == "show_odds_chart")
             meta = chart.meta or {}
             assert meta.get("ui", {}).get("resourceUri") == ODDS_UI_URI
+            assert meta.get("ui/resourceUri") == ODDS_UI_URI
             resources = await client.list_resources()
-            uris = {str(item.uri) for item in resources.resources}
-            assert ODDS_UI_URI in uris
+            listed_resources = {str(item.uri): item for item in resources.resources}
+            assert ODDS_UI_URI in listed_resources
+            assert ODDS_UI_LEGACY_URI in listed_resources
+            listed_mime = getattr(listed_resources[ODDS_UI_URI], "mimeType", None) or getattr(
+                listed_resources[ODDS_UI_URI], "mime_type", None
+            )
+            assert listed_mime == ODDS_UI_MIME
             resource = await client.read_resource(ODDS_UI_URI)
             first = resource.contents[0]
             text = getattr(first, "text", None)
             assert isinstance(text, str)
             assert "PlayItOut Odds Explorer" in text
+            assert "ui/initialize" in text
+            assert "appInfo" in text
+            assert "ui/notifications/tool-result" in text
+            assert "ui/notifications/initialized" in text
             assert "pio_at_" not in text
             assert "Bearer" not in text
             mime = getattr(first, "mimeType", None) or getattr(first, "mime_type", None)
-            assert mime in {None, ODDS_UI_MIME} or "html" in str(mime)
+            assert mime == ODDS_UI_MIME
+            content_meta = getattr(first, "meta", None) or {}
+            assert content_meta.get("ui", {}).get("csp", {}).get("connectDomains") == []
 
         view = structured(
             await harness.call(
@@ -368,6 +385,12 @@ async def test_chart_tools_resource_and_static_png() -> None:
         )
         assert view["status"] == "PUBLISHED"
         assert view["points"]
+        assert view["ui_resource"] == ODDS_UI_URI
+        result = await harness.call(
+            grant.access_token, "show_odds_chart", {"goal_id": goal_id, "range": "ALL"}
+        )
+        assert result.structured_content is not None
+        assert result.structured_content["points"] == view["points"]
         image = await harness.call(
             grant.access_token, "get_odds_chart_image", {"goal_id": goal_id, "range": "1D"}
         )
@@ -405,8 +428,7 @@ async def test_mcp_apps_extension_is_advertised_on_initialize() -> None:
             **(capabilities.get("extensions") or {}),
         }
         assert UI_EXTENSION_ID in advertised
-        settings = advertised[UI_EXTENSION_ID]
-        assert settings.get("resourceUri") == ODDS_UI_URI
+        assert isinstance(advertised[UI_EXTENSION_ID], dict)
 
 
 async def test_chart_and_goal_are_owner_scoped() -> None:

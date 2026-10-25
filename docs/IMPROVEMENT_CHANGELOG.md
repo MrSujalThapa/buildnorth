@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — MCP Apps Odds Explorer handshake
+
+**Hypothesis:** Grok Bot called `show_odds_chart` and received `ui://playitout/odds-explorer` without rendering because the view spoke a private handshake (`clientInfo`, data only on `hostContext.toolResult`) instead of MCP Apps `appInfo` / `ui/notifications/tool-result`.
+
+**Changes:** Register the HTML through the official Python `Apps` extension (`text/html;profile=mcp-app`, CSP on the resource). Tool `_meta` carries both `ui.resourceUri` and deprecated `ui/resourceUri`. The view sends `ui/initialize` with `appInfo`, always follows with `ui/notifications/initialized` (including a 500ms fallback), reads `ui/notifications/tool-result`, and versions the URI to `ui://playitout/odds-explorer/v2` so hosts cannot keep a cached broken bundle. Forecast math, OAuth, and the static PNG tool are unchanged.
+
+**Measured result:** Protocol tests below; live Cursor Agent and Grok Bot rendering are recorded in the task report, not as a forecast score.
+
 ## 2026-10-24 — Bounded content reads for unfamiliar providers
 
 Preview planning now prefers a content read over metadata and can make one follow-up read with identifiers the first response actually returned. A selected resource is not rewritten into a search. Declared base64 content is decoded before display. A message list can be followed by a bounded per-message read. Query-only connections offer a search instead of an empty source list. A bare number is not treated as progress unless a date and a unit or quantity name are present. No forecast was published. Hosted inference credit remains unavailable, so tracked rows stay unverified.
