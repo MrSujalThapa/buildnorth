@@ -35,3 +35,24 @@
 
 .chart-standing-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 
+
+.ws-chart-multi { display: flex; flex-direction: column; gap: 8px; overflow: visible; }
+.ws-plot { position: relative; flex: 1; min-height: 0; }
+.ws-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+.ws-legend li { min-width: 0; transition: opacity .15s ease; }
+.ws-legend li.is-dimmed { opacity: .45; }
+.ws-legend button, .ws-legend-static { display: inline-flex; align-items: center; gap: 6px; max-width: 340px; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; }
+.ws-legend button { cursor: pointer; border-radius: 6px; }
+.ws-legend button:focus-visible { outline: 2px solid var(--market-chart-accent, #299f96); outline-offset: 2px; }
+.ws-legend li.is-active .ws-legend-label { text-decoration: underline; text-underline-offset: 3px; }
+.ws-legend i { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; }
+.ws-legend i.dashed { width: 14px; height: 0; border-radius: 0; border-width: 0 0 2px; border-style: dashed; }
+.ws-legend-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--market-text, #686664); }
+.ws-legend strong { font-variant-numeric: tabular-nums; font-weight: 650; }
+.ws-legend em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--market-text, #686664); }
+.ws-readout { position: absolute; top: 10px; left: 10px; z-index: 6; display: grid; gap: 3px; min-width: 170px; max-width: 280px; padding: 8px 10px; border: 1px solid var(--market-grid, rgba(128,128,128,.25)); border-radius: 8px; background: var(--app-surface, #fff); font-size: 12px; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.ws-readout > span { color: var(--market-text, #686664); font-size: 11px; }
+.ws-readout div { display: grid; grid-template-columns: 8px 1fr auto; align-items: center; gap: 6px; }
+.ws-readout div i { width: 8px; height: 8px; border-radius: 50%; }
+.ws-readout div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-readout strong { font-variant-numeric: tabular-nums; }

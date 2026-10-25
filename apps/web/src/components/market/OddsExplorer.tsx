@@ -7,6 +7,7 @@ import {
 } from "./marketRanges";
 import WealthsimpleAreaChart, {
   type ChartSelection,
+  type ProbabilityBranch,
   type ScenarioBranch,
 } from "./WealthsimpleAreaChart";
 
@@ -18,6 +19,12 @@ type Props = {
   overlay?: ChartPoint[];
   overlayTone?: "positive" | "negative";
   scenarioBranch?: ScenarioBranch | null;
+  branches?: ProbabilityBranch[];
+  historyLabel?: string;
+  historyColor?: string;
+  lineOnly?: boolean;
+  percentAxis?: boolean;
+  scenarioRegionLabel?: string;
   showTimeAxis?: boolean;
   emptyMessage?: string;
   interactive?: boolean;
@@ -33,6 +40,12 @@ export default function OddsExplorer({
   overlay = [],
   overlayTone,
   scenarioBranch = null,
+  branches,
+  historyLabel,
+  historyColor,
+  lineOnly,
+  percentAxis,
+  scenarioRegionLabel,
   showTimeAxis = false,
   emptyMessage = "No published forecast yet. Play It Out will not invent a series.",
   interactive = true,
@@ -75,6 +88,12 @@ export default function OddsExplorer({
           overlay={overlay}
           overlayTone={overlayTone}
           scenarioBranch={scenarioBranch}
+          branches={branches}
+          historyLabel={historyLabel}
+          historyColor={historyColor}
+          lineOnly={lineOnly}
+          percentAxis={percentAxis}
+          scenarioRegionLabel={scenarioRegionLabel}
           showTimeAxis={showTimeAxis}
           markers={markers}
           comparison={comparison}

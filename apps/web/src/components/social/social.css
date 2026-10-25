@@ -82,6 +82,12 @@
   background: var(--app-surface);
 }
 
+.discover-card-chart .market-sparkline {
+  height: 100%;
+  padding: 16px 0 8px;
+  box-sizing: border-box;
+}
+
 .discover-card-chart.is-empty {
   display: grid;
   place-items: center;

@@ -1,5 +1,14 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
 
 import { futuresFromDistribution } from "../../adapters/compareViewModel";
 import PossibleFuturesView from "./PossibleFuturesView";
@@ -38,6 +47,8 @@ describe("PossibleFuturesView", () => {
   it("reports scenario shares as percentages of simulated futures", () => {
     renderView("simple");
     expect(screen.getByLabelText("Possible future scenarios")).toHaveTextContent("82%");
+    expect(screen.getByTestId("series-outcome-0")).toHaveTextContent("Target reached82%");
+    expect(screen.getByTestId("series-outcome-1")).toHaveTextContent("Downside outcome18%");
   });
 
   it("withholds unweighted structural scenarios from the result view", () => {

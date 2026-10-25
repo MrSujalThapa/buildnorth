@@ -1,7 +1,9 @@
 ﻿import type { FutureScenario } from "../../adapters/compareViewModel";
 import { formatOutcomeRange, type OutcomeScale } from "../../adapters/outcomeFormat";
 import type { WhatIfView } from "../../adapters/templateTypes";
+import WealthsimpleAreaChart, { type ProbabilityBranch } from "../market/WealthsimpleAreaChart";
 import OutcomeIntervals from "./OutcomeIntervals";
+import { FUTURE_SERIES_COLORS, WORSE_SERIES_COLOR } from "./seriesColors";
 import { ScenarioComposer } from "./ScenarioComposer";
 
 type Props = {
@@ -21,6 +23,61 @@ type Props = {
 
 function share(scenario: FutureScenario | undefined): string {
   return scenario?.probability == null ? "—" : `${scenario.probability}%`;
+}
+
+const HORIZON_TICKS = [
+  { value: 0, label: "Today" },
+  { value: 1, label: "Goal deadline" },
+];
+
+function FuturesChart({
+  scenarios,
+  selectedId,
+  onSelect,
+}: {
+  scenarios: FutureScenario[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  let paletteIndex = 0;
+  const branches: ProbabilityBranch[] = scenarios
+    .filter((scenario) => scenario.probability != null)
+    .map((scenario) => {
+      const color =
+        scenario.tone === "negative"
+          ? WORSE_SERIES_COLOR
+          : FUTURE_SERIES_COLORS[paletteIndex++ % FUTURE_SERIES_COLORS.length]!;
+      return {
+        id: scenario.id,
+        label: scenario.label,
+        color,
+        points: [
+          { timestamp: 0, value: scenario.probability! },
+          { timestamp: 1, value: scenario.probability! },
+        ],
+      };
+    });
+  return (
+    <div className="futures-chart" role="group" aria-label="Possible future scenarios">
+      <div className="futures-chart-plot">
+        <WealthsimpleAreaChart
+          data={[]}
+          branches={branches}
+          lineOnly
+          percentAxis
+          showTimeAxis
+          xTicks={HORIZON_TICKS}
+          interactive={false}
+          highlightedBranchId={selectedId}
+          onBranchSelect={onSelect}
+          scenarioRegionLabel="Share of simulated futures"
+        />
+      </div>
+      <p className="what-if-chart-caption">
+        Each line is the share of simulated futures that end in that outcome by the deadline. The engine prices a single horizon, so the lines are level rather than a modeled path.
+      </p>
+    </div>
+  );
 }
 
 export default function PossibleFuturesView({
@@ -98,20 +155,7 @@ export default function PossibleFuturesView({
                 <strong>{mostLikely?.label ?? "—"}</strong>
                 <em>{share(mostLikely)}</em>
               </div>
-              <div className="scenario-distribution" aria-label="Possible future scenarios">
-                {scenarios.map((scenario) => (
-                  <button
-                    key={scenario.id}
-                    type="button"
-                    className={selectedClusterId === scenario.id ? "selected" : ""}
-                    onClick={() => toggle(scenario.id)}
-                  >
-                    <span>{scenario.label}</span>
-                    <strong>{share(scenario)}</strong>
-                    <i style={{ width: `${scenario.probability ?? 0}%` }} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
+              <FuturesChart scenarios={scenarios} selectedId={selectedClusterId} onSelect={toggle} />
               <div className="futures-selection" aria-live="polite">
                 <span>{selected?.label ?? "Select a scenario"}</span>
                 <p>
@@ -134,6 +178,8 @@ export default function PossibleFuturesView({
                   <strong>{strongChance}%</strong>
                 </div>
               </div>
+
+              <FuturesChart scenarios={scenarios} selectedId={selectedClusterId} onSelect={toggle} />
 
               <div className="deep-primary">
                 <div className="viz-block">
