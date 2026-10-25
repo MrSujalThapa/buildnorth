@@ -144,7 +144,7 @@ async def test_parallel_judges_cannot_cross_global_dollar_limit() -> None:
 
 def test_judge_hosted_allowance_defaults() -> None:
     settings = _settings()
-    assert settings.hosted_global_quota_usd == 100.0
+    assert settings.hosted_global_quota_usd == 250.0
     assert settings.hosted_user_quota_usd == 5.0
 
 

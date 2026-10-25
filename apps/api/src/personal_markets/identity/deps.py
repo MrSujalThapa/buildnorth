@@ -1,4 +1,3 @@
-from typing import Annotated
 import time
 from typing import Annotated
 from uuid import UUID
@@ -34,7 +33,8 @@ async def get_principal(
         verified_ms = round((time.perf_counter() - started) * 1000)
         principal = await identity.principal_from_claims(claims)
         structlog.get_logger(__name__).info(
-            "identity_timing", verified_ms=verified_ms,
+            "identity_timing",
+            verified_ms=verified_ms,
             principal_ms=round((time.perf_counter() - started) * 1000) - verified_ms,
         )
         return principal
@@ -53,7 +53,7 @@ async def get_invited_principal(
 async def get_admin_principal(
     principal: Annotated[Principal, Depends(get_principal)],
 ) -> Principal:
-    if principal.role != "admin":
+    if principal.role != "admin" or not principal.trusted_admin:
         raise ForbiddenError("admin access is required")
     return principal
 

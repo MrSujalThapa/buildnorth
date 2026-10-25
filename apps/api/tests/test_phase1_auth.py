@@ -58,8 +58,9 @@ def test_allowlisted_admin_bootstraps_without_invitation() -> None:
     assert me.status_code == 200
     body = me.json()
     assert body["role"] == "admin"
-    assert body["invited"] is False
-    assert body["hosted"]["enabled"] is False
+    assert body["invited"] is True
+    assert body["hosted"]["enabled"] is True
+    assert body["hosted"]["quota_usd"] == 100
     assert goals.status_code == 200
     assert goals.json() == []
     assert stolen.status_code == 404

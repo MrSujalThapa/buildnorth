@@ -29,9 +29,9 @@ def build_store(settings: Settings) -> RemoteMcpStore:
 
 
 async def _lookup_user(user_id: UUID) -> Principal | None:
-    from personal_markets.identity.factory import get_identity_repository
+    from personal_markets.identity.factory import get_identity_service
 
-    principal: Principal | None = await get_identity_repository().get_user(user_id)
+    principal: Principal | None = await get_identity_service().principal_for_user_id(user_id)
     return principal
 
 

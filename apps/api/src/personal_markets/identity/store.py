@@ -42,7 +42,7 @@ class InMemoryIdentityRepository:
             updated = existing.model_copy(
                 update={
                     "email": principal.email or existing.email,
-                    "email_verified": existing.email_verified or principal.email_verified,
+                    "email_verified": principal.email_verified,
                     "role": principal.role,
                 }
             )
@@ -110,7 +110,9 @@ class InMemoryIdentityRepository:
                 update={
                     "redemption_count": count,
                     "redeemed_by": invitation.redeemed_by or principal.user_id,
-                    "redeemed_at": now if count >= invitation.max_redemptions else invitation.redeemed_at,
+                    "redeemed_at": now
+                    if count >= invitation.max_redemptions
+                    else invitation.redeemed_at,
                 }
             )
             self.invites[invitation_id] = updated
@@ -168,6 +170,30 @@ class InMemoryIdentityRepository:
         )
         return True
 
+    async def has_invitation_redemption(self, user_id: UUID) -> bool:
+        return any(owner == user_id for _, owner in self.redemptions)
+
+    async def reconcile_entitlement(
+        self,
+        user_id: UUID,
+        *,
+        enabled: bool,
+        quota_usd: float,
+        quota_tokens: int,
+    ) -> None:
+        async with self._lock:
+            user = self.users.get(user_id)
+            if user is None:
+                return
+            self.users[user_id] = user.model_copy(
+                update={
+                    "invited": enabled,
+                    "hosted_enabled": enabled,
+                    "hosted_quota_usd": quota_usd if enabled else 0.0,
+                    "hosted_quota_tokens": quota_tokens if enabled else 0,
+                }
+            )
+
 
 class PostgresIdentityRepository:
     def __init__(self, engine: AsyncEngine) -> None:
@@ -184,7 +210,7 @@ class PostgresIdentityRepository:
                           values (:id, :clerk_user_id, :email, :email_verified, :role)
                           on conflict (clerk_user_id) do update set
                             email = coalesce(excluded.email, app_users.email),
-                            email_verified = app_users.email_verified or excluded.email_verified,
+                            email_verified = excluded.email_verified,
                             role = excluded.role
                           returning *
                         )
@@ -379,7 +405,9 @@ class PostgresIdentityRepository:
             )
             if updated is None:
                 raise RuntimeError("failed to consume invitation slot")
-            return RedeemResult(invitation=self._to_invitation(dict(updated)), already_redeemed=False)
+            return RedeemResult(
+                invitation=self._to_invitation(dict(updated)), already_redeemed=False
+            )
 
     async def revoke_invitation(self, invitation_id: UUID, now: datetime) -> Invitation | None:
         async with transaction(self._engine) as connection:
@@ -439,6 +467,50 @@ class PostgresIdentityRepository:
                 },
             )
         return bool(result.rowcount)
+
+    async def has_invitation_redemption(self, user_id: UUID) -> bool:
+        async with autocommit_connection(self._engine) as connection:
+            found = await connection.scalar(
+                text("""
+                select exists(select 1 from invitation_redemptions where user_id = :user_id)
+            """),
+                {"user_id": user_id},
+            )
+        return bool(found)
+
+    async def reconcile_entitlement(
+        self,
+        user_id: UUID,
+        *,
+        enabled: bool,
+        quota_usd: float,
+        quota_tokens: int,
+    ) -> None:
+        async with transaction(self._engine) as connection:
+            if enabled:
+                await connection.execute(
+                    text("""
+                    insert into hosted_entitlements (user_id, enabled, quota_usd, quota_tokens, granted_at)
+                    values (:user_id, true, :quota_usd, :quota_tokens, now())
+                    on conflict (user_id) do update set
+                      enabled = true,
+                      quota_usd = excluded.quota_usd,
+                      quota_tokens = excluded.quota_tokens
+                    where hosted_entitlements.enabled is distinct from true
+                       or hosted_entitlements.quota_usd is distinct from excluded.quota_usd
+                       or hosted_entitlements.quota_tokens is distinct from excluded.quota_tokens
+                """),
+                    {"user_id": user_id, "quota_usd": quota_usd, "quota_tokens": quota_tokens},
+                )
+            else:
+                await connection.execute(
+                    text("""
+                    update hosted_entitlements set enabled = false, quota_usd = 0, quota_tokens = 0
+                    where user_id = :user_id and
+                      (enabled is distinct from false or quota_usd <> 0 or quota_tokens <> 0)
+                """),
+                    {"user_id": user_id},
+                )
 
     async def get_profile(self, user_id: UUID) -> UserProfile:
         async with autocommit_connection(self._engine) as connection:

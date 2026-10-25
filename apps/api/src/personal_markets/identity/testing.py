@@ -30,7 +30,9 @@ def invited_principal(clerk_user_id: str = "test-user-a") -> Principal:
 
 
 def admin_principal(clerk_user_id: str = "test-admin") -> Principal:
-    return make_principal(clerk_user_id, email="admin@example.test", invited=True, role="admin")
+    return make_principal(
+        clerk_user_id, email="admin@example.test", invited=True, role="admin"
+    ).model_copy(update={"trusted_admin": True})
 
 
 def bearer_for(principal: Principal, secret: str) -> str:

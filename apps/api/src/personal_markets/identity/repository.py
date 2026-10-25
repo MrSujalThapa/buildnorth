@@ -50,3 +50,14 @@ class IdentityRepository(Protocol):
         invitation_id: UUID | None,
         now: datetime,
     ) -> bool: ...
+
+    async def has_invitation_redemption(self, user_id: UUID) -> bool: ...
+
+    async def reconcile_entitlement(
+        self,
+        user_id: UUID,
+        *,
+        enabled: bool,
+        quota_usd: float,
+        quota_tokens: int,
+    ) -> None: ...

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import cast
@@ -37,6 +38,20 @@ class InferenceBudgetService:
         self._store = store
         self._settings = settings
 
+    def _effective_caps(self, principal: Principal) -> tuple[float, int]:
+        admin = principal.role == "admin" and principal.trusted_admin
+        return (
+            min(
+                principal.hosted_quota_usd, self._settings.hosted_admin_quota_usd if admin else 5.0
+            ),
+            min(
+                principal.hosted_quota_tokens,
+                self._settings.hosted_admin_quota_tokens
+                if admin
+                else self._settings.hosted_user_quota_tokens,
+            ),
+        )
+
     async def usage_for(self, principal: Principal) -> HostedUsage:
         enabled, counters, global_counters = await asyncio.gather(
             self._store.hosted_enabled(self._settings.hosted_inference_enabled),
@@ -44,12 +59,9 @@ class InferenceBudgetService:
             self._store.counters("global"),
         )
         kill = not enabled
-        remaining_usd = max(
-            0.0, principal.hosted_quota_usd - counters.reserved_usd - counters.spent_usd
-        )
-        remaining_tokens = max(
-            0, principal.hosted_quota_tokens - counters.reserved_tokens - counters.spent_tokens
-        )
+        cap_usd, cap_tokens = self._effective_caps(principal)
+        remaining_usd = max(0.0, cap_usd - counters.reserved_usd - counters.spent_usd)
+        remaining_tokens = max(0, cap_tokens - counters.reserved_tokens - counters.spent_tokens)
         global_remaining = max(
             0.0,
             self._settings.hosted_global_quota_usd
@@ -65,15 +77,15 @@ class InferenceBudgetService:
         )
         return HostedUsage(
             enabled=principal.hosted_enabled and not kill,
-            quota_usd=principal.hosted_quota_usd,
-            quota_tokens=principal.hosted_quota_tokens,
+            quota_usd=cap_usd,
+            quota_tokens=cap_tokens,
             reserved_usd=counters.reserved_usd,
             spent_usd=counters.spent_usd,
             reserved_tokens=counters.reserved_tokens,
             spent_tokens=counters.spent_tokens,
             remaining_usd=remaining_usd,
             remaining_tokens=remaining_tokens,
-            global_remaining_usd=global_remaining if principal.role == "admin" else None,
+            global_remaining_usd=global_remaining if principal.trusted_admin else None,
             hosted_available=hosted_available,
             kill_switch=kill,
         )
@@ -82,11 +94,16 @@ class InferenceBudgetService:
         await self._store.set_hosted_enabled(enabled)
 
     async def reserve_research(self, principal: Principal | None, amount: float) -> Reservation:
-        if principal is None or not principal.hosted_enabled:
+        if not math.isfinite(amount) or amount <= 0:
+            raise ProviderBudgetExceededError("Invalid hosted research charge")
+        if principal is None or not principal.hosted_enabled or not (
+            principal.invited or principal.trusted_admin
+        ):
             raise ForbiddenError("Hosted research tool allowance is required")
         if not await self._store.hosted_enabled(self._settings.hosted_inference_enabled):
             raise ProviderNotConfiguredError("Hosted research tools are disabled")
         await self.enforce_application_limits(principal.user_id, None)
+        cap_usd, cap_tokens = self._effective_caps(principal)
         reservation = await self._store.reserve(
             user_id=principal.user_id,
             clerk_user_id=principal.clerk_user_id,
@@ -95,8 +112,8 @@ class InferenceBudgetService:
             model="approved_research_tool",
             amount_usd=amount,
             tokens=0,
-            user_cap_usd=principal.hosted_quota_usd,
-            user_cap_tokens=principal.hosted_quota_tokens,
+            user_cap_usd=cap_usd,
+            user_cap_tokens=cap_tokens,
             global_cap_usd=self._settings.hosted_global_quota_usd,
             global_cap_tokens=self._settings.hosted_global_quota_tokens,
             daily_cost_cap=self._settings.openai_max_cost_usd,
@@ -140,10 +157,13 @@ class InferenceBudgetService:
             raise ProviderNotConfiguredError("hosted inference is disabled")
         if not principal.hosted_enabled:
             raise ForbiddenError("this account has no hosted inference entitlement")
+        if not principal.invited and not principal.trusted_admin:
+            raise ForbiddenError("an invitation is required for hosted inference")
         await self._enforce_rate_limits(principal.user_id, client_ip)
         max_tokens = int(max_output_tokens)
         projected_tokens = max(256, max_tokens + input_token_bound)
         projected_usd = estimate_cost_usd(model, input_token_bound, max_tokens)
+        cap_usd, cap_tokens = self._effective_caps(principal)
         try:
             reserved = await self._store.reserve(
                 user_id=principal.user_id,
@@ -153,8 +173,8 @@ class InferenceBudgetService:
                 model=model,
                 amount_usd=projected_usd,
                 tokens=projected_tokens,
-                user_cap_usd=principal.hosted_quota_usd,
-                user_cap_tokens=principal.hosted_quota_tokens,
+                user_cap_usd=cap_usd,
+                user_cap_tokens=cap_tokens,
                 global_cap_usd=self._settings.hosted_global_quota_usd,
                 global_cap_tokens=self._settings.hosted_global_quota_tokens,
                 daily_cost_cap=self._settings.openai_max_cost_usd,

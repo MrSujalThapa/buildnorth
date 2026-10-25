@@ -73,7 +73,7 @@ def test_non_admin_me_omits_global_hosted_budget() -> None:
         assert "hosted_available" in hosted
         client.app.state.auth_bypass_principal = make_principal(
             "admin-one", invited=True, role="admin", email="admin@example.com"
-        )
+        ).model_copy(update={"trusted_admin": True})
         admin = client.get("/api/v1/me").json()["hosted"]
         assert admin["global_remaining_usd"] is not None
 

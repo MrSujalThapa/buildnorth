@@ -24,12 +24,14 @@ services:
         value: "true"
       - key: PM_HOSTED_USER_QUOTA_USD
         value: "5.0"
-      - key: PM_HOSTED_GLOBAL_QUOTA_USD
+      - key: PM_HOSTED_ADMIN_QUOTA_USD
         value: "100.0"
+      - key: PM_HOSTED_GLOBAL_QUOTA_USD
+        value: "250.0"
       - key: PM_HOSTED_USER_QUOTA_TOKENS
         value: "5000000"
       - key: PM_HOSTED_GLOBAL_QUOTA_TOKENS
-        value: "100000000"
+        value: "250000000"
       - key: PM_OPENAI_MAX_COST_USD
         value: "100.0"
       - key: PM_OPENAI_DAILY_TOKEN_BUDGET_HIGH_VOLUME
@@ -72,6 +74,8 @@ services:
       - key: PM_CLERK_AUTHORIZED_PARTIES
         sync: false
       - key: PM_ADMIN_EMAILS
+        sync: false
+      - key: PM_ADMIN_CLERK_USER_IDS
         sync: false
       - key: VITE_CLERK_PUBLISHABLE_KEY
         sync: false
