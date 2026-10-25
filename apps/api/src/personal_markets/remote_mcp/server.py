@@ -43,11 +43,9 @@ from personal_markets.core.config import Settings
 from personal_markets.identity.domain import Principal
 from personal_markets.remote_mcp.oauth import RemoteMcpAuthorization
 from personal_markets.remote_mcp.odds_app import (
-    ODDS_EXPLORER_HTML,
-    ODDS_UI_MIME,
     ODDS_UI_URI,
     UI_EXTENSION_ID,
-    PlayItOutUiExtension,
+    build_odds_apps,
 )
 from personal_markets.remote_mcp.policy import ObservationPolicy
 from personal_markets.remote_mcp.scopes import ALL_SCOPES, DEFAULT_SCOPES, TOOL_SCOPES
@@ -334,11 +332,10 @@ def build_remote_mcp(
         version="0.5.0",
         auth_server_provider=authorization,
         auth=auth,
-        extensions=[PlayItOutUiExtension()],
+        extensions=[build_odds_apps()],
     )
     _advertise_ui_on_handshake(server)
     _register_tools(server, tools, users, store)
-    _register_odds_app(server)
     security = TransportSecuritySettings(
         enable_dns_rebinding_protection=True,
         allowed_hosts=_host_patterns(settings.public_api_url),
@@ -751,7 +748,10 @@ def _register_tools(
             write=True,
         )
 
-    _CHART_META = {"ui": {"resourceUri": ODDS_UI_URI}}
+    _CHART_META = {
+        "ui": {"resourceUri": ODDS_UI_URI, "visibility": ["model", "app"]},
+        "ui/resourceUri": ODDS_UI_URI,
+    }
 
     @server.tool(
         annotations=_READ,
@@ -763,8 +763,9 @@ def _register_tools(
         range: Annotated[str, Field(pattern=r"^(1D|1W|1M|1Y|ALL)$")] = "ALL",
     ) -> OddsChartView:
         """Published forecast history for an interactive Odds Explorer. Hosts that
-        implement MCP Apps (io.modelcontextprotocol/ui) should render ui://playitout/odds-explorer.
-        Other hosts should call get_odds_chart_image. Never invents points."""
+        implement MCP Apps (io.modelcontextprotocol/ui) should render
+        ui://playitout/odds-explorer/v2. Other hosts should call get_odds_chart_image.
+        Never invents points."""
         return await run(
             "show_odds_chart",
             lambda who: tools.show_odds_chart(who, goal_id, range),
@@ -817,32 +818,19 @@ def _advertise_ui_on_handshake(server: MCPServer) -> None:
     """
     inner = server._lowlevel_server
     original = inner.create_initialization_options
-    settings = {"resourceUri": ODDS_UI_URI, "mimeType": ODDS_UI_MIME}
 
     def create_initialization_options(
         notification_options: Any = None,
         experimental_capabilities: dict[str, dict[str, Any]] | None = None,
         extensions: dict[str, dict[str, Any]] | None = None,
     ) -> Any:
+        advertised = dict(extensions if extensions is not None else inner.extensions)
         experimental = dict(experimental_capabilities or {})
-        experimental.setdefault(UI_EXTENSION_ID, settings)
+        experimental.setdefault(UI_EXTENSION_ID, advertised.get(UI_EXTENSION_ID, {}))
         return original(
             notification_options,
             experimental,
-            extensions,
+            advertised,
         )
 
     inner.create_initialization_options = create_initialization_options  # type: ignore[method-assign]
-
-
-def _register_odds_app(server: MCPServer) -> None:
-    @server.resource(
-        ODDS_UI_URI,
-        name="Odds Explorer",
-        title="PlayItOut Odds Explorer",
-        description="Interactive historical probability chart. Data comes from show_odds_chart.",
-        mime_type=ODDS_UI_MIME,
-        meta={"ui": {"csp": {"connectDomains": [], "resourceDomains": []}}},
-    )
-    async def odds_explorer() -> str:
-        return ODDS_EXPLORER_HTML
