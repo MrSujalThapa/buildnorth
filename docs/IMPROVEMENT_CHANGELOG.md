@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-24 — Preview quality for any connected source
+
+The same preview now classifies records from their fields. Empty rows and provider-prefixed labels are omitted. A source with no numeric measurement says that no measurable progress was detected. The Plugins page and the goal evidence page both use that preview. No forecast was published.
+
+## 2026-10-24 — Compact source preview
+
+The selected resource now shows a short unverified preview of the records that were actually read. A missing hosted-inference entitlement leaves those records tracked and says interpretation is pending. Structured evidence was not used, because that path republishes a priceable model. No forecast was published.
+
 ## 2026-10-24 — Universal source preview
 
 Connected sources now preview through one presentation model. A record is a measurement, activity, message, document, or plain record based on the fields that were actually returned. The evidence screen uses that model for resource cards, proposed measurements, and unverified previews. No provider-specific screen was added. Preview reads are not stored. No forecast was published.

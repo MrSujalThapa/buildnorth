@@ -535,6 +535,120 @@ def test_preview_shapes_follow_the_record_not_the_provider() -> None:
     assert preview.records[2].text.startswith("A long note")
 
 
+def test_unstructured_rows_drop_empty_text_and_provider_labels() -> None:
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+    from personal_markets.integrations.source_presentation import present_source
+
+    paragraph = "To organize your goals, break them down into smaller steps you can observe."
+    rows = normalize_tool_result(
+        plugin_id="acme_sheets",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name="ACME_GET_VALUES",
+        payload={
+            "values": [
+                [paragraph],
+                ["", ""],
+                ["|", "|", "|"],
+                ["Write the outcome you can observe this week."],
+            ]
+        },
+        user_id="user",
+    )
+    preview = present_source(
+        resource_title="Untitled",
+        resource_type="spreadsheet",
+        tool_name="ACME_GET_VALUES",
+        arguments={},
+        payloads=[row.payload for row in rows],
+    )
+    rendered = " ".join(
+        f"{record.title} {record.text or ''}" for record in preview.records
+    )
+    assert "row:" not in rendered
+    assert "acme_sheets" not in rendered.lower()
+    assert preview.measurements == []
+    assert preview.notice is not None
+    assert "No measurable progress detected" in preview.notice
+    assert len(preview.records) == 2
+    assert all(record.title.count(paragraph[:24]) <= 1 for record in preview.records)
+
+
+def test_repeated_fields_from_an_unknown_provider_become_a_labeled_table() -> None:
+    from personal_markets.integrations.source_presentation import present_source
+
+    preview = present_source(
+        resource_title="Work log",
+        resource_type="resource",
+        tool_name="NEWPROVIDER_LIST_ITEMS",
+        arguments={},
+        payloads=[
+            {"status": "open", "title": "Lane closure", "count": "2"},
+            {"status": "closed", "title": "Bridge work", "count": "1"},
+        ],
+    )
+    assert preview.columns == ["Status", "Title", "Count"]
+    assert [record.cells for record in preview.records] == [
+        ["open", "Lane closure", "2"],
+        ["closed", "Bridge work", "1"],
+    ]
+    assert preview.measurements == []
+    assert preview.tool_name == "NEWPROVIDER_LIST_ITEMS"
+
+
+def test_a_dated_numeric_grid_is_a_measurement_without_a_known_provider() -> None:
+    from personal_markets.integrations.composio_normalizer import normalize_tool_result
+    from personal_markets.integrations.source_presentation import present_source
+
+    rows = normalize_tool_result(
+        plugin_id="fieldkit",
+        plugin_connection_id=uuid4(),
+        sync_run_id=uuid4(),
+        tool_name="FIELDKIT_GET_GRID",
+        payload={
+            "values": [
+                ["Day", "Hours"],
+                ["2026-10-20", "3"],
+                ["2026-10-21", "4"],
+                ["", ""],
+            ]
+        },
+        user_id="user",
+    )
+    preview = present_source(
+        resource_title="Hours",
+        resource_type="resource",
+        tool_name="FIELDKIT_GET_GRID",
+        arguments={},
+        payloads=[row.payload for row in rows],
+    )
+    assert [record.kind for record in preview.records] == ["measurement", "measurement"]
+    assert [record.numeric_value for record in preview.records] == [3, 4]
+    assert preview.records[0].timestamp == "2026-10-20"
+    assert preview.measurements[0].label == "Hours"
+    assert preview.notice is None
+
+
+def test_a_grid_without_labels_does_not_use_the_first_row_as_headers() -> None:
+    from personal_markets.integrations.source_presentation import present_source
+
+    preview = present_source(
+        resource_title="Checklist",
+        resource_type="resource",
+        tool_name="ACME_GET_VALUES",
+        arguments={},
+        payloads=[
+            {"values": ["Ada Lovelace — 5551234", "Done"], "summary": "acme row: Ada"},
+            {"values": ["Grace Hopper", "Open"], "summary": "acme row: Grace"},
+        ],
+    )
+    assert preview.columns == []
+    assert "row:" not in " ".join(record.title for record in preview.records)
+    assert preview.records[0].title == "Ada Lovelace — 5551234"
+    assert preview.records[0].text == "Done"
+    assert preview.measurements == []
+
+
 @pytest.mark.asyncio
 async def test_preview_reads_without_storing_records() -> None:
     from personal_markets.integrations.mcp_domain import ReadCapabilityRecord

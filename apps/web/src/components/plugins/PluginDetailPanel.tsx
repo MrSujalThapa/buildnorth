@@ -1,6 +1,7 @@
 ﻿import { Check, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { PluginBrandIcon } from "./PluginBrandIcon";
+import { PluginResourcePreview } from "./PluginResourcePreview";
 import type { PluginDisplay } from "./PluginsPage";
 export default function PluginDetailPanel({
   plugin,
@@ -53,6 +54,7 @@ export default function PluginDetailPanel({
             {plugin.lastSyncLabel ? <span>{plugin.lastSyncLabel}</span> : null}
           </div>
         ) : null}
+        {connected ? <PluginResourcePreview pluginId={plugin.id} /> : null}
         <section>
           <h3>{connected ? "Available read actions" : "Potential reads after connection"}</h3>
           <ul>

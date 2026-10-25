@@ -38,6 +38,13 @@ const readsById: Record<string, string[]> = {
   figma: ["Selected files", "Design activity", "Prototype updates"],
 };
 
+export function readableAction(label: string): string {
+  if (!/^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(label)) return label;
+  const parts = label.split("_").slice(1);
+  const words = (parts.length ? parts : label.split("_")).map((part) => part.toLowerCase());
+  return words.join(" ").replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
 function formatLastSync(lastSyncAt: string | null | undefined): string | undefined {
   if (!lastSyncAt) return undefined;
   const parsed = new Date(lastSyncAt);
@@ -57,7 +64,7 @@ export function pluginViewToDisplay(plugin: PluginView): PluginDisplay {
   const id = plugin.definition.id;
   const reads =
     plugin.definition.capabilities.length > 0
-      ? plugin.definition.capabilities.map((capability) => capability.label)
+      ? plugin.definition.capabilities.map((capability) => readableAction(capability.label))
       : isPluginConnected(plugin)
         ? ["No compatible read action confirmed yet. Check Evidence to discover this connection's tools."]
         : readsById[id] ?? ["Selected read activity"];

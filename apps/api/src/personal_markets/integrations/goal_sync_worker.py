@@ -11,12 +11,33 @@ from uuid import UUID
 import structlog
 
 from personal_markets.core.config import get_settings
+from personal_markets.core.errors import (
+    ForbiddenError,
+    ProviderBudgetExceededError,
+    ProviderNotConfiguredError,
+)
 from personal_markets.integrations.goal_sync_jobs import GoalSyncJob, get_goal_sync_job_store
 from personal_markets.integrations.goal_sync_service import GoalSyncService
 from personal_markets.integrations.source_watches import get_source_watch_store
 from personal_markets.wiring import get_integration_repository, integration_gateway_for
 
 _log = structlog.get_logger(__name__)
+_INTERPRETATION_ERRORS = (ForbiddenError, ProviderBudgetExceededError, ProviderNotConfiguredError)
+
+
+def public_sync_error(error: BaseException) -> str:
+    """Explain a failed interpretation without describing a healthy source as disconnected."""
+    message = str(error).lower()
+    if isinstance(error, _INTERPRETATION_ERRORS) and any(
+        phrase in message for phrase in ("inference", "credit", "entitlement", "budget", "hosted")
+    ):
+        return (
+            "Source tracked — evidence interpretation pending. "
+            "Hosted inference credit is unavailable, so these records stay unverified."
+        )
+    if any(word in message for word in ("access denied", "permission", "unauthorized")):
+        return "Source access failed. Reconnect this source and try again."
+    return "Source sync failed. Review the connection and try again."
 
 
 async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
@@ -100,14 +121,7 @@ async def execute_goal_sync_job(application: Any, job: GoalSyncJob) -> None:
     except Exception as error:  # noqa: BLE001
         _log.exception("goal_source_sync_job_failed", run_id=str(job.id), goal_id=str(job.goal_id))
         receipt["error_type"] = type(error).__name__
-        public_error = (
-            "Source access failed. Reconnect this source and try again."
-            if any(
-                word in str(error).lower()
-                for word in ("access denied", "permission", "unauthorized")
-            )
-            else "Source sync failed. Review the connection and try again."
-        )
+        public_error = public_sync_error(error)
         await store.update(
             job.id,
             status="failed",

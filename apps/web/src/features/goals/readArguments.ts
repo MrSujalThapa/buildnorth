@@ -15,7 +15,7 @@ const PAGE_ARGUMENT_KEYS = new Set([
 
 const RESOURCE_ARGUMENT = /(^|_)(id|query|channel|q)$|calendarId|spreadsheetId/;
 
-export function schemaBody(schema: ReadArgumentSchema | undefined): ReadArgumentSchema {
+export function schemaBody(schema: ReadArgumentSchema | null | undefined): ReadArgumentSchema {
   return schema?.parameters ?? schema ?? {};
 }
 

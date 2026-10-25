@@ -14,7 +14,7 @@ import { PluginBrandIcon } from "../../components/plugins/PluginBrandIcon";
 import { isPluginConnected, pluginViewToDisplay } from "../../components/plugins/pluginPresentation";
 import { AgentProgress } from "../agents/AgentProgress";
 import { EvidenceWorkflow } from "./EvidenceWorkflow";
-import { additionalRequiredArguments, schemaBody, type ReadArgumentSchema } from "./readArguments";
+import { additionalRequiredArguments, schemaBody } from "./readArguments";
 import { ResourceMark, SourcePreviewView, sourceNoun } from "./SourcePreview";
 import "./evidence.css";
 
@@ -648,7 +648,7 @@ function SourceResourcePanel({
     }).map((item) => ({ value: item.tool_name!, label: item.label, tools: [item.tool_name!] }));
   const generic = !["github", "notion", "calendar"].includes(source.pluginId);
   const selectedCapability = (capabilities.data ?? []).find((item) => item.tool_name === selectedActivities[0]);
-  const selectedSchema = schemaBody(selectedCapability?.input_schema as ReadArgumentSchema | undefined);
+  const selectedSchema = schemaBody(selectedCapability?.input_schema);
   const requiredFields = generic ? additionalRequiredArguments(selectedSchema) : [];
   const schemaProperties = selectedSchema.properties ?? {};
   const requiredArgumentsReady = requiredFields.every((key) => (readArguments[key] ?? "").trim());
@@ -677,23 +677,26 @@ function SourceResourcePanel({
   const noun = sourceNoun(options.map((item) => item.resource_type));
   const [measurementId, setMeasurementId] = useState<string | null>(null);
   const [trackingLabel, setTrackingLabel] = useState("");
+  const [previewArguments, setPreviewArguments] = useState<Record<string, string>>({});
   const preview = useQuery({
-    queryKey: ["plugin-preview", source.pluginId, selectedOption?.resource_id, readArguments],
+    queryKey: ["plugin-preview", source.pluginId, selectedOption?.resource_id, previewArguments],
     queryFn: () => api.previewPluginSource(source.pluginId, {
       resource_id: selectedOption?.resource_id ?? "",
       resource_title: selectedOption?.label,
       resource_type: selectedOption?.resource_type,
-      arguments: readArguments,
+      arguments: previewArguments,
     }),
-    enabled: generic && Boolean(selectedOption),
+    enabled: Boolean(selectedOption),
+    staleTime: 60_000,
   });
   useEffect(() => {
     setMeasurementId(null);
     setTrackingLabel("");
+    setPreviewArguments({});
   }, [selectedOption?.resource_id]);
   useEffect(() => {
     const data = preview.data;
-    if (!data?.tool_name) return;
+    if (!data?.tool_name || !generic) return;
     if (selectedActivities[0] !== data.tool_name) onToggleActivity(data.tool_name);
     for (const [key, value] of Object.entries(data.arguments)) {
       const identifiesResource = /(^|_)(id|query|channel|q)$|calendarId|spreadsheetId/.test(key);
@@ -704,7 +707,7 @@ function SourceResourcePanel({
       setMeasurementId((current) => current ?? measurement.id);
       setTrackingLabel((current) => current || measurement.label);
     }
-  }, [preview.data, onArgumentChange, onToggleActivity, readArguments, selectedActivities]);
+  }, [preview.data, generic, onArgumentChange, onToggleActivity, readArguments, selectedActivities]);
 
   return (
     <div className="evidence-resource-panel">
@@ -746,6 +749,25 @@ function SourceResourcePanel({
                     <ExternalLink size={17} aria-hidden="true" />
                   </a>
                 ) : null}
+                {checked ? (
+                  <div className="source-inline-preview">
+                    {preview.isLoading ? <p className="field-hint" role="status">Reading this source…</p> : null}
+                    {preview.isError ? <p className="field-hint" role="alert">This source could not be read. Check permission and try again.</p> : null}
+                    {preview.data ? (
+                      <SourcePreviewView
+                        preview={preview.data}
+                        selectedMeasurementId={measurementId}
+                        trackingLabel={trackingLabel}
+                        onSelectMeasurement={(id) => {
+                          const measurement = preview.data?.measurements.find((item) => item.id === id);
+                          setMeasurementId(id);
+                          setTrackingLabel(measurement?.label ?? "");
+                        }}
+                        onTrackingLabel={setTrackingLabel}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -773,21 +795,6 @@ function SourceResourcePanel({
           />
         </label>
       ) : null}
-      {generic && selectedOption && preview.data ? (
-        <SourcePreviewView
-          preview={preview.data}
-          selectedMeasurementId={measurementId}
-          trackingLabel={trackingLabel}
-          onSelectMeasurement={(id) => {
-            const measurement = preview.data?.measurements.find((item) => item.id === id);
-            setMeasurementId(id);
-            setTrackingLabel(measurement?.label ?? "");
-          }}
-          onTrackingLabel={setTrackingLabel}
-        />
-      ) : null}
-      {generic && selectedOption && preview.isLoading ? <p className="field-hint" role="status">Reading the selected source…</p> : null}
-      {generic && selectedOption && preview.isError ? <p className="field-hint" role="alert">The selected source could not be read. Check the connection and try again.</p> : null}
       {generic && !options.length ? (
         <label className="evidence-ref-field">
           <span>Authorized resource ID or bounded query</span>
@@ -802,16 +809,20 @@ function SourceResourcePanel({
         const choices = property?.enum ?? [];
         return (
           <label key={key} className="evidence-ref-field">
-            <span>{key.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase())}</span>
+            <span>{key === "range" ? "Rows to include" : key.replaceAll("_", " ").replace(/^\w/, (letter) => letter.toUpperCase())}</span>
             {choices.length ? (
-              <select className="ui-field" value={readArguments[key] ?? ""} onChange={(event) => onArgumentChange(key, event.target.value)}>
+              <select className="ui-field" value={readArguments[key] ?? ""} onChange={(event) => {
+                onArgumentChange(key, event.target.value);
+                setPreviewArguments((current) => ({ ...current, [key]: event.target.value }));
+              }}>
                 <option value="">Select</option>
                 {choices.map((choice) => <option key={choice} value={choice}>{choice}</option>)}
               </select>
             ) : (
               <input className="ui-field" value={readArguments[key] ?? ""} maxLength={500} required
                 onChange={(event) => onArgumentChange(key, event.target.value)}
-                placeholder="Enter the value this read requires" />
+                onBlur={(event) => setPreviewArguments((current) => ({ ...current, [key]: event.target.value.trim() }))}
+                placeholder={key === "range" ? "Window this read should include" : "Enter the value this read requires"} />
             )}
           </label>
         );

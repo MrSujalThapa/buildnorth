@@ -283,6 +283,7 @@ export interface SourcePreviewRecord {
   text?: string | null;
   actor?: string | null;
   metrics?: { label: string; value: number; unit?: string | null }[];
+  cells?: string[];
 }
 
 export interface SourcePreview {
@@ -291,8 +292,10 @@ export interface SourcePreview {
   tool_name: string;
   arguments: Record<string, string>;
   fields: { key: string; label: string; role: string }[];
+  columns?: string[];
   measurements: { id: string; label: string; detail: string; unit?: string | null; ambiguous: boolean }[];
   records: SourcePreviewRecord[];
+  notice?: string | null;
   validation_status: "unverified";
   promotes_to_verified_outcome: false;
   error?: string | null;
