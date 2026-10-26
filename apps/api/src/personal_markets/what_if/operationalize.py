@@ -69,7 +69,7 @@ _FAMILIES: tuple[_Family, ...] = (
         id="outreach",
         pattern=re.compile(
             r"cold[\s-]?e?-?mail|\bemail(?:ing)?\b|outreach|reach(?:ing)? out|\bdms?\b|"
-            r"\bmessag|network(?:ing)?|referr|recruiters?|coffee chats?|warm intros?|"
+            r"\bmessag|network(?:ing)?|referr|recruiters?|warm intros?|"
             r"connect(?:ing)? with|linkedin|hiring managers?",
             re.I,
         ),
@@ -427,14 +427,113 @@ def _qualitative_plan(family: _Family, baseline: WhatIfBaselineState) -> Strateg
     )
 
 
+_COUNT = re.compile(r"(\d+(?:,\d{3})*(?:\.\d+)?)(?!\s*%)")
+_WORD = re.compile(r"[A-Za-z][A-Za-z'-]*")
+# Words that name the speaker or the ask, not the activity being counted.
+_CLAUSE_NOISE = frozenset(
+    {"what", "if", "i", "im", "i'm", "have", "has", "had", "do", "did", "my", "a", "an", "the"}
+)
+
+
+def _counted_clause(text: str) -> str | None:
+    """Words beside the quantity. A later clause must not decide what the number counts."""
+    cleaned = _REPLY_RATE.sub(" ", text)
+    match = _COUNT.search(cleaned)
+    if match is None:
+        return None
+    before = _WORD.findall(cleaned[: match.start()])[-6:]
+    after = _WORD.findall(cleaned[match.end() :])[:5]
+    clause = " ".join(before + after).strip()
+    return clause or None
+
+
+def _activity_phrase(text: str) -> str:
+    clause = _counted_clause(text) or ""
+    words = [word for word in clause.split() if word.lower() not in _CLAUSE_NOISE]
+    trailing = {"per", "week", "weekly", "month", "monthly", "day", "daily", "at", "with", "for"}
+    while words and words[-1].lower() in trailing:
+        words.pop()
+    while words and words[0].lower() in {"more", "extra", "additional"}:
+        words.pop(0)
+    return " ".join(words[:6])
+
+
+def _unmapped_activity(
+    baseline: WhatIfBaselineState, text: str
+) -> tuple[StrategyPlan, list[InterventionChangeResponse]] | None:
+    """A counted activity with no model lever stays unpriced on every goal."""
+    if not baseline.priced:
+        return None
+    quantity = _stated_quantity(text, "week")
+    activity = _activity_phrase(text)
+    if quantity is None or quantity <= 0 or len(activity) < 3:
+        return None
+    levers = [
+        StrategyLever(
+            assumption=item.name,
+            label=item.name.replace("_", " ").replace(".", " "),
+            unit=item.unit,
+            unit_label=item.unit,
+            baseline_value=item.value,
+            minimum=item.minimum,
+            maximum=item.maximum,
+            question=(
+                f"What share of each {activity} should change {item.name.replace('_', ' ')}? "
+                "Nothing is priced until you say."
+            ),
+            mapping_note=(
+                f"{activity} is not an input of this model. Connect it to {item.name} "
+                "with an explicit conversion, or leave it unpriced."
+            ),
+        )
+        for item in baseline.assumptions
+        if item.editable
+    ]
+    if not levers:
+        return None
+    return (
+        StrategyPlan(
+            family="unmapped_action",
+            interpretation=(
+                f"You described {quantity:g} {activity}. That activity is not one of this "
+                "goal's model inputs, so no probability change is assumed."
+            ),
+            levers=levers,
+            needs=[
+                "Name which existing model input this activity changes, and the conversion. "
+                "No uplift is assumed."
+            ],
+            analysis=[
+                StrategyAnalysisPoint(
+                    heading="Unpriced until you connect it",
+                    body=(
+                        "Any counted activity this model does not already price takes this path. "
+                        "The engine does not invent a conversion or a probability."
+                    ),
+                )
+            ],
+            stated_quantity=quantity,
+            modeled=False,
+            affected_outcomes=[item.assumption for item in levers],
+            metrics_to_track=[activity.replace(" ", "_")],
+            unpriced=True,
+        ),
+        [],
+    )
+
+
 def operationalize_strategy(
     baseline: WhatIfBaselineState, text: str
 ) -> tuple[StrategyPlan, list[InterventionChangeResponse]] | None:
     """Map a strategy onto priced options; return the plan and any change it fully specifies."""
     if not text.strip():
         return None
+    # When a quantity is present, only the words beside it can select a lever.
+    # "10 coffee chats ... at startups I'm applying to" is not 10 applications.
+    clause = _counted_clause(text)
+    scope = clause if clause is not None else text
     for family in _FAMILIES:
-        if not family.pattern.search(text):
+        if not family.pattern.search(scope):
             continue
         decrease = is_decrease(text)
         assumption = _target(baseline, family) if baseline.priced else None
@@ -524,7 +623,7 @@ def operationalize_strategy(
             conflicts=list(resolved.conflicts) if resolved is not None else [],
         )
         return plan, changes
-    return None
+    return _unmapped_activity(baseline, text)
 
 
 def _stated_inputs(options: list[StrategyOption], selected: str | None) -> dict[str, float]:

@@ -125,7 +125,7 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         mine = client.get(f"/api/v1/goals/{fork_id}")
         assert mine.status_code == 200
         assert mine.json()["title"] == "My FDE path"
-        archived = client.post(f"/api/v1/goals/{fork_id}/archive")
+        archived = client.delete(f"/api/v1/goals/{fork_id}")
         assert archived.status_code == 200
         again = client.post(
             f"/api/v1/social/markets/{goal.goal_id}/fork",
@@ -155,7 +155,7 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         assert gone.status_code == 404
         still_listed = client.get("/api/v1/public/markets")
         assert still_listed.json()["items"] == []
-        still_mine = client.get(f"/api/v1/goals/{fork_id}")
+        still_mine = client.get(f"/api/v1/goals/{again.json()['goal_id']}")
         assert still_mine.status_code == 200
         stars = client.get("/api/v1/public/profiles/bob/stars")
         assert stars.json()["items"] == []

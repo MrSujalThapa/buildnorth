@@ -10,6 +10,14 @@ This file is both an engineering log and a hackathon deliverable.
 
 **Measured result:** Evidence, hiring, phase3, and MCP tests passed. Archived forks no longer occupy the active uniqueness key, so the same source can be forked again. Ruff baseline is clean. No Spur calls.
 
+## 2026-10-26 — Unlisted What If activities stay unpriced
+
+**Hypothesis:** Matching a family keyword anywhere in the sentence prices the wrong lever. The counted activity has to be the words next to the quantity.
+
+**Changes:** A known lever is selected only from the clause around the number. Any other counted activity, on any goal, returns an unpriced plan whose levers are that goal's existing inputs and asks for a conversion. No coefficient is invented. Hiring stage classification uses the metric, not a denylist of activity names; free text names a stage only when the metric itself is generic. Fork re-create uses DELETE, and the active-fork lookup casts a null idempotency key to text so Postgres can type it.
+
+**Measured result:** `test_operationalize_strategy.py`, `test_hiring_model.py`, `test_evidence_informational.py`, and the marketplace fork test passed locally. No Spur calls. Not yet in production.
+
 ## 2026-10-26 — Invited judges receive $10 hosted Spur credit
 
 **Hypothesis:** The invite-only gate already works; the remaining judge-credit mismatch was the $5 hard cap.

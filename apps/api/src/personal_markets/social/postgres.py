@@ -271,7 +271,7 @@ class PostgresSocialRepository:
                         text(
                             f"{self._goal_select()} where user_id = :owner and status = 'active'"
                             " and (forked_from_goal_id = :source"
-                            " or (:key is not null and fork_idempotency_key = :key))"
+                            " or fork_idempotency_key = cast(:key as text))"
                             " order by updated_at desc limit 1"
                         ),
                         {"owner": owner_id, "source": source_goal_id, "key": idempotency_key},
