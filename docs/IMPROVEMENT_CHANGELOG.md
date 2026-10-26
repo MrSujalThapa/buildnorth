@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Persist unmodeled evidence; FDE uses the hiring funnel
+
+**Hypothesis:** Real observations were dropped when they lacked a model coefficient, and natural FDE goals compiled as empty DAGs that only accepted the final offer.
+
+**Changes:** Unmapped MCP/website observations persist as informational. Coffee chats, cold emails, and NeetCode submissions are not interviews, applications, or study hours. Funnel tokens in the title/metric win over sequential-launch DAG. Metric names clip to 80 characters. Codex's period-vs-stock fingerprinting was reused; the larger forecast-reliability worktree was left intact.
+
+**Measured result:** `test_evidence_informational.py`, hiring, phase3 primitives/scenarios, and the MCP invalid-metric case passed locally. No Spur calls.
+
 ## 2026-10-26 — Invited judges receive $10 hosted Spur credit
 
 **Hypothesis:** The invite-only gate already works; the remaining judge-credit mismatch was the $5 hard cap.

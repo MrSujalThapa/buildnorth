@@ -91,9 +91,11 @@ def refine_architect_proposal(proposal: GoalArchitectProposal) -> GoalArchitectP
     inferred = infer_primitive_kind(proposal)
     kind = proposal.primitive_kind or inferred
     # Sequential launch → then → milestone is a DAG even if the architect labelled it a
-    # funnel or growth process. The live proposal is still validated; this only selects
-    # the compiler family.
-    if inferred == "dependency_dag":
+    # funnel or growth process. Hiring pipelines stay a funnel: "after applying" is not
+    # a product-launch DAG, and empty DAG nodes only accept the final offer event.
+    if inferred == "funnel":
+        kind = "funnel"
+    elif inferred == "dependency_dag":
         kind = "dependency_dag"
     clarifications = list(proposal.clarifications_required)
     if proposal.success_target in {"", "unspecified"} and not any(
@@ -171,11 +173,16 @@ def infer_primitive_kind(proposal: GoalArchitectProposal) -> str | None:
     blob = _blob(proposal)
     if proposal.goal_type == "habit":
         return "habit"
-    if (proposal.goal_type == "multi_outcome" or any(token in blob for token in _DAG_TOKENS)) and (
-        "launch" in blob or "then" in blob or "milestone" in blob
-    ):
+    outcome = " ".join(
+        [proposal.title, proposal.success_metric, proposal.success_target]
+    ).lower()
+    hiring_funnel = any(token in outcome for token in _FUNNEL_TOKENS)
+    sequential_launch = (
+        proposal.goal_type == "multi_outcome" or any(token in blob for token in _DAG_TOKENS)
+    ) and ("launch" in blob or "then" in blob or "milestone" in blob)
+    if sequential_launch and not hiring_funnel:
         return "dependency_dag"
-    if any(token in blob for token in _FUNNEL_TOKENS) and proposal.goal_type == "deadline_event":
+    if hiring_funnel and proposal.goal_type in {"deadline_event", "multi_outcome"}:
         return "funnel"
     if any(token in blob for token in _GROWTH_TOKENS):
         return "growth"

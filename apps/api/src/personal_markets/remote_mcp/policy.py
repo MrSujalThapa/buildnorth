@@ -13,7 +13,11 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from personal_markets.evidence.metrics import canonicalize_metric, is_period_metric
+from personal_markets.evidence.metrics import (
+    canonicalize_metric,
+    clip_metric_name,
+    is_period_metric,
+)
 from personal_markets.forecasting.inputs_builder import proposal_from_goal
 from personal_markets.forecasting.priceability import requirements_for
 from personal_markets.goals.domain import GoalContract
@@ -162,6 +166,23 @@ def observation_policy(goal: GoalContract) -> ObservationPolicy:
         kind_semantics=KIND_SEMANTICS,
         validation_rules=VALIDATION_RULES,
         limitations=limitations,
+    )
+
+
+def informational_policy(metric: str, unit: str | None = None, kind: str | None = None) -> MetricPolicy:
+    """Persist a legitimate observation the numerical model cannot consume."""
+    accepted: list[Kind] = ["snapshot", "increment", "period"]
+    default: Kind = kind if kind in accepted else "increment"
+    clipped = clip_metric_name(metric)
+    return MetricPolicy(
+        metric=clipped,
+        label=clipped.replace("_", " "),
+        unit=(unit or "count"),
+        required=False,
+        accepted_names=[clipped, metric],
+        accepted_kinds=accepted,
+        default_kind=default,
+        why="Recorded as informational evidence. The numerical model has no coefficient for it.",
     )
 
 

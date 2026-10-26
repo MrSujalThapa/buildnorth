@@ -179,10 +179,18 @@ def anchor_reported_today_increment(
     return event.model_copy(update={"observed_at": received_at.isoformat()})
 
 
+METRIC_NAME_LIMIT = 80
+
+
+def clip_metric_name(metric: str, limit: int = METRIC_NAME_LIMIT) -> str:
+    return (metric or "").strip()[:limit]
+
+
 def observation_kind(
     metric: str,
     event_type: str,
     explicit: str | None = None,
+    unit: str | None = None,
 ) -> ObservationKind:
     if explicit == "event":
         return "increment"
@@ -196,10 +204,16 @@ def observation_kind(
         raise ValueError("Observation aggregation requires clarification")
     canonical = canonicalize_metric(metric)
     normalized_type = event_type.strip().lower()
-    if canonical in _PERIOD_METRICS:
-        return "period"
     if normalized_type in _INCREMENT_EVENT_TYPES:
         return "increment"
+    normalized_unit = (unit or "").lower().replace(" ", "")
+    if any(
+        token in normalized_unit
+        for token in ("/week", "perweek", "/month", "permonth", "/day", "perday")
+    ):
+        return "period"
+    if canonical in _PERIOD_METRICS:
+        return "period"
     if normalized_type == "manual_state_entry" or canonical in _SNAPSHOT_METRICS:
         return "snapshot"
     return "increment"
@@ -208,10 +222,10 @@ def observation_kind(
 def reduce_stock_value(
     observations: list[tuple[datetime, float, ObservationKind]],
 ) -> float:
-    """Latest snapshot/period wins; dated increments after that snapshot still add."""
+    """Latest absolute snapshot wins; period rates never become stock totals."""
     if not observations:
         return 0.0
-    snapshots = [item for item in observations if item[2] in {"snapshot", "period"}]
+    snapshots = [item for item in observations if item[2] == "snapshot"]
     increments = [item for item in observations if item[2] == "increment"]
     if not snapshots:
         return float(sum(item[1] for item in increments))
@@ -241,20 +255,25 @@ def latest_metric_value(
     return dated[-1][1]
 
 
-def period_key(kind: ObservationKind, metric: str, observed_at: datetime | None) -> str:
+def period_key(
+    kind: ObservationKind, metric: str, observed_at: datetime | None, unit: str | None = None
+) -> str:
     if observed_at is None or kind == "snapshot":
         return ""
     if kind == "period":
         canonical = canonicalize_metric(metric)
-        if canonical.startswith("weekly_"):
+        unit_label = (unit or "").lower().replace(" ", "")
+        if canonical.startswith("weekly_") or "/week" in unit_label or "perweek" in unit_label:
             iso = observed_at.isocalendar()
             return f"{iso.year}-W{iso.week:02d}"
+        if canonical.startswith("daily_") or "/day" in unit_label or "perday" in unit_label:
+            return observed_at.date().isoformat()
         return observed_at.strftime("%Y-%m")
     return observed_at.date().isoformat()
 
 
 def canonicalize_event(event: EvidenceEventProposal) -> EvidenceEventProposal:
-    canonical = canonicalize_metric(event.metric)
+    canonical = clip_metric_name(canonicalize_metric(event.metric))
     if canonical == event.metric:
         return event
     return event.model_copy(update={"metric": canonical})

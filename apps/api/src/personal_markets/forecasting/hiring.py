@@ -133,8 +133,12 @@ def aggregate_funnel_from_evidence(
             last_activity = observed
 
         count = float(_event_count(item))
-        kind = observation_kind(item.metric, item.event_type, item.provenance.observation_kind)
-        stage = _resolve_stage(metric, event_type, category, summary)
+        kind = observation_kind(
+            item.metric, item.event_type, item.provenance.observation_kind, item.unit
+        )
+        if kind == "period":
+            continue
+        stage = _resolve_stage(metric, event_type, category, f"{summary} {item.unit or ''}")
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)
             rejection_rows.setdefault(rejection_stage, []).append((observed, count, kind))
@@ -609,6 +613,23 @@ def _event_count(item: NormalizedEvidence) -> int:
 
 def _resolve_stage(metric: str, event_type: str, category: str, summary: str) -> str:
     blob = " ".join([metric, event_type, category, summary])
+    if _matches(
+        blob,
+        (
+            "coffee chat",
+            "coffee_chat",
+            "coffee chats",
+            "cold email",
+            "cold_email",
+            "cold emails",
+            "cold outreach",
+        ),
+    ):
+        return "unrelated"
+    if _matches(blob, ("neetcode", "leetcode")):
+        if "hour" in blob or _matches(blob, ("practice_hours", "study_hours", "prep_hours")):
+            return "practice"
+        return "unrelated"
     if _matches(blob, ("offer_received", "signed_offer", "offer", "received offer")):
         return "offer"
     if _matches(blob, ("reject", "rejected", "declined", "failed screen", "no offer")):
@@ -638,7 +659,9 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
         return "technical"
     if _matches(blob, ("final round", "final_round", "final interview", "onsite loop")):
         return "final"
-    if _matches(blob, ("leetcode", "practice", "study", "prep", "hours")):
+    if _matches(blob, ("practice_hours", "prep_hours", "study_hours")) or (
+        _matches(blob, ("practice", "study", "prep")) and "hour" in blob
+    ):
         return "practice"
     if "interview" in blob:
         return "technical"

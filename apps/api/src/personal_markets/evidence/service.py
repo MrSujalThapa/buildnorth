@@ -77,7 +77,7 @@ def evidence_fingerprint(
     user_id: UUID, event: EvidenceEventProposal, goal_id: UUID | None = None
 ) -> str:
     event = canonicalize_event(event)
-    kind = observation_kind(event.metric, event.event_type, event.observation_kind)
+    kind = observation_kind(event.metric, event.event_type, event.observation_kind, event.unit)
     observed = parse_observed_at(event.observed_at)
     # Source, event type and summary are provenance, not identity. Period/day
     # keys keep distinct increments and weekly/monthly readings from collapsing.
@@ -86,7 +86,7 @@ def evidence_fingerprint(
             str(goal_id or ""),
             kind,
             event.metric,
-            period_key(kind, event.metric, observed),
+            period_key(kind, event.metric, observed, event.unit),
             "" if event.numeric_value is None else f"{event.numeric_value:.6f}",
             event.categorical_value or "",
         ]

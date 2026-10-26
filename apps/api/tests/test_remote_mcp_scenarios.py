@@ -264,12 +264,12 @@ async def test_b_invalid_metric_unit_and_kind_are_rejected_with_policy_hints() -
             )
         )
         rows = await _deps(harness).evidence.list_for_goal(UUID(goal_id))
-    assert bad_metric["error"]["code"] == "invalid_argument"
-    assert "applications_submitted" in bad_metric["error"]["details"]["accepted_metrics"]
+    assert bad_metric.get("status") == "committed"
+    assert bad_metric["evidence"][0]["metric"] == "salary"
     assert bad_unit["error"]["code"] == "invalid_argument"
     assert future["error"]["code"] == "invalid_argument"
     assert no_time["error"]["code"] == "invalid_argument"
-    assert rows == []
+    assert [item.metric for item in rows] == ["salary"]
 
 
 async def test_b_client_cannot_claim_higher_trust() -> None:
