@@ -19,12 +19,20 @@ const result = { priced: true, baseline_probability: 0.3, scenario_probability: 
 describe("draftPlan", () => {
   it("stores the priced scenario as a hypothesis with totals for the window", () => {
     const draft = draftPlan({ priced, result, domain: "career", durationWeeks: 8, start: new Date("2026-10-26T00:00:00Z") });
-    expect(draft?.summary).toBe("+10 applications per week for 8 weeks");
+    expect(draft?.summary).toBe("+10 outreach emails per week for 8 weeks");
+    expect(draft?.body.unit).toBe("outreach emails");
     expect(draft?.body.planned_quantity).toBe(80);
     expect(draft?.body.action).toBe("Cold email 10 founders a week");
     expect(draft?.body.window_end).toBe("2026-12-21T00:00:00.000Z");
     expect(draft?.body.plan_context.changes).toHaveLength(2);
     expect(draft?.body.plan_context.scenario_probability).toBe(0.42);
+  });
+
+  it("keeps the application unit when the user chose that proxy", () => {
+    const proxy = { ...priced, option_id: "as_applications", proxy: true, changes: [priced.changes[0]!] };
+    const draft = draftPlan({ priced: proxy, result, domain: "career", durationWeeks: 8, start: new Date("2026-10-26T00:00:00Z") });
+    expect(draft?.body.unit).toBe("applications");
+    expect(draft?.summary).toBe("+10 applications per week for 8 weeks");
   });
 
   it("refuses to draft when nothing was priced", () => {

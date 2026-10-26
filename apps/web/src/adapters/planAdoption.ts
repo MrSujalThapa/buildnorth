@@ -27,6 +27,13 @@ function unitNoun(change: ParsedInterventionChange) {
   return (noun === "currency" ? "dollars" : noun || "units").slice(0, MAX_UNIT);
 }
 
+/** Reply-rate outreach is priced through the application lever, but the plan is emails. */
+function displayUnit(priced: StrategyChangesResponse, change: ParsedInterventionChange) {
+  const modeledAsApplications = /application/i.test(`${change.metric} ${change.unit}`);
+  if (priced.option_id === "reply_rate" && !priced.proxy && modeledAsApplications) return "outreach emails";
+  return unitNoun(change);
+}
+
 function actionText(title: string) {
   const action = title.trim().replace(/^what\s*if\s*(i\s+)?/i, "").replace(/\?$/, "");
   const text = action ? `${action.charAt(0).toUpperCase()}${action.slice(1)}` : "Planned change";
@@ -56,7 +63,7 @@ export function draftPlan(args: {
   const perPeriod = Math.abs(lead.value);
   const decrease = lead.operation === "subtract";
   const end = new Date(args.start.getTime() + weeks * 7 * DAY_MS);
-  const noun = unitNoun(lead);
+  const noun = displayUnit(priced, lead);
   return {
     decrease,
     summary: `${decrease ? "−" : "+"}${formatQuantity(perPeriod)} ${noun} per ${period} for ${periods} ${period}${periods === 1 ? "" : "s"}`,

@@ -64,6 +64,9 @@ def test_reading_goal_exposes_primary_rate_not_an_application_lever() -> None:
     baseline = build_baseline_state(_reading_goal(), _evidence([(90, 2), (60, 3), (30, 4), (0, 5)]))
     names = [item.name for item in baseline.assumptions if item.editable]
     assert "primary.rate" in names
+    assert baseline.priceability is not None
+    assert baseline.priceability.status == "PRICED"
+    assert baseline.priceability.missing == []
     assert "weekly_application_rate" not in names
     assert "flow" not in names
     plan, changes = operationalize_strategy(baseline, "what if I read 1 more book a week")  # type: ignore[misc]

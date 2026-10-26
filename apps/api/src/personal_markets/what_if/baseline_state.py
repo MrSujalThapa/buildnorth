@@ -114,8 +114,11 @@ def build_baseline_state(
         priced=True,
         status="EXPLORATORY",
         message=None,
-        priceability=_priceability_view(
-            describe_priceability(goal, proposal, evidence, overrides=overrides)
+        priceability=_reconcile_fitted_priceability(
+            _priceability_view(
+                describe_priceability(goal, proposal, evidence, overrides=overrides)
+            ),
+            assumptions,
         ),
         current_value=resolved.current_value,
         target_value=resolved.target_value,
@@ -138,6 +141,59 @@ def build_baseline_state(
         compare_candidates=build_compare_candidates(goal, resolved, constraints),
     )
     return baseline
+
+
+def _reconcile_fitted_priceability(
+    view: PriceabilityView, assumptions: list[Assumption]
+) -> PriceabilityView:
+    """A rate fitted from history is not still missing, even if nobody typed it in."""
+    if view.status != "ASSUMPTION_REQUIRED" or not view.missing:
+        return view
+    still_missing: list[MissingStateInput] = []
+    satisfied = list(view.satisfied)
+    for item in view.missing:
+        found = next(
+            (
+                assumption
+                for assumption in assumptions
+                if assumption.name == item.key or assumption.name.endswith(f".{item.key}")
+            ),
+            None,
+        )
+        if found is None:
+            still_missing.append(item)
+            continue
+        source = found.source.value if hasattr(found.source, "value") else str(found.source)
+        satisfied.append(
+            SatisfiedStateInput(
+                key=item.key,
+                label=item.label,
+                value=found.value,
+                source=source,
+                detail=f"{found.name} = {found.value:g} {found.unit}, estimated from history",
+            )
+        )
+    if len(still_missing) == len(view.missing):
+        return view
+    if still_missing:
+        labels = [item.label for item in still_missing]
+        joined = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f" and {labels[-1]}"
+        return view.model_copy(
+            update={
+                "missing": still_missing,
+                "satisfied": satisfied,
+                "headline": f"Your goal is measurable, but we still need {joined}.",
+            }
+        )
+    return view.model_copy(
+        update={
+            "status": "PRICED",
+            "reason": None,
+            "headline": "Priced from your evidence.",
+            "missing": [],
+            "satisfied": satisfied,
+        }
+    )
 
 
 def _priceability_view(report: PriceabilityReport) -> PriceabilityView:

@@ -135,7 +135,7 @@ _FAMILIES: tuple[_Family, ...] = (
         id="savings",
         pattern=re.compile(
             r"\bsav(?:e|ing)\b|cut (?:back|spending|costs)|budget|side (?:hustle|income|gig)|"
-            r"\binvest|contribut|raise|bonus|spend less",
+            r"\binvest(?:ing|ment|ments|s)?\b|contribut|raise|bonus|spend less",
             re.I,
         ),
         targets=("flow",),

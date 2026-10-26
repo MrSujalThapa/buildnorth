@@ -191,6 +191,7 @@ def price_cumulative_count(
     n_rate_observations: int = 0,
     overdispersion: float | None = None,
     seed: int = 42,
+    n_draws: int = 4_000,
 ) -> PrimitivePrice:
     """Count process toward a threshold.
 
@@ -226,7 +227,11 @@ def price_cumulative_count(
     elif n_rate_observations >= 3 and mu > 0:
         rng = np.random.default_rng(seed)
         se_log = 1.0 / math.sqrt(n_rate_observations)
-        draws = rng.lognormal(mean=math.log(max(mu, _EPS)), sigma=se_log, size=4_000)
+        draws = rng.lognormal(
+            mean=math.log(max(mu, _EPS)),
+            sigma=se_log,
+            size=min(max(int(n_draws), 200), 20_000),
+        )
         probability = float(np.mean(poisson.sf(remaining - 1, draws)))
         method = "poisson_count_rate_uncertainty"
         limitations.append(

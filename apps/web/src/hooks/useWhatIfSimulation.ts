@@ -60,6 +60,9 @@ export function useWhatIfSimulation(
   const [lastParse, setLastParse] = useState<Awaited<ReturnType<typeof api.parseIntervention>> | null>(null);
   const pendingScenario = useRef<string | null>(null);
   const parseGeneration = useRef(0);
+  const pricedChanges = useRef<ParsedInterventionChange[] | null>(null);
+  const pricedTitle = useRef<string | null>(null);
+  const pricedDepth = useRef<string | null>(null);
   const simulation = useMutation({ mutationFn: (body: Record<string, unknown>) => api.fastReprice(body) });
   const persistSimulation = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.simulateWhatIf(body),
@@ -240,9 +243,13 @@ export function useWhatIfSimulation(
               : prior,
           );
           if (!changes.length) {
+            pricedChanges.current = null;
             persistSimulation.reset();
             return;
           }
+          pricedChanges.current = changes;
+          pricedTitle.current = resolved.title;
+          pricedDepth.current = `${request.config.minimum_draws}:${request.config.include_sensitivity}`;
           setPricedOption(resolved);
           persistSimulation.mutate(
             { ...request, parsed_changes: changes, intervention: { ...request.intervention, title: resolved.title } },
@@ -252,6 +259,19 @@ export function useWhatIfSimulation(
       },
     );
   }
+
+  useEffect(() => {
+    const changes = pricedChanges.current;
+    if (!request || !changes?.length) return;
+    const depth = `${request.config.minimum_draws}:${request.config.include_sensitivity}`;
+    if (pricedDepth.current === depth) return;
+    pricedDepth.current = depth;
+    persistSimulation.mutate({
+      ...request,
+      parsed_changes: changes,
+      intervention: { ...request.intervention, title: pricedTitle.current || request.intervention.title },
+    });
+  }, [persistSimulation, request]);
 
   useEffect(() => {
     if (request && pendingScenario.current) {

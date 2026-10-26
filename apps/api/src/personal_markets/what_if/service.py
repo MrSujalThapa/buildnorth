@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 from dataclasses import replace
+from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import numpy as np
@@ -47,6 +48,8 @@ from personal_markets.what_if.domain import (
     ResourceCost,
     ScenarioDistribution,
     ScenarioOutcome,
+    SensitivityResult,
+    SimulationDiagnostics,
     StructuredIntervention,
     TargetPath,
     TargetSearchRequest,
@@ -93,6 +96,36 @@ from personal_markets.what_if.reverse_search import (
 )
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
+
+
+def _composition_outcome_bins(
+    diagnostics: dict[str, object], *, seed: int, n_draws: int
+) -> tuple[list[DistributionBin], dict[str, float], int]:
+    """Terminal-count distribution from the count model. Samples are binned, not stored."""
+    mu = diagnostics.get("mu")
+    current = diagnostics.get("current")
+    if not isinstance(mu, int | float) or not isinstance(current, int | float) or float(mu) <= 0:
+        return [], {}, 0
+    observations = diagnostics.get("n_rate_observations")
+    draws = min(max(int(n_draws), 200), 20_000)
+    rng = np.random.default_rng(seed)
+    if isinstance(observations, int | float) and observations >= 3:
+        se_log = 1.0 / math.sqrt(float(observations))
+        lambdas = rng.lognormal(mean=math.log(max(float(mu), 1e-9)), sigma=se_log, size=draws)
+        samples = float(current) + rng.poisson(lambdas)
+    else:
+        samples = float(current) + rng.poisson(float(mu), size=draws)
+    quantiles = np.quantile(samples, [0.1, 0.5, 0.9])
+    bins = [
+        DistributionBin.model_validate(item)
+        for item in outcome_distribution_bins(np.asarray(samples, dtype=float))
+    ]
+    quantiles_out = {
+        "p10": float(quantiles[0]),
+        "p50": float(quantiles[1]),
+        "p90": float(quantiles[2]),
+    }
+    return bins, quantiles_out, draws
 
 
 class WhatIfService:
@@ -213,9 +246,13 @@ class WhatIfService:
         if spec is None:
             return None
         proposal = proposal_from_goal(goal)
+        draw_controls = {
+            "n_draws": request.config.minimum_draws,
+            "seed": request.config.seed,
+        }
         baseline_inputs = build_numeric_inputs(goal, proposal, evidence)
         if baseline_inputs is None:
-            baseline_inputs = composition_numeric_inputs(goal, evidence)
+            baseline_inputs = composition_numeric_inputs(goal, evidence, overrides=draw_controls)
         baseline = price_composition(goal, baseline_inputs or NumericInputs())
         if baseline is None:
             return None
@@ -235,7 +272,9 @@ class WhatIfService:
             ) > 1e-9:
                 shared[item.name] = float(item.value)
         if shared:
-            shared_inputs = composition_numeric_inputs(goal, evidence, overrides=shared)
+            shared_inputs = composition_numeric_inputs(
+                goal, evidence, overrides={**draw_controls, **shared}
+            )
             shared_price = price_composition(goal, shared_inputs) if shared_inputs else None
             if shared_inputs is not None and shared_price is not None:
                 baseline_inputs, baseline = shared_inputs, shared_price
@@ -298,7 +337,9 @@ class WhatIfService:
                 return await self._persist(request, result, spec.family, spec.compiler_version)
             return result
         scenario_inputs = (
-            composition_numeric_inputs(goal, evidence, overrides={**shared, **overrides})
+            composition_numeric_inputs(
+                goal, evidence, overrides={**draw_controls, **shared, **overrides}
+            )
             or baseline_inputs
         )
         scenario = price_composition(goal, scenario_inputs or baseline_inputs)
@@ -340,6 +381,81 @@ class WhatIfService:
                 "scenario, not an actionable intervention with identified causal support."
             )
         )
+        composition_diag = (scenario.transforms or {}).get("composition") or {}
+        bins, quantiles, draws_used = _composition_outcome_bins(
+            composition_diag if isinstance(composition_diag, dict) else {},
+            seed=request.config.seed,
+            n_draws=request.config.minimum_draws,
+        )
+        sensitivity: list[SensitivityResult] = []
+        if request.config.include_sensitivity and isinstance(composition_diag, dict):
+            rate_assumption = next(
+                (item for item in request.assumptions if item.name.endswith(".rate")), None
+            )
+            center = composition_diag.get("rate")
+            if rate_assumption is not None and isinstance(center, int | float):
+                step = rate_assumption.step or max(abs(float(center)) * 0.1, 1e-6)
+                probed: list[float] = []
+                for edge in (float(center) - step, float(center) + step):
+                    clamped = min(rate_assumption.maximum, max(rate_assumption.minimum, edge))
+                    probed_inputs = composition_numeric_inputs(
+                        goal,
+                        evidence,
+                        overrides={
+                            **draw_controls,
+                            **shared,
+                            **overrides,
+                            rate_assumption.name: clamped,
+                        },
+                    )
+                    probed_price = None
+                    if probed_inputs is not None:
+                        probed_price = price_composition(goal, probed_inputs)
+                    if (
+                        probed_price is None
+                        or probed_price.raw_probability is None
+                        or baseline.raw_probability is None
+                    ):
+                        probed.append(scenario_probability)
+                    else:
+                        probed.append(
+                            baseline.raw_probability
+                            + execution * (probed_price.raw_probability - baseline.raw_probability)
+                        )
+                lower_rate = min(
+                    rate_assumption.maximum, max(rate_assumption.minimum, float(center) - step)
+                )
+                upper_rate = min(
+                    rate_assumption.maximum, max(rate_assumption.minimum, float(center) + step)
+                )
+                lower_prob, upper_prob = probed
+                swing = abs(upper_prob - lower_prob) * 100
+                sensitivity_direction: Literal["increases", "decreases", "mixed"]
+                if upper_prob > lower_prob:
+                    sensitivity_direction = "increases"
+                elif upper_prob < lower_prob:
+                    sensitivity_direction = "decreases"
+                else:
+                    sensitivity_direction = "mixed"
+                sensitivity.append(
+                    SensitivityResult(
+                        assumption_id=rate_assumption.id or rate_assumption.name,
+                        label=rate_assumption.description.split(".")[0]
+                        if rate_assumption.description
+                        else rate_assumption.name,
+                        baseline_value=float(center),
+                        lower_value=lower_rate,
+                        upper_value=upper_rate,
+                        probability_at_lower=lower_prob,
+                        probability_at_baseline=scenario_probability,
+                        probability_at_upper=upper_prob,
+                        swing=swing,
+                        direction=sensitivity_direction,
+                        probability_swing_pp=swing,
+                        lower_probability=lower_prob,
+                        upper_probability=upper_prob,
+                    )
+                )
         result = WhatIfResult(
             priced=True,
             status="EXPLORATORY",
@@ -348,6 +464,17 @@ class WhatIfService:
             scenario_probability=scenario_probability,
             conditional_on_execution_probability=conditional,
             execution_probability=execution,
+            distribution_bins=bins,
+            outcome_quantiles=quantiles,
+            sensitivity=sensitivity,
+            diagnostics=SimulationDiagnostics(
+                n_draws=draws_used,
+                seed=request.config.seed,
+                converged=True,
+                criterion="count_mixture" if draws_used else "not_sampled",
+                achieved_mc_error=0.0,
+                duration_ms=0.0,
+            ),
             expected_uplift_pp=uplift,
             uplift_interval_pp=None,
             assumptions=request.assumptions,

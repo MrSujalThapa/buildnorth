@@ -233,9 +233,9 @@ async def test_identical_paths_match_and_dominant_path_wins() -> None:
 @pytest.mark.asyncio
 async def test_reverse_search_known_answers_and_resimulation() -> None:
     goal = make_goal()
-    service = LinearWhatIfService(
-        GoalService(InMemoryGoalRepository()), InMemorySimulationRepository()
-    )
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, uuid4())
+    service = LinearWhatIfService(GoalService(repo), InMemorySimulationRepository())
     base = make_base(str(goal.goal_id))
     limits = ResourceLimitsInput(hours_per_week=5, money=1000, energy=5)
     one = await service.target_search(
