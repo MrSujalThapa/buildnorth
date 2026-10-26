@@ -57,6 +57,7 @@ from personal_markets.remote_mcp.policy import (
     IDEMPOTENCY_KEY,
     MetricPolicy,
     ObservationPolicy,
+    informational_policy,
     match_metric,
     observation_policy,
     resolve_observed_at,
@@ -423,7 +424,7 @@ class ScenarioCompare(BaseModel):
 
 
 class StructuredRow(BaseModel):
-    metric: str = Field(min_length=1, max_length=80)
+    metric: str = Field(min_length=1, max_length=200)
     value: float = Field(allow_inf_nan=False, ge=-1e12, le=1e12)
     unit: str = Field(min_length=1, max_length=40)
     observation_kind: Literal["snapshot", "increment", "period"]
@@ -1132,18 +1133,9 @@ class RemoteMcpTools:
     def _validate(
         policy: ObservationPolicy, metric: str, unit: str, observation_kind: str
     ) -> MetricPolicy:
-        if not policy.priceable_family:
-            raise ToolFailure(
-                "not_accepted",
-                "This goal has no numerical model yet, so it does not accept structured evidence.",
-            )
-        metric_policy = match_metric(policy, metric)
+        metric_policy = match_metric(policy, metric) if policy.priceable_family else None
         if metric_policy is None:
-            raise ToolFailure(
-                "invalid_argument",
-                f"Metric {metric!r} is not used by this goal's model.",
-                details={"accepted_metrics": [item.metric for item in policy.metrics]},
-            )
+            return informational_policy(metric, unit, observation_kind)
         if not unit_matches(metric_policy.unit, unit, metric_policy):
             raise ToolFailure(
                 "invalid_argument",
@@ -1310,7 +1302,8 @@ class RemoteMcpTools:
                 }
             )
             if metric_policy is None:
-                problems.append(f"{event.metric!r} is not a metric this goal's model uses.")
+                if event.numeric_value is None and not event.categorical_value:
+                    problems.append(f"No value was found for {event.metric}.")
                 continue
             if event.numeric_value is None:
                 problems.append(f"No numeric value was found for {metric_policy.metric}.")
@@ -2131,9 +2124,14 @@ def candidates_with_policy(
 ) -> list[tuple[EvidenceEventProposal, MetricPolicy]]:
     pairs = []
     for event in proposal.events:
-        metric_policy = match_metric(policy, event.metric)
-        if metric_policy is not None:
-            pairs.append((event, metric_policy))
+        metric_policy = match_metric(policy, event.metric) if policy.priceable_family else None
+        if metric_policy is None:
+            if event.numeric_value is None and not event.categorical_value:
+                continue
+            metric_policy = informational_policy(
+                event.metric, event.unit, event.observation_kind
+            )
+        pairs.append((event, metric_policy))
     return pairs
 
 

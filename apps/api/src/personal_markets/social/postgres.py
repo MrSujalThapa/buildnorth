@@ -217,23 +217,9 @@ class PostgresSocialRepository:
         source_user_id: UUID,
         idempotency_key: str | None,
     ) -> tuple[dict[str, Any], bool]:
-        if idempotency_key:
-            async with autocommit_connection(self._engine) as connection:
-                existing = (
-                    (
-                        await connection.execute(
-                            text(
-                                f"{self._goal_select()} where user_id = :owner"
-                                " and fork_idempotency_key = :key"
-                            ),
-                            {"owner": owner_id, "key": idempotency_key},
-                        )
-                    )
-                    .mappings()
-                    .one_or_none()
-                )
-            if existing:
-                return dict(existing), False
+        existing = await self._active_fork(owner_id, source_goal_id, idempotency_key)
+        if existing:
+            return existing, False
         try:
             async with transaction(self._engine) as connection:
                 await connection.execute(
@@ -267,28 +253,34 @@ class PostgresSocialRepository:
                     },
                 )
         except IntegrityError:
-            if not idempotency_key:
-                raise
-            async with autocommit_connection(self._engine) as connection:
-                existing = (
-                    (
-                        await connection.execute(
-                            text(
-                                f"{self._goal_select()} where user_id = :owner"
-                                " and fork_idempotency_key = :key"
-                            ),
-                            {"owner": owner_id, "key": idempotency_key},
-                        )
-                    )
-                    .mappings()
-                    .one_or_none()
-                )
+            existing = await self._active_fork(owner_id, source_goal_id, idempotency_key)
             if existing:
-                return dict(existing), False
+                return existing, False
             raise
         row = await self.get_goal_row(goal_id)
         assert row is not None
         return row, True
+
+    async def _active_fork(
+        self, owner_id: UUID, source_goal_id: UUID, idempotency_key: str | None
+    ) -> dict[str, Any] | None:
+        async with autocommit_connection(self._engine) as connection:
+            row = (
+                (
+                    await connection.execute(
+                        text(
+                            f"{self._goal_select()} where user_id = :owner and status = 'active'"
+                            " and (forked_from_goal_id = :source"
+                            " or fork_idempotency_key = cast(:key as text))"
+                            " order by updated_at desc limit 1"
+                        ),
+                        {"owner": owner_id, "source": source_goal_id, "key": idempotency_key},
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        return dict(row) if row else None
 
     async def star(self, user_id: UUID, goal_id: UUID) -> bool:
         async with transaction(self._engine) as connection:

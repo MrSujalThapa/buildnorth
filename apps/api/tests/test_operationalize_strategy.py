@@ -53,6 +53,29 @@ HIRING = _baseline(
 )
 
 
+def test_counted_activity_outside_the_model_stays_unpriced_on_any_goal() -> None:
+    prompts = (
+        "What if I have 10 coffee chats with FDEs at startups I'm applying to?",
+        "What if I do 4 customer discovery calls a week?",
+        "What if I log 3 mobility sessions?",
+    )
+    for prompt in prompts:
+        plan, changes = operationalize_strategy(HIRING, prompt)  # type: ignore[misc]
+        assert changes == [] and plan.unpriced and not plan.modeled
+        assert plan.family == "unmapped_action" and plan.options == []
+        assert plan.stated_quantity and plan.stated_quantity > 0
+        assert {item.assumption for item in plan.levers} == {
+            "weekly_application_rate",
+            "application_to_response",
+        }
+        assert "no probability change is assumed" in plan.interpretation
+    finance = _baseline(_assumption("flow", 1800, "currency/month", maximum=10000))
+    plan, changes = operationalize_strategy(finance, "what if I run 12 customer interviews")  # type: ignore[misc]
+    assert changes == [] and plan.family == "unmapped_action"
+    assert plan.levers[0].assumption == "flow"
+    assert operationalize_strategy(HIRING, "what if I dye my hair") is None
+
+
 def test_cold_email_is_not_silently_treated_as_an_application() -> None:
     plan, changes = operationalize_strategy(HIRING, "what if I cold email 10 founders a week")  # type: ignore[misc]
     assert changes == [] and not plan.modeled

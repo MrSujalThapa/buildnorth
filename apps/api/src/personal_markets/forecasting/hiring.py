@@ -133,8 +133,12 @@ def aggregate_funnel_from_evidence(
             last_activity = observed
 
         count = float(_event_count(item))
-        kind = observation_kind(item.metric, item.event_type, item.provenance.observation_kind)
-        stage = _resolve_stage(metric, event_type, category, summary)
+        kind = observation_kind(
+            item.metric, item.event_type, item.provenance.observation_kind, item.unit
+        )
+        if kind == "period":
+            continue
+        stage = _resolve_stage(metric, event_type, category, summary, item.unit or "")
         if stage == "rejection":
             rejection_stage = _rejection_stage(metric, event_type, category, summary)
             rejection_rows.setdefault(rejection_stage, []).append((observed, count, kind))
@@ -607,8 +611,49 @@ def _event_count(item: NormalizedEvidence) -> int:
     return 1
 
 
-def _resolve_stage(metric: str, event_type: str, category: str, summary: str) -> str:
-    blob = " ".join([metric, event_type, category, summary])
+# A free-text summary can name a stage only when the metric is not itself a distinct activity.
+_GENERIC_METRICS = frozenset(
+    {
+        "",
+        "activity",
+        "count",
+        "event",
+        "interview_stage",
+        "note",
+        "notes",
+        "observation",
+        "outcome",
+        "stage",
+        "update",
+    }
+)
+
+
+def _resolve_stage(
+    metric: str, event_type: str, category: str, summary: str, unit: str = ""
+) -> str:
+    structured = " ".join(part for part in (metric, event_type, category, unit) if part)
+    stage = _classify_stage(structured)
+    if stage != "unrelated":
+        return stage
+    if metric.strip() in {"stage", "interview_stage"} and category:
+        mapping = {
+            "application": "application",
+            "response": "response",
+            "phone_screen": "phone_screen",
+            "technical_screen": "technical",
+            "technical": "technical",
+            "onsite": "final",
+            "final": "final",
+            "offer": "offer",
+        }
+        return mapping.get(category, "technical")
+    if metric.strip() in _GENERIC_METRICS:
+        return _classify_stage(" ".join(part for part in (summary, unit) if part))
+    return "unrelated"
+
+
+def _classify_stage(blob: str) -> str:
     if _matches(blob, ("offer_received", "signed_offer", "offer", "received offer")):
         return "offer"
     if _matches(blob, ("reject", "rejected", "declined", "failed screen", "no offer")):
@@ -638,24 +683,12 @@ def _resolve_stage(metric: str, event_type: str, category: str, summary: str) ->
         return "technical"
     if _matches(blob, ("final round", "final_round", "final interview", "onsite loop")):
         return "final"
-    if _matches(blob, ("leetcode", "practice", "study", "prep", "hours")):
+    if _matches(blob, ("practice_hours", "prep_hours", "study_hours")) or (
+        _matches(blob, ("practice", "study", "prep")) and "hour" in blob
+    ):
         return "practice"
     if "interview" in blob:
         return "technical"
-    if metric in {"stage", "interview_stage"} and category:
-        mapping = {
-            "application": "application",
-            "response": "response",
-            "phone_screen": "phone_screen",
-            "technical_screen": "technical",
-            "technical": "technical",
-            "onsite": "final",
-            "final": "final",
-            "offer": "offer",
-        }
-        return mapping.get(category, "technical")
-    # Unrecognized evidence (focus sessions, capacity readings, notes) is not a
-    # funnel stage; counting it as applications inflated the pipeline.
     return "unrelated"
 
 

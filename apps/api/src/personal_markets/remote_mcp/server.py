@@ -521,7 +521,7 @@ def _register_tools(
     @server.tool(annotations=_WRITE, title="Submit structured evidence")
     async def submit_structured_evidence(
         goal_id: GoalId,
-        metric: Annotated[str, Field(min_length=1, max_length=80)],
+        metric: Annotated[str, Field(min_length=1, max_length=200)],
         value: Annotated[float, Field(allow_inf_nan=False, ge=-1e12, le=1e12)],
         unit: Annotated[str, Field(min_length=1, max_length=40)],
         observation_kind: Annotated[
