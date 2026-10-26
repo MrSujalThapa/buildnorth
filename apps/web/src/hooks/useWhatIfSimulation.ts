@@ -202,6 +202,9 @@ export function useWhatIfSimulation(
           conflicts: [],
           proxy: selected === "as_applications",
         });
+        pricedChanges.current = parsed.changes;
+        pricedTitle.current = trimmed;
+        pricedDepth.current = `${request.config.minimum_draws}:${request.config.include_sensitivity}`;
         const body = {
           ...request,
           parsed_changes: parsed.changes,
