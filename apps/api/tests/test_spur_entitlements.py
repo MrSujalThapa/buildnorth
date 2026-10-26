@@ -20,7 +20,13 @@ from personal_markets.integrations.inference_catalog import hosted_allowlist
 
 
 def _settings() -> Settings:
-    return Settings(environment="test", admin_emails=["admin@example.test"])
+    return Settings(
+        environment="test",
+        admin_emails=["admin@example.test"],
+        hosted_user_quota_usd=10,
+        hosted_global_quota_usd=250,
+        openai_max_cost_usd=100,
+    )
 
 
 def _claims(user: str, email: str, verified: bool = True) -> TokenClaims:
@@ -86,13 +92,13 @@ async def test_invitation_is_capped_and_repeated_redemption_preserves_budget() -
     invite = await service.create_invitation(
         admin, hosted_quota_usd=100, hosted_quota_tokens=100_000_000
     )
-    assert invite.hosted_quota_usd == 5
+    assert invite.hosted_quota_usd == 10
     first = await service.redeem_invitation(user, invite.token or "")
     second = await service.redeem_invitation(first, invite.token or "")
-    assert first.hosted_quota_usd == second.hosted_quota_usd == 5
+    assert first.hosted_quota_usd == second.hosted_quota_usd == 10
     assert (
         await service.principal_from_claims(_claims("user", "user@example.test"))
-    ).hosted_quota_usd == 5
+    ).hosted_quota_usd == 10
 
 
 async def test_stale_ordinary_quota_cannot_overspend_under_concurrency() -> None:
@@ -102,11 +108,11 @@ async def test_stale_ordinary_quota_cannot_overspend_under_concurrency() -> None
     user = make_principal(
         "old-user", invited=True, hosted=True, quota_usd=100, quota_tokens=100_000_000
     )
-    assert (await budget.usage_for(user)).quota_usd == 5
+    assert (await budget.usage_for(user)).quota_usd == 10
     requests = await asyncio.gather(
-        *[budget.reserve_research(user, 1.0) for _ in range(10)], return_exceptions=True
+        *[budget.reserve_research(user, 1.0) for _ in range(15)], return_exceptions=True
     )
-    assert sum(not isinstance(item, Exception) for item in requests) == 5
+    assert sum(not isinstance(item, Exception) for item in requests) == 10
     assert sum(isinstance(item, ProviderBudgetExceededError) for item in requests) == 5
     assert (await budget.usage_for(user)).remaining_usd == 0
     with pytest.raises(ProviderBudgetExceededError, match="Invalid"):
@@ -134,7 +140,7 @@ async def test_downward_reconciliation_preserves_historical_spend() -> None:
         agent_name="research",
         provider="monid",
         model="approved_research_tool",
-        amount_usd=6.0,
+        amount_usd=11.0,
         tokens=0,
         user_cap_usd=100,
         user_cap_tokens=5_000_000,
@@ -150,12 +156,12 @@ async def test_downward_reconciliation_preserves_historical_spend() -> None:
         model="approved_research_tool",
         input_tokens=0,
         output_tokens=0,
-        cost=6.0,
+        cost=11.0,
     )
     reconciled = await service.principal_from_claims(_claims("legacy", "legacy@example.test"))
     usage = await budget.usage_for(reconciled)
-    assert usage.quota_usd == 5
-    assert usage.spent_usd == 6
+    assert usage.quota_usd == 10
+    assert usage.spent_usd == 11
     assert usage.remaining_usd == 0
     assert len(store.ledger) == 1
 
@@ -264,7 +270,7 @@ async def test_background_user_charge_never_uses_admin_allocation() -> None:
     await service.redeem_invitation(other, invite.token or "")
     refreshed = await service.principal_for_user_id(other.user_id)
     assert refreshed is not None and refreshed.user_id == other.user_id
-    await budget.reserve_research(refreshed, 4.0)
+    await budget.reserve_research(refreshed, 9.0)
     assert (await budget.usage_for(admin)).remaining_usd == 100
     assert (await budget.usage_for(refreshed)).remaining_usd == 1
 

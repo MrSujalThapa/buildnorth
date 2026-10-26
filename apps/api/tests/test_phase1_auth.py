@@ -1,9 +1,12 @@
 import asyncio
 import hashlib
+from datetime import UTC, datetime, timedelta
 
+import pytest
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
+from personal_markets.core.errors import ForbiddenError
 from personal_markets.identity.factory import get_identity_repository, get_identity_service
 from personal_markets.identity.testing import (
     admin_principal,
@@ -478,6 +481,27 @@ async def test_shared_invite_concurrent_distinct_accounts_consume_one_slot_each(
     assert again.hosted_quota_usd == successes[0].hosted_quota_usd
     assert stored_again is not None
     assert stored_again.redemption_count == 5
+
+
+async def test_expired_shared_invite_cannot_be_redeemed() -> None:
+    isolated_app()
+    admin = admin_principal()
+    user = make_principal("after-expiry")
+    repo = get_identity_repository()
+    for principal in (admin, user):
+        repo.users[principal.user_id] = principal
+        repo.by_clerk[principal.clerk_user_id] = principal.user_id
+    identity = get_identity_service()
+    invitation = await identity.create_invitation(admin, max_redemptions=20, ttl_hours=1)
+    stored = await repo.get_invitation_by_hash(
+        hashlib.sha256((invitation.token or "").encode("utf-8")).hexdigest()
+    )
+    assert stored is not None
+    repo.invites[stored.invitation_id] = stored.model_copy(
+        update={"expires_at": datetime.now(UTC) - timedelta(minutes=1)}
+    )
+    with pytest.raises(ForbiddenError, match="expired"):
+        await identity.redeem_invitation(user, invitation.token or "")
 
 
 def test_revoked_shared_invite_cannot_be_redeemed() -> None:

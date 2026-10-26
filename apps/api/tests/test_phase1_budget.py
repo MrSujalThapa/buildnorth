@@ -143,9 +143,12 @@ async def test_parallel_judges_cannot_cross_global_dollar_limit() -> None:
 
 
 def test_judge_hosted_allowance_defaults() -> None:
+    from personal_markets.core.config import HOSTED_USER_QUOTA_USD
+
     settings = _settings()
     assert settings.hosted_global_quota_usd == 250.0
-    assert settings.hosted_user_quota_usd == 5.0
+    assert HOSTED_USER_QUOTA_USD == 10.0
+    assert settings.hosted_user_quota_usd <= HOSTED_USER_QUOTA_USD
 
 
 async def test_global_budget_exhaustion() -> None:

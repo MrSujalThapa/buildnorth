@@ -23,7 +23,7 @@ services:
       - key: PM_HOSTED_INFERENCE_ENABLED
         value: "true"
       - key: PM_HOSTED_USER_QUOTA_USD
-        value: "5.0"
+        value: "10.0"
       - key: PM_HOSTED_ADMIN_QUOTA_USD
         value: "100.0"
       - key: PM_HOSTED_GLOBAL_QUOTA_USD

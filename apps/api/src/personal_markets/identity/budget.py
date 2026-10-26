@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from personal_markets.agents.models import estimate_cost_usd, pool_for_model
-from personal_markets.core.config import Settings
+from personal_markets.core.config import HOSTED_USER_QUOTA_USD, Settings
 from personal_markets.core.errors import (
     DomainError,
     ForbiddenError,
@@ -42,7 +42,8 @@ class InferenceBudgetService:
         admin = principal.role == "admin" and principal.trusted_admin
         return (
             min(
-                principal.hosted_quota_usd, self._settings.hosted_admin_quota_usd if admin else 5.0
+                principal.hosted_quota_usd,
+                self._settings.hosted_admin_quota_usd if admin else HOSTED_USER_QUOTA_USD,
             ),
             min(
                 principal.hosted_quota_tokens,
