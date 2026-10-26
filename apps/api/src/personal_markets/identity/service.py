@@ -6,7 +6,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from personal_markets.core.config import Settings
+from personal_markets.core.config import HOSTED_USER_QUOTA_USD, Settings, cap_invited_quota_usd
 from personal_markets.core.errors import (
     ConflictError,
     ForbiddenError,
@@ -118,11 +118,7 @@ class IdentityService:
             False if is_admin else await self._repository.has_invitation_redemption(stored.user_id)
         )
         if is_admin or redeemed:
-            quota_usd = (
-                self._settings.hosted_admin_quota_usd
-                if is_admin
-                else min(self._settings.hosted_user_quota_usd, 5.0)
-            )
+            quota_usd = self._settings.hosted_admin_quota_usd if is_admin else HOSTED_USER_QUOTA_USD
             quota_tokens = (
                 self._settings.hosted_admin_quota_tokens
                 if is_admin
@@ -203,15 +199,7 @@ class IdentityService:
             email=bound_email,
             note=note,
             max_redemptions=redemptions,
-            hosted_quota_usd=min(
-                max(
-                    0.0,
-                    hosted_quota_usd
-                    if hosted_quota_usd is not None
-                    else self._settings.hosted_user_quota_usd,
-                ),
-                5.0,
-            ),
+            hosted_quota_usd=cap_invited_quota_usd(hosted_quota_usd),
             hosted_quota_tokens=min(
                 max(
                     0,
@@ -253,9 +241,7 @@ class IdentityService:
             await self._repository.reconcile_entitlement(
                 principal.user_id,
                 enabled=True,
-                quota_usd=min(
-                    invitation.hosted_quota_usd, self._settings.hosted_user_quota_usd, 5.0
-                ),
+                quota_usd=HOSTED_USER_QUOTA_USD,
                 quota_tokens=min(
                     invitation.hosted_quota_tokens, self._settings.hosted_user_quota_tokens
                 ),
@@ -266,9 +252,7 @@ class IdentityService:
         await self._repository.reconcile_entitlement(
             principal.user_id,
             enabled=True,
-            quota_usd=min(
-                redeemed.invitation.hosted_quota_usd, self._settings.hosted_user_quota_usd, 5.0
-            ),
+            quota_usd=HOSTED_USER_QUOTA_USD,
             quota_tokens=min(
                 redeemed.invitation.hosted_quota_tokens, self._settings.hosted_user_quota_tokens
             ),

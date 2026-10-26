@@ -20,7 +20,14 @@ _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 DEFAULT_USER_ID = UUID("10000000-0000-0000-0000-000000000001")
 AUTHENTICATED_SPUR_MODEL = "spur-deepseek-v4-flash"
+HOSTED_USER_QUOTA_USD = 10.0
 _REPO_ROOT = Path(__file__).resolve().parents[5]
+
+
+def cap_invited_quota_usd(requested: float | None = None) -> float:
+    """Each invited user receives $10 of hosted Spur credit and cannot be granted more."""
+    value = HOSTED_USER_QUOTA_USD if requested is None else requested
+    return min(max(0.0, float(value)), HOSTED_USER_QUOTA_USD)
 
 
 class _IgnoreBlankEnvSettingsSource(EnvSettingsSource):
@@ -129,7 +136,9 @@ class Settings(BaseSettings):
     test_auth_secret: str | None = None
     scripted_inference: bool = False
     hosted_inference_enabled: bool = True
-    hosted_user_quota_usd: float = Field(default=5.0, ge=0)
+    hosted_user_quota_usd: float = Field(
+        default=HOSTED_USER_QUOTA_USD, ge=0, le=HOSTED_USER_QUOTA_USD
+    )
     hosted_user_quota_tokens: int = 5_000_000
     hosted_admin_quota_usd: float = Field(default=100.0, ge=0, le=100.0)
     hosted_admin_quota_tokens: int = 100_000_000
