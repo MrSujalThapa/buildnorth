@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-REQUIRED_FILES = 26
+REQUIRED_FILES = 27
 RESERVED_GAPS: set[str] = set()
 REQUIRED = {
     "goals",
