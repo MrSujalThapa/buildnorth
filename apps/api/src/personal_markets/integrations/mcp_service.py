@@ -484,7 +484,12 @@ class IntegrationGatewayService:
                 fresh = age is not None and 0 <= age < 300
             except ValueError:
                 fresh = False
-            if auth_url and fresh:
+            metadata = existing.account_metadata
+            same_toolkit = metadata.get("toolkit_slug") == plugin_id
+            complete_request = bool(
+                metadata.get("auth_config_id") and metadata.get("connection_request_id")
+            )
+            if auth_url and fresh and same_toolkit and complete_request:
                 return {
                     "plugin_id": plugin_id,
                     "connection_id": str(existing.id),
@@ -504,6 +509,7 @@ class IntegrationGatewayService:
             status="pending_auth",
             account_metadata={
                 "gateway": gateway_provider,
+                "toolkit_slug": plugin_id,
                 "auth_config_id": init.auth_config_id,
                 "connection_request_id": init.connection_request_id,
                 "auth_url": init.redirect_url,

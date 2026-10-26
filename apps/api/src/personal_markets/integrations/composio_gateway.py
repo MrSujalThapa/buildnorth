@@ -253,19 +253,26 @@ class ComposioIntegrationGateway:
         _toolkit_cache.clear()
 
     async def ensure_auth_config(self, toolkit_slug: str) -> str:
-        assert self._client is not None
+        client = self._client
+        assert client is not None
 
         def _call() -> str:
-            existing = self._client.auth_configs.list(search=toolkit_slug)
+            existing = client.auth_configs.list(toolkit_slug=toolkit_slug)
             for item in getattr(existing, "items", []) or []:
                 slug = getattr(getattr(item, "toolkit", None), "slug", None)
-                if slug == toolkit_slug:
+                if slug != toolkit_slug:
+                    raise ValueError("Composio returned an auth config for another toolkit")
+                if getattr(item, "status", "ENABLED") == "ENABLED":
                     return str(item.id)
-            created = self._client.auth_configs.create(
+            created = client.auth_configs.create(
                 toolkit=toolkit_slug,
                 options={"type": "use_composio_managed_auth", "name": f"PlayItOut {toolkit_slug}"},
             )
-            return str(created.id)
+            config_id = str(created.id)
+            verified = client.auth_configs.get(config_id)
+            if getattr(getattr(verified, "toolkit", None), "slug", None) != toolkit_slug:
+                raise ValueError("Composio created an auth config for another toolkit")
+            return config_id
 
         return await asyncio.to_thread(_call)
 
@@ -375,7 +382,7 @@ class ComposioIntegrationGateway:
                     )
                     if request is not None:
                         account = self._to_connected_account(request)
-                        if account is not None:
+                        if account is not None and account.toolkit_slug == toolkit_slug:
                             return ConnectedAccountStatus(
                                 connected_account_id=account.connected_account_id,
                                 status="connected",
@@ -390,7 +397,7 @@ class ComposioIntegrationGateway:
             active: list[ComposioConnectedAccount] = []
             for item in getattr(accounts, "items", []) or []:
                 account = self._to_connected_account(item)
-                if account is not None:
+                if account is not None and account.toolkit_slug == toolkit_slug:
                     active.append(account)
             if not active:
                 return ConnectedAccountStatus(connected_account_id=None, status="pending_auth")

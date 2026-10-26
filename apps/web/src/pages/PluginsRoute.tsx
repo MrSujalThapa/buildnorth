@@ -53,6 +53,7 @@ export function PluginsRoute() {
   const authPopupRef = useRef<Window | null>(null);
   const authRequestIdRef = useRef<string | null>(null);
   const pendingAuthUrlRef = useRef<string | null>(null);
+  const activeAuthPluginRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedQuery(query.trim()), 280);
@@ -74,6 +75,7 @@ export function PluginsRoute() {
     authPopupRef.current?.close();
     authPopupRef.current = null;
     authRequestIdRef.current = null;
+    activeAuthPluginRef.current = null;
   }, []);
 
   const presentAuthUrl = (url: string) => {
@@ -106,7 +108,13 @@ export function PluginsRoute() {
     }
   };
 
-  const handleConnectResult = (result: PluginConnectResponse, popup: Window | null) => {
+  const handleConnectResult = (pluginId: string, result: PluginConnectResponse, popup: Window | null) => {
+    if (result.plugin_id !== pluginId) {
+      popup?.close();
+      clearAuthUi();
+      setAuthNotice("Connection response did not match the selected plugin. Try again.");
+      return;
+    }
     authPopupRef.current = popup;
     if (result.status === "connected") {
       popup?.close();
@@ -125,7 +133,6 @@ export function PluginsRoute() {
   const connectPlugin = useMutation({
     mutationFn: (pluginId: string) => api.connectPlugin(pluginId),
     onSettled: () => {
-      setConnectingId(null);
       void queryClient.invalidateQueries({ queryKey: ["plugins"] });
     },
   });
@@ -134,7 +141,7 @@ export function PluginsRoute() {
     mutationFn: (pluginId: string) => api.disconnectPlugin(pluginId),
     onMutate: (pluginId) => {
       setDisconnectingId(pluginId);
-      clearAuthUi();
+      if (activeAuthPluginRef.current === pluginId) clearAuthUi();
     },
     onSettled: () => {
       setDisconnectingId(null);
@@ -218,8 +225,8 @@ export function PluginsRoute() {
               } } }
               : item),
           }));
-          clearAuthUi();
-          setAuthNotice(`${result.plugin_id} connected.`);
+          if (activeAuthPluginRef.current === result.plugin_id) clearAuthUi();
+          if (!activeAuthPluginRef.current) setAuthNotice(`${result.plugin_id} connected.`);
           void queryClient.invalidateQueries({ queryKey: ["plugins"] });
         }
       } catch {
@@ -253,6 +260,8 @@ export function PluginsRoute() {
   const selected = selectedId ? displays.find((plugin) => plugin.id === selectedId) ?? null : null;
 
   const runConnect = async (pluginId: string, plugin: PluginView) => {
+    // Each click retains its own launcher and request ID. A later click may
+    // become the active UI without redirecting or closing the earlier tab.
     setConnectingId(pluginId);
     setBlockedAuthUrl(null);
     setAuthNotice(null);
@@ -263,6 +272,7 @@ export function PluginsRoute() {
       plugin.connection.status === "pending_auth";
 
     const requestId = needsOAuth ? createComposioAuthRequestId() : null;
+    activeAuthPluginRef.current = pluginId;
     authRequestIdRef.current = requestId;
     const popup = requestId ? openAuthLauncher(requestId) : null;
     authPopupRef.current = popup;
@@ -273,13 +283,23 @@ export function PluginsRoute() {
 
     try {
       const result = await connectPlugin.mutateAsync(pluginId);
-      handleConnectResult(result, popup);
+      if (activeAuthPluginRef.current !== pluginId || authRequestIdRef.current !== requestId) {
+        if (result.plugin_id === pluginId && result.auth_url && requestId) {
+          deliverComposioAuthUrl(requestId, result.auth_url, popup);
+        } else {
+          popup?.close();
+        }
+        return;
+      }
+      handleConnectResult(pluginId, result, popup);
     } catch (error) {
       popup?.close();
-      authPopupRef.current = null;
-      authRequestIdRef.current = null;
-      setAuthNotice(error instanceof Error ? error.message : "Connect failed.");
-      setBlockedAuthUrl(null);
+      if (activeAuthPluginRef.current === pluginId && authRequestIdRef.current === requestId) {
+        clearAuthUi();
+        setAuthNotice(error instanceof Error ? error.message : "Connect failed.");
+      }
+    } finally {
+      setConnectingId((current) => current === pluginId ? null : current);
     }
   };
 
