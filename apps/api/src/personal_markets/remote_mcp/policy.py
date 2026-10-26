@@ -174,7 +174,12 @@ def informational_policy(
 ) -> MetricPolicy:
     """Persist a legitimate observation the numerical model cannot consume."""
     accepted: list[Kind] = ["snapshot", "increment", "period"]
-    default: Kind = kind if kind in accepted else "increment"
+    defaults: dict[str, Kind] = {
+        "snapshot": "snapshot",
+        "increment": "increment",
+        "period": "period",
+    }
+    default = defaults.get(kind or "", "increment")
     clipped = clip_metric_name(metric)
     return MetricPolicy(
         metric=clipped,

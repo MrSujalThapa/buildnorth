@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from personal_markets.agents.model_planner import infer_primitive_kind, refine_architect_proposal
+from personal_markets.evidence.domain import NormalizedEvidence, Provenance
 from personal_markets.evidence.metrics import clip_metric_name, observation_kind
 from personal_markets.forecasting.hiring import aggregate_funnel_from_evidence
 from personal_markets.ports import (
@@ -45,10 +46,8 @@ def _event(metric: str, value: float, unit: str = "count") -> EvidenceEventPropo
     )
 
 
-def _evidence(metric: str, value: float, summary: str, unit: str = "count"):
+def _evidence(metric: str, value: float, summary: str, unit: str = "count") -> NormalizedEvidence:
     from uuid import uuid4
-
-    from personal_markets.evidence.domain import NormalizedEvidence, Provenance
 
     return NormalizedEvidence(
         evidence_id=uuid4(),
