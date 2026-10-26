@@ -70,8 +70,8 @@ describe("toBlueprintView", () => {
   it("shows baseline, modeled odds and a pp delta for a reachable path", () => {
     const view = toBlueprintView(makeBlueprint());
     expect(view.status).toBe("reachable");
-    expect(view.statusLabel).toBe("Reaches ~90%");
-    expect([view.baseline, view.modeled, view.delta, view.target]).toEqual(["74%", "89%", "+15 pp", "90%"]);
+    expect(view.statusLabel).toBe("Reaches 89.1% (within 1 pp of 90%)");
+    expect([view.baseline, view.modeled, view.delta, view.target]).toEqual(["74%", "89.1%", "+15 pp", "90%"]);
     expect(view.deltaTone).toBe("up");
     expect(view.followThrough).toBe("Assumes the change holds in 72% of futures");
   });
@@ -102,8 +102,8 @@ describe("toBlueprintView", () => {
       }),
     );
     expect(view.status).toBe("short");
-    expect(view.statusLabel).toBe("32 pp short of 90%");
-    expect(view.plateau).toEqual({ label: "Odds plateau near 59%", explanation: "Odds level off near 59% from about 20 applications/week." });
+    expect(view.statusLabel).toBe("58% does not reach 90% (32 pp short)");
+    expect(view.plateau).toEqual({ label: "Odds plateau near 58.6%", explanation: "Odds level off near 59% from about 20 applications/week." });
   });
 
   it("keeps the current plan without a delta when the target is already met", () => {
@@ -124,11 +124,23 @@ describe("toBlueprintView", () => {
     expect(view.plan.map((item) => item.kind)).toEqual(["change", "step"]);
   });
 
+  it("never presents 84% as reaching 90%", () => {
+    const view = toBlueprintView(makeBlueprint({
+      reachable: false,
+      modeled_probability: 0.84,
+      delta_pp: 10,
+      tolerance_pp: 0.5,
+    }));
+    expect(view.status).toBe("short");
+    expect(view.statusLabel).toBe("84% does not reach 90% (6 pp short)");
+    expect(view.statusLabel).not.toMatch(/Reaches/);
+  });
+
   it("formats alternatives without recomputing their odds", () => {
     const view = toBlueprintView(makeBlueprint());
     expect(view.alternatives.map((item) => [item.odds, item.reaches, item.effortLabel])).toEqual([
-      ["82%", false, "Heavy lift"],
-      ["90%", true, "Heavy lift"],
+      ["81.6%", false, "Heavy lift"],
+      ["90.4%", true, "Heavy lift"],
     ]);
   });
 });

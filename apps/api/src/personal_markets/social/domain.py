@@ -33,6 +33,54 @@ class PublicBlueprint(BaseModel):
     suggested_integrations: list[str] = Field(default_factory=list)
     model_configuration: dict[str, Any] = Field(default_factory=dict)
     forecast: PublicForecastState
+    # Snapshots stored before versioning validate as schema version 1.
+    blueprint_version: int = 1
+    snapshot_at: datetime | None = None
+    goal_contract_version: int | None = None
+    tracked_metrics: list[str] = Field(default_factory=list)
+
+
+class PublicModelChange(BaseModel):
+    previous: str
+    current: str
+
+
+class PublicStatusChange(BaseModel):
+    previous: str
+    current: str
+
+
+class PublicMarketUpdate(BaseModel):
+    """One published forecast, described only with fields the receipt actually stored.
+
+    Evidence is reported as counts plus metric names the owner published as tracked
+    metrics; values, summaries and evidence identifiers never appear here.
+    """
+
+    published_at: datetime
+    probability: float = Field(ge=0, le=1)
+    previous_probability: float | None = Field(default=None, ge=0, le=1)
+    change_points: float | None = None
+    kind: Literal["first_publication", "update"]
+    receipt_recorded: bool = False
+    evidence_total: int | None = None
+    new_evidence_count: int | None = None
+    retired_evidence_count: int | None = None
+    new_evidence_metrics: list[str] = Field(default_factory=list)
+    other_new_evidence_count: int = 0
+    model: str | None = None
+    model_change: PublicModelChange | None = None
+    status_change: PublicStatusChange | None = None
+    definition_revised: bool = False
+    deadline_changed: bool = False
+
+
+class PublicModeledSensitivity(BaseModel):
+    """Assumption names the latest published model used. Not a causal attribution."""
+
+    published_at: datetime
+    model: str | None = None
+    drivers: list[str] = Field(default_factory=list)
 
 
 class PublicCreator(BaseModel):
@@ -76,6 +124,8 @@ class PublicMarketCard(BaseModel):
 class PublicMarketDetail(PublicMarketCard):
     blueprint: PublicBlueprint
     share_path: str
+    updates: list[PublicMarketUpdate] = Field(default_factory=list)
+    modeled_sensitivity: PublicModeledSensitivity | None = None
 
 
 class OwnerMarketSocial(BaseModel):

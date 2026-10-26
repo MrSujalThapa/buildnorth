@@ -12,6 +12,7 @@ from personal_markets.behavior.commitments import (
     Commitment,
     CommitmentObservation,
     OutcomeStatus,
+    PlanContext,
     get_commitment_store,
     trials_from_commitments,
 )
@@ -68,6 +69,7 @@ class CreateCommitmentBody(BaseModel):
     unit: str = Field(min_length=1, max_length=40)
     window_start: datetime
     window_end: datetime
+    plan_context: PlanContext | None = None
 
     @model_validator(mode="after")
     def validate_window(self) -> CreateCommitmentBody:

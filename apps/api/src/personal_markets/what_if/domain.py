@@ -383,6 +383,52 @@ class BlueprintAlternative(BaseModel):
     note: str | None = None
 
 
+BlueprintLeverKind = Literal["behavioral_volume", "conversion"]
+FollowThroughSource = Literal["fitted", "user", "default", "not_modeled"]
+
+
+class BlueprintPlanAction(BaseModel):
+    """One ordered step of the recommended plan, with the quantity the engine priced."""
+
+    order: int = Field(ge=1)
+    kind: Literal["behavioral_volume", "conversion", "action"]
+    lever_id: str | None = None
+    behavior: str
+    baseline_value: float | None = None
+    required_value: float | None = None
+    unit: str
+    quantity_label: str
+    timeline: str
+    effort: EffortLevel
+    constraint: str
+    requires_evidence: bool = False
+
+
+class BlueprintSearchedLever(BaseModel):
+    lever_id: str
+    label: str
+    kind: BlueprintLeverKind
+    unit: str
+    baseline_value: float
+    search_minimum: float
+    search_maximum: float
+    bound_source: str
+
+
+class BlueprintExcludedParameter(BaseModel):
+    name: str
+    reason: str
+
+
+class BlueprintUnpricedRecommendation(BaseModel):
+    """A relevant action the model cannot price; it never carries a probability."""
+
+    metric: str
+    label: str
+    measurement: str
+    priced: Literal[False] = False
+
+
 class ReverseBlueprint(BaseModel):
     """Recommended combination of changes for a target-odds search.
 
@@ -408,6 +454,16 @@ class ReverseBlueprint(BaseModel):
     alternatives: list[BlueprintAlternative] = Field(default_factory=list)
     tolerance_pp: float
     method: str = "reverse_blueprint@1.0.0"
+    plan_actions: list[BlueprintPlanAction] = Field(default_factory=list)
+    searched_levers: list[BlueprintSearchedLever] = Field(default_factory=list)
+    excluded_parameters: list[BlueprintExcludedParameter] = Field(default_factory=list)
+    unpriced_recommendations: list[BlueprintUnpricedRecommendation] = Field(
+        default_factory=list
+    )
+    missing_capabilities: list[str] = Field(default_factory=list)
+    follow_through_source: FollowThroughSource | None = None
+    periods_remaining: int | None = None
+    period_unit: str | None = None
 
 
 class TargetSearchResult(BaseModel):

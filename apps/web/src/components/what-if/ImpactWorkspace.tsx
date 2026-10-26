@@ -6,7 +6,15 @@ import { formatProbabilityPercent } from "../../adapters/formatProbability";
 import { formatOutcome } from "../../adapters/outcomeFormat";
 import type { SimulationPoint } from "../../adapters/simulationTypes";
 import type { ChartPoint, Market, WhatIfPlan, WhatIfPreview, WhatIfView } from "../../adapters/templateTypes";
-import type { ParseInterventionResult, Priceability, StrategyInsight, StrategyLever } from "../../api/client";
+import type {
+  ParseInterventionResult,
+  Priceability,
+  StrategyChangesResponse,
+  StrategyInsight,
+  StrategyPlan,
+  WhatIfResult,
+} from "../../api/client";
+import ApplyPlanPanel from "./ApplyPlanPanel";
 import OddsExplorer from "../market/OddsExplorer";
 import type { ProbabilityBranch } from "../market/WealthsimpleAreaChart";
 import { BETTER_SERIES_COLOR, ORIGINAL_SERIES_COLOR, WORSE_SERIES_COLOR } from "./seriesColors";
@@ -47,7 +55,8 @@ type Props = {
   publishedOdds?: number | null;
   history?: ChartPoint[];
   parseResult?: ParseInterventionResult | null;
-  onRunPlannedChange?: (title: string, lever: StrategyLever, amount: number) => void;
+  onRunStrategyOption?: (question: string, plan: StrategyPlan, optionId: string, inputs: Record<string, number>) => void;
+  applyPlan?: { goalId: string; domain: string; priced: StrategyChangesResponse | null; result: WhatIfResult | undefined } | null;
   onSubmitMissingState?: (
     entries: { key: string; label: string; value: number; unit: string }[],
   ) => void;
@@ -165,7 +174,8 @@ export default function ImpactWorkspace({
   publishedOdds,
   history = [],
   parseResult = null,
-  onRunPlannedChange,
+  onRunStrategyOption,
+  applyPlan = null,
   onSubmitMissingState,
   onAddEvidence,
   onConnectSource,
@@ -237,9 +247,20 @@ export default function ImpactWorkspace({
   const qualitativeKind =
     parseResult?.request_kind && parseResult.request_kind !== "quantitative_scenario" && !strategyPlan?.modeled;
   const planCard = strategyPlan ? (
-    <StrategyPlanCard plan={strategyPlan} question={question} busy={running} onRun={onRunPlannedChange} />
+    <StrategyPlanCard plan={strategyPlan} question={question} busy={running} onRun={onRunStrategyOption} />
   ) : null;
   const plainLanguage = scenarioPlainLanguage({ question, publishedOdds, preview });
+  const applyPanel =
+    applyPlan && preview.scenarioOdds != null ? (
+      <ApplyPlanPanel
+        key={`${applyPlan.priced?.title}-${applyPlan.result?.scenario_probability}`}
+        goalId={applyPlan.goalId}
+        domain={applyPlan.domain}
+        priced={applyPlan.priced}
+        result={applyPlan.result}
+        durationWeeks={plan.durationWeeks}
+      />
+    ) : null;
 
   const outcomeChart = (label: string) => (
     <OutcomeDistribution
@@ -332,6 +353,7 @@ export default function ImpactWorkspace({
             {planCard}
             {changeChart}
             {plainLanguage ? <p className="scenario-plain">{plainLanguage}</p> : null}
+            {applyPanel}
             {parseResult?.confirmation_needed ? (
               <p className="quiet-copy" role="status">This looks like real progress. Record it as evidence if you want the published forecast to consider it.</p>
             ) : null}
@@ -409,6 +431,7 @@ export default function ImpactWorkspace({
 
           {planCard}
           {changeChart}
+          {applyPanel}
 
           <div className="deep-primary">
             <div className="viz-block">

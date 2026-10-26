@@ -7,7 +7,7 @@ from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.hiring import STAGE_CHAIN, load_hiring_reference
 from personal_markets.forecasting.running import load_running_reference
-from personal_markets.goals.domain import GoalContract, GoalType
+from personal_markets.goals.domain import GoalContract
 from personal_markets.what_if.domain import Assumption
 
 DEFAULT_EXECUTION = 0.72
@@ -107,7 +107,9 @@ def continuous_target_assumptions(
         growth_volatility = min(0.08, max(0.001, noise / max(target_value, 1)))
         shock_probability = 0.02
         shock_fraction = 0.08
-        flow_source = _map_source(str(numeric.assumption_sources.get("trend", "REAL_USER_EVIDENCE")))
+        flow_source = _map_source(
+            str(numeric.assumption_sources.get("trend", "REAL_USER_EVIDENCE"))
+        )
         flow_scope = "training_trend"
         flow_unit = "seconds/week"
         flow_desc = "Weekly pace improvement trend from recent performance evidence."
@@ -233,7 +235,9 @@ def hazard_assumptions(
     model_version: str,
 ) -> list[Assumption]:
     reference = load_hiring_reference()
-    weekly_rate = float(numeric.assumptions.get("weekly_application_rate") or reference.weekly_application_rate)
+    weekly_rate = float(
+        numeric.assumptions.get("weekly_application_rate") or reference.weekly_application_rate
+    )
     weekly_source = _map_source(
         str(numeric.assumption_sources.get("weekly_application_rate", "REFERENCE"))
     )
@@ -309,6 +313,143 @@ def hazard_assumptions(
             assumption_id="execution_probability",
             name="execution_probability",
             description="Probability the planned pipeline changes are sustained.",
+            value=DEFAULT_EXECUTION,
+            minimum=0.0,
+            maximum=1.0,
+            step=0.01,
+            source=AssumptionSource.USER,
+            unit="probability",
+            provenance="User exploration assumption for plan follow-through.",
+            editable=True,
+            scope="execution",
+            model_family=model_family,
+            version=model_version,
+        )
+    )
+    return assumptions
+
+
+# The user-controllable rate of each composed primitive. Spread parameters (sigma,
+# noise) describe fitted uncertainty and stay read-only.
+COMPOSED_LEVER_PARAMETERS = {
+    "cumulative_count": ("rate", "additions"),
+    "continuous_threshold": ("trend", "change"),
+    "growth": ("mu", "log growth"),
+}
+COMPOSED_READONLY_PARAMETERS = {"growth": ("sigma",), "continuous_threshold": ("noise",)}
+# Search/edit bound for a composed rate: a multiple of the larger of today's rate and
+# the pace the target requires. A range for the control, not evidence of feasibility.
+COMPOSED_RATE_RANGE_MULTIPLE = 4.0
+COMPOSED_RATE_STEPS = 200.0
+
+
+def composed_assumptions(
+    goal: GoalContract,
+    numeric: NumericInputs,
+    *,
+    model_family: str,
+    model_version: str,
+) -> list[Assumption]:
+    """Expose each composed primitive's fitted rate as an editable lever.
+
+    The composition engine already accepts `node.parameter` overrides; this only
+    makes them visible so What If and Reverse can price them instead of guessing.
+    """
+    prepared = numeric.state.get("composition_prepared")
+    nodes = prepared.get("nodes") if isinstance(prepared, dict) else None
+    spec = goal.model_requirements.get("forecast_spec") or {}
+    primitives = spec.get("primitives") if isinstance(spec, dict) else None
+    if not isinstance(nodes, dict) or not isinstance(primitives, list):
+        return []
+    horizon = float(numeric.state.get("periods") or 1.0)
+    target = numeric.state.get("target_value")
+    assumptions: list[Assumption] = []
+    for primitive in primitives:
+        if not isinstance(primitive, dict):
+            continue
+        node_id = str(primitive.get("id") or "")
+        kind = str(primitive.get("kind") or "")
+        node = nodes.get(node_id)
+        lever = COMPOSED_LEVER_PARAMETERS.get(kind)
+        if not isinstance(node, dict) or lever is None:
+            continue
+        parameters = node.get("parameters") or {}
+        parameter, noun = lever
+        if parameter not in parameters:
+            continue
+        value = float(parameters[parameter])
+        metric = str(primitive.get("metric") or node_id).replace("_", " ")
+        time_unit = str((primitive.get("config") or {}).get("time_unit") or "week")
+        unit_text = str(primitive.get("unit") or metric)
+        current = node.get("current")
+        node_target = node.get("target", target)
+        required = 0.0
+        if current is not None and node_target is not None:
+            gap = (
+                math.log(float(node_target) / float(current))
+                if kind == "growth" and float(current) > 0 and float(node_target) > 0
+                else float(node_target) - float(current)
+            )
+            required = abs(gap) / max(horizon, 1.0)
+        span = max(abs(value), required, 1e-6) * COMPOSED_RATE_RANGE_MULTIPLE
+        if kind == "growth":
+            minimum, maximum, unit = -span, span, f"log growth/{time_unit}"
+        elif kind == "cumulative_count":
+            minimum, maximum, unit = 0.0, span, f"{unit_text}/{time_unit}"
+        else:
+            minimum, maximum, unit = -span, span, f"{unit_text}/{time_unit}"
+        source_tag = str(numeric.assumption_sources.get(f"{node_id}.{parameter}") or "estimated")
+        assumptions.append(
+            _assumption(
+                assumption_id=f"{node_id}.{parameter}",
+                name=f"{node_id}.{parameter}",
+                description=(
+                    f"Expected {noun} in {metric} per {time_unit} for the rest of the horizon."
+                ),
+                value=value,
+                minimum=minimum,
+                maximum=maximum,
+                step=max(span / COMPOSED_RATE_STEPS, 1e-4),
+                source=AssumptionSource.USER
+                if source_tag == "user_assumption"
+                else AssumptionSource.FITTED,
+                unit=unit,
+                provenance=f"{source_tag} {kind} parameter via {model_family}@{model_version}",
+                editable=True,
+                scope="composed_rate",
+                model_family=model_family,
+                version=model_version,
+            )
+        )
+        for readonly in COMPOSED_READONLY_PARAMETERS.get(kind, ()):
+            if readonly not in parameters:
+                continue
+            spread = float(parameters[readonly])
+            assumptions.append(
+                _assumption(
+                    assumption_id=f"{node_id}.{readonly}",
+                    name=f"{node_id}.{readonly}",
+                    description=f"Fitted uncertainty around the {metric} {noun} rate.",
+                    value=spread,
+                    minimum=0.0,
+                    maximum=max(spread * 2.0, 1e-3),
+                    step=max(spread / 100.0, 1e-4),
+                    source=AssumptionSource.FITTED,
+                    unit=unit,
+                    provenance=f"Fitted spread via {model_family}@{model_version}",
+                    editable=False,
+                    scope="composed_spread",
+                    model_family=model_family,
+                    version=model_version,
+                )
+            )
+    if not any(item.editable for item in assumptions):
+        return assumptions
+    assumptions.append(
+        _assumption(
+            assumption_id="execution_probability",
+            name="execution_probability",
+            description="Probability the planned change in rate is sustained.",
             value=DEFAULT_EXECUTION,
             minimum=0.0,
             maximum=1.0,

@@ -268,6 +268,27 @@ export interface ReverseBlueprint {
   }[];
   tolerance_pp: number;
   method: string;
+  plan_actions?: {
+    order: number;
+    kind: "behavioral_volume" | "conversion" | "action";
+    lever_id: string | null;
+    behavior: string;
+    baseline_value: number | null;
+    required_value: number | null;
+    unit: string;
+    quantity_label: string;
+    timeline: string;
+    effort: ReverseBlueprintLeverChange["effort"];
+    constraint: string;
+    requires_evidence: boolean;
+  }[];
+  searched_levers?: { lever_id: string; label: string; kind: string; unit: string; baseline_value: number; search_minimum: number; search_maximum: number; bound_source: string }[];
+  excluded_parameters?: { name: string; reason: string }[];
+  unpriced_recommendations?: { metric: string; label: string; measurement: string; priced: false }[];
+  missing_capabilities?: string[];
+  follow_through_source?: "fitted" | "user" | "default" | "not_modeled" | null;
+  periods_remaining?: number | null;
+  period_unit?: string | null;
 }
 
 export interface ActionFrontierResult {
@@ -370,6 +391,92 @@ export interface StrategyPlan {
   analysis: { heading: string; body: string }[];
   stated_quantity: number | null;
   modeled: boolean;
+  affected_outcomes?: string[];
+  options?: StrategyOption[];
+  selected_option?: string | null;
+  metrics_to_track?: string[];
+  conflicts?: string[];
+  unpriced?: boolean;
+}
+
+export interface StrategyInput {
+  key: string;
+  label: string;
+  unit: string;
+  minimum: number | null;
+  maximum: number | null;
+  required: boolean;
+  value: number | null;
+  suggested_values: number[];
+}
+
+export interface StrategyOption {
+  id: string;
+  label: string;
+  description: string;
+  proxy: boolean;
+  inputs: StrategyInput[];
+}
+
+export type CommitmentStatus = "completed" | "partial" | "missed" | "cancelled" | "unknown";
+
+/** The What If scenario a plan was adopted from. A hypothesis, never evidence. */
+export interface PlanContext {
+  source?: "what_if";
+  title: string;
+  family?: string | null;
+  option_id?: string | null;
+  proxy: boolean;
+  changes: { metric: string; operation: string; value: number; unit: string; frequency?: string | null }[];
+  quantity_per_period: number;
+  period: "day" | "week" | "month";
+  duration_periods: number;
+  baseline_probability?: number | null;
+  scenario_probability?: number | null;
+  execution_probability?: number | null;
+  assumptions_used: string[];
+  priced_at: string;
+}
+
+export interface PlannedCommitment {
+  id: string;
+  goal_id: string;
+  domain: string;
+  action: string;
+  planned_quantity: number;
+  unit: string;
+  window_start: string;
+  window_end: string;
+  created_at: string;
+  plan_context?: PlanContext | null;
+}
+
+export interface CommitmentObservation {
+  id: string;
+  commitment_id: string;
+  version: number;
+  status: CommitmentStatus;
+  actual_quantity: number | null;
+  observed_at: string;
+}
+
+export interface AdoptPlanBody {
+  domain: string;
+  action: string;
+  planned_quantity: number;
+  unit: string;
+  window_start: string;
+  window_end: string;
+  plan_context: PlanContext;
+}
+
+export interface StrategyChangesResponse {
+  option_id: string;
+  title: string;
+  changes: ParsedInterventionChange[];
+  assumptions_used: string[];
+  conflicts: string[];
+  proxy: boolean;
 }
 
 export interface CourseGradeComponent {
@@ -548,6 +655,36 @@ export interface PublicBlueprint {
   suggested_integrations: string[];
   model_configuration: Record<string, unknown>;
   forecast: PublicForecastState;
+  blueprint_version?: number;
+  snapshot_at?: string | null;
+  goal_contract_version?: number | null;
+  tracked_metrics?: string[];
+}
+
+export interface PublicMarketUpdate {
+  published_at: string;
+  probability: number;
+  previous_probability: number | null;
+  /** Percentage points, already rounded to one decimal. */
+  change_points: number | null;
+  kind: "first_publication" | "update";
+  receipt_recorded: boolean;
+  evidence_total: number | null;
+  new_evidence_count: number | null;
+  retired_evidence_count: number | null;
+  new_evidence_metrics: string[];
+  other_new_evidence_count: number;
+  model: string | null;
+  model_change: { previous: string; current: string } | null;
+  status_change: { previous: string; current: string } | null;
+  definition_revised: boolean;
+  deadline_changed: boolean;
+}
+
+export interface PublicModeledSensitivity {
+  published_at: string;
+  model: string | null;
+  drivers: string[];
 }
 
 export interface PublicMarketCard {
@@ -581,6 +718,8 @@ export interface ForkProvenance {
 export interface PublicMarketDetail extends PublicMarketCard {
   blueprint: PublicBlueprint;
   share_path: string;
+  updates?: PublicMarketUpdate[];
+  modeled_sensitivity?: PublicModeledSensitivity | null;
 }
 
 export interface OwnerMarketSocial {
@@ -1314,6 +1453,36 @@ export const api = {
     }),
   parseIntervention: (body: { goal_id: string; text: string }) =>
     request<ParseInterventionResult>("/api/v1/what-if/parse-intervention", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  listPlans: (goalId: string) =>
+    request<{ commitments: PlannedCommitment[]; observations: CommitmentObservation[] }>(
+      `/api/v1/goals/${goalId}/commitments`,
+    ),
+  adoptPlan: (goalId: string, body: AdoptPlanBody) =>
+    request<PlannedCommitment>(`/api/v1/goals/${goalId}/commitments`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  observePlan: (
+    goalId: string,
+    commitmentId: string,
+    body: { status: CommitmentStatus; actual_quantity?: number | null; observed_at: string },
+  ) =>
+    request<CommitmentObservation>(`/api/v1/goals/${goalId}/commitments/${commitmentId}/observations`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  evaluatePlan: (body: { goal_id: string; changes: ParsedInterventionChange[] }) =>
+    request<WhatIfResult>("/api/v1/what-if/plan-evaluation", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
+  strategyChanges: (body: {
+    goal_id: string;
+    family: string;
+    option_id: string;
+    text: string;
+    inputs: Record<string, number>;
+  }) =>
+    request<StrategyChangesResponse>("/api/v1/what-if/strategy-changes", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
     }),
   parseDecision: (body: { goal_id: string; text: string }) =>

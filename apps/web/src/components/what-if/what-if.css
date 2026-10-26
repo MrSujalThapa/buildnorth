@@ -2013,3 +2013,43 @@
 .strategy-plan .strategy-run:hover:not(:disabled) { opacity: .86; }
 .strategy-plan .strategy-run:disabled { opacity: .4; cursor: not-allowed; }
 .strategy-plan .strategy-run:focus-visible { outline: 2px solid var(--what-if-accent); outline-offset: 2px; }
+.strategy-outcomes { margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: var(--what-if-ink); }
+.strategy-outcomes span { margin-right: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--what-if-muted); }
+.strategy-options { display: grid; gap: 8px; margin: 0 0 14px; padding: 0; border: 0; }
+.strategy-options legend { margin-bottom: 8px; font-size: 14px; font-weight: 560; color: var(--what-if-ink); }
+.strategy-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--what-if-border); border-radius: 8px; cursor: pointer; transition: border-color var(--what-if-duration, .16s) var(--what-if-ease, ease); }
+.strategy-option:hover, .strategy-option.is-selected { border-color: var(--what-if-accent); }
+.strategy-option input { margin-top: 3px; accent-color: var(--what-if-accent); }
+.strategy-option strong { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; color: var(--what-if-ink); }
+.strategy-option small { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.45; color: var(--what-if-muted); }
+.strategy-proxy { padding: 1px 6px; border: 1px solid var(--what-if-border); border-radius: 4px; font-size: 11px; font-style: normal; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--what-if-muted); }
+.strategy-field + .strategy-field { margin-top: 14px; }
+.strategy-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.strategy-actions .strategy-footnote { margin: 0; }
+.strategy-conflicts { margin: 14px 0 0; padding: 10px 14px 10px 28px; border: 1px solid color-mix(in srgb, var(--what-if-negative) 40%, transparent); border-radius: 8px; font-size: 13px; line-height: 1.5; color: var(--what-if-ink); }
+.strategy-track { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--what-if-border); }
+.strategy-track ul { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--what-if-ink); }
+.reverse-unpriced, .reverse-missing { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--what-if-border); }
+.reverse-unpriced h4, .reverse-missing h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--what-if-muted); }
+.reverse-unpriced ul, .reverse-missing ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; color: var(--what-if-ink); }
+.reverse-unpriced strong { font-weight: 600; }
+.apply-plan { margin: 16px 0 0; padding: 14px 16px; border: 1px solid var(--what-if-border); border-radius: 10px; }
+.apply-plan.is-saved { border-color: color-mix(in srgb, var(--what-if-positive, #2fa36b) 50%, transparent); }
+.apply-plan.is-saved p:last-child { margin: 4px 0 0; font-size: 13.5px; color: var(--what-if-ink); }
+.apply-plan.is-saved a { color: var(--what-if-accent); font-weight: 600; }
+.apply-plan-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.apply-plan-copy { margin: 4px 0 0; font-size: 13.5px; color: var(--what-if-ink); }
+.what-if-page .apply-plan-button { flex: none; height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--what-if-ink); color: var(--what-if-bg, #0b0b0c); font: 600 13.5px/1 inherit; font-family: inherit; cursor: pointer; }
+.what-if-page .apply-plan-button:disabled { opacity: .5; cursor: progress; }
+.apply-plan-form h3 { margin: 4px 0 12px; font-size: 17px; font-weight: 600; color: var(--what-if-ink); font-variant-numeric: tabular-nums; }
+.apply-plan-fields { display: flex; gap: 20px; }
+.apply-plan-fields label { display: grid; gap: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--what-if-muted); }
+.apply-plan-fields input { height: 34px; padding: 0 10px; border: 1px solid var(--what-if-border); border-radius: 8px; background: transparent; color: var(--what-if-ink); font: 500 14px/1 inherit; font-family: inherit; color-scheme: light dark; }
+.apply-plan-weeks { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--what-if-ink); }
+.apply-plan-weeks input { width: 72px; }
+.apply-plan-odds { display: flex; gap: 28px; margin: 16px 0 0; }
+.apply-plan-odds dt { font-size: 12px; color: var(--what-if-muted); }
+.apply-plan-odds dd { margin: 4px 0 0; font: 600 18px/1 var(--font-mono); color: var(--what-if-ink); font-variant-numeric: tabular-nums; }
+.apply-plan-assumptions { margin: 12px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--what-if-ink); }
+.apply-plan-note { margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--what-if-muted); }
+.apply-plan-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; }

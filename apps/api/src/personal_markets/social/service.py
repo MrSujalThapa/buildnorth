@@ -29,6 +29,12 @@ from personal_markets.social.domain import (
     Visibility,
 )
 from personal_markets.social.repository import SocialRepository
+from personal_markets.social.updates import (
+    derive_updates,
+    modeled_sensitivity,
+    new_evidence_ids,
+    receipt_facts,
+)
 
 
 def _handle(user_id: UUID, profile: UserProfile) -> str:
@@ -126,8 +132,9 @@ class SocialService:
         self, owner_id: UUID, goal_id: UUID, visibility: Visibility
     ) -> OwnerMarketSocial:
         goal = await self._goals.get_goal(goal_id, owner_id=owner_id)
-        blueprint = build_public_blueprint(goal)
-        published_at = datetime.now(UTC) if visibility == "public" else None
+        now = datetime.now(UTC)
+        blueprint = build_public_blueprint(goal, snapshot_at=now)
+        published_at = now if visibility == "public" else None
         updated = await self._repository.set_visibility(
             goal_id,
             owner_id,
@@ -292,10 +299,17 @@ class SocialService:
         blueprint = self._blueprint_for_viewer(row, viewer_id).model_copy(
             update={"forecast": card.forecast}
         )
+        facts = receipt_facts(await self._repository.published_updates(goal_id))
+        wanted = sorted(new_evidence_ids(facts))
+        metrics = await self._repository.evidence_metrics(goal_id, wanted) if wanted else {}
         return PublicMarketDetail(
             **card.model_dump(),
             blueprint=blueprint,
             share_path=f"/m/{goal_id}",
+            updates=derive_updates(
+                facts, tracked_metrics=blueprint.tracked_metrics, evidence_metrics=metrics
+            ),
+            modeled_sensitivity=modeled_sensitivity(facts),
         )
 
     async def profile(self, handle: str, viewer_id: UUID | None) -> PublicProfile:
@@ -418,7 +432,9 @@ class SocialService:
             raise ConflictError("This blueprint has no public success criteria to fork")
         source = await self._goals.get_goal(source_goal_id)
         metric = blueprint.success_criteria.get("metric")
-        state_dimensions = [metric] if isinstance(metric, str) and metric else ["progress"]
+        state_dimensions = list(blueprint.tracked_metrics) or (
+            [metric] if isinstance(metric, str) and metric else ["progress"]
+        )
         reviewed_requirements: dict[str, Any] = dict(blueprint.model_configuration)
         if blueprint.category and blueprint.category != source.goal_type.value:
             reviewed_requirements["life_area"] = blueprint.category
@@ -450,6 +466,8 @@ class SocialService:
             reviewed_source, owner_title=title, deadline=reviewed_deadline, new_goal_id=new_id
         )
         carried = _carried_fields(forked.success_definition, forked.model_requirements)
+        if blueprint.tracked_metrics:
+            carried.append("tracked_metrics")
         forked = forked.model_copy(
             update={
                 "model_requirements": {
@@ -457,6 +475,10 @@ class SocialService:
                     "forked_blueprint": {
                         "source_goal_id": str(source_goal_id),
                         "source_title": blueprint.title,
+                        "source_blueprint_version": blueprint.blueprint_version,
+                        "source_snapshot_at": (
+                            blueprint.snapshot_at.isoformat() if blueprint.snapshot_at else None
+                        ),
                         "carried_fields": carried,
                         "forked_at": datetime.now(UTC).isoformat(),
                     },

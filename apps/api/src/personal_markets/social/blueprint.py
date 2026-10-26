@@ -122,6 +122,24 @@ FORECAST_SPEC_PRIVATE_KEYS = frozenset(
     }
 )
 FORECAST_SPEC_EVIDENCE_PARTS = ("evidence", "observation", "observed", "current_value")
+BLUEPRINT_SCHEMA_VERSION = 2
+MAX_TRACKED_METRICS = 12
+MAX_METRIC_NAME_LENGTH = 60
+
+
+def tracked_metric_names(success: dict[str, Any], state_dimensions: list[Any]) -> list[str]:
+    """Metric names the goal definition tracks: success metric first, then dimensions."""
+    names: list[str] = []
+    for item in [success.get("metric"), *state_dimensions]:
+        if not isinstance(item, str):
+            continue
+        name = item.strip()
+        if not name or len(name) > MAX_METRIC_NAME_LENGTH or name in names:
+            continue
+        if any(part in name.lower() for part in SENSITIVE_KEY_PARTS):
+            continue
+        names.append(name)
+    return names[:MAX_TRACKED_METRICS]
 
 
 def forecast_units(model_requirements: dict[str, Any]) -> str | None:
@@ -213,6 +231,9 @@ def _blueprint_from_parts(
     deadline: datetime | None,
     model_requirements: dict[str, Any],
     description: str = "",
+    state_dimensions: list[Any] | None = None,
+    goal_contract_version: int | None = None,
+    snapshot_at: datetime | None = None,
 ) -> PublicBlueprint:
     success = enriched_success_definition(success_definition, model_requirements)
     requirements = public_model_configuration(model_requirements)
@@ -245,7 +266,20 @@ def _blueprint_from_parts(
         suggested_integrations=[str(item) for item in integrations],
         model_configuration=requirements,
         forecast=forecast_state_from_requirements(model_requirements),
+        blueprint_version=BLUEPRINT_SCHEMA_VERSION,
+        snapshot_at=snapshot_at,
+        goal_contract_version=goal_contract_version,
+        tracked_metrics=tracked_metric_names(success, state_dimensions or []),
     )
+
+
+def _json_list(value: Any) -> list[Any]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+    return value if isinstance(value, list) else []
 
 
 def _json_dict(value: Any) -> dict[str, Any]:
@@ -260,12 +294,15 @@ def _json_dict(value: Any) -> dict[str, Any]:
 def blueprint_from_row(row: dict[str, Any]) -> PublicBlueprint:
     """Live blueprint from goal columns; used for owner views and gap filling."""
     deadline = row.get("deadline")
+    version = row.get("version")
     return _blueprint_from_parts(
         title=str(row["title"]),
         goal_type=str(row["goal_type"]),
         success_definition=_json_dict(row.get("success_definition_json")),
         deadline=deadline if isinstance(deadline, datetime) else None,
         model_requirements=_json_dict(row.get("model_requirements_json")),
+        state_dimensions=_json_list(row.get("state_dimensions_json")),
+        goal_contract_version=version if isinstance(version, int) else None,
     )
 
 
@@ -298,10 +335,14 @@ def reviewed_blueprint(row: dict[str, Any], *, live: bool) -> PublicBlueprint:
         updates["description"] = success_summary(criteria, deadline) or current.description
     if not snapshot.milestones and current.milestones:
         updates["milestones"] = current.milestones
+    if not snapshot.tracked_metrics and current.tracked_metrics:
+        updates["tracked_metrics"] = current.tracked_metrics
     return snapshot.model_copy(update=updates)
 
 
-def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicBlueprint:
+def build_public_blueprint(
+    goal: GoalContract, description: str = "", *, snapshot_at: datetime | None = None
+) -> PublicBlueprint:
     return _blueprint_from_parts(
         title=goal.title,
         goal_type=goal.goal_type.value,
@@ -309,6 +350,9 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
         deadline=goal.deadline,
         model_requirements=goal.model_requirements,
         description=description,
+        state_dimensions=list(goal.state_dimensions),
+        goal_contract_version=goal.version,
+        snapshot_at=snapshot_at,
     )
 
 

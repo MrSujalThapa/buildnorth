@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -19,6 +20,40 @@ from personal_markets.core.errors import ResourceNotFoundError, SemanticProvider
 from personal_markets.persistence.database import autocommit_connection, create_engine, transaction
 
 OutcomeStatus = Literal["completed", "partial", "missed", "cancelled", "unknown"]
+MAX_PLAN_CHANGES = 5
+MAX_PLAN_NOTES = 6
+MAX_PLAN_PERIODS = 104
+
+
+class PlanChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str = Field(min_length=1, max_length=80)
+    operation: Literal["add", "subtract", "set"]
+    value: float
+    unit: str = Field(max_length=60)
+    frequency: str | None = Field(default=None, max_length=20)
+
+
+class PlanContext(BaseModel):
+    """The What If scenario a plan was adopted from. A hypothesis, never evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["what_if"] = "what_if"
+    title: str = Field(min_length=1, max_length=240)
+    family: str | None = Field(default=None, max_length=40)
+    option_id: str | None = Field(default=None, max_length=40)
+    proxy: bool = False
+    changes: list[PlanChange] = Field(min_length=1, max_length=MAX_PLAN_CHANGES)
+    quantity_per_period: float = Field(gt=0)
+    period: Literal["day", "week", "month"]
+    duration_periods: int = Field(ge=1, le=MAX_PLAN_PERIODS)
+    baseline_probability: float | None = Field(default=None, ge=0, le=1)
+    scenario_probability: float | None = Field(default=None, ge=0, le=1)
+    execution_probability: float | None = Field(default=None, ge=0, le=1)
+    assumptions_used: list[str] = Field(default_factory=list, max_length=MAX_PLAN_NOTES)
+    priced_at: datetime
 
 
 class Commitment(BaseModel):
@@ -32,6 +67,12 @@ class Commitment(BaseModel):
     window_start: datetime
     window_end: datetime
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    plan_context: PlanContext | None = None
+
+    @field_validator("plan_context", mode="before")
+    @classmethod
+    def decode_plan_context(cls, value: object) -> object:
+        return json.loads(value) if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def validate_window(self) -> Commitment:
@@ -185,12 +226,17 @@ class PostgresCommitmentStore:
                         text("""
                 insert into behavior_commitments
                   (id, owner_id, goal_id, domain, action, planned_quantity, unit,
-                   window_start, window_end)
+                   window_start, window_end, plan_context)
                 values (:id, :owner_id, :goal_id, :domain, :action, :planned_quantity,
-                        :unit, :window_start, :window_end)
+                        :unit, :window_start, :window_end, cast(:plan_context as jsonb))
                 returning *
             """),
-                        plan.model_dump(),
+                        {
+                            **plan.model_dump(exclude={"plan_context"}),
+                            "plan_context": plan.plan_context.model_dump_json()
+                            if plan.plan_context is not None
+                            else None,
+                        },
                     )
                 )
                 .mappings()

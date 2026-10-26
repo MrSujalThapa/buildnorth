@@ -2,13 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, type WorkflowSnapshot } from "../api/client";
-import { absoluteUrl, shareLink } from "../features/social/share";
 import { isCourseStandingGoal } from "../adapters/courseGrade";
 import { currentForecastStatus, toMarketDetail } from "../adapters/marketViewModel";
 import CourseStandingPanel from "../components/market/CourseStandingPanel";
 import MarketDetailPage from "../components/market/MarketDetailPage";
 import VisibilityControl from "../components/market/VisibilityControl";
+import GoalPlansPanel from "../components/goals/GoalPlansPanel";
 import ForkedBlueprintPanel from "../components/social/ForkedBlueprintPanel";
+import ShareDialog from "../components/social/ShareDialog";
 import { StrategyLearningPanel } from "../features/goals/StrategyLearningPanel";
 import "../components/social/social.css";
 
@@ -22,7 +23,7 @@ export function GoalDetailRoute() {
   const [workflowSnapshot] = useState<WorkflowSnapshot | null>(initialSnapshot);
   const [evidenceAnswers, setEvidenceAnswers] = useState<Record<string, string>>({});
   const [publishOpen, setPublishOpen] = useState(false);
-  const [shareNote, setShareNote] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const continuation = useQuery({
     queryKey: ["goal-evidence-continuation", goalId],
     queryFn: ({ signal }) => api.goalEvidenceContinuation(goalId, signal),
@@ -68,6 +69,7 @@ export function GoalDetailRoute() {
     mutationFn: (visibility: "public" | "private") => api.setMarketVisibility(goalId, visibility),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["market-social", goalId] });
+      void queryClient.invalidateQueries({ queryKey: ["public-market", goalId] });
       void queryClient.invalidateQueries({ queryKey: ["goals"] });
       setPublishOpen(false);
     },
@@ -133,18 +135,7 @@ export function GoalDetailRoute() {
             disabled={publish.isPending}
           />
         }
-        onShare={() => {
-          void api.shareMarket(goalId).then((result) => {
-            if (!result.shareable) {
-              setShareNote(result.reason ?? "Publish this market before sharing.");
-              setPublishOpen(true);
-              return;
-            }
-            return shareLink({ url: result.url ?? absoluteUrl(`/m/${goalId}`), title: market.title }).then((mode) => {
-              setShareNote(mode === "copied" ? "Link copied" : "Shared");
-            });
-          }).catch(() => setShareNote("Could not share this market."));
-        }}
+        onShare={() => setShareOpen(true)}
       >
         {justForked && social.data?.fork ? (
           <ForkedBlueprintPanel
@@ -155,6 +146,7 @@ export function GoalDetailRoute() {
             onDismiss={() => { void navigate(`/goals/${goalId}`, { replace: true }); }}
           />
         ) : null}
+        {goalId ? <GoalPlansPanel goalId={goalId} /> : null}
         {isCourseStandingGoal(goal.data) ? <CourseStandingPanel /> : null}
         {goalId ? <StrategyLearningPanel goalId={goalId} /> : null}
         {latestWorkflow?.status === "evidence_pending" || latestWorkflow?.status === "evidence_running" ? (
@@ -217,7 +209,13 @@ export function GoalDetailRoute() {
           </div>
         </div>
       ) : null}
-      {shareNote ? <div className="share-toast" role="status">{shareNote}</div> : null}
+      {shareOpen ? (
+        <ShareDialog
+          goalId={goalId}
+          onClose={() => setShareOpen(false)}
+          onPublish={() => { setShareOpen(false); setPublishOpen(true); }}
+        />
+      ) : null}
     </>
   );
 }

@@ -15,17 +15,28 @@ from typing import Literal
 from personal_markets.what_if.domain import (
     BlueprintAction,
     BlueprintAlternative,
+    BlueprintExcludedParameter,
     BlueprintLeverChange,
+    BlueprintLeverKind,
+    BlueprintPlanAction,
     BlueprintPlateau,
+    BlueprintSearchedLever,
+    BlueprintUnpricedRecommendation,
     EffortLevel,
+    FollowThroughSource,
     ReverseBlueprint,
 )
 
+# A plan "reaches" the target only if its modeled odds are at least target minus this
+# many percentage points. Requests may ask for a tighter tolerance, never a looser one.
+TARGET_TOLERANCE_PP = 0.5
+TARGET_TOLERANCE = TARGET_TOLERANCE_PP / 100
 # Relative change vs. today's lever value (0.5 = +50%) that bounds each effort level.
 EFFORT_LIGHT_MAX_RATIO = 0.5
 EFFORT_MODERATE_MAX_RATIO = 1.5
 # Same bounds as a share of the lever's remaining modeled range, used when today's value
-# is zero or too small for a ratio to mean anything.
+# is zero or too small for a ratio to mean anything, and always for conversion levers,
+# whose search range is itself the bound on what the plan may assume.
 EFFORT_LIGHT_MAX_RANGE = 0.25
 EFFORT_MODERATE_MAX_RANGE = 0.6
 # Using this share of the remaining range is heavy regardless of the ratio.
@@ -44,6 +55,9 @@ FOLLOW_THROUGH_CAP_MARGIN = 0.03
 # Conditional-on-execution odds at or above this mean the lever itself is saturated.
 SATURATED_CONDITIONAL = 0.97
 MAX_ALTERNATIVES = 5
+BLUEPRINT_METHOD = "reverse_blueprint@2.0.0"
+
+LeverKind = BlueprintLeverKind
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +69,12 @@ class LeverSpec:
     maximum: float
     step: float
     increasing: bool = True
+    kind: LeverKind = "behavioral_volume"
+    label: str | None = None
+    # Settings snap to `origin + k * step`; levers whose baseline is off the absolute
+    # grid (fitted conversion rates, estimated composed rates) snap from the baseline.
+    origin: float = 0.0
+    bound_source: str = "Assumption range from the model."
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +114,12 @@ class BlueprintInputs:
     scans: tuple[LeverScan, ...] = ()
     follow_through: float | None = None
     levers: tuple[LeverSpec, ...] = field(default_factory=tuple)
+    follow_through_source: FollowThroughSource | None = None
+    excluded: tuple[BlueprintExcludedParameter, ...] = ()
+    unpriced: tuple[BlueprintUnpricedRecommendation, ...] = ()
+    periods: int | None = None
+    period_unit: str | None = None
+    max_plan_levers: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,20 +127,39 @@ class _LeverCopy:
     noun: str
     unit_label: str
     currency: bool = False
+    percent: bool = False
+
+
+def _lower_first(text: str) -> str:
+    """Sentence-case a label without breaking acronyms such as "OA"."""
+    if len(text) > 1 and text[1].isupper():
+        return text
+    return text[:1].lower() + text[1:]
 
 
 def _lever_copy(lever: LeverSpec) -> _LeverCopy:
+    if lever.kind == "conversion":
+        noun = _lower_first(lever.label or lever.lever_id.replace("_", " "))
+        return _LeverCopy(noun, "", percent=True)
     if lever.lever_id == "weekly_application_rate":
         return _LeverCopy("weekly applications", "applications/week")
     if lever.lever_id == "flow" and lever.unit.startswith("currency"):
         return _LeverCopy("monthly contribution", "/month", currency=True)
     if lever.lever_id == "flow" and lever.unit == "seconds/week":
         return _LeverCopy("weekly pace trend", "s/week")
-    return _LeverCopy(lever.lever_id.replace("_", " "), lever.unit)
+    noun = lever.label.lower() if lever.label else lever.lever_id.replace("_", " ")
+    return _LeverCopy(noun, lever.unit)
+
+
+def lever_label(lever: LeverSpec) -> str:
+    noun = _lever_copy(lever).noun
+    return noun[:1].upper() + noun[1:]
 
 
 def format_lever_value(lever: LeverSpec, value: float) -> str:
     copy = _lever_copy(lever)
+    if copy.percent:
+        return f"{value * 100:.0f}%"
     whole = lever.step >= 1 or abs(value) >= 100
     number = f"{value:,.0f}" if whole else f"{value:,.4g}"
     if copy.currency:
@@ -122,6 +167,14 @@ def format_lever_value(lever: LeverSpec, value: float) -> str:
         magnitude = f"{abs(value):,.0f}" if whole else f"{abs(value):,.4g}"
         return f"{sign}${magnitude}{copy.unit_label}"
     return f"{number} {copy.unit_label}"
+
+
+def _format_delta(lever: LeverSpec, delta: float) -> str:
+    """Signed change; probability levers move in percentage points, not percent."""
+    sign = "+" if delta >= 0 else "-"
+    if _lever_copy(lever).percent:
+        return f"{sign}{abs(delta) * 100:.0f} pp"
+    return f"{sign}{format_lever_value(lever, abs(delta))}"
 
 
 def _bare_value(lever: LeverSpec, value: float) -> str:
@@ -133,6 +186,10 @@ def _bare_value(lever: LeverSpec, value: float) -> str:
 
 def _pct(probability: float) -> str:
     return f"{probability * 100:.0f}%"
+
+
+def _pct1(probability: float) -> str:
+    return f"{probability * 100:.1f}%"
 
 
 def _pp(delta: float) -> str:
@@ -159,7 +216,7 @@ def classify_effort(lever: LeverSpec, value: float) -> EffortLevel:
     used = range_used(lever, value)
     if used >= EFFORT_HEAVY_RANGE:
         return "heavy"
-    ratio = relative_change(lever, value)
+    ratio = None if lever.kind == "conversion" else relative_change(lever, value)
     if ratio is not None:
         magnitude = abs(ratio)
         if magnitude <= EFFORT_LIGHT_MAX_RATIO:
@@ -180,8 +237,8 @@ def lever_change(setting: LeverSetting) -> BlueprintLeverChange:
     delta = value - lever.baseline
     verb = "Raise" if delta > 0 else "Lower" if delta < 0 else "Keep"
     ratio = relative_change(lever, value)
-    detail = f"{'+' if delta >= 0 else '-'}{format_lever_value(lever, abs(delta))}"
-    if ratio is not None and delta != 0 and lever.baseline > 0:
+    detail = _format_delta(lever, delta)
+    if ratio is not None and delta != 0 and lever.baseline > 0 and not copy.percent:
         detail += f", {value / lever.baseline:.1f}× today"
     if verb == "Keep":
         description = f"Keep {copy.noun} at {format_lever_value(lever, value)}"
@@ -192,7 +249,7 @@ def lever_change(setting: LeverSetting) -> BlueprintLeverChange:
         )
     return BlueprintLeverChange(
         lever_id=lever.lever_id,
-        label=copy.noun[:1].upper() + copy.noun[1:],
+        label=lever_label(lever),
         unit=lever.unit,
         baseline_value=lever.baseline,
         recommended_value=value,
@@ -204,11 +261,22 @@ def lever_change(setting: LeverSetting) -> BlueprintLeverChange:
     )
 
 
+def setting_effort(setting: LeverSetting) -> float:
+    """Effort units for one lever setting.
+
+    Behavioral levers cost their relative change (doubling = 1). Conversion levers cost
+    the share of their search bound used, so assuming the full bound costs as much as
+    doubling a behavior instead of looking cheap because rates are small numbers.
+    """
+    lever = setting.lever
+    if lever.kind == "conversion":
+        return range_used(lever, setting.value)
+    ratio = relative_change(lever, setting.value)
+    return abs(ratio) if ratio is not None else range_used(lever, setting.value)
+
+
 def effort_score(option: PricedOption) -> float:
-    score = 0.0
-    for setting in option.settings:
-        ratio = relative_change(setting.lever, setting.value)
-        score += abs(ratio) if ratio is not None else range_used(setting.lever, setting.value)
+    score = sum(setting_effort(setting) for setting in option.settings)
     for action in option.actions:
         score += action.hours_per_week / ACTION_HOURS_PER_EFFORT_UNIT
         score += action.money / ACTION_MONEY_PER_EFFORT_UNIT
@@ -352,6 +420,123 @@ def _join(parts: list[str]) -> str:
     return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
+_KIND_ORDER: dict[str, int] = {"behavioral_volume": 0, "conversion": 1}
+
+
+def _ordered_settings(option: PricedOption) -> list[LeverSetting]:
+    """Direct behaviors first, then conversion assumptions; each in search order."""
+    indexed = list(enumerate(option.settings))
+    indexed.sort(key=lambda item: (_KIND_ORDER.get(item[1].lever.kind, 2), item[0]))
+    return [setting for _, setting in indexed]
+
+
+def _period_phrase(periods: int | None, unit: str | None) -> str:
+    if periods is None or not unit:
+        return "until the deadline"
+    plural = unit if periods == 1 else f"{unit}s"
+    return f"for the {periods} {plural} until the deadline"
+
+
+def _rate_period(unit: str) -> str | None:
+    tail = unit.rsplit("/", 1)[-1] if "/" in unit else ""
+    return tail if tail in {"day", "week", "month"} else None
+
+
+def _timeline(setting: LeverSetting, periods: int | None, period_unit: str | None) -> str:
+    lever = setting.lever
+    if lever.kind == "conversion":
+        return (
+            f"Hold this rate on new applications {_period_phrase(periods, period_unit)}; "
+            "the model applies it to every future application."
+        )
+    rate_unit = _rate_period(lever.unit)
+    span = _period_phrase(periods, period_unit)
+    if rate_unit is None:
+        return f"Start now and hold it {span}."
+    total = ""
+    if periods is not None and rate_unit == period_unit and lever.increasing:
+        amount = setting.value * periods
+        total = f" (about {amount:,.0f} in total)" if abs(amount) >= 1 else ""
+    return f"Every {rate_unit}, starting now, {span}{total}."
+
+
+def _constraint(change: BlueprintLeverChange, lever: LeverSpec) -> str:
+    if lever.kind == "conversion":
+        return (
+            "A conversion assumption you would need to achieve (for example through "
+            "interview prep or referrals). Back it with logged outcomes before relying "
+            f"on it. Searched up to {format_lever_value(lever, lever.maximum)}: "
+            f"{lever.bound_source}"
+        )
+    notes = []
+    if change.effort == "heavy":
+        notes.append("Heavy lift; check it fits your week")
+    elif change.effort == "moderate":
+        notes.append("Moderate step up from today")
+    else:
+        notes.append("Small step up from today")
+    if change.range_used >= NEAR_BOUND_RANGE:
+        notes.append("near the top of the range the model allows, where odds are least tested")
+    return "; ".join(notes) + "."
+
+
+def plan_actions(
+    option: PricedOption, *, periods: int | None, period_unit: str | None
+) -> list[BlueprintPlanAction]:
+    items: list[BlueprintPlanAction] = []
+    for setting in _ordered_settings(option):
+        lever = setting.lever
+        change = lever_change(setting)
+        if change.effort == "none":
+            continue
+        behavior = (
+            f"Achieve {_lever_copy(lever).noun} of {format_lever_value(lever, setting.value)}"
+            if lever.kind == "conversion"
+            else change.description
+        )
+        items.append(
+            BlueprintPlanAction(
+                order=len(items) + 1,
+                kind=lever.kind,
+                lever_id=lever.lever_id,
+                behavior=behavior,
+                baseline_value=lever.baseline,
+                required_value=setting.value,
+                unit=lever.unit,
+                quantity_label=format_lever_value(lever, setting.value),
+                timeline=_timeline(setting, periods, period_unit),
+                effort=change.effort,
+                constraint=_constraint(change, lever),
+                requires_evidence=lever.kind == "conversion",
+            )
+        )
+    for action in option.actions:
+        hours = f"{action.hours_per_week:g} h/week" if action.hours_per_week else ""
+        money = f"{action.money:,.0f} money" if action.money else ""
+        cost = ", ".join(part for part in (hours, money) if part)
+        units = action.hours_per_week / ACTION_HOURS_PER_EFFORT_UNIT + (
+            action.money / ACTION_MONEY_PER_EFFORT_UNIT
+        )
+        effort: EffortLevel = (
+            "light" if units <= EFFORT_LIGHT_MAX_RATIO
+            else "moderate" if units <= EFFORT_MODERATE_MAX_RATIO
+            else "heavy"
+        )
+        items.append(
+            BlueprintPlanAction(
+                order=len(items) + 1,
+                kind="action",
+                behavior=f"Add {action.title}",
+                unit="action",
+                quantity_label=cost or "as planned",
+                timeline=f"Start now and keep it {_period_phrase(periods, period_unit)}.",
+                effort=effort,
+                constraint=f"Costs {cost}." if cost else "Uses the action's own assumed effect.",
+            )
+        )
+    return items
+
+
 def _steps(
     option: PricedOption, changes: list[BlueprintLeverChange], follow_through: float | None
 ) -> list[str]:
@@ -377,17 +562,20 @@ def _tradeoffs(
 ) -> list[str]:
     notes: list[str] = []
     for change in changes:
-        where = format_lever_value(
-            next(s.lever for s in option.settings if s.lever.lever_id == change.lever_id),
-            change.recommended_value,
-        )
-        if change.effort == "heavy":
+        lever = next(s.lever for s in option.settings if s.lever.lever_id == change.lever_id)
+        where = format_lever_value(lever, change.recommended_value)
+        if lever.kind == "conversion":
+            notes.append(
+                f"{change.label} at {where} is an assumption, not evidence; log outcomes "
+                "to confirm it."
+            )
+        elif change.effort == "heavy":
             notes.append(f"{change.label} at {where} is a heavy lift; check it fits your week.")
         elif change.effort == "moderate":
             notes.append(f"{change.label} at {where} is a moderate step up from today.")
         if change.range_used >= NEAR_BOUND_RANGE:
             notes.append(
-                f"{where} is near the top of the range the model allows for "
+                f"{where} is near the top of the range searched for "
                 f"{change.label.lower()}; odds there are the least tested."
             )
     for action in option.actions:
@@ -411,7 +599,7 @@ def _tradeoffs(
         closest = max(cheaper, key=lambda item: item.probability)
         notes.append(
             f"A smaller change ({option_label(closest).lower()}) models "
-            f"{_pct(closest.probability)}, {_pp(target - closest.probability)} short of target."
+            f"{_pct1(closest.probability)}, {_pp(target - closest.probability)} short of target."
         )
     return notes
 
@@ -429,6 +617,8 @@ def _alternative(
         note = f"Smaller change, {_pp(target - option.probability)} short of target."
     else:
         note = f"Larger change, still {_pp(target - option.probability)} short of target."
+    if len(option.settings) == 1 and not option.actions:
+        note += " Single-lever option."
     return BlueprintAlternative(
         id=option.id,
         label=option_label(option),
@@ -439,6 +629,14 @@ def _alternative(
         effort_score=round(effort_score(option), 4),
         note=note,
     )
+
+
+def _select_alternatives(items: list[BlueprintAlternative]) -> list[BlueprintAlternative]:
+    """Reaching options first, then the strongest short ones; shown cheapest first."""
+    ranked = sorted(
+        items, key=lambda item: (not item.reaches_target, -item.modeled_probability)
+    )
+    return sorted(ranked[:MAX_ALTERNATIVES], key=lambda item: item.effort_score)
 
 
 def _plateau_for(
@@ -458,8 +656,90 @@ def _plateau_for(
     return None
 
 
+def searched_levers(levers: Sequence[LeverSpec]) -> list[BlueprintSearchedLever]:
+    return [
+        BlueprintSearchedLever(
+            lever_id=lever.lever_id,
+            label=lever_label(lever),
+            kind=lever.kind,
+            unit=lever.unit,
+            baseline_value=lever.baseline,
+            search_minimum=lever.minimum,
+            search_maximum=lever.maximum,
+            bound_source=lever.bound_source,
+        )
+        for lever in levers
+    ]
+
+
+def missing_capabilities(
+    inputs: BlueprintInputs, chosen: PricedOption | None
+) -> list[str]:
+    """What the model would need before the target could be reached. Text only."""
+    notes: list[str] = []
+    if not inputs.levers:
+        notes.append(
+            "No user-controllable lever is modeled for this goal; add a measured rate "
+            "(for example a weekly count) so the model can price changes to it."
+        )
+    if chosen is not None:
+        for setting in chosen.settings:
+            lever = setting.lever
+            if range_used(lever, setting.value) >= NEAR_BOUND_RANGE:
+                edge = lever.maximum if lever.increasing else lever.minimum
+                notes.append(
+                    f"{lever_label(lever)} is at the edge of its searched range "
+                    f"({format_lever_value(lever, edge)}): {lever.bound_source}"
+                )
+        if (
+            inputs.max_plan_levers is not None
+            and len(chosen.settings) >= inputs.max_plan_levers
+            and len(inputs.levers) > inputs.max_plan_levers
+        ):
+            notes.append(
+                f"Plans combine at most {inputs.max_plan_levers} lever changes at once to "
+                "stay actionable."
+            )
+    if inputs.follow_through is not None and inputs.follow_through < 1:
+        source = {
+            "fitted": "fitted from your logged behavior",
+            "user": "set by you",
+            "default": "the default; no behavior evidence yet",
+        }.get(inputs.follow_through_source or "", "modeled")
+        notes.append(
+            f"Follow-through is modeled at {_pct(inputs.follow_through)} ({source}). In "
+            "futures where the plan slips the change does nothing, which caps every plan. "
+            "Logged commitments showing stronger follow-through would raise that cap."
+        )
+    if inputs.unpriced:
+        names = ", ".join(item.label.lower() for item in inputs.unpriced[:3])
+        notes.append(
+            f"Actions like {names} have no modeled effect yet; measuring them would let "
+            "the model test whether they move a modeled rate."
+        )
+    return notes
+
+
+def _context(inputs: BlueprintInputs) -> dict[str, object]:
+    return {
+        "follow_through_probability": inputs.follow_through,
+        "follow_through_source": inputs.follow_through_source,
+        "searched_levers": searched_levers(inputs.levers),
+        "excluded_parameters": list(inputs.excluded),
+        "unpriced_recommendations": list(inputs.unpriced),
+        "periods_remaining": inputs.periods,
+        "period_unit": inputs.period_unit,
+        "method": BLUEPRINT_METHOD,
+    }
+
+
 def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
-    target, baseline, tolerance = inputs.target, inputs.baseline, inputs.tolerance
+    return _build(inputs).model_copy(update=_context(inputs))
+
+
+def _build(inputs: BlueprintInputs) -> ReverseBlueprint:
+    target, baseline = inputs.target, inputs.baseline
+    tolerance = min(inputs.tolerance, TARGET_TOLERANCE)
     tolerance_pp = tolerance * 100
     if baseline + tolerance >= target:
         keep = [
@@ -473,14 +753,13 @@ def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
             reachable=True,
             already_satisfied=True,
             headline=(
-                f"You're already at about {_pct(baseline)}, at or above the {_pct(target)} "
-                "target. Keep the current plan."
+                f"You're already at about {_pct1(baseline)}, within {tolerance_pp:g} pp of "
+                f"the {_pct(target)} target or above it. Keep the current plan."
             ),
             rationale="Today's evidence already clears the target; no change is needed.",
             lever_changes=keep,
             steps=[f"{change.description}." for change in keep]
             + ["Hold everything else at today's evidence, and log progress so the odds re-price."],
-            follow_through_probability=inputs.follow_through,
             max_modeled_probability=baseline,
             tolerance_pp=tolerance_pp,
         )
@@ -496,8 +775,8 @@ def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
             baseline_probability=baseline,
             reachable=False,
             headline=(
-                f"No modeled change moves the odds above about {_pct(baseline)}, so "
-                f"{_pct(target)} is out of reach with these levers."
+                f"{_pct(target)} is not reachable with the currently modeled levers: no "
+                f"modeled change moves the odds above about {_pct1(baseline)}."
             ),
             rationale=(
                 f"All {len(inputs.options)} priced options stayed within "
@@ -505,12 +784,12 @@ def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
                 if inputs.options
                 else "No supported lever could be priced for this goal."
             ),
-            follow_through_probability=inputs.follow_through,
             max_modeled_probability=max(
                 (item.probability for item in inputs.options), default=baseline
             ),
             plateau=plateau,
             tolerance_pp=tolerance_pp,
+            missing_capabilities=missing_capabilities(inputs, None),
         )
 
     reaching = [item for item in frontier if reaches(item.probability)]
@@ -518,36 +797,43 @@ def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
     if reaching:
         chosen = reaching[0]
     else:
-        # Past the cheapest option within a plateau's width of the best, effort buys nothing.
-        top = frontier[-1].probability
-        chosen = next(item for item in frontier if top - item.probability <= PLATEAU_GAIN_TOLERANCE)
-    changes = [lever_change(setting) for setting in chosen.settings]
-    lever_by_id = {setting.lever.lever_id: setting.lever for setting in chosen.settings}
+        # The highest modeled odds; among exact ties, the smaller change.
+        chosen = max(
+            inputs.options, key=lambda item: (item.probability, -effort_score(item))
+        )
+    ordered = _ordered_settings(chosen)
+    changes = [lever_change(setting) for setting in ordered]
+    lever_by_id = {setting.lever.lever_id: setting.lever for setting in ordered}
     summary = [_short_change(change, lever_by_id[change.lever_id]) for change in changes]
     summary.extend(f"add {action.title}" for action in chosen.actions)
     plan = _join(summary)
     modeled = chosen.probability
+    combination = len(chosen.settings) + len(chosen.actions) > 1
+    kind = "combination" if combination else "change"
     if reachable:
-        headline = f"To reach ~{_pct(target)}: {plan}. Modeled odds {_pct(modeled)}."
+        meets = (
+            f"modeled {_pct1(modeled)}"
+            if modeled >= target
+            else f"modeled {_pct1(modeled)}, within {tolerance_pp:g} pp"
+        )
+        headline = f"Reaches the {_pct(target)} target ({meets}): {plan}."
         rationale = (
-            f"The smallest change among {len(inputs.options)} priced options that reaches "
-            f"{_pct(target)} (within {tolerance_pp:g} pp). Smaller and larger options are "
-            "listed as alternatives."
+            f"The cheapest {kind} among {len(inputs.options)} priced options whose modeled "
+            f"odds are at least {_pct(target)} minus {tolerance_pp:g} pp. Smaller and "
+            "larger options, including single-lever ones, are listed as alternatives."
         )
     else:
         headline = (
-            f"{_pct(target)} is out of reach with these levers. Closest path: {plan}, "
-            f"modeled at {_pct(modeled)}."
+            f"{_pct(target)} is not reachable with the currently modeled levers. Highest "
+            f"modeled odds: {_pct1(modeled)}, {_pp(target - modeled)} short, with: {plan}."
         )
         rationale = (
-            f"No tested combination reaches {_pct(target)}. This is the highest modeled "
-            f"result among {len(inputs.options)} priced options; past it, extra effort "
-            "stops buying odds."
+            f"No tested combination reaches {_pct(target)} (within {tolerance_pp:g} pp). "
+            f"This is the highest modeled result among {len(inputs.options)} priced options."
         )
-    alternatives = [
-        _alternative(item, target, tolerance, chosen) for item in frontier if item is not chosen
-    ]
-    alternatives.sort(key=lambda item: item.effort_score)
+    alternatives = _select_alternatives(
+        [_alternative(item, target, tolerance, chosen) for item in frontier if item is not chosen]
+    )
     return ReverseBlueprint(
         target_probability=target,
         baseline_probability=baseline,
@@ -560,9 +846,12 @@ def build_reverse_blueprint(inputs: BlueprintInputs) -> ReverseBlueprint:
         actions=list(chosen.actions),
         steps=_steps(chosen, changes, inputs.follow_through),
         tradeoffs=_tradeoffs(chosen, changes, frontier, target, tolerance),
-        follow_through_probability=inputs.follow_through,
-        max_modeled_probability=max(item.probability for item in frontier),
+        max_modeled_probability=max(item.probability for item in inputs.options),
         plateau=_plateau_for(inputs, set(lever_by_id), reachable),
-        alternatives=alternatives[:MAX_ALTERNATIVES],
+        alternatives=alternatives,
         tolerance_pp=tolerance_pp,
+        plan_actions=plan_actions(
+            chosen, periods=inputs.periods, period_unit=inputs.period_unit
+        ),
+        missing_capabilities=[] if reachable else missing_capabilities(inputs, chosen),
     )

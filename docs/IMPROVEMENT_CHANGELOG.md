@@ -2,6 +2,22 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Integration pass: plan units, fitted priceability, count-model deeper analysis
+
+**Hypothesis:** Browser journeys would fail where reply-rate plans were labeled as applications, where a fitted composed rate was still reported missing, and where Deeper analysis ignored draw count for cumulative-count goals.
+
+**Changes:** Reply-rate plans store outreach emails. "investor" no longer matches the savings strategy. A fitted composed parameter clears the missing-state report. Cumulative-count What Ifs bin the count mixture at the requested draw count and reprice rate sensitivity only in Deeper analysis. Reverse contract tests persist the goal they search.
+
+**Measured result:** Local signed-in Chrome (existing session, API on 127.0.0.1:8001, demo workspace seed). FDE cold email asked for a reply rate, saved 40 outreach emails, check-in persisted, evidence stayed 22. Reverse at 90% returned 89.7% within 0.5 pp via two conversion levers; 87.4% and 81.1% labeled short; 90.2% applications also reached. Read 24 books used books/week, refused +2 as out of range, priced +1 at 90.8%, Deeper used 8,000 draws (median 60 books), Reverse 99% returned 92.3% and said it does not reach 99%. Public FDE page after publish: receipt updates with metric names only; fork evidence count 0. No new Spur calls.
+
+## 2026-10-25 — Product intelligence: generalize, Apply plan, Reverse, public drivers
+
+**Hypothesis:** Arbitrary goals, cold-email strategy, multi-lever Reverse, adopted plans, and public odds context would work from existing services if composed rates, commitment storage, and publication receipts were wired through instead of adding a new subsystem.
+
+**Changes:** Composed goals expose `node.rate` as a What If lever; cold email is not an application unless the user picks a labeled proxy or reply-rate assumption; adopted What Ifs store `plan_context` on commitments (migration 0026); Reverse searches volume + conversion levers and reports 0.5 pp target tolerance; public pages explain odds moves from stored receipts only; Share copies a public-safe AI summary after a private-goal preview.
+
+**Measured result:** Targeted backend/frontend tests pass (operationalize, composed baseline, plan adoption, two-user follow-through, reverse, social, share). Not yet merged, deployed, or browser-verified.
+
 ## 2026-10-25 — Ship pass: public browse, owner seed, control reset
 
 **Hypothesis:** Empty signed-in Profile/activity came from excluding the owner's own workspace seed, and raw HTML flashes came from unclassed native controls plus AuthGate blocking `/social` and `/m`.

@@ -394,6 +394,7 @@ def _price_node(node: dict[str, Any], inputs: NumericInputs) -> PrimitivePrice:
                 method="cumulative_count",
                 limitations=["NOT_PRICED: count model needs current stock, target, and rate."],
             )
+        prepared = inputs.state.get("composition_prepared") or {}
         return price_cumulative_count(
             current=float(node["current"]),
             target=float(node["target"]),
@@ -401,7 +402,8 @@ def _price_node(node: dict[str, Any], inputs: NumericInputs) -> PrimitivePrice:
             periods=horizon,
             n_rate_observations=int(params.get("n_rate_observations") or 0),
             overdispersion=params.get("overdispersion"),
-            seed=int(inputs.state.get("seed") or 42),
+            seed=int(prepared.get("seed") or 42),
+            n_draws=int(prepared.get("n_draws") or 4_000),
         )
     if kind == "growth":
         if node["current"] is None or node["target"] is None or "mu" not in params:

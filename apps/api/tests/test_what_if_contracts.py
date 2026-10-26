@@ -593,9 +593,9 @@ async def test_reverse_fills_empty_candidates_from_baseline() -> None:
                 ],
             )
 
-    service = ReverseFillService(
-        GoalService(InMemoryGoalRepository()), InMemorySimulationRepository()
-    )
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, uuid4())
+    service = ReverseFillService(GoalService(repo), InMemorySimulationRepository())
     result = await service.target_search(
         TargetSearchRequest(
             base=make_base(str(goal.goal_id)),
@@ -612,9 +612,9 @@ async def test_reverse_fills_empty_candidates_from_baseline() -> None:
 @pytest.mark.asyncio
 async def test_reverse_discovers_assumption_levers_without_catalog() -> None:
     goal = make_goal()
-    service = LinearWhatIfService(
-        GoalService(InMemoryGoalRepository()), InMemorySimulationRepository()
-    )
+    repo = InMemoryGoalRepository()
+    await repo.create(goal, uuid4())
+    service = LinearWhatIfService(GoalService(repo), InMemorySimulationRepository())
     result = await service.target_search(
         TargetSearchRequest(
             base=make_base(str(goal.goal_id), flow=3),
