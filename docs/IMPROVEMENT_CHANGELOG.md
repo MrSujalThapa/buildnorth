@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-26 — Deeper analysis reprices a directly parsed scenario
+
+**Hypothesis:** A priced What If that never opened a strategy-option card kept the simple draw count after Deeper analysis was selected, so sensitivity stayed empty.
+
+**Changes:** The direct priced parse stores its changes the same way a chosen strategy option does, so switching analysis depth runs the simulation again at the deeper draw count.
+
+**Measured result:** Not yet rechecked in production.
+
 ## 2026-10-25 — Public blueprints include a labeled playbook
 
 **Hypothesis:** Public markets can show forkable steps without new goal data if missing strategy lists are normalized and empty plans are filled from the goal’s target and domain, labeled as a suggestion.
