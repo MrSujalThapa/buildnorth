@@ -4,7 +4,8 @@ import {
   api,
   type Goal,
   type ParsedInterventionChange,
-  type StrategyLever,
+  type StrategyChangesResponse,
+  type StrategyPlan,
   type WhatIfAssumption,
   type WhatIfBaselineState,
   type WhatIfResult,
@@ -67,6 +68,8 @@ export function useWhatIfSimulation(
   const parseIntervention = useMutation({
     mutationFn: (text: string) => api.parseIntervention({ goal_id: goalId, text }),
   });
+  const strategyChanges = useMutation({ mutationFn: api.strategyChanges });
+  const [pricedOption, setPricedOption] = useState<StrategyChangesResponse | null>(null);
 
   useEffect(() => {
     parseGeneration.current += 1;
@@ -166,6 +169,7 @@ export function useWhatIfSimulation(
     }
     pendingScenario.current = null;
     setInterpretationMessage(null);
+    setPricedOption(null);
     const generation = ++parseGeneration.current;
     parseIntervention.mutate(trimmed, {
         onSuccess: (parsed) => {
@@ -186,6 +190,15 @@ export function useWhatIfSimulation(
           );
           return;
         }
+        const selected = parsed.strategy_plan?.selected_option ?? "parsed";
+        setPricedOption({
+          option_id: selected,
+          title: trimmed,
+          changes: parsed.changes,
+          assumptions_used: [],
+          conflicts: [],
+          proxy: selected === "as_applications",
+        });
         const body = {
           ...request,
           parsed_changes: parsed.changes,
@@ -200,32 +213,43 @@ export function useWhatIfSimulation(
     });
   }
 
-  /** Runs a lever value the user picked from a strategy plan; the quantity is theirs, not inferred. */
-  function runPlannedChange(title: string, lever: StrategyLever, amount: number) {
-    if (!request || !(amount > 0)) return;
-    const change: ParsedInterventionChange = {
-      metric: lever.assumption,
-      operation: "add",
-      value: amount,
-      unit: lever.unit,
-      frequency: null,
-      scope: "goal_state",
-      provenance: "USER_ASSUMPTION",
-    };
+  /** Prices an option the user chose from a strategy plan; the backend builds the model changes. */
+  function runStrategyOption(question: string, plan: StrategyPlan, optionId: string, inputs: Record<string, number>) {
+    if (!request || !goal) return;
     setInterpretationMessage(null);
-    setLastParse((prior) =>
-      prior?.strategy_plan
-        ? {
-            ...prior,
-            changes: [change],
-            pricing_status: "PRICED",
-            strategy_plan: { ...prior.strategy_plan, modeled: true, stated_quantity: amount, needs: [] },
+    strategyChanges.mutate(
+      { goal_id: goal.goal_id, family: plan.family, option_id: optionId, text: question, inputs },
+      {
+        onSuccess: (resolved) => {
+          const changes: ParsedInterventionChange[] = resolved.changes;
+          setLastParse((prior) =>
+            prior?.strategy_plan
+              ? {
+                  ...prior,
+                  changes,
+                  pricing_status: changes.length ? "PRICED" : "NOT_PRICED",
+                  strategy_plan: {
+                    ...prior.strategy_plan,
+                    modeled: changes.length > 0,
+                    selected_option: optionId,
+                    stated_quantity: inputs.amount ?? null,
+                    conflicts: resolved.conflicts,
+                    needs: [],
+                  },
+                }
+              : prior,
+          );
+          if (!changes.length) {
+            persistSimulation.reset();
+            return;
           }
-        : prior,
-    );
-    persistSimulation.mutate(
-      { ...request, parsed_changes: [change], intervention: { ...request.intervention, title } },
-      { onSuccess: () => options?.onScenarioPersisted?.() },
+          setPricedOption(resolved);
+          persistSimulation.mutate(
+            { ...request, parsed_changes: changes, intervention: { ...request.intervention, title: resolved.title } },
+            { onSuccess: () => options?.onScenarioPersisted?.() },
+          );
+        },
+      },
     );
   }
 
@@ -250,7 +274,9 @@ export function useWhatIfSimulation(
     preview,
     request,
     runScenario,
-    runPlannedChange,
+    runStrategyOption,
+    strategyRunning: strategyChanges.isPending,
+    pricedOption,
     assumptions,
   };
 }

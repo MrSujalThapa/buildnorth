@@ -86,7 +86,8 @@ class PostgresSocialRepository:
         return """
             select id, user_id, title, goal_type, success_definition_json, deadline,
                    model_requirements_json, visibility, published_at, public_blueprint_json,
-                   forked_from_goal_id, forked_from_user_id, updated_at, status
+                   forked_from_goal_id, forked_from_user_id, updated_at, status,
+                   state_dimensions_json, version
             from goals
         """
 
@@ -371,7 +372,7 @@ class PostgresSocialRepository:
                                g.deadline, g.model_requirements_json, g.visibility, g.published_at,
                                g.public_blueprint_json,
                                g.forked_from_goal_id, g.forked_from_user_id,
-                               g.updated_at, g.status
+                               g.updated_at, g.status, g.state_dimensions_json, g.version
                         from market_stars s
                         join goals g on g.id = s.goal_id
                         where s.user_id = :user_id and g.status = 'active' and {access}
@@ -585,6 +586,57 @@ class PostgresSocialRepository:
             for row in rows:
                 grouped[row["goal_id"]].append(dict(row))
         return grouped
+
+    async def published_updates(self, goal_id: UUID) -> list[dict[str, Any]]:
+        async with autocommit_connection(self._engine) as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select probability, created_at, source_kind, forecast_status,
+                               model_family, model_version,
+                               case when receipt_json is null then null else jsonb_build_object(
+                                 'normalized_evidence_ids', receipt_json->'normalized_evidence_ids',
+                                 'goal_contract_version', receipt_json->'goal_contract_version',
+                                 'forecast_spec', jsonb_build_object(
+                                   'deadline', receipt_json#>'{forecast_spec,deadline}'
+                                 ),
+                                 'assumption_names', case
+                                   when jsonb_typeof(receipt_json->'assumptions') = 'array' then (
+                                     select coalesce(jsonb_agg(item->'name'), '[]'::jsonb)
+                                     from jsonb_array_elements(receipt_json->'assumptions') item
+                                     where jsonb_typeof(item) = 'object'
+                                   )
+                                 end
+                               ) end as receipt_json
+                        from market_forecast_history
+                        where goal_id = :id and source_kind = 'published_forecast'
+                        order by created_at
+                        """
+                    ),
+                    {"id": goal_id},
+                )
+            ).mappings()
+            return [dict(row) for row in rows]
+
+    async def evidence_metrics(self, goal_id: UUID, evidence_ids: list[str]) -> dict[str, str]:
+        if not evidence_ids:
+            return {}
+        async with autocommit_connection(self._engine) as connection:
+            rows = (
+                await connection.execute(
+                    text(
+                        """
+                        select e.id::text as id, e.metric
+                        from evidence_events e
+                        join goal_evidence ge on ge.evidence_id = e.id
+                        where ge.goal_id = :goal_id and e.id::text in :ids
+                        """
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"goal_id": goal_id, "ids": evidence_ids},
+                )
+            ).mappings()
+            return {str(row["id"]): str(row["metric"]) for row in rows}
 
     async def discover_creators(self, limit: int) -> list[UUID]:
         async with autocommit_connection(self._engine) as connection:

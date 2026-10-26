@@ -7,6 +7,8 @@ export default function PublicBlueprintDetails({ blueprint }: { blueprint: Publi
     .map(milestoneText)
     .filter((item): item is string => Boolean(item));
   const deadline = formatLongDate(blueprint.deadline);
+  const tracked = (blueprint.tracked_metrics ?? []).map((item) => item.replaceAll("_", " "));
+  const snapshot = formatLongDate(blueprint.snapshot_at);
   return (
     <section className="public-blueprint" aria-labelledby="public-blueprint-title">
       <h2 id="public-blueprint-title">Blueprint</h2>
@@ -40,9 +42,18 @@ export default function PublicBlueprintDetails({ blueprint }: { blueprint: Publi
               <ol className="public-milestones">{milestones.map((row, index) => <li key={`${index}-${row}`}>{row}</li>)}</ol>
             </div>
           ) : null}
+          {tracked.length ? (
+            <div className="public-blueprint-block">
+              <h3>Tracked metrics</h3>
+              <p>{tracked.join(", ")}</p>
+            </div>
+          ) : null}
         </>
       )}
-      <p className="public-blueprint-note">Forking copies this blueprint into a new private market. Evidence and odds stay with the creator.</p>
+      <p className="public-blueprint-note">
+        {snapshot ? <>Blueprint as published on {snapshot}. </> : null}
+        Forking copies this blueprint into a new private market. Evidence and odds stay with the creator.
+      </p>
     </section>
   );
 }

@@ -80,7 +80,7 @@ export function primaryLever(baseline: WhatIfBaselineState | undefined): WhatIfA
     const found = baseline.assumptions.find((item) => item.name === name && item.editable !== false);
     if (found && found.maximum > found.minimum) return found;
   }
-  return null;
+  return baseline.assumptions.find((item) => item.editable !== false && item.name.endsWith(".rate") && item.maximum > item.minimum) ?? null;
 }
 
 export function leverUnitLabel(lever: WhatIfAssumption): string {

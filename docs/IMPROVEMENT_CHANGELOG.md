@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Product intelligence: generalize, Apply plan, Reverse, public drivers
+
+**Hypothesis:** Arbitrary goals, cold-email strategy, multi-lever Reverse, adopted plans, and public odds context would work from existing services if composed rates, commitment storage, and publication receipts were wired through instead of adding a new subsystem.
+
+**Changes:** Composed goals expose `node.rate` as a What If lever; cold email is not an application unless the user picks a labeled proxy or reply-rate assumption; adopted What Ifs store `plan_context` on commitments (migration 0026); Reverse searches volume + conversion levers and reports 0.5 pp target tolerance; public pages explain odds moves from stored receipts only; Share copies a public-safe AI summary after a private-goal preview.
+
+**Measured result:** Targeted backend/frontend tests pass (operationalize, composed baseline, plan adoption, two-user follow-through, reverse, social, share). Not yet merged, deployed, or browser-verified.
+
 ## 2026-10-25 — Ship pass: public browse, owner seed, control reset
 
 **Hypothesis:** Empty signed-in Profile/activity came from excluding the owner's own workspace seed, and raw HTML flashes came from unclassed native controls plus AuthGate blocking `/social` and `/m`.

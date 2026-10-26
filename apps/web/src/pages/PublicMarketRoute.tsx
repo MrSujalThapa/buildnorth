@@ -8,14 +8,16 @@ import OddsExplorer from "../components/market/OddsExplorer";
 import { ODDS_EXPLORER_RANGES } from "../components/market/marketRanges";
 import { VisibilityBadge } from "../components/market/VisibilityControl";
 import { useAccount } from "../auth/AuthGate";
-import { absoluteUrl, shareLink } from "../features/social/share";
 import SparsePublicHistory from "../components/social/SparsePublicHistory";
 import PublicBlueprintDetails from "../components/social/PublicBlueprintDetails";
+import ShareDialog from "../components/social/ShareDialog";
 import {
   categoryLabel,
   formatShortDate,
+  marketUpdates,
   publicMarketStats,
   signedPoints,
+  updateContext,
 } from "../components/social/publicMarketView";
 import "../components/social/social.css";
 import "../components/market/market-detail.css";
@@ -29,7 +31,7 @@ export function PublicMarketRoute() {
   const navigate = useNavigate();
   const account = useAccount();
   const queryClient = useQueryClient();
-  const [message, setMessage] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [forkTitle, setForkTitle] = useState("");
   const [forkOpen, setForkOpen] = useState(false);
   const market = useQuery({
@@ -65,6 +67,7 @@ export function PublicMarketRoute() {
   }
   const item = market.data;
   const history = historyPoints(item.history);
+  const updates = marketUpdates(item);
   const isOwner = account?.user_id === item.creator.user_id;
   const stats = publicMarketStats(item);
   const creatorName = item.creator.display_name || item.creator.handle;
@@ -105,15 +108,7 @@ export function PublicMarketRoute() {
               <span>Fork</span>
               <span className="pm-action-count">{item.fork_count}</span>
             </button>
-            <button
-              type="button"
-              className="pm-action"
-              onClick={() => {
-                void shareLink({ url: absoluteUrl(`/m/${item.goal_id}`), title: item.title })
-                  .then((mode) => setMessage(mode === "copied" ? "Link copied" : "Shared"))
-                  .catch(() => undefined);
-              }}
-            >
+            <button type="button" className="pm-action" aria-haspopup="dialog" onClick={() => setShareOpen(true)}>
               <Share2 size={15} aria-hidden="true" />
               <span>Share</span>
             </button>
@@ -159,25 +154,42 @@ export function PublicMarketRoute() {
               )}
             </section>
             <section className="public-events" aria-labelledby="public-events-title">
-              <h2 id="public-events-title">Recent updates</h2>
-              {item.history.length ? (
-                <ol>
-                  {item.history.slice(-6).reverse().map((point, index, recent) => {
-                    const previous = recent[index + 1];
-                    const change = previous ? (point.probability - previous.probability) * 100 : null;
-                    return (
-                      <li key={point.created_at}>
-                        <time dateTime={point.created_at}>{formatShortDate(point.created_at)}</time>
-                        <span>{previous || item.history.length > recent.length ? "Forecast updated" : "Forecast published"}</span>
-                        <strong>{(point.probability * 100).toFixed(1)}%</strong>
-                        {change != null ? (
-                          <span className={change >= 0 ? "is-up" : "is-down"}>{signedPoints(change)}</span>
-                        ) : <span />}
-                      </li>
-                    );
-                  })}
-                </ol>
+              <h2 id="public-events-title">What moves the odds</h2>
+              {updates.length ? (
+                <>
+                  <p className="public-events-note">What each published forecast recorded: new evidence by tracked metric, model and definition changes. Shown alongside the move, not as its cause.</p>
+                  <ol>
+                    {updates.slice(-6).reverse().map((update) => {
+                      const [lead, ...rest] = updateContext(update);
+                      return (
+                        <li key={update.published_at}>
+                          <time dateTime={update.published_at}>{formatShortDate(update.published_at)}</time>
+                          <div className="public-event-context">
+                            <span>{lead ?? "Forecast published"}</span>
+                            {rest.length ? <small>{rest.join(" · ")}</small> : null}
+                          </div>
+                          <strong>
+                            {update.previous_probability != null ? (
+                              <span className="public-event-before">{(update.previous_probability * 100).toFixed(1)}% → </span>
+                            ) : null}
+                            {(update.probability * 100).toFixed(1)}%
+                          </strong>
+                          {update.change_points != null ? (
+                            <span className={update.change_points >= 0 ? "is-up" : "is-down"}>{signedPoints(update.change_points)}</span>
+                          ) : <span />}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </>
               ) : <p className="quiet-copy">No published forecast updates yet.</p>}
+              {item.modeled_sensitivity?.drivers.length ? (
+                <section className="public-sensitivity" aria-labelledby="public-sensitivity-title">
+                  <h3 id="public-sensitivity-title">Modeled sensitivity</h3>
+                  <p>Assumptions the latest published model{item.modeled_sensitivity.model ? ` (${item.modeled_sensitivity.model})` : ""} prices with. Modeled inputs, not observed causes.</p>
+                  <ul>{item.modeled_sensitivity.drivers.map((driver) => <li key={driver}>{driver}</li>)}</ul>
+                </section>
+              ) : null}
             </section>
           </div>
 
@@ -223,7 +235,13 @@ export function PublicMarketRoute() {
           </form>
         </div>
       ) : null}
-      {message ? <div className="share-toast" role="status">{message}</div> : null}
+      {shareOpen ? (
+        <ShareDialog
+          goalId={item.goal_id}
+          onClose={() => setShareOpen(false)}
+          onPublish={isOwner ? () => { void navigate(`/goals/${item.goal_id}`); } : undefined}
+        />
+      ) : null}
     </main>
   );
 }

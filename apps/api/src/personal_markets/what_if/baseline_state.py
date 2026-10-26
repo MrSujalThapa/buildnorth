@@ -7,14 +7,15 @@ from typing import Any, Literal
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.forecasting.engine import NumericInputs, price_family
 from personal_markets.forecasting.families import AssumptionSource
+from personal_markets.forecasting.hiring import STAGE_CHAIN
 from personal_markets.forecasting.inputs_builder import build_numeric_inputs
 from personal_markets.forecasting.inputs_builder import proposal_from_goal as proposal_from_goal
 from personal_markets.forecasting.priceability import describe_priceability
 from personal_markets.forecasting.registry import ForecastModelRegistry
 from personal_markets.forecasting.requirements import PriceabilityReport
 from personal_markets.goals.domain import GoalContract, GoalType
-from personal_markets.ports import GoalArchitectProposal
 from personal_markets.what_if.assumptions import (
+    composed_assumptions,
     continuous_target_assumptions,
     hazard_assumptions,
 )
@@ -203,7 +204,9 @@ def resolve_simulation_context(
         overrides = {
             item.name.removeprefix("stage_rate_"): item.value
             for item in assumptions
-            if item.name == "weekly_application_rate" or item.name.startswith("stage_rate_")
+            if item.name == "weekly_application_rate"
+            or item.name in STAGE_CHAIN
+            or item.name.startswith("stage_rate_")
         }
         scenario_numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides)
         scenario = _resolve_context(
@@ -285,7 +288,14 @@ def _resolve_context(
             target_value=None if target is None else float(target),
             periods=None if periods is None else int(periods),
             direction="at_most" if direction == "at_most" else "at_least",
-            assumptions=[],
+            assumptions=composed_assumptions(
+                goal,
+                numeric,
+                model_family=str(spec.get("family") or "composed"),
+                model_version=str(spec.get("model_version") or "composed_v1"),
+            )
+            if composed.priced
+            else [],
             baseline_probability=composed.raw_probability,
             model_family=str(spec.get("family") or "composed"),
             model_version=str(spec.get("model_version") or "composed_v1"),

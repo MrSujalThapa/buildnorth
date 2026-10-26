@@ -23,7 +23,19 @@ export type BlueprintAlternativeView = {
   effortLabel: string;
 };
 
+export type BlueprintPlanActionView = {
+  order: number;
+  behavior: string;
+  quantity: string;
+  timeline: string;
+  effort: ReverseBlueprintLeverChange["effort"];
+  effortLabel: string;
+  constraint: string;
+  requiresEvidence: boolean;
+};
+
 export type BlueprintPlanItem =
+  | { kind: "action"; action: BlueprintPlanActionView }
   | { kind: "change"; change: BlueprintChangeView }
   | { kind: "step"; text: string };
 
@@ -44,6 +56,10 @@ export type BlueprintView = {
   followThrough: string | null;
   plateau: { label: string; explanation: string } | null;
   alternatives: BlueprintAlternativeView[];
+  tolerance: string;
+  unpriced: { label: string; measurement: string }[];
+  missing: string[];
+  followThroughSource: string | null;
 };
 
 const EFFORT_LABELS: Record<ReverseBlueprintLeverChange["effort"], string> = {
@@ -54,7 +70,9 @@ const EFFORT_LABELS: Record<ReverseBlueprintLeverChange["effort"], string> = {
 };
 
 function percent(probability: number): string {
-  return `${Math.round(probability * 100)}%`;
+  const points = probability * 100;
+  const rounded = Math.abs(points - Math.round(points)) < 0.05 ? Math.round(points) : Math.round(points * 10) / 10;
+  return `${rounded}%`;
 }
 
 function signedPoints(pp: number): string {
@@ -92,11 +110,18 @@ function statusOf(blueprint: ReverseBlueprint): BlueprintStatus {
 
 function statusLabel(blueprint: ReverseBlueprint, status: BlueprintStatus): string {
   const target = percent(blueprint.target_probability);
+  const modeled = blueprint.modeled_probability == null ? null : percent(blueprint.modeled_probability);
+  const tolerance = blueprint.tolerance_pp;
   if (status === "met") return `Already at or above ${target}`;
-  if (status === "reachable") return `Reaches ~${target}`;
+  if (status === "reachable") {
+    if (modeled && blueprint.modeled_probability! + 1e-9 < blueprint.target_probability) {
+      return `Reaches ${modeled} (within ${tolerance} pp of ${target})`;
+    }
+    return `Reaches ${modeled ?? target}`;
+  }
   const best = blueprint.modeled_probability ?? blueprint.baseline_probability;
-  const gap = Math.max(0, Math.round((blueprint.target_probability - best) * 100));
-  return `${gap} pp short of ${target}`;
+  const gap = Math.max(0, Math.round((blueprint.target_probability - best) * 1000) / 10);
+  return `${modeled ?? percent(best)} does not reach ${target} (${gap} pp short)`;
 }
 
 function heaviest(changes: ReverseBlueprintLeverChange[]): ReverseBlueprintLeverChange["effort"] {
@@ -112,11 +137,25 @@ export function toBlueprintView(blueprint: ReverseBlueprint): BlueprintView {
   const delta = blueprint.delta_pp;
   const plateau = blueprint.plateau;
   const changes = blueprint.lever_changes.map(changeView);
-  // The API lists one step per lever change first; those render as structured rows.
-  const plan: BlueprintPlanItem[] = [
-    ...changes.map((change) => ({ kind: "change" as const, change })),
-    ...blueprint.steps.slice(blueprint.lever_changes.length).map((text) => ({ kind: "step" as const, text })),
-  ];
+  const actions = blueprint.plan_actions ?? [];
+  const plan: BlueprintPlanItem[] = actions.length
+    ? actions.map((item) => ({
+        kind: "action" as const,
+        action: {
+          order: item.order,
+          behavior: item.behavior,
+          quantity: item.quantity_label,
+          timeline: item.timeline,
+          effort: item.effort,
+          effortLabel: EFFORT_LABELS[item.effort],
+          constraint: item.constraint,
+          requiresEvidence: item.requires_evidence,
+        },
+      }))
+    : [
+        ...changes.map((change) => ({ kind: "change" as const, change })),
+        ...blueprint.steps.slice(blueprint.lever_changes.length).map((text) => ({ kind: "step" as const, text })),
+      ];
   return {
     status,
     statusLabel: statusLabel(blueprint, status),
@@ -152,6 +191,13 @@ export function toBlueprintView(blueprint: ReverseBlueprint): BlueprintView {
       note: item.note,
       effortLabel: EFFORT_LABELS[heaviest(item.lever_changes)],
     })),
+    tolerance: `within ${blueprint.tolerance_pp} pp`,
+    unpriced: (blueprint.unpriced_recommendations ?? []).map((item) => ({
+      label: item.label,
+      measurement: item.measurement,
+    })),
+    missing: blueprint.missing_capabilities ?? [],
+    followThroughSource: blueprint.follow_through_source ?? null,
   };
 }
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+from dataclasses import replace
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import numpy as np
@@ -12,9 +14,11 @@ from personal_markets.behavior.cohort import (
     is_synthetic_goal,
 )
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
+from personal_markets.behavior.domain import CommitmentTrial
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.core.errors import ResourceNotFoundError
+from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.primitives import at_numerical_bound
@@ -23,6 +27,7 @@ from personal_markets.forecasting.repository import PublishedBaseline
 from personal_markets.forecasting.service import BaselineForecastService
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
+from personal_markets.what_if.assumptions import DEFAULT_EXECUTION
 from personal_markets.what_if.baseline_state import (
     build_baseline_state,
     resolve_simulation_context,
@@ -31,7 +36,9 @@ from personal_markets.what_if.domain import (
     ActionFrontierResult,
     ContinuousSearchVariable,
     DistributionBin,
+    FollowThroughSource,
     FrontierPoint,
+    InterventionChangeInput,
     MarketHistoryPointResponse,
     PathComparisonItem,
     PathComparisonRequest,
@@ -56,6 +63,7 @@ from personal_markets.what_if.intervention_overrides import (
     apply_parsed_changes_to_assumptions,
     unmapped_change_metrics,
 )
+from personal_markets.what_if.intervention_registry import composed_metric_units, goal_domain
 from personal_markets.what_if.optimizer import ActionOptimizer, ResourceLimits
 from personal_markets.what_if.repository import (
     InMemorySimulationRepository,
@@ -69,11 +77,20 @@ from personal_markets.what_if.resources import (
     opportunity_cost_messages,
 )
 from personal_markets.what_if.reverse_blueprint import (
+    TARGET_TOLERANCE,
     BlueprintInputs,
     LeverSpec,
     build_reverse_blueprint,
 )
-from personal_markets.what_if.reverse_search import REVERSE_LEVER_NAMES, ReverseSearch
+from personal_markets.what_if.reverse_search import (
+    EXECUTION_ASSUMPTION,
+    MAX_PLAN_LEVERS,
+    LeverSelection,
+    ReverseSearch,
+    composed_rate_assumptions,
+    select_levers,
+    unpriced_recommendations,
+)
 from personal_markets.what_if.sensitivity import compute_sensitivity, outcome_distribution_bins
 from personal_markets.what_if.simulation import PairedSimulation, SimulationEngine
 
@@ -148,6 +165,36 @@ class WhatIfService:
     async def fast_reprice(self, request: WhatIfRequest) -> WhatIfResult:
         return await self._simulate(request, persist=False)
 
+    async def evaluate_plan(
+        self, goal_id: str, changes: list[InterventionChangeInput]
+    ) -> WhatIfResult:
+        """Reprice an adopted plan against today's evidence; nothing is persisted."""
+        baseline = await self.baseline_state(goal_id)
+        if (
+            not baseline.priced
+            or baseline.current_value is None
+            or baseline.target_value is None
+            or not baseline.assumptions
+        ):
+            return WhatIfResult(
+                priced=False,
+                status="NOT_PRICED",
+                message=baseline.message or "This goal has no priced baseline to evaluate against.",
+                assumptions=[],
+            )
+        request = WhatIfRequest(
+            goal_id=goal_id,
+            current_value=baseline.current_value,
+            target_value=baseline.target_value,
+            periods=max(1, baseline.periods or 1),
+            direction=baseline.direction,
+            assumptions=baseline.assumptions,
+            intervention=baseline.default_intervention,
+            parsed_changes=changes,
+            config=baseline.config,
+        )
+        return await self._simulate(request, persist=False)
+
     async def _simulate_composition(
         self, goal: GoalContract, request: WhatIfRequest, evidence: list, *, persist: bool
     ) -> WhatIfResult | None:
@@ -176,6 +223,23 @@ class WhatIfService:
         unmapped: list[str] = []
         baseline_assumptions = baseline_inputs.assumptions if baseline_inputs else {}
         assumption_names = set(baseline_assumptions.keys())
+        # Edited assumption values form the shared context of both arms; parsed changes
+        # are the scenario. Older clients send no execution assumption: full execution.
+        execution = 1.0
+        shared: dict[str, float] = {}
+        for item in request.assumptions:
+            if item.name == "execution_probability":
+                execution = max(0.0, min(1.0, float(item.value)))
+            elif item.name in assumption_names and abs(
+                float(item.value) - float(baseline_assumptions.get(item.name) or 0.0)
+            ) > 1e-9:
+                shared[item.name] = float(item.value)
+        if shared:
+            shared_inputs = composition_numeric_inputs(goal, evidence, overrides=shared)
+            shared_price = price_composition(goal, shared_inputs) if shared_inputs else None
+            if shared_inputs is not None and shared_price is not None:
+                baseline_inputs, baseline = shared_inputs, shared_price
+                baseline_assumptions = shared_inputs.assumptions
         for change in request.parsed_changes or []:
             metric = change.metric
             short = metric.split(".", 1)[-1]
@@ -234,7 +298,8 @@ class WhatIfService:
                 return await self._persist(request, result, spec.family, spec.compiler_version)
             return result
         scenario_inputs = (
-            composition_numeric_inputs(goal, evidence, overrides=overrides) or baseline_inputs
+            composition_numeric_inputs(goal, evidence, overrides={**shared, **overrides})
+            or baseline_inputs
         )
         scenario = price_composition(goal, scenario_inputs or baseline_inputs)
         if (
@@ -242,6 +307,7 @@ class WhatIfService:
             or baseline.raw_probability is None
             or scenario is None
             or not scenario.priced
+            or scenario.raw_probability is None
         ):
             return WhatIfResult(
                 priced=False,
@@ -250,11 +316,16 @@ class WhatIfService:
                 baseline_probability=baseline.raw_probability,
                 assumptions=request.assumptions,
             )
-        uplift = (scenario.raw_probability - baseline.raw_probability) * 100.0
-        limitations = list(scenario.limitations)
-        bound = at_numerical_bound(baseline.raw_probability) or at_numerical_bound(
-            scenario.raw_probability
+        conditional = scenario.raw_probability
+        profile = getattr(self, "_last_behavior_profile", None)
+        # Same follow-through rule as the other families: the changed rate only holds
+        # on the share of futures where the plan is actually carried out.
+        scenario_probability = baseline.raw_probability + execution * (
+            conditional - baseline.raw_probability
         )
+        uplift = (scenario_probability - baseline.raw_probability) * 100.0
+        limitations = list(scenario.limitations)
+        bound = at_numerical_bound(baseline.raw_probability) or at_numerical_bound(conditional)
         if bound:
             limitations.append(
                 "One or both probabilities sit on the primitive numerical bound. "
@@ -274,15 +345,36 @@ class WhatIfService:
             status="EXPLORATORY",
             message=message,
             baseline_probability=baseline.raw_probability,
-            scenario_probability=scenario.raw_probability,
+            scenario_probability=scenario_probability,
+            conditional_on_execution_probability=conditional,
+            execution_probability=execution,
             expected_uplift_pp=uplift,
             uplift_interval_pp=None,
             assumptions=request.assumptions,
+            execution_breakdown={
+                "current_probability": baseline.raw_probability,
+                "conditional_on_full_execution": conditional,
+                "follow_through_probability": execution,
+                "execution_adjusted_probability": scenario_probability,
+                "interval": list(profile.execution.interval) if profile is not None else None,
+                "source": profile.execution.source
+                if profile is not None
+                else next(
+                    (
+                        item.source
+                        for item in request.assumptions
+                        if item.name == "execution_probability"
+                    ),
+                    "USER_ASSUMPTION",
+                ),
+            },
+            behavior_profile=profile.model_dump(mode="json") if profile is not None else None,
             receipt={
                 "hypothetical": True,
                 "causal_status": "parameter_intervention",
                 "compiler_version": spec.compiler_version,
                 "overrides": overrides,
+                "shared_overrides": shared,
                 "limitations": limitations,
                 "numerical_bound": bound,
             },
@@ -324,9 +416,6 @@ class WhatIfService:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
             if not is_synthetic_goal(goal):
                 evidence = authentic_evidence(evidence)
-            composed = await self._simulate_composition(goal, request, evidence, persist=persist)
-            if composed is not None:
-                return composed
             explicit_trials = []
             if self._owner_id is not None:
                 # Every owned goal's commitments form the person-level (global) level of
@@ -342,6 +431,9 @@ class WhatIfService:
             request = self._apply_behavior_execution(
                 goal, request, evidence, commitment_trials=explicit_trials
             )
+            composed = await self._simulate_composition(goal, request, evidence, persist=persist)
+            if composed is not None:
+                return composed
             user_overrides = {item.name: item.value for item in request.assumptions}
             baseline_ctx = resolve_simulation_context(
                 goal, evidence, parsed_changes=[], assumption_overrides=user_overrides
@@ -898,13 +990,46 @@ class WhatIfService:
         return items
 
     async def target_search(self, request: TargetSearchRequest) -> TargetSearchResult:
+        request = request.model_copy(
+            update={
+                "probability_tolerance": min(request.probability_tolerance, TARGET_TOLERANCE)
+            }
+        )
+        goal = await self._require_goal(request.base.goal_id)
+        evidence = await self._reverse_evidence(request.base.goal_id, goal)
+        request = await self._ensure_search_levers(request)
+        request, follow_source = await self._reverse_follow_through(goal, request, evidence)
         baseline = await self._simulate(
             request.base.model_copy(update={"intervention": None}), persist=False
         )
         current = baseline.baseline_probability or 0
         gap = max(0, (request.target_probability - current) * 100)
-        request = await self._ensure_search_levers(request)
-        levers = self._search_levers(request)
+        follow_through = baseline.execution_probability
+        if follow_through is None:
+            follow_source = "not_modeled"
+        selection, composed_periods = self._reverse_levers(goal, request, evidence)
+        levers = list(selection.levers)
+        periods, period_unit = self._reverse_horizon(request, levers, composed_periods)
+        searched_ids = {lever.lever_id for lever in levers}
+        inputs = BlueprintInputs(
+            target=request.target_probability,
+            baseline=current,
+            tolerance=request.probability_tolerance,
+            follow_through=follow_through,
+            follow_through_source=follow_source,
+            levers=tuple(levers),
+            excluded=selection.excluded,
+            unpriced=tuple(
+                unpriced_recommendations(
+                    goal_domain(goal),
+                    {item.name for item in request.base.assumptions} | searched_ids,
+                    searched_ids,
+                )
+            ),
+            periods=periods,
+            period_unit=period_unit,
+            max_plan_levers=MAX_PLAN_LEVERS,
+        )
         if current + request.probability_tolerance >= request.target_probability:
             return TargetSearchResult(
                 target_probability=request.target_probability,
@@ -912,15 +1037,7 @@ class WhatIfService:
                 gap_pp=gap,
                 feasible=True,
                 message="Target odds are already satisfied under the current assumptions.",
-                blueprint=build_reverse_blueprint(
-                    BlueprintInputs(
-                        target=request.target_probability,
-                        baseline=current,
-                        tolerance=request.probability_tolerance,
-                        follow_through=baseline.execution_probability,
-                        levers=tuple(levers),
-                    )
-                ),
+                blueprint=build_reverse_blueprint(inputs),
                 paths=[
                     TargetPath(
                         label="No change required",
@@ -956,6 +1073,7 @@ class WhatIfService:
                 ),
                 paths=[],
                 search_method="no_supported_levers",
+                blueprint=build_reverse_blueprint(inputs),
             )
             return await self._persist_target_search(request, result)
         request = request.model_copy(update={"candidates": supported_candidates})
@@ -969,18 +1087,14 @@ class WhatIfService:
         bundles = await search.price_bundles()
         scans = [await search.scan(lever) for lever in levers]
         scans = await search.solve_levers(scans)
+        await search.combine_levers(scans)
         await search.combine(scans, bundles)
         blueprint = build_reverse_blueprint(
-            BlueprintInputs(
-                target=request.target_probability,
-                baseline=current,
-                tolerance=request.probability_tolerance,
+            replace(
+                inputs,
                 options=tuple(search.options),
                 scans=tuple(scan for scan in scans if scan.points),
-                follow_through=search.follow_through
-                if search.follow_through is not None
-                else baseline.execution_probability,
-                levers=tuple(levers),
+                levers=tuple(scan.lever for scan in scans),
             )
         )
         paths = search.feasible_paths()
@@ -1000,13 +1114,87 @@ class WhatIfService:
             message=(
                 "Minimum viable paths verified against the target."
                 if paths
-                else "Target odds are not reachable under current constraints."
+                else "Target odds are not reachable with the currently modeled levers."
             ),
             paths=paths[:3],
-            search_method="bounded_enumeration_and_binary_search",
+            search_method="bounded_multi_lever_search",
             blueprint=blueprint,
         )
         return await self._persist_target_search(request, result)
+
+    async def _reverse_evidence(self, goal_id: str, goal: GoalContract) -> list[NormalizedEvidence]:
+        if self._evidence is None:
+            return []
+        evidence = await self._evidence.list_for_goal(UUID(goal_id))
+        return evidence if is_synthetic_goal(goal) else authentic_evidence(evidence)
+
+    async def _reverse_follow_through(
+        self, goal: GoalContract, request: TargetSearchRequest, evidence: list[NormalizedEvidence]
+    ) -> tuple[TargetSearchRequest, FollowThroughSource]:
+        """Fit follow-through exactly as Change does and pin it on the search base."""
+        base = request.base.model_copy(update={"intervention": None})
+        if self._evidence is not None:
+            trials: list[CommitmentTrial] = []
+            if self._owner_id is not None:
+                owned = await self._goals.list_goals(owner_id=self._owner_id)
+                cohort = behavior_cohort_goals(owned, synthetic=is_synthetic_goal(goal))
+                plans, observations = await get_commitment_store().list_for_goals(
+                    self._owner_id, [item.goal_id for item in cohort]
+                )
+                trials = trials_from_commitments(plans, observations)
+            base = self._apply_behavior_execution(goal, base, evidence, commitment_trials=trials)
+        execution = next(
+            (item for item in base.assumptions if item.name == EXECUTION_ASSUMPTION), None
+        )
+        source: FollowThroughSource
+        if execution is None:
+            source = "not_modeled"
+        elif execution.source == AssumptionSource.FITTED:
+            source = "fitted"
+        elif abs(execution.value - DEFAULT_EXECUTION) < 1e-6:
+            source = "default"
+        else:
+            source = "user"
+        updated = request.base.model_copy(update={"assumptions": base.assumptions})
+        return request.model_copy(update={"base": updated}), source
+
+    def _reverse_levers(
+        self, goal: GoalContract, request: TargetSearchRequest, evidence: list[NormalizedEvidence]
+    ) -> tuple[LeverSelection, int | None]:
+        assumptions = list(request.base.assumptions)
+        units = composed_metric_units(goal)
+        composed_periods: int | None = None
+        if units and self._evidence is not None:
+            from personal_markets.forecasting.composition import composition_numeric_inputs
+
+            inputs = composition_numeric_inputs(goal, evidence)
+            if inputs is not None:
+                names = {item.name for item in assumptions}
+                assumptions.extend(
+                    item
+                    for item in composed_rate_assumptions(units, inputs.assumptions)
+                    if item.name not in names
+                )
+                horizon = inputs.state.get("periods")
+                if isinstance(horizon, int | float) and horizon > 0:
+                    composed_periods = math.ceil(horizon)
+        return select_levers(assumptions), composed_periods
+
+    @staticmethod
+    def _reverse_horizon(
+        request: TargetSearchRequest, levers: list[LeverSpec], composed_periods: int | None
+    ) -> tuple[int | None, str | None]:
+        """Periods left and their unit, for plan timelines."""
+        deadline = next(
+            (item for item in request.base.assumptions if item.name == "periods_remaining"), None
+        )
+        if deadline is not None:
+            return int(deadline.value), deadline.unit.removesuffix("s")
+        tails = [lever.unit.rsplit("/", 1)[-1] for lever in levers if "/" in lever.unit]
+        unit = next((tail for tail in tails if tail in {"day", "week", "month"}), None)
+        if composed_periods is not None:
+            return composed_periods, unit
+        return request.base.periods, unit
 
     async def action_frontier(self, request: TargetSearchRequest) -> ActionFrontierResult:
         baseline = await self._simulate(
@@ -1208,9 +1396,9 @@ class WhatIfService:
         """Fill Reverse search when the client omits candidates or searchable assumptions."""
         updates: dict[str, object] = {}
         names = {item.name for item in request.base.assumptions}
+        missing_levers = not select_levers(request.base.assumptions).levers
         needs_state = (not request.candidates) or (
-            request.continuous_variable is None
-            and not names & {"flow", "weekly_application_rate"}
+            request.continuous_variable is None and missing_levers
         )
         state = None
         if needs_state:
@@ -1225,7 +1413,6 @@ class WhatIfService:
                 if item.intervention is not None
             ]
         if request.continuous_variable is None:
-            missing_levers = not names & {"flow", "weekly_application_rate"}
             if missing_levers and state is not None and state.assumptions:
                 updates["base"] = request.base.model_copy(
                     update={"assumptions": state.assumptions}
@@ -1240,34 +1427,6 @@ class WhatIfService:
         if not updates:
             return request
         return request.model_copy(update=updates)
-
-    @staticmethod
-    def _search_levers(request: TargetSearchRequest) -> list[LeverSpec]:
-        """Searchable model levers, in the order the old search tried them."""
-        names = list(REVERSE_LEVER_NAMES)
-        if request.continuous_variable is not None and (
-            request.continuous_variable.assumption not in names
-        ):
-            names.append(request.continuous_variable.assumption)
-        indexed = {item.name: item for item in request.base.assumptions}
-        levers: list[LeverSpec] = []
-        for name in names:
-            assumption = indexed.get(name)
-            if assumption is None or not assumption.editable:
-                continue
-            if assumption.maximum <= assumption.minimum:
-                continue
-            levers.append(
-                LeverSpec(
-                    lever_id=assumption.name,
-                    unit=assumption.unit,
-                    baseline=assumption.value,
-                    minimum=assumption.minimum,
-                    maximum=assumption.maximum,
-                    step=assumption.step,
-                )
-            )
-        return levers
 
     @staticmethod
     def _bundle_intervention(

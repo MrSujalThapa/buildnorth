@@ -1,4 +1,4 @@
-import type { PublicBlueprint, PublicMarketDetail } from "../../api/client";
+import type { PublicBlueprint, PublicMarketDetail, PublicMarketUpdate } from "../../api/client";
 
 const longDate = new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 const shortDate = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -138,4 +138,66 @@ export function signedPoints(value: number): string {
 
 export function categoryLabel(category: string): string {
   return humanize(category);
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** Published updates, newest last. Older API payloads only carry probability history. */
+export function marketUpdates(market: PublicMarketDetail): PublicMarketUpdate[] {
+  if (market.updates?.length) return market.updates;
+  return market.history.map((point, index) => {
+    const previous = index > 0 ? market.history[index - 1] : undefined;
+    return {
+      published_at: point.created_at,
+      probability: point.probability,
+      previous_probability: previous?.probability ?? null,
+      change_points: previous ? Math.round((point.probability - previous.probability) * 1000) / 10 : null,
+      kind: index === 0 ? "first_publication" : "update",
+      receipt_recorded: false,
+      evidence_total: null,
+      new_evidence_count: null,
+      retired_evidence_count: null,
+      new_evidence_metrics: [],
+      other_new_evidence_count: 0,
+      model: null,
+      model_change: null,
+      status_change: null,
+      definition_revised: false,
+      deadline_changed: false,
+    };
+  });
+}
+
+/**
+ * What the receipt recorded alongside an odds move. These describe what changed
+ * between publications; they are not presented as the cause of the move.
+ */
+export function updateContext(update: PublicMarketUpdate): string[] {
+  const parts: string[] = [];
+  const metrics = update.new_evidence_metrics;
+  const named = metrics.length
+    ? `: ${metrics.join(", ")}${update.other_new_evidence_count ? ` + ${update.other_new_evidence_count} other` : ""}`
+    : "";
+  if (update.kind === "first_publication") {
+    parts.push(
+      update.evidence_total != null
+        ? `First publication, ${plural(update.evidence_total, "evidence record", "evidence records")}${named}`
+        : "First publication",
+    );
+  } else if (update.new_evidence_count != null) {
+    parts.push(update.new_evidence_count > 0
+      ? `${plural(update.new_evidence_count, "new evidence record", "new evidence records")}${named}`
+      : "No new evidence");
+  }
+  if (update.retired_evidence_count) {
+    parts.push(`${plural(update.retired_evidence_count, "record", "records")} superseded`);
+  }
+  if (update.model_change) parts.push(`Model ${update.model_change.previous} → ${update.model_change.current}`);
+  if (update.status_change) parts.push(`Status ${update.status_change.previous} → ${update.status_change.current}`);
+  if (update.definition_revised) parts.push("Goal definition revised");
+  if (update.deadline_changed) parts.push("Deadline changed");
+  if (!update.receipt_recorded && update.kind === "update") parts.push("Details not recorded for this update");
+  return parts;
 }
