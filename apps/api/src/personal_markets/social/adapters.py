@@ -194,9 +194,12 @@ class InMemorySocialRepository:
         source_user_id: UUID,
         idempotency_key: str | None,
     ) -> tuple[dict[str, Any], bool]:
-        if idempotency_key:
-            existing_id = self._idempotency.get((owner_id, idempotency_key))
-            if existing_id and (row := self._row(existing_id)):
+        for existing_id, (source_id, _source_user) in self._fork.items():
+            same_source = source_id == source_goal_id
+            stored_key = self._idempotency.get((owner_id, idempotency_key or ""))
+            same_key = bool(idempotency_key and stored_key == existing_id)
+            owner_match = self._goals._owners.get(existing_id) == owner_id
+            if owner_match and (same_source or same_key) and (row := self._row(existing_id)):
                 return row, False
         goal = GoalContract(
             goal_id=goal_id,

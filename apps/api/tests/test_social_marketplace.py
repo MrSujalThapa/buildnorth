@@ -125,6 +125,24 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         mine = client.get(f"/api/v1/goals/{fork_id}")
         assert mine.status_code == 200
         assert mine.json()["title"] == "My FDE path"
+        archived = client.post(f"/api/v1/goals/{fork_id}/archive")
+        assert archived.status_code == 200
+        again = client.post(
+            f"/api/v1/social/markets/{goal.goal_id}/fork",
+            json={"idempotency_key": "fork-retry-key-1", "title": "My FDE path again"},
+        )
+        assert again.status_code == 200
+        assert again.json()["created"] is True
+        assert again.json()["goal_id"] != fork_id
+        fresh = client.get(f"/api/v1/goals/{again.json()['goal_id']}")
+        assert fresh.status_code == 200
+        assert fresh.json()["title"] == "My FDE path again"
+        duplicate = client.post(
+            f"/api/v1/social/markets/{goal.goal_id}/fork",
+            json={"idempotency_key": "fork-other-key", "title": "Should not duplicate"},
+        )
+        assert duplicate.json()["created"] is False
+        assert duplicate.json()["goal_id"] == again.json()["goal_id"]
 
         app.state.auth_bypass_principal = owner
         private = client.post(

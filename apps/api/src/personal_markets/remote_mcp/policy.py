@@ -169,7 +169,9 @@ def observation_policy(goal: GoalContract) -> ObservationPolicy:
     )
 
 
-def informational_policy(metric: str, unit: str | None = None, kind: str | None = None) -> MetricPolicy:
+def informational_policy(
+    metric: str, unit: str | None = None, kind: str | None = None
+) -> MetricPolicy:
     """Persist a legitimate observation the numerical model cannot consume."""
     accepted: list[Kind] = ["snapshot", "increment", "period"]
     default: Kind = kind if kind in accepted else "increment"

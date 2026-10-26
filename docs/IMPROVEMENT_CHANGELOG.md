@@ -8,7 +8,7 @@ This file is both an engineering log and a hackathon deliverable.
 
 **Changes:** Unmapped MCP/website observations persist as informational. Coffee chats, cold emails, and NeetCode submissions are not interviews, applications, or study hours. Funnel tokens in the title/metric win over sequential-launch DAG. Metric names clip to 80 characters. Codex's period-vs-stock fingerprinting was reused; the larger forecast-reliability worktree was left intact.
 
-**Measured result:** `test_evidence_informational.py`, hiring, phase3 primitives/scenarios, and the MCP invalid-metric case passed locally. No Spur calls.
+**Measured result:** Evidence, hiring, phase3, and MCP tests passed. Archived forks no longer occupy the active uniqueness key, so the same source can be forked again. Ruff baseline is clean. No Spur calls.
 
 ## 2026-10-26 — Invited judges receive $10 hosted Spur credit
 

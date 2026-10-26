@@ -3,7 +3,11 @@ from datetime import UTC, datetime, timedelta
 from personal_markets.agents.model_planner import infer_primitive_kind, refine_architect_proposal
 from personal_markets.evidence.metrics import clip_metric_name, observation_kind
 from personal_markets.forecasting.hiring import aggregate_funnel_from_evidence
-from personal_markets.ports import EvidenceAgentProposal, EvidenceEventProposal, GoalArchitectProposal
+from personal_markets.ports import (
+    EvidenceAgentProposal,
+    EvidenceEventProposal,
+    GoalArchitectProposal,
+)
 from personal_markets.remote_mcp.policy import ObservationPolicy, informational_policy
 from personal_markets.remote_mcp.tools import RemoteMcpTools, candidates_with_policy
 
