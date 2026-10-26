@@ -24,7 +24,7 @@ from personal_markets.ports import ResearchArtifact
 pytestmark = pytest.mark.integration
 
 
-async def test_postgres_parallel_reservations_obey_five_dollar_cap() -> None:
+async def test_postgres_parallel_reservations_obey_ten_dollar_cap() -> None:
     url = isolated_postgres_url()
     if not url:
         pytest.skip("PM_TEST_DATABASE_URL is not configured")
@@ -43,10 +43,11 @@ async def test_postgres_parallel_reservations_obey_five_dollar_cap() -> None:
         store = PostgresBudgetStore(engine)
         budget = InferenceBudgetService(store, Settings())
         results = await asyncio.gather(
-            *[budget.reserve_research(user, 1.0) for _ in range(10)], return_exceptions=True
+            *[budget.reserve_research(user, 1.0) for _ in range(15)], return_exceptions=True
         )
-        assert sum(not isinstance(item, Exception) for item in results) == 5
-        assert (await store.counters(str(user.user_id))).reserved_usd == 5.0
+        assert sum(not isinstance(item, Exception) for item in results) == 10
+        assert sum(isinstance(item, Exception) for item in results) == 5
+        assert (await store.counters(str(user.user_id))).reserved_usd == 10.0
     finally:
         await engine.dispose()
 
