@@ -49,6 +49,7 @@ def _carried_fields(success: dict[str, Any], requirements: dict[str, Any]) -> li
         ("description", "description"),
         ("milestones", "milestones"),
         ("strategy", "strategy"),
+        ("strategies", "strategies"),
     ):
         if success.get(key):
             fields.append(name)
@@ -450,8 +451,11 @@ class SocialService:
             reviewed_success["description"] = blueprint.description
         if blueprint.milestones and not reviewed_success.get("milestones"):
             reviewed_success["milestones"] = blueprint.milestones
-        if blueprint.strategies and not reviewed_success.get("strategy"):
-            reviewed_success["strategy"] = blueprint.strategies[0]
+            reviewed_success["milestones_source"] = blueprint.milestones_source
+        if blueprint.strategies and not reviewed_success.get("strategies"):
+            reviewed_success["strategies"] = list(blueprint.strategies)
+            reviewed_success["strategies_source"] = blueprint.strategies_source
+            reviewed_success.setdefault("strategy", blueprint.strategies[0])
         reviewed_source = source.model_copy(
             update={
                 "title": blueprint.title,

@@ -32,14 +32,23 @@ export default function PublicBlueprintDetails({ blueprint }: { blueprint: Publi
           ) : null}
           {blueprint.strategies.length ? (
             <div className="public-blueprint-block">
-              <h3>Approach</h3>
+              <h3>{blueprint.strategies_source === "suggested" ? "Suggested playbook" : "Approach"}</h3>
+              {blueprint.strategies_source === "suggested" ? (
+                <p className="quiet-copy">A template from this goal’s target and domain. The creator has not recorded these steps, and they are not completed actions.</p>
+              ) : null}
               <ul className="public-milestones">{blueprint.strategies.map((row) => <li key={row}>{row}</li>)}</ul>
             </div>
           ) : null}
           {milestones.length ? (
             <div className="public-blueprint-block">
-              <h3>Milestones</h3>
+              <h3>{blueprint.milestones_source === "suggested" ? "Suggested milestones" : "Milestones"}</h3>
               <ol className="public-milestones">{milestones.map((row, index) => <li key={`${index}-${row}`}>{row}</li>)}</ol>
+            </div>
+          ) : null}
+          {blueprint.evidence_types.length ? (
+            <div className="public-blueprint-block">
+              <h3>What to log</h3>
+              <ul className="public-milestones">{blueprint.evidence_types.map((row) => <li key={row}>{row}</li>)}</ul>
             </div>
           ) : null}
           {tracked.length ? (

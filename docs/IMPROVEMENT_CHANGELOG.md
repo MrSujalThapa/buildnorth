@@ -2,6 +2,14 @@
 
 This file is both an engineering log and a hackathon deliverable.
 
+## 2026-10-25 — Public blueprints include a labeled playbook
+
+**Hypothesis:** Public markets can show forkable steps without new goal data if missing strategy lists are normalized and empty plans are filled from the goal’s target and domain, labeled as a suggestion.
+
+**Changes:** Strategy lists stay separate steps. Empty public plans get a suggested playbook for hiring, reading, savings, fitness, and a generic target. Creator-written steps and milestones are kept. Old snapshots with empty steps are filled on read. Forks copy every step and milestone and still omit evidence.
+
+**Measured result:** Social blueprint tests pass. Production pages not rechecked in this entry.
+
 ## 2026-10-25 — Integration pass: plan units, fitted priceability, count-model deeper analysis
 
 **Hypothesis:** Browser journeys would fail where reply-rate plans were labeled as applications, where a fitted composed rate was still reported missing, and where Deeper analysis ignored draw count for cumulative-count goals.
