@@ -12,7 +12,10 @@ const COMPARISONS: Record<string, string> = {
 };
 
 const TARGET_KEYS = ["target", "target_value", "threshold", "value", "amount", "seconds"] as const;
-const HIDDEN_KEYS = new Set(["milestones", "strategy", "description", "metric", "operator", "unit", ...TARGET_KEYS]);
+const HIDDEN_KEYS = new Set([
+  "milestones", "strategy", "strategies", "strategies_source", "milestones_source",
+  "description", "metric", "operator", "unit", ...TARGET_KEYS,
+]);
 
 const OTHER_LABELS: Record<string, string> = {
   event: "Outcome", success_event: "Outcome", window: "Window", criteria: "Criteria", habit: "Habit", direction: "Direction",

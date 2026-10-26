@@ -82,10 +82,10 @@ def test_publish_star_follow_fork_and_revoke() -> None:
         assert preview.status_code == 200
         body = preview.json()
         assert body["visibility"] == "public"
-        assert (
-            "email" not in str(body).lower()
-            or "success" in body["public_preview"]["success_criteria"]
-        )
+        preview_text = str(body["public_preview"]).lower()
+        assert "@" not in preview_text
+        assert "private_journal" not in preview_text
+        assert "credential" not in preview_text
         assert "token" not in body["public_preview"]["model_configuration"]
         listed = client.get("/api/v1/public/markets")
         assert any(item["goal_id"] == str(goal.goal_id) for item in listed.json()["items"])

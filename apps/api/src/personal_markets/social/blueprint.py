@@ -8,6 +8,7 @@ from uuid import UUID
 from personal_markets.core.errors import ConflictError
 from personal_markets.goals.domain import GoalContract, GoalType, ResourceConstraints
 from personal_markets.social.domain import PublicBlueprint, PublicForecastState, PublicHistoryPoint
+from personal_markets.social.playbook import normalize_steps, suggest_playbook
 
 PUBLIC_SUCCESS_KEYS = frozenset(
     {
@@ -24,6 +25,9 @@ PUBLIC_SUCCESS_KEYS = frozenset(
         "description",
         "milestones",
         "strategy",
+        "strategies",
+        "strategies_source",
+        "milestones_source",
         "criteria",
         "target_value",
         "direction",
@@ -237,9 +241,9 @@ def _blueprint_from_parts(
 ) -> PublicBlueprint:
     success = enriched_success_definition(success_definition, model_requirements)
     requirements = public_model_configuration(model_requirements)
-    milestones = success.get("milestones") or requirements.get("milestones") or []
-    if not isinstance(milestones, list):
-        milestones = []
+    creator_milestones = normalize_steps(
+        success.get("milestones") or requirements.get("milestones") or []
+    )
     evidence_types = (
         requirements.get("suggested_evidence") or requirements.get("evidence_types") or []
     )
@@ -248,7 +252,22 @@ def _blueprint_from_parts(
     integrations = requirements.get("suggested_integrations") or []
     if not isinstance(integrations, list):
         integrations = []
-    strategy = success.get("strategy") or requirements.get("strategy")
+    creator_strategies = normalize_steps(
+        success.get("strategies")
+        or requirements.get("strategies")
+        or success.get("strategy")
+        or requirements.get("strategy")
+    )
+    suggested_steps, suggested_milestones, suggested_evidence = suggest_playbook(
+        title=title,
+        success=success,
+        category=str(model_requirements.get("life_area") or goal_type),
+        goal_type=goal_type,
+    )
+    strategies = creator_strategies or suggested_steps
+    milestones = creator_milestones or suggested_milestones
+    if not evidence_types:
+        evidence_types = suggested_evidence
     text = (
         description
         or str(success_definition.get("description") or "")
@@ -260,8 +279,10 @@ def _blueprint_from_parts(
         category=str(model_requirements.get("life_area") or goal_type),
         deadline=deadline,
         success_criteria=success,
-        milestones=[item for item in milestones if isinstance(item, (str, dict))],
-        strategies=[str(strategy)] if strategy else [],
+        milestones=milestones,
+        strategies=strategies,
+        strategies_source="creator" if creator_strategies else "suggested",
+        milestones_source="creator" if creator_milestones else "suggested",
         evidence_types=[str(item) for item in evidence_types],
         suggested_integrations=[str(item) for item in integrations],
         model_configuration=requirements,
@@ -333,8 +354,20 @@ def reviewed_blueprint(row: dict[str, Any], *, live: bool) -> PublicBlueprint:
         criteria = updates.get("success_criteria", snapshot.success_criteria)
         deadline = updates.get("deadline", snapshot.deadline)
         updates["description"] = success_summary(criteria, deadline) or current.description
-    if not snapshot.milestones and current.milestones:
-        updates["milestones"] = current.milestones
+    stored_steps = normalize_steps(snapshot.strategies)
+    if stored_steps != snapshot.strategies or not stored_steps:
+        updates["strategies"] = stored_steps or current.strategies
+        updates["strategies_source"] = (
+            snapshot.strategies_source if stored_steps else current.strategies_source
+        )
+    stored_milestones = normalize_steps(snapshot.milestones)
+    if stored_milestones != list(snapshot.milestones) or not stored_milestones:
+        updates["milestones"] = stored_milestones or current.milestones
+        updates["milestones_source"] = (
+            snapshot.milestones_source if stored_milestones else current.milestones_source
+        )
+    if not snapshot.evidence_types and current.evidence_types:
+        updates["evidence_types"] = current.evidence_types
     if not snapshot.tracked_metrics and current.tracked_metrics:
         updates["tracked_metrics"] = current.tracked_metrics
     return snapshot.model_copy(update=updates)

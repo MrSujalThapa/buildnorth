@@ -651,6 +651,9 @@ export interface PublicBlueprint {
   success_criteria: Record<string, unknown>;
   milestones: unknown[];
   strategies: string[];
+  /** Absent on older snapshots. "suggested" is a template, not a commitment. */
+  strategies_source?: "creator" | "suggested";
+  milestones_source?: "creator" | "suggested";
   evidence_types: string[];
   suggested_integrations: string[];
   model_configuration: Record<string, unknown>;

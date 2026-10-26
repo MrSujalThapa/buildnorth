@@ -67,12 +67,15 @@ export function buildAssistantSummary(market: PublicMarketDetail, url: string | 
     for (const row of criteria) lines.push(`- ${row.label}: ${row.value}`);
   }
   if (blueprint.strategies.length) {
-    lines.push("", "## Approach");
+    lines.push("", blueprint.strategies_source === "suggested" ? "## Suggested playbook" : "## Approach");
+    if (blueprint.strategies_source === "suggested") {
+      lines.push("A template from the goal target and domain. These are not recorded actions.");
+    }
     for (const item of blueprint.strategies) lines.push(`- ${item}`);
   }
   const milestones = blueprint.milestones.map(milestoneText).filter((item): item is string => Boolean(item));
   if (milestones.length) {
-    lines.push("", "## Milestones");
+    lines.push("", blueprint.milestones_source === "suggested" ? "## Suggested milestones" : "## Milestones");
     milestones.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
   }
   const tracked = blueprint.tracked_metrics ?? [];

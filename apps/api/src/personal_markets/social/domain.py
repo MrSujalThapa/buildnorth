@@ -29,6 +29,9 @@ class PublicBlueprint(BaseModel):
     success_criteria: dict[str, Any] = Field(default_factory=dict)
     milestones: list[Any] = Field(default_factory=list)
     strategies: list[str] = Field(default_factory=list)
+    # "creator" is text the goal already stored. "suggested" is a template, not a commitment.
+    strategies_source: Literal["creator", "suggested"] = "creator"
+    milestones_source: Literal["creator", "suggested"] = "creator"
     evidence_types: list[str] = Field(default_factory=list)
     suggested_integrations: list[str] = Field(default_factory=list)
     model_configuration: dict[str, Any] = Field(default_factory=dict)
