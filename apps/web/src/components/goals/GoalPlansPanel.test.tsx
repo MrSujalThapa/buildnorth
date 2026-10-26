@@ -34,9 +34,9 @@ const plan: PlannedCommitment = {
 
 vi.mock("../../api/client", () => ({
   api: {
-    listPlans: vi.fn(async () => ({ commitments: [plan], observations: [] })),
-    evaluatePlan: vi.fn(async () => ({ priced: true, baseline_probability: 0.3, scenario_probability: 0.4 })),
-    observePlan: vi.fn(async () => ({ id: "obs", commitment_id: "plan-1", version: 1, status: "partial", actual_quantity: 20, observed_at: new Date().toISOString() })),
+    listPlans: vi.fn(() => Promise.resolve({ commitments: [plan], observations: [] })),
+    evaluatePlan: vi.fn(() => Promise.resolve({ priced: true, baseline_probability: 0.3, scenario_probability: 0.4 })),
+    observePlan: vi.fn(() => Promise.resolve({ id: "obs", commitment_id: "plan-1", version: 1, status: "partial", actual_quantity: 20, observed_at: new Date().toISOString() })),
   },
 }));
 
