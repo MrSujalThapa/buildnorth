@@ -836,3 +836,22 @@
 .theme-dark .return-panel {
   background: var(--app-surface, #131314);
 }
+
+.goal-plans { margin: 28px 0 0; padding-top: 20px; border-top: 1px solid var(--market-border); }
+.goal-plans > header h2 { margin: 4px 0 8px; font-size: 20px; letter-spacing: -0.02em; }
+.goal-plans > header p:last-child { margin: 0; font-size: 13.5px; color: var(--market-muted); max-width: 62ch; }
+.goal-plan { margin-top: 16px; padding: 16px 18px; border: 1px solid var(--market-border); border-radius: 10px; }
+.goal-plan h3 { margin: 4px 0; font-size: 17px; }
+.goal-plan header p { margin: 0; font-size: 13.5px; color: var(--market-muted); }
+.goal-plan dl { display: flex; gap: 28px; margin: 12px 0 0; }
+.goal-plan dt { font-size: 12px; color: var(--market-muted); }
+.goal-plan dd { margin: 4px 0 0; font: 600 18px/1 var(--font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+.goal-plan-note { margin: 10px 0 0; font-size: 13px; color: var(--market-text); }
+.goal-plan form { margin-top: 14px; }
+.goal-plan label { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.goal-plan input { width: 88px; height: 34px; padding: 0 10px; border: 1px solid var(--market-border); border-radius: 8px; background: transparent; color: inherit; }
+.goal-plan-actions { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+.goal-plan-actions button, .goal-plan-actions a { font-size: 13.5px; }
+.goal-plan-actions button[type="submit"] { height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: var(--market-text); color: var(--market-bg); font-weight: 600; cursor: pointer; }
+.goal-plan-actions button[type="button"] { background: none; border: 0; color: var(--market-muted); cursor: pointer; }
+.theme-dark .goal-plan { background: var(--app-surface, #131314); }

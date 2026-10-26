@@ -41,14 +41,28 @@ function BlueprintPanel({ view, onSeeFutures }: { view: BlueprintView; onSeeFutu
           </div>
         ) : null}
         <div className="reverse-odds-target">
-          <dt>Target</dt>
+          <dt>Target ({view.tolerance})</dt>
           <dd>{view.target}</dd>
         </div>
       </dl>
       {view.plan.length ? (
         <ol className="reverse-plan" aria-label="Steps">
           {view.plan.map((item, index) =>
-            item.kind === "change" ? (
+            item.kind === "action" ? (
+              <li key={`action-${item.action.order}`} className="reverse-plan-change">
+                <span className="reverse-plan-index">{item.action.order}</span>
+                <div className="reverse-plan-body">
+                  <strong>{item.action.behavior}</strong>
+                  <span className="reverse-plan-values">
+                    <b>{item.action.quantity}</b>
+                    {item.action.timeline ? <em>{item.action.timeline}</em> : null}
+                  </span>
+                  {item.action.constraint ? <p className="reverse-quiet">{item.action.constraint}</p> : null}
+                  {item.action.requiresEvidence ? <p className="reverse-quiet">Assumption: back this conversion with evidence.</p> : null}
+                </div>
+                <span className={`reverse-effort is-${item.action.effort}`}>{item.action.effortLabel}</span>
+              </li>
+            ) : item.kind === "change" ? (
               <li key={`change-${item.change.id}`} className="reverse-plan-change">
                 <span className="reverse-plan-index">{index + 1}</span>
                 <div className="reverse-plan-body">
@@ -74,7 +88,12 @@ function BlueprintPanel({ view, onSeeFutures }: { view: BlueprintView; onSeeFutu
         <div>
           <h4>Why this path</h4>
           <p>{view.rationale}</p>
-          {view.followThrough ? <p className="reverse-quiet">{view.followThrough}.</p> : null}
+          {view.followThrough ? (
+            <p className="reverse-quiet">
+              {view.followThrough}
+              {view.followThroughSource ? ` (${view.followThroughSource})` : ""}.
+            </p>
+          ) : null}
         </div>
         {view.tradeoffs.length ? (
           <div>
@@ -85,6 +104,27 @@ function BlueprintPanel({ view, onSeeFutures }: { view: BlueprintView; onSeeFutu
           </div>
         ) : null}
       </div>
+      {view.missing.length ? (
+        <div className="reverse-missing">
+          <h4>What the model cannot price yet</h4>
+          <ul>
+            {view.missing.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {view.unpriced.length ? (
+        <div className="reverse-unpriced">
+          <h4>Unpriced recommendations</h4>
+          <ul>
+            {view.unpriced.map((item) => (
+              <li key={item.label}>
+                <strong>{item.label}</strong>
+                <span> — {item.measurement}. No probability attached.</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {view.plateau ? (
         <p className="reverse-plateau" role="note">
           <strong>{view.plateau.label}.</strong> {view.plateau.explanation}

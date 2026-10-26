@@ -36,6 +36,39 @@ test("fork panel lists the carried blueprint and next steps", () => {
   expect(onWhatIf).toHaveBeenCalledOnce();
 });
 
+test("fork panel shows carried approach, milestones and tracked metrics as a starting point", () => {
+  render(
+    <MemoryRouter>
+      <ForkedBlueprintPanel
+        fork={{
+          source_goal_id: "src-2", source_user_id: "u1", source_handle: "maya", source_title: "Land an FDE offer",
+          source_public: true, forked_at: "2026-10-25T00:00:00Z",
+          carried_fields: ["title", "success_criteria", "milestones", "strategy", "tracked_metrics"],
+        }}
+        goal={{
+          goal_id: "fork-2", title: "Land an FDE offer", goal_type: "threshold", deadline: "2026-12-31T23:59:59Z",
+          forecast_status: "EXPLORATORY", state_dimensions: ["applications_submitted", "interviews"],
+          success_definition: {
+            metric: "applications_submitted", operator: ">=", target: 40,
+            milestones: ["Ship portfolio", "First onsite"],
+            strategy: "Two tailored applications per weekday",
+          },
+        }}
+        onEvidence={vi.fn()}
+        onWhatIf={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText(/milestones, approach, tracked metrics/)).toBeInTheDocument();
+  expect(screen.getByText(/starting point/)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Starting approach" })).toBeInTheDocument();
+  expect(screen.getByText("Two tailored applications per weekday")).toBeInTheDocument();
+  expect(screen.getByText("Ship portfolio")).toBeInTheDocument();
+  expect(screen.getByText("First onsite")).toBeInTheDocument();
+  expect(screen.getByText("applications submitted, interviews")).toBeInTheDocument();
+});
+
 test("visibility pill shows lock for private, globe for public, and toggles", () => {
   const onToggle = vi.fn();
   const { rerender, container } = render(<VisibilityControl visibility="private" onToggle={onToggle} />);

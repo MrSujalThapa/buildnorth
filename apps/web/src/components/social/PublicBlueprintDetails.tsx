@@ -7,6 +7,8 @@ export default function PublicBlueprintDetails({ blueprint }: { blueprint: Publi
     .map(milestoneText)
     .filter((item): item is string => Boolean(item));
   const deadline = formatLongDate(blueprint.deadline);
+  const tracked = (blueprint.tracked_metrics ?? []).map((item) => item.replaceAll("_", " "));
+  const snapshot = formatLongDate(blueprint.snapshot_at);
   return (
     <section className="public-blueprint" aria-labelledby="public-blueprint-title">
       <h2 id="public-blueprint-title">Blueprint</h2>
@@ -30,19 +32,37 @@ export default function PublicBlueprintDetails({ blueprint }: { blueprint: Publi
           ) : null}
           {blueprint.strategies.length ? (
             <div className="public-blueprint-block">
-              <h3>Approach</h3>
+              <h3>{blueprint.strategies_source === "suggested" ? "Suggested playbook" : "Approach"}</h3>
+              {blueprint.strategies_source === "suggested" ? (
+                <p className="quiet-copy">A template from this goal’s target and domain. The creator has not recorded these steps, and they are not completed actions.</p>
+              ) : null}
               <ul className="public-milestones">{blueprint.strategies.map((row) => <li key={row}>{row}</li>)}</ul>
             </div>
           ) : null}
           {milestones.length ? (
             <div className="public-blueprint-block">
-              <h3>Milestones</h3>
+              <h3>{blueprint.milestones_source === "suggested" ? "Suggested milestones" : "Milestones"}</h3>
               <ol className="public-milestones">{milestones.map((row, index) => <li key={`${index}-${row}`}>{row}</li>)}</ol>
+            </div>
+          ) : null}
+          {blueprint.evidence_types.length ? (
+            <div className="public-blueprint-block">
+              <h3>What to log</h3>
+              <ul className="public-milestones">{blueprint.evidence_types.map((row) => <li key={row}>{row}</li>)}</ul>
+            </div>
+          ) : null}
+          {tracked.length ? (
+            <div className="public-blueprint-block">
+              <h3>Tracked metrics</h3>
+              <p>{tracked.join(", ")}</p>
             </div>
           ) : null}
         </>
       )}
-      <p className="public-blueprint-note">Forking copies this blueprint into a new private market. Evidence and odds stay with the creator.</p>
+      <p className="public-blueprint-note">
+        {snapshot ? <>Blueprint as published on {snapshot}. </> : null}
+        Forking copies this blueprint into a new private market. Evidence and odds stay with the creator.
+      </p>
     </section>
   );
 }

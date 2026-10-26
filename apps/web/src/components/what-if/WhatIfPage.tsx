@@ -586,7 +586,8 @@ export default function WhatIfPage({
               running={
                 simulation.simulation.isPending ||
                 simulation.parseIntervention.isPending ||
-                simulation.persistSimulation.isPending
+                simulation.persistSimulation.isPending ||
+                simulation.strategyRunning
               }
 
               runError={scenarioErrorMessage(
@@ -598,7 +599,17 @@ export default function WhatIfPage({
               publishedOdds={market.odds}
               history={market.history}
               parseResult={simulation.lastParse}
-              onRunPlannedChange={simulation.runPlannedChange}
+              onRunStrategyOption={simulation.runStrategyOption}
+              applyPlan={
+                goal && simulation.scenarioResult?.priced
+                  ? {
+                      goalId: goal.goal_id,
+                      domain: goal.state_dimensions?.[0] ?? "general",
+                      priced: simulation.pricedOption,
+                      result: simulation.scenarioResult,
+                    }
+                  : null
+              }
 
               onQuestionChange={setQuestion}
 

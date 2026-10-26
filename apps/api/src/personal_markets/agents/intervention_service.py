@@ -51,6 +51,10 @@ from personal_markets.what_if.strategy_insights import (
 )
 from personal_markets.what_if.strategy_plan import StrategyPlan
 
+# A single-strategy question that maps onto a known lever family is answered from the
+# deterministic plan; comparisons and open discovery still use the strategy agent.
+DETERMINISTIC_STRATEGY_KINDS = frozenset({"exploratory_hypothetical"})
+
 
 class InterventionAgentService:
     def __init__(
@@ -92,17 +96,13 @@ class InterventionAgentService:
             if classified.kind in STRATEGY_KINDS or classified.kind == "quantitative_scenario"
             else None
         )
+        if operational is not None and classified.kind in DETERMINISTIC_STRATEGY_KINDS:
+            return self._operational_response(text, classified, baseline, *operational)
         if classified.kind in STRATEGY_KINDS:
             parsed = await self._parse_strategy(goal, baseline, text, classified, summaries)
             if operational is None:
                 return parsed
-            plan = operational[0].model_copy(
-                update={
-                    "modeled": False,
-                    "stated_quantity": None,
-                    "needs": [operational[0].levers[0].question],
-                }
-            )
+            plan = operational[0]
             summary = parsed.consumer_summary if parsed.insights else plan_summary(plan)
             return parsed.model_copy(update={"strategy_plan": plan, "consumer_summary": summary})
         if operational is not None and self.explicit_changes(goal, text) is None:
@@ -131,7 +131,9 @@ class InterventionAgentService:
             pricing_status="PRICED" if changes else "NOT_PRICED",
             agent_run_id=None,
             limitations=[
-                "Mapped deterministically onto a modeled lever; no inference call and no "
+                "No modeled input for this action; it is described, not priced."
+                if plan.unpriced
+                else "Mapped deterministically onto a modeled lever; no inference call and no "
                 "assumed effect size."
             ],
             research_claims=[],

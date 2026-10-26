@@ -105,17 +105,17 @@ it("leads with the recommended path blueprint instead of raw lever rows", () => 
   renderView();
   const card = screen.getByRole("region", { name: blueprint.headline });
   expect(within(card).getByText("Recommended path")).toBeInTheDocument();
-  expect(within(card).getByText("Reaches ~90%")).toBeInTheDocument();
+  expect(within(card).getByText("Reaches 89.1% (within 1 pp of 90%)")).toBeInTheDocument();
   const odds = within(card).getByLabelText("Modeled odds");
   expect(within(odds).getByText("74%")).toBeInTheDocument();
-  expect(within(odds).getByText("89%")).toBeInTheDocument();
+  expect(within(odds).getByText("89.1%")).toBeInTheDocument();
   expect(within(odds).getByText("+15 pp")).toBeInTheDocument();
   const steps = within(card).getByRole("list", { name: "Steps" });
   expect(within(steps).getByText("2/week")).toBeInTheDocument();
   expect(within(steps).getByText("40/week")).toBeInTheDocument();
   expect(within(steps).getByText("Heavy lift")).toBeInTheDocument();
   expect(within(card).getByText(/heavy lift; check it fits your week/)).toBeInTheDocument();
-  expect(within(card).getByRole("note")).toHaveTextContent("Odds plateau near 90%.");
+  expect(within(card).getByRole("note")).toHaveTextContent("Odds plateau near 90.4%.");
   // The raw sweep row is not the headline answer in the simple view.
   expect(screen.queryByText("34 applications/week")).not.toBeInTheDocument();
 });
@@ -127,7 +127,7 @@ it("lists deduplicated alternatives in a compact table", () => {
   expect(rows).toHaveLength(2);
   const row = rows[1] as HTMLElement;
   expect(within(row).getByRole("rowheader")).toHaveTextContent("Weekly applications at 14 applications/week");
-  expect(within(row).getByText("82%")).toBeInTheDocument();
+  expect(within(row).getByText("81.6%")).toBeInTheDocument();
   expect(within(row).getByText("Smaller change, 8 pp short of target.")).toBeInTheDocument();
 });
 

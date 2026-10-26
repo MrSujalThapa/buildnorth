@@ -122,4 +122,13 @@ class SocialRepository(Protocol):
 
     async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]: ...
 
+    async def published_updates(self, goal_id: UUID) -> list[dict[str, Any]]:
+        """Published history rows with `receipt_json` limited to public-derivable fields:
+        evidence ids, goal contract version, spec deadline and assumption names."""
+        ...
+
+    async def evidence_metrics(self, goal_id: UUID, evidence_ids: list[str]) -> dict[str, str]:
+        """Metric name per evidence id linked to the goal. Never values or summaries."""
+        ...
+
     async def discover_creators(self, limit: int) -> list[UUID]: ...

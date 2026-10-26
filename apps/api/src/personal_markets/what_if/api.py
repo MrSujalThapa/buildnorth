@@ -2,6 +2,7 @@ from time import perf_counter
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
 
 from personal_markets.agents.intervention_service import InterventionAgentService
 from personal_markets.forecasting.course_grade import (
@@ -14,6 +15,7 @@ from personal_markets.identity.deps import get_invited_principal
 from personal_markets.identity.domain import Principal
 from personal_markets.what_if.domain import (
     ActionFrontierResult,
+    InterventionChangeInput,
     MarketHistoryPointResponse,
     PathComparisonRequest,
     PathComparisonResult,
@@ -34,7 +36,9 @@ from personal_markets.what_if.intervention_models import (
     ParseInterventionResponse,
     TypedDecisionResponse,
 )
+from personal_markets.what_if.operationalize import resolve_option
 from personal_markets.what_if.service import WhatIfService
+from personal_markets.what_if.strategy_plan import StrategyChangesRequest, StrategyChangesResponse
 from personal_markets.wiring import get_goal_service, get_intervention_service, get_what_if_service
 
 router = APIRouter(prefix="/api/v1/what-if", tags=["what-if"])
@@ -151,6 +155,32 @@ async def parse_intervention(
     service: Annotated[InterventionAgentService, Depends(get_intervention_service)],
 ) -> ParseInterventionResponse:
     return await service.parse(payload.goal_id, payload.text)
+
+
+@router.post("/strategy-changes", response_model=StrategyChangesResponse)
+async def strategy_changes(
+    payload: StrategyChangesRequest,
+    service: Annotated[WhatIfService, Depends(get_what_if_service)],
+) -> StrategyChangesResponse:
+    """Deterministic: turns the user's chosen option and inputs into model changes."""
+    baseline = await service.baseline_state(payload.goal_id)
+    return resolve_option(
+        baseline, payload.family, payload.option_id, payload.inputs, payload.text
+    )
+
+
+class PlanEvaluationRequest(BaseModel):
+    goal_id: str
+    changes: list[InterventionChangeInput] = Field(min_length=1, max_length=5)
+
+
+@router.post("/plan-evaluation", response_model=WhatIfResult)
+async def plan_evaluation(
+    payload: PlanEvaluationRequest,
+    service: Annotated[WhatIfService, Depends(get_what_if_service)],
+) -> WhatIfResult:
+    """Conditional odds for an adopted plan under today's evidence. Not a forecast."""
+    return await service.evaluate_plan(payload.goal_id, payload.changes)
 
 
 @router.post("/course-grade", response_model=CourseGradeResult)

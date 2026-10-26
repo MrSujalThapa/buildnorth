@@ -8,6 +8,7 @@ from uuid import UUID
 from personal_markets.core.errors import ConflictError
 from personal_markets.goals.domain import GoalContract, GoalType, ResourceConstraints
 from personal_markets.social.domain import PublicBlueprint, PublicForecastState, PublicHistoryPoint
+from personal_markets.social.playbook import normalize_steps, suggest_playbook
 
 PUBLIC_SUCCESS_KEYS = frozenset(
     {
@@ -24,6 +25,9 @@ PUBLIC_SUCCESS_KEYS = frozenset(
         "description",
         "milestones",
         "strategy",
+        "strategies",
+        "strategies_source",
+        "milestones_source",
         "criteria",
         "target_value",
         "direction",
@@ -122,6 +126,24 @@ FORECAST_SPEC_PRIVATE_KEYS = frozenset(
     }
 )
 FORECAST_SPEC_EVIDENCE_PARTS = ("evidence", "observation", "observed", "current_value")
+BLUEPRINT_SCHEMA_VERSION = 2
+MAX_TRACKED_METRICS = 12
+MAX_METRIC_NAME_LENGTH = 60
+
+
+def tracked_metric_names(success: dict[str, Any], state_dimensions: list[Any]) -> list[str]:
+    """Metric names the goal definition tracks: success metric first, then dimensions."""
+    names: list[str] = []
+    for item in [success.get("metric"), *state_dimensions]:
+        if not isinstance(item, str):
+            continue
+        name = item.strip()
+        if not name or len(name) > MAX_METRIC_NAME_LENGTH or name in names:
+            continue
+        if any(part in name.lower() for part in SENSITIVE_KEY_PARTS):
+            continue
+        names.append(name)
+    return names[:MAX_TRACKED_METRICS]
 
 
 def forecast_units(model_requirements: dict[str, Any]) -> str | None:
@@ -213,12 +235,15 @@ def _blueprint_from_parts(
     deadline: datetime | None,
     model_requirements: dict[str, Any],
     description: str = "",
+    state_dimensions: list[Any] | None = None,
+    goal_contract_version: int | None = None,
+    snapshot_at: datetime | None = None,
 ) -> PublicBlueprint:
     success = enriched_success_definition(success_definition, model_requirements)
     requirements = public_model_configuration(model_requirements)
-    milestones = success.get("milestones") or requirements.get("milestones") or []
-    if not isinstance(milestones, list):
-        milestones = []
+    creator_milestones = normalize_steps(
+        success.get("milestones") or requirements.get("milestones") or []
+    )
     evidence_types = (
         requirements.get("suggested_evidence") or requirements.get("evidence_types") or []
     )
@@ -227,7 +252,22 @@ def _blueprint_from_parts(
     integrations = requirements.get("suggested_integrations") or []
     if not isinstance(integrations, list):
         integrations = []
-    strategy = success.get("strategy") or requirements.get("strategy")
+    creator_strategies = normalize_steps(
+        success.get("strategies")
+        or requirements.get("strategies")
+        or success.get("strategy")
+        or requirements.get("strategy")
+    )
+    suggested_steps, suggested_milestones, suggested_evidence = suggest_playbook(
+        title=title,
+        success=success,
+        category=str(model_requirements.get("life_area") or goal_type),
+        goal_type=goal_type,
+    )
+    strategies = creator_strategies or suggested_steps
+    milestones = creator_milestones or suggested_milestones
+    if not evidence_types:
+        evidence_types = suggested_evidence
     text = (
         description
         or str(success_definition.get("description") or "")
@@ -239,13 +279,28 @@ def _blueprint_from_parts(
         category=str(model_requirements.get("life_area") or goal_type),
         deadline=deadline,
         success_criteria=success,
-        milestones=[item for item in milestones if isinstance(item, (str, dict))],
-        strategies=[str(strategy)] if strategy else [],
+        milestones=milestones,
+        strategies=strategies,
+        strategies_source="creator" if creator_strategies else "suggested",
+        milestones_source="creator" if creator_milestones else "suggested",
         evidence_types=[str(item) for item in evidence_types],
         suggested_integrations=[str(item) for item in integrations],
         model_configuration=requirements,
         forecast=forecast_state_from_requirements(model_requirements),
+        blueprint_version=BLUEPRINT_SCHEMA_VERSION,
+        snapshot_at=snapshot_at,
+        goal_contract_version=goal_contract_version,
+        tracked_metrics=tracked_metric_names(success, state_dimensions or []),
     )
+
+
+def _json_list(value: Any) -> list[Any]:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+    return value if isinstance(value, list) else []
 
 
 def _json_dict(value: Any) -> dict[str, Any]:
@@ -260,12 +315,15 @@ def _json_dict(value: Any) -> dict[str, Any]:
 def blueprint_from_row(row: dict[str, Any]) -> PublicBlueprint:
     """Live blueprint from goal columns; used for owner views and gap filling."""
     deadline = row.get("deadline")
+    version = row.get("version")
     return _blueprint_from_parts(
         title=str(row["title"]),
         goal_type=str(row["goal_type"]),
         success_definition=_json_dict(row.get("success_definition_json")),
         deadline=deadline if isinstance(deadline, datetime) else None,
         model_requirements=_json_dict(row.get("model_requirements_json")),
+        state_dimensions=_json_list(row.get("state_dimensions_json")),
+        goal_contract_version=version if isinstance(version, int) else None,
     )
 
 
@@ -296,12 +354,28 @@ def reviewed_blueprint(row: dict[str, Any], *, live: bool) -> PublicBlueprint:
         criteria = updates.get("success_criteria", snapshot.success_criteria)
         deadline = updates.get("deadline", snapshot.deadline)
         updates["description"] = success_summary(criteria, deadline) or current.description
-    if not snapshot.milestones and current.milestones:
-        updates["milestones"] = current.milestones
+    stored_steps = normalize_steps(snapshot.strategies)
+    if stored_steps != snapshot.strategies or not stored_steps:
+        updates["strategies"] = stored_steps or current.strategies
+        updates["strategies_source"] = (
+            snapshot.strategies_source if stored_steps else current.strategies_source
+        )
+    stored_milestones = normalize_steps(snapshot.milestones)
+    if stored_milestones != list(snapshot.milestones) or not stored_milestones:
+        updates["milestones"] = stored_milestones or current.milestones
+        updates["milestones_source"] = (
+            snapshot.milestones_source if stored_milestones else current.milestones_source
+        )
+    if not snapshot.evidence_types and current.evidence_types:
+        updates["evidence_types"] = current.evidence_types
+    if not snapshot.tracked_metrics and current.tracked_metrics:
+        updates["tracked_metrics"] = current.tracked_metrics
     return snapshot.model_copy(update=updates)
 
 
-def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicBlueprint:
+def build_public_blueprint(
+    goal: GoalContract, description: str = "", *, snapshot_at: datetime | None = None
+) -> PublicBlueprint:
     return _blueprint_from_parts(
         title=goal.title,
         goal_type=goal.goal_type.value,
@@ -309,6 +383,9 @@ def build_public_blueprint(goal: GoalContract, description: str = "") -> PublicB
         deadline=goal.deadline,
         model_requirements=goal.model_requirements,
         description=description,
+        state_dimensions=list(goal.state_dimensions),
+        goal_contract_version=goal.version,
+        snapshot_at=snapshot_at,
     )
 
 

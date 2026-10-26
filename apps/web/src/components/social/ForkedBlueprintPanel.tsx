@@ -18,8 +18,10 @@ const FIELD_LABELS: Record<string, string> = {
   description: "description",
   milestones: "milestones",
   strategy: "approach",
+  strategies: "approach",
   category: "category",
   forecast_spec: "model setup",
+  tracked_metrics: "tracked metrics",
 };
 
 export default function ForkedBlueprintPanel({ fork, goal, onEvidence, onWhatIf, onDismiss }: Props) {
@@ -29,7 +31,17 @@ export default function ForkedBlueprintPanel({ fork, goal, onEvidence, onWhatIf,
   const milestones = (Array.isArray(rawMilestones) ? rawMilestones : [])
     .map(milestoneText)
     .filter((item): item is string => Boolean(item));
-  const carried = (fork.carried_fields ?? []).map((field) => FIELD_LABELS[field]).filter(Boolean);
+  const rawStrategies = goal.success_definition?.strategies;
+  const steps = Array.isArray(rawStrategies)
+    ? rawStrategies.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  const rawStrategy = goal.success_definition?.strategy;
+  const approach = typeof rawStrategy === "string" && rawStrategy.trim() ? rawStrategy.trim() : null;
+  const suggested = goal.success_definition?.strategies_source === "suggested";
+  const tracked = (fork.carried_fields ?? []).includes("tracked_metrics")
+    ? goal.state_dimensions.map((item) => item.replaceAll("_", " "))
+    : [];
+  const carried = [...new Set((fork.carried_fields ?? []).map((field) => FIELD_LABELS[field]).filter(Boolean))];
   const source = fork.source_public && fork.source_handle
     ? <Link to={`/m/${fork.source_goal_id}`}>@{fork.source_handle}/{fork.source_title}</Link>
     : <span>a public blueprint</span>;
@@ -43,13 +55,37 @@ export default function ForkedBlueprintPanel({ fork, goal, onEvidence, onWhatIf,
         </button>
       </header>
       <p className="forked-panel-copy">
-        This is your private copy{carried.length ? <> with the {carried.join(", ")}</> : null}. Odds start fresh once you add your own evidence.
+        This is your private copy{carried.length ? <> with the {carried.join(", ")}</> : null}. Treat the milestones and approach as a starting point and adapt them to your situation. Odds start fresh once you add your own evidence; none of the creator’s evidence or progress was copied.
       </p>
       <dl className="forked-panel-facts">
         {deadline ? <div><dt>Target date</dt><dd>{deadline}</dd></div> : null}
         {criteria.map((row) => <div key={row.key}><dt>{row.label}</dt><dd>{row.value}</dd></div>)}
-        {milestones.length ? <div><dt>Milestones</dt><dd>{milestones.join(" · ")}</dd></div> : null}
+        {tracked.length ? <div><dt>Tracked metrics</dt><dd>{tracked.join(", ")}</dd></div> : null}
       </dl>
+      {steps.length || approach || milestones.length ? (
+        <div className="forked-panel-plan">
+          {steps.length ? (
+            <div>
+              <h3>{suggested ? "Suggested playbook" : "Starting approach"}</h3>
+              {suggested ? (
+                <p className="quiet-copy">A template copied with the blueprint. None of these steps are recorded as done.</p>
+              ) : null}
+              <ul>{steps.map((row) => <li key={row}>{row}</li>)}</ul>
+            </div>
+          ) : approach ? (
+            <div>
+              <h3>Starting approach</h3>
+              <p>{approach}</p>
+            </div>
+          ) : null}
+          {milestones.length ? (
+            <div>
+              <h3>Starting milestones</h3>
+              <ol>{milestones.map((row, index) => <li key={`${index}-${row}`}>{row}</li>)}</ol>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="forked-panel-actions">
         <button type="button" className="ui-button" onClick={onEvidence}>Add evidence</button>
         <button type="button" className="ui-button ui-button-secondary" onClick={onWhatIf}>Explore What If</button>

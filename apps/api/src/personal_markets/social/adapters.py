@@ -26,6 +26,7 @@ class InMemorySocialRepository:
         self._follows: dict[tuple[UUID, UUID], datetime] = {}
         self._activity: list[tuple[UUID, ActivityType, date, UUID | None]] = []
         self._history: dict[UUID, list[dict[str, Any]]] = {}
+        self._evidence_metrics: dict[UUID, dict[str, str]] = {}
         self._updated: dict[UUID, datetime] = {}
 
     def bind_goals(self, goals: InMemoryGoalRepository) -> None:
@@ -77,6 +78,8 @@ class InMemorySocialRepository:
             "title": goal.title,
             "goal_type": goal.goal_type.value,
             "success_definition_json": goal.success_definition,
+            "state_dimensions_json": list(goal.state_dimensions),
+            "version": goal.version,
             "deadline": goal.deadline,
             "model_requirements_json": goal.model_requirements,
             "visibility": self._visibility.get(goal_id, "private"),
@@ -340,6 +343,21 @@ class InMemorySocialRepository:
 
     async def history_for_goals(self, goal_ids: list[UUID]) -> dict[UUID, list[dict[str, Any]]]:
         return {goal_id: list(self._history.get(goal_id, [])) for goal_id in goal_ids}
+
+    def add_evidence_metrics(self, goal_id: UUID, metrics: dict[str, str]) -> None:
+        self._evidence_metrics.setdefault(goal_id, {}).update(metrics)
+
+    async def published_updates(self, goal_id: UUID) -> list[dict[str, Any]]:
+        rows = [
+            row
+            for row in self._history.get(goal_id, [])
+            if str(row.get("source_kind") or "published_forecast") == "published_forecast"
+        ]
+        return sorted(rows, key=lambda row: row["created_at"])
+
+    async def evidence_metrics(self, goal_id: UUID, evidence_ids: list[str]) -> dict[str, str]:
+        linked = self._evidence_metrics.get(goal_id, {})
+        return {item: linked[item] for item in evidence_ids if item in linked}
 
     async def discover_creators(self, limit: int) -> list[UUID]:
         counts: dict[UUID, int] = {}
