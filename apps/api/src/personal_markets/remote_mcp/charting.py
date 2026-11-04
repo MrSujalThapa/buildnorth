@@ -84,6 +84,8 @@ def series_from_history(history: list[PublishedBaseline]) -> list[dict[str, Any]
                 "probability": item.probability,
                 "probability_pct": item.probability * 100.0,
                 "forecast_status": item.forecast_status,
+                "model_family": item.model_family,
+                "model_version": item.model_version,
                 "receipt_id": item.material_hash,
                 "evidence_watermark": item.evidence_watermark,
             }

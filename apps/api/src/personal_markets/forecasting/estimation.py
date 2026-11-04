@@ -11,6 +11,7 @@ import numpy as np
 
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.metrics import (
+    ObservationKind,
     canonicalize_metric,
     observation_kind,
     reduce_stock_value,
@@ -49,11 +50,11 @@ def evidence_series(
     evidence: list[NormalizedEvidence],
     metric: str,
     aliases: tuple[str, ...] = (),
-) -> list[tuple[datetime, float, str]]:
+) -> list[tuple[datetime, float, ObservationKind]]:
     wanted: set[str] = set()
     for name in (metric, *aliases):
         wanted |= _metric_keys(name)
-    series: list[tuple[datetime, float, str]] = []
+    series: list[tuple[datetime, float, ObservationKind]] = []
     for item in evidence:
         if _metric_keys(item.metric).isdisjoint(wanted):
             continue
@@ -63,6 +64,7 @@ def evidence_series(
             item.metric,
             item.event_type,
             item.provenance.observation_kind,
+            item.unit,
         )
         series.append((item.observed_at, float(item.numeric_value), kind))
     series.sort(key=lambda row: row[0])
@@ -75,12 +77,94 @@ def current_stock(
     aliases: tuple[str, ...] = (),
 ) -> float | None:
     series = evidence_series(evidence, metric, aliases)
-    if not series:
+    if not any(kind in {"snapshot", "increment"} for _, _, kind in series):
         return None
-    return reduce_stock_value([(stamp, value, kind) for stamp, value, kind in series])  # type: ignore[arg-type]
+    return reduce_stock_value([(stamp, value, kind) for stamp, value, kind in series])
 
 
-_COMPLETION_VALUES = frozenset({"launched", "completed", "complete", "done", "achieved", "yes", "true"})
+def latest_period_rate(
+    evidence: list[NormalizedEvidence],
+    metric: str,
+    *,
+    now: datetime,
+    aliases: tuple[str, ...] = (),
+    time_unit_days: float = 7.0,
+) -> EstimatedParameter:
+    """Resolve a dated period measurement into the model's time unit.
+
+    A period reading is a flow, never an absolute count. Only explicit time units
+    (or a weekly/daily/monthly metric name) can be converted; ambiguous units stay
+    informational rather than silently becoming a future-rate assumption.
+    """
+    wanted = set().union(*(_metric_keys(name) for name in (metric, *aliases)))
+    readings: list[tuple[datetime, NormalizedEvidence, float]] = []
+    for item in evidence:
+        if _metric_keys(item.metric).isdisjoint(wanted):
+            continue
+        if item.numeric_value is None or item.numeric_value < 0 or item.observed_at is None:
+            continue
+        if (
+            item.observed_at > now
+            or observation_kind(
+                item.metric, item.event_type, item.provenance.observation_kind, item.unit
+            )
+            != "period"
+        ):
+            continue
+        label = (item.unit or "").lower().replace(" ", "")
+        name = canonicalize_metric(item.metric)
+        period_days = (
+            7.0
+            if "/week" in label or "perweek" in label or name.startswith("weekly_")
+            else 30.437
+            if "/month" in label or "permonth" in label or name.startswith("monthly_")
+            else 1.0
+            if "/day" in label or "perday" in label or name.startswith("daily_")
+            else None
+        )
+        if period_days is None:
+            continue
+        readings.append((item.observed_at, item, period_days))
+    if not readings:
+        return EstimatedParameter(
+            name="rate",
+            value=None,
+            unit="count/period",
+            estimator="period_measurement",
+            source_kind="observed",
+            usable=False,
+            limitations=["No dated period reading with a convertible time unit was recorded."],
+        )
+    stamp, latest, period_days = max(
+        readings, key=lambda row: (row[0], str(row[1].evidence_id or ""))
+    )
+    assert latest.numeric_value is not None
+    return EstimatedParameter(
+        name="rate",
+        value=float(latest.numeric_value) * time_unit_days / period_days,
+        unit="count/period",
+        estimator="latest_period_measurement",
+        source_kind="observed",
+        n_observations=len(readings),
+        usable=True,
+        provenance={
+            "evidence_id": str(latest.evidence_id) if latest.evidence_id else None,
+            "observed_at": stamp.isoformat(),
+            "source_type": latest.provenance.source_type,
+            "source_quality": latest.source_quality,
+            "observed_vs_entered": latest.provenance.observed_vs_entered,
+            "original_unit": latest.unit,
+            "assumption": (
+                "The latest observed period rate is projected forward; "
+                "future cadence is unverified."
+            ),
+        },
+    )
+
+
+_COMPLETION_VALUES = frozenset(
+    {"launched", "completed", "complete", "done", "achieved", "yes", "true"}
+)
 
 
 def observed_completion(
@@ -110,11 +194,16 @@ def estimate_rate(
     time_unit_days: float = 7.0,
 ) -> EstimatedParameter:
     """MLE additions per time unit from dated increments, or snapshot deltas."""
+    measured = latest_period_rate(
+        evidence, metric, now=now, aliases=aliases, time_unit_days=time_unit_days
+    )
+    if measured.usable:
+        return measured
     series = evidence_series(evidence, metric, aliases)
     increments = [
         (stamp, value) for stamp, value, kind in series if kind == "increment" and value >= 0
     ]
-    snapshots = [(stamp, value) for stamp, value, kind in series if kind in {"snapshot", "period"}]
+    snapshots = [(stamp, value) for stamp, value, kind in series if kind == "snapshot"]
     if len(increments) >= 2:
         first, last = increments[0][0], max(increments[-1][0], now)
         span_days = max((last - first).total_seconds() / 86400.0, time_unit_days / 8.0)

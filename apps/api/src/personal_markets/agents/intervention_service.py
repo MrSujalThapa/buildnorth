@@ -9,6 +9,7 @@ from personal_markets.agents.json_schema import strict_json_schema
 from personal_markets.agents.models import estimate_cost_usd, ladders
 from personal_markets.agents.prompts import load_prompt
 from personal_markets.agents.state import redact, stable_run_id
+from personal_markets.behavior.cohort import authentic_evidence, is_synthetic_goal
 from personal_markets.core.config import Settings
 from personal_markets.core.errors import (
     ProviderBudgetExceededError,
@@ -17,6 +18,7 @@ from personal_markets.core.errors import (
 )
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.service import EvidenceService
+from personal_markets.forecasting.identity import published_replay_time
 from personal_markets.forecasting.service import BaselineForecastService
 from personal_markets.goals.domain import GoalContract
 from personal_markets.goals.service import GoalService
@@ -83,7 +85,22 @@ class InterventionAgentService:
     async def parse(self, goal_id: str, text: str) -> ParseInterventionResponse:
         goal = await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
         evidence = await self._evidence.list_for_goal(UUID(goal_id))
-        baseline = build_baseline_state(goal, evidence)
+        if not is_synthetic_goal(goal):
+            evidence = authentic_evidence(evidence)
+        replay_time = None
+        if self._forecasts is not None:
+            history = await self._forecasts.published_history(goal.goal_id)
+            if history:
+                replay_time = published_replay_time(
+                    history[-1].receipt,
+                    goal_version=goal.version,
+                    evidence_ids=[str(item.evidence_id) for item in evidence if item.evidence_id],
+                )
+        baseline = (
+            build_baseline_state(goal, evidence, now=replay_time)
+            if replay_time is not None
+            else build_baseline_state(goal, evidence)
+        )
         baseline = await self._with_published(goal.goal_id, baseline)
         classified = classify_what_if_request(text)
         summaries = [item.summary for item in evidence if item.summary]
@@ -100,7 +117,7 @@ class InterventionAgentService:
             return self._operational_response(text, classified, baseline, *operational)
         if classified.kind in STRATEGY_KINDS:
             parsed = await self._parse_strategy(goal, baseline, text, classified, summaries)
-            if operational is None:
+            if operational is None or parsed.strategy_plan is not None:
                 return parsed
             plan = operational[0]
             summary = parsed.consumer_summary if parsed.insights else plan_summary(plan)

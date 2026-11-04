@@ -34,8 +34,8 @@ test("terminal branches render without inventing a historical series", () => {
       percentAxis
       showHistoryInLegend={false}
       branches={[
-        { id: "original", label: "Original", color: "#d4a82d", start: 71.9, end: 71.9, dashed: true },
-        { id: "what-if", label: "What if: skip exam", color: "#e5534b", start: 71.9, end: 65, note: "−6.9 pts" },
+        { id: "original", label: "Original", color: "#d4a82d", start: 71.9, end: 71.9, terminalOnly: true },
+        { id: "what-if", label: "What if: skip exam", color: "#e5534b", start: 71.9, end: 65, terminalOnly: true, note: "−6.9 pts" },
       ]}
     />,
   );

@@ -597,6 +597,9 @@ export default function WhatIfPage({
                   ? simulation.scenarioResult.message ?? "This action cannot be priced from the current evidence."
                   : null)}
               publishedOdds={market.odds}
+              publishedRelation={baseline?.published_relation}
+              publishedModelVersion={baseline?.published_model_version}
+              currentModelVersion={baseline?.model_version}
               history={market.history}
               parseResult={simulation.lastParse}
               onRunStrategyOption={simulation.runStrategyOption}

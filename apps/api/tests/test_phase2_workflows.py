@@ -41,7 +41,7 @@ from personal_markets.what_if.service import WhatIfService
 @pytest.mark.parametrize(
     "mode,provider,model",
     [
-        ("hosted", "spur", "spur-deepseek-v4-flash"),
+        ("hosted", "spur", "spur-glm-5-3"),
         ("byok", "openai", "gpt-5.4-mini"),
         ("byok", "anthropic", "claude-sonnet-5-5"),
     ],
@@ -53,7 +53,7 @@ def test_scenarios_a_b_c_native_protocol_to_persisted_forecast(
     principal = app.state.auth_bypass_principal
     settings = Settings(
         inference_provider="spur",
-        inference_model="spur-deepseek-v4-flash",
+        inference_model="spur-glm-5-3",
         spur_api_key="platform-key",
         openai_max_retries=0,
         byok_encryption_keys={"v1": base64.urlsafe_b64encode(os.urandom(32)).decode()},

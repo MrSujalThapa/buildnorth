@@ -47,6 +47,8 @@ export type ProbabilityBranch = {
   start?: number;
   end?: number;
   dashed?: boolean;
+  /** Render only the evaluated terminal probability when no time path was modeled. */
+  terminalOnly?: boolean;
   /** Shown next to the value in the legend, e.g. "+6.7 pts". */
   note?: string;
 };
@@ -451,7 +453,7 @@ export default function WealthsimpleAreaChart({
           />
         ) : null}
 
-        {resolvedBranches.map((branch, index) => (
+        {resolvedBranches.map((branch, index) => branch.terminalOnly ? null : (
           <Line
             key={branch.id}
             type="linear"

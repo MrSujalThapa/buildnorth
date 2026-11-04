@@ -749,8 +749,13 @@ class LangGraphAgentWorkflow:
                 update={"model_requirements": {**requirements, "forecast_spec": spec_payload}}
             )
         evidence = await self._deps.evidence.list_for_goal(goal_id)
+        from personal_markets.behavior.cohort import authentic_evidence, is_synthetic_goal
+
+        if not is_synthetic_goal(goal):
+            evidence = authentic_evidence(evidence)
         evidence_ids = [str(item.evidence_id) for item in evidence if item.evidence_id]
-        numeric = build_numeric_inputs(goal, proposal, evidence)
+        evaluation_time = datetime.now(UTC)
+        numeric = build_numeric_inputs(goal, proposal, evidence, now=evaluation_time)
         research_ids = [
             claim.get("source", "") for claim in (state.get("research") or {}).get("claims") or []
         ]
@@ -793,6 +798,7 @@ class LangGraphAgentWorkflow:
             dict(state.get("agent_run_ids") or {}),
             research_ids,
             numeric,
+            evaluated_at=evaluation_time,
         )
         from personal_markets.forecasting.spec import compile_existing_spec
 
@@ -805,6 +811,7 @@ class LangGraphAgentWorkflow:
         )
         if (
             proposal.research_required
+            and spec.spec_version == 2
             and not engine_ready
             and (research is None or research.status != "sufficient")
         ):

@@ -14,6 +14,7 @@ export type ImpactViewModel = {
   causalCaption: string | null;
   fullExecutionOdds: number | null;
   followThroughPercent: number | null;
+  followThroughLabel: string;
   sensitivity: { label: string; swingPp: number }[];
   opportunityCosts: string[];
   fragilityPp: number | null;
@@ -77,6 +78,9 @@ export function toImpactViewModel(
         : null,
     followThroughPercent:
       result?.execution_probability != null ? result.execution_probability * 100 : null,
+    followThroughLabel: result?.assumptions?.find(
+      (item) => item.name === "execution_probability",
+    )?.source === "FITTED" ? "Estimated follow-through" : "Assumed follow-through",
     sensitivity,
     opportunityCosts: result?.opportunity_costs ?? [],
     fragilityPp: result?.fragility_pp ?? null,

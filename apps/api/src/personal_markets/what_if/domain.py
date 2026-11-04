@@ -255,6 +255,9 @@ class WhatIfBaselineState(BaseModel):
     published_probability: float | None = None
     published_model_version: str | None = None
     published_evidence_watermark: str | None = None
+    published_relation: (
+        Literal["same_inputs", "older_inputs", "unverified", "inconsistent"] | None
+    ) = None
     assumptions: list[Assumption] = Field(default_factory=list)
     default_intervention: StructuredIntervention | None = None
     model_family: str
@@ -263,6 +266,8 @@ class WhatIfBaselineState(BaseModel):
     evidence_watermark: str = "none"
     reference_versions: list[str] = Field(default_factory=list)
     domain_state: dict[str, object] = Field(default_factory=dict)
+    state_hash: str | None = None
+    evaluation_input_hash: str | None = None
     resource_constraints: ResourceCost = Field(default_factory=ResourceCost)
     resource_budget: ResourceBudget = Field(default_factory=ResourceBudget)
     limitations: list[str] = Field(default_factory=list)

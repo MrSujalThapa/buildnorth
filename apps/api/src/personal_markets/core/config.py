@@ -19,7 +19,7 @@ _LOCAL_ENVIRONMENTS = frozenset({"development", "test", "pytest"})
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 DEFAULT_USER_ID = UUID("10000000-0000-0000-0000-000000000001")
-AUTHENTICATED_SPUR_MODEL = "spur-deepseek-v4-flash"
+AUTHENTICATED_SPUR_MODEL = "spur-glm-5-3"
 HOSTED_USER_QUOTA_USD = 10.0
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 

@@ -228,9 +228,10 @@ ODDS_EXPLORER_HTML = """<!DOCTYPE html>
       });
       hint.textContent = (currentForecastStatus === "WITHHELD" ? "Historical odds · Current withheld · " : "Published · ") + publishedTime;
       const nearby = markerNear(points, shown);
+      const modelLabel = shown.model_version ? (" · Model " + shown.model_version) : "";
       inspect.textContent = nearby && nearby.label
-        ? ("Evidence: " + nearby.label)
-        : "Drag or slide to inspect published odds. Evidence ticks are inspectable. This view cannot change your forecast.";
+        ? ("Evidence: " + nearby.label + modelLabel)
+        : ("Published receipt" + modelLabel + ". Drag or slide to inspect odds. This view cannot change your forecast.");
       const coords = points.map((p) => [xOf(points, p.timestamp_ms, width), yOf(points, p.probability_pct, height)]);
       if (coords.length === 1) {
         const [x, y] = coords[0];

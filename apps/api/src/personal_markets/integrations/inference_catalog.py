@@ -121,7 +121,7 @@ def default_model(provider: str) -> str:
     return {
         "openai": "gpt-5.4-mini",
         "anthropic": "claude-sonnet-5-5",
-        "spur": "spur-deepseek-v4-flash",
+        "spur": "spur-glm-5-3",
     }[provider]
 
 

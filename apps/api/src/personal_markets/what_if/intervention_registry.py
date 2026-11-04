@@ -42,14 +42,23 @@ KNOWN_METRICS: dict[str, set[str]] = {
 def goal_domain(goal: GoalContract) -> str:
     dims = " ".join(goal.state_dimensions).lower()
     title = goal.title.lower()
-    if goal.goal_type == GoalType.CONTINUOUS_TARGET or "net worth" in title or "finance" in dims:
+    if (
+        goal.goal_type == GoalType.CONTINUOUS_TARGET
+        or "net worth" in title
+        or "finance" in dims
+        or "savings contribution" in dims
+        or "monthly_savings_contribution" in dims
+    ):
         return "finance"
-    if goal.goal_type == GoalType.THRESHOLD and ("run" in title or "10k" in title or "running" in dims):
+    if goal.goal_type == GoalType.THRESHOLD and (
+        "run" in title or "10k" in title or "running" in dims
+    ):
         return "running"
     if goal.goal_type == GoalType.MULTI_OUTCOME or "startup" in title:
         return "startup"
     if goal.goal_type == GoalType.DEADLINE_EVENT and any(
-        token in title or token in dims for token in ("offer", "career", "interview", "fde", "swe", "job")
+        token in title or token in dims
+        for token in ("offer", "career", "interview", "fde", "swe", "job")
     ):
         return "career"
     return "generic"

@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from helpers import POSTGRES_MIGRATION_SKIP, isolated_postgres_url
-from personal_markets.core.config import Settings
+from personal_markets.core.config import HOSTED_USER_QUOTA_USD, Settings
 from personal_markets.identity.budget import InferenceBudgetService, PostgresBudgetStore
 from personal_markets.identity.credentials import (
     CredentialCipher,
@@ -24,7 +24,7 @@ from personal_markets.ports import ResearchArtifact
 pytestmark = pytest.mark.integration
 
 
-async def test_postgres_parallel_reservations_obey_ten_dollar_cap() -> None:
+async def test_postgres_parallel_reservations_obey_invited_user_cap() -> None:
     url = isolated_postgres_url()
     if not url:
         pytest.skip("PM_TEST_DATABASE_URL is not configured")
@@ -41,13 +41,16 @@ async def test_postgres_parallel_reservations_obey_ten_dollar_cap() -> None:
                 {"id": user.user_id, "clerk": user.clerk_user_id},
             )
         store = PostgresBudgetStore(engine)
-        budget = InferenceBudgetService(store, Settings())
+        budget = InferenceBudgetService(
+            store, Settings(hosted_global_quota_usd=250.0, openai_max_cost_usd=100.0)
+        )
         results = await asyncio.gather(
             *[budget.reserve_research(user, 1.0) for _ in range(15)], return_exceptions=True
         )
-        assert sum(not isinstance(item, Exception) for item in results) == 10
-        assert sum(isinstance(item, Exception) for item in results) == 5
-        assert (await store.counters(str(user.user_id))).reserved_usd == 10.0
+        expected = int(HOSTED_USER_QUOTA_USD)
+        assert sum(not isinstance(item, Exception) for item in results) == expected
+        assert sum(isinstance(item, Exception) for item in results) == 15 - expected
+        assert (await store.counters(str(user.user_id))).reserved_usd == HOSTED_USER_QUOTA_USD
     finally:
         await engine.dispose()
 

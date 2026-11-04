@@ -14,6 +14,14 @@ def test_parse_monthly_contribution() -> None:
     assert parsed.changes[0].value == 1500.0
 
 
+def test_saved_monthly_amount_is_a_set_value() -> None:
+    parsed = parse_intervention_text("What if I saved 1200 a month instead of 900?")
+    assert len(parsed.changes) == 1
+    assert parsed.changes[0].metric == "monthly_contribution"
+    assert parsed.changes[0].operation == "set"
+    assert parsed.changes[0].value == 1200
+
+
 def test_parse_weekly_running_km() -> None:
     parsed = parse_intervention_text("What if I run 30 km/week?")
     assert len(parsed.changes) == 1

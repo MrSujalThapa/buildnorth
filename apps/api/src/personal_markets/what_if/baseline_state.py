@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Literal
@@ -8,6 +10,7 @@ from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.forecasting.engine import NumericInputs, price_family
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.forecasting.hiring import STAGE_CHAIN
+from personal_markets.forecasting.identity import evaluation_input_hash
 from personal_markets.forecasting.inputs_builder import build_numeric_inputs
 from personal_markets.forecasting.inputs_builder import proposal_from_goal as proposal_from_goal
 from personal_markets.forecasting.priceability import describe_priceability
@@ -71,7 +74,12 @@ def build_baseline_state(
     registry = ForecastModelRegistry()
     proposal = proposal_from_goal(goal)
     overrides = _merged_overrides(parsed_changes)
-    numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+    numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
+    state_hash = (
+        hashlib.sha256(json.dumps(numeric.state, sort_keys=True, default=str).encode()).hexdigest()
+        if numeric is not None
+        else None
+    )
     model = registry.select_for(goal, numeric)
     resolved = _resolve_context(
         goal,
@@ -79,6 +87,19 @@ def build_baseline_state(
         model.descriptor.version,
         numeric,
         evidence,
+    )
+    input_hash = (
+        evaluation_input_hash(
+            goal_version=goal.version,
+            model_family=resolved.model_family,
+            model_version=resolved.model_version,
+            evidence_ids=[str(item.evidence_id) for item in evidence if item.evidence_id],
+            numeric_state=numeric.state,
+            numeric_assumptions=numeric.assumptions,
+            assumption_sources=numeric.assumption_sources,
+        )
+        if numeric is not None
+        else None
     )
 
     if not resolved.priced:
@@ -96,6 +117,8 @@ def build_baseline_state(
             evidence_watermark=_evidence_watermark(evidence),
             reference_versions=list(resolved.reference_versions),
             domain_state=resolved.domain_state,
+            state_hash=state_hash,
+            evaluation_input_hash=input_hash,
             config=DEFAULT_SIM_CONFIG,
             compare_candidates=[],
         )
@@ -134,6 +157,8 @@ def build_baseline_state(
         evidence_watermark=_evidence_watermark(evidence),
         reference_versions=list(resolved.reference_versions),
         domain_state=resolved.domain_state,
+        state_hash=state_hash,
+        evaluation_input_hash=input_hash,
         resource_constraints=constraints,
         resource_budget=_resource_budget(goal),
         limitations=_limitations(resolved),
@@ -234,11 +259,12 @@ def resolve_simulation_context(
     *,
     parsed_changes: list[InterventionChangeInput] | None = None,
     assumption_overrides: dict[str, float] | None = None,
+    now: datetime | None = None,
 ) -> ResolvedSimulationContext:
     registry = ForecastModelRegistry()
     proposal = proposal_from_goal(goal)
     # Resolve the unedited state first so relative edits are applied only once.
-    numeric = build_numeric_inputs(goal, proposal, evidence)
+    numeric = build_numeric_inputs(goal, proposal, evidence, now=now)
     model = registry.select_for(goal, numeric)
     resolved = _resolve_context(
         goal, model.descriptor.family, model.descriptor.version, numeric, evidence
@@ -264,7 +290,9 @@ def resolve_simulation_context(
             or item.name in STAGE_CHAIN
             or item.name.startswith("stage_rate_")
         }
-        scenario_numeric = build_numeric_inputs(goal, proposal, evidence, overrides=overrides)
+        scenario_numeric = build_numeric_inputs(
+            goal, proposal, evidence, overrides=overrides, now=now
+        )
         scenario = _resolve_context(
             goal, model.descriptor.family, model.descriptor.version, scenario_numeric, evidence
         )

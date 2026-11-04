@@ -407,7 +407,10 @@ export function EvidenceSourceWorkspace({
                           if (active.length === resourceIds.length) updateWatches.mutate({ recipe, selected: active, status: "paused" });
                           else {
                             const missing = resourceIds.filter((resourceId) => !selected.some((watch) => watch?.resource_id === resourceId && watch.status !== "revoked"));
-                            updateWatches.mutate({ recipe, resourceIds: missing, selected: paused, status: "active" });
+                            updateWatches.mutate({
+                              recipe, resourceIds: missing, selected: paused, status: "active",
+                              scope: revoked.some((watch) => watch.scope === "parent") ? "parent" : "resource",
+                            });
                           }
                         }}>{active.length === resourceIds.length ? "Pause" : paused.length === resourceIds.length ? "Resume" : revoked.length === resourceIds.length ? "Restart" : `Monitor ${resourceIds.length === 1 ? "source" : `${resourceIds.length} sources`}`}</button>
                         {recipe.plugin_id === "notion" && !active.length && !paused.length ? <button type="button" disabled={Boolean(disconnected) || updateWatches.isPending} onClick={() => updateWatches.mutate({ recipe, resourceIds, status: "active", scope: "parent" })}>Include accessible subpages</button> : null}

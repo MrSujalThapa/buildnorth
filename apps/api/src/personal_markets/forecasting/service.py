@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from personal_markets.agents.critic import deterministic_critic
 from personal_markets.forecasting.engine import NumericInputs, family_receipt_metadata, price_family
+from personal_markets.forecasting.identity import evaluation_input_hash
 from personal_markets.forecasting.registry import (
     ForecastModelRegistry,
     OuladCompletionApplicabilityPolicy,
@@ -49,7 +50,10 @@ class BaselineForecastService:
         agent_run_ids: dict[str, str],
         research_source_ids: list[str],
         inputs: NumericInputs | None = None,
+        *,
+        evaluated_at: datetime | None = None,
     ) -> PricingResult:
+        evaluation_time = evaluated_at or datetime.now(UTC)
         numeric = inputs or NumericInputs()
         from personal_markets.forecasting.composition import price_composition
 
@@ -66,7 +70,7 @@ class BaselineForecastService:
         from personal_markets.forecasting.spec import compile_existing_spec
 
         spec = compile_existing_spec(goal, inputs)
-        if spec.research_required:
+        if spec.research_required and spec.spec_version == 2:
             priced = False
             spec.status = "INSUFFICIENT_EVIDENCE"
             limitations.append(
@@ -75,6 +79,12 @@ class BaselineForecastService:
             )
         else:
             spec.status = "READY" if priced else "NEEDS_INPUT"
+            if spec.research_required and priced:
+                spec.research_required = False
+                limitations.append(
+                    "Contextual research questions were not used as numerical inputs; "
+                    "this is an exploratory family forecast."
+                )
         if model is None:
             spec_payload = goal.model_requirements.get("forecast_spec") or {}
             metadata = {
@@ -89,7 +99,7 @@ class BaselineForecastService:
         else:
             metadata = family_receipt_metadata(model)
         receipt: dict[str, Any] = {
-            "receipt_version": 1,
+            "receipt_version": 2,
             "forecast_kind": "baseline",
             "priced": priced,
             "goal_id": str(goal.goal_id),
@@ -120,6 +130,15 @@ class BaselineForecastService:
             "state_hash": hashlib.sha256(
                 json.dumps(numeric.state, sort_keys=True, default=str).encode()
             ).hexdigest(),
+            "evaluation_input_hash": evaluation_input_hash(
+                goal_version=goal.version,
+                model_family=str(metadata["family"]),
+                model_version=str(metadata["version"]),
+                evidence_ids=evidence_ids,
+                numeric_state=numeric.state,
+                numeric_assumptions=numeric.assumptions,
+                assumption_sources=numeric.assumption_sources,
+            ),
             "agent_run_ids": agent_run_ids,
             "assumptions": family_price.used_assumptions,
             "feature_transforms": family_price.transforms,
@@ -130,6 +149,7 @@ class BaselineForecastService:
             "publication": "priced" if priced else "NOT_PRICED",
             "limitations": limitations,
             "created_at": datetime.now(UTC).isoformat(),
+            "evaluated_at": evaluation_time.isoformat(),
             "run_id": str(uuid4()),
             "llm_used_for_probability": False,
             "parameter_lineage": spec.parameter_provenance or family_price.used_assumptions,
