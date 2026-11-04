@@ -13,9 +13,15 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from personal_markets.evidence.domain import NormalizedEvidence
+from personal_markets.evidence.metrics import (
+    ObservationKind,
+    observation_kind,
+    reduce_stock_value,
+)
 
 PriceabilityStatus = Literal["PRICED", "ASSUMPTION_REQUIRED", "NOT_PRICED"]
 
@@ -166,8 +172,9 @@ def resolve_state(
         except (TypeError, ValueError):
             continue
 
-    # Latest observation wins per requirement; ties break on match strength.
-    best: dict[str, tuple[float, NormalizedEvidence]] = {}
+    # Resolve all eligible rows for a requirement so increments cannot replace
+    # an absolute stock and period rates cannot masquerade as stock levels.
+    matched: dict[str, list[tuple[float, NormalizedEvidence]]] = {}
     claimed: set[int] = set()
     for index, item in enumerate(evidence):
         if item.numeric_value is None:
@@ -182,26 +189,45 @@ def resolve_state(
             continue
         score, requirement = max(scores, key=lambda pair: pair[0])
         claimed.add(index)
-        current = best.get(requirement.key)
-        if current is None:
-            best[requirement.key] = (score, item)
-            continue
-        current_score, current_item = current
-        current_at = current_item.observed_at
-        item_at = item.observed_at
-        if current_at is not None and item_at is not None:
-            if item_at > current_at or (item_at == current_at and score > current_score):
-                best[requirement.key] = (score, item)
-        elif score > current_score:
-            best[requirement.key] = (score, item)
+        matched.setdefault(requirement.key, []).append((score, item))
 
-    for key, (_score_value, item) in best.items():
+    for key, candidates in matched.items():
+        requirement = by_key[key]
+        is_flow = "/" in requirement.unit or "per " in requirement.unit.lower()
+        eligible: list[tuple[float, NormalizedEvidence, ObservationKind]] = []
+        for score, item in candidates:
+            kind = observation_kind(
+                item.metric, item.event_type, item.provenance.observation_kind, item.unit
+            )
+            if (is_flow and kind == "period") or (
+                not is_flow and kind in {"snapshot", "increment"}
+            ):
+                eligible.append((score, item, kind))
+        if not eligible:
+            continue
+        score, item, _kind = max(
+            eligible,
+            key=lambda row: (row[1].observed_at or datetime.min.replace(tzinfo=UTC), row[0]),
+        )
         assert item.numeric_value is not None
+        value = float(item.numeric_value)
+        if not is_flow:
+            value = reduce_stock_value(
+                [
+                    (
+                        row.observed_at or datetime.min.replace(tzinfo=UTC),
+                        float(row.numeric_value),
+                        kind,
+                    )
+                    for _score, row, kind in eligible
+                    if row.numeric_value is not None
+                ]
+            )
         resolved[key] = ResolvedValue(
             key=key,
-            value=float(item.numeric_value),
+            value=value,
             source=_source_label(item),
-            detail=f"{item.metric} = {item.numeric_value:g}{f' {item.unit}' if item.unit else ''}",
+            detail=f"{item.metric} = {value:g}{f' {item.unit}' if item.unit else ''}",
             evidence_id=str(item.evidence_id) if item.evidence_id else None,
             matched_metric=item.metric,
         )
@@ -212,12 +238,12 @@ def resolve_state(
             continue
         for route in requirement.derived_from:
             if all(part in resolved for part in route):
-                value = _derive(requirement.key, route, resolved)
-                if value is None:
+                derived_value = _derive(requirement.key, route, resolved)
+                if derived_value is None:
                     continue
                 resolved[requirement.key] = ResolvedValue(
                     key=requirement.key,
-                    value=value,
+                    value=derived_value,
                     source="DERIVED",
                     detail=" - ".join(route),
                 )

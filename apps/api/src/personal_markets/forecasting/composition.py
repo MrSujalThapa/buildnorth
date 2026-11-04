@@ -225,6 +225,8 @@ def _node_state(
     horizon: float,
     days: float,
 ) -> tuple[dict[str, Any], list[str]]:
+    from personal_markets.forecasting.habit_evidence import habit_trials
+
     metric = node.state_bindings.get("current") or node.metric
     aliases = _aliases(spec, metric)
     current = overrides.get(metric)
@@ -255,7 +257,10 @@ def _node_state(
             and item.numeric_value is not None
         ]
         if entered:
-            latest = max(entered, key=lambda item: item.observed_at or datetime.min.replace(tzinfo=UTC))
+            latest = max(
+                entered,
+                key=lambda item: item.observed_at or datetime.min.replace(tzinfo=UTC),
+            )
             parameters[parameter] = float(latest.numeric_value)
             sources[parameter] = "user_assumption"
     _apply_parameter_overrides(parameters, sources, overrides, node.id, node.kind)
@@ -336,6 +341,12 @@ def _node_state(
         target = resolve_target_number(goal)
     if node.kind in {"cumulative_count", "growth", "continuous_threshold"} and target is None:
         gaps.append("numeric success target")
+    node_config = dict(node.config)
+    if node.kind == "habit":
+        trials = habit_trials(evidence, metric, now)
+        if trials:
+            node_config["history"] = [completed for _, completed in trials]
+            node_config["history_evidence_ids"] = [evidence_id for evidence_id, _ in trials]
     return (
         {
             "kind": node.kind,
@@ -345,7 +356,7 @@ def _node_state(
             "horizon": horizon,
             "parameters": parameters,
             "sources": sources,
-            "config": node.config,
+            "config": node_config,
             "independence": node.independence,
             "prerequisites": list(node.prerequisites),
             "stage_counts": packed_counts,

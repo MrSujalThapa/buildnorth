@@ -53,6 +53,9 @@ type Props = {
   runError?: string | null;
   priceability?: Priceability | null;
   publishedOdds?: number | null;
+  publishedRelation?: "same_inputs" | "older_inputs" | "unverified" | "inconsistent";
+  publishedModelVersion?: string | null;
+  currentModelVersion?: string | null;
   history?: ChartPoint[];
   parseResult?: ParseInterventionResult | null;
   onRunStrategyOption?: (question: string, plan: StrategyPlan, optionId: string, inputs: Record<string, number>) => void;
@@ -172,6 +175,9 @@ export default function ImpactWorkspace({
   runError,
   priceability,
   publishedOdds,
+  publishedRelation,
+  publishedModelVersion,
+  currentModelVersion,
   history = [],
   parseResult = null,
   onRunStrategyOption,
@@ -205,6 +211,7 @@ export default function ImpactWorkspace({
             start: preview.currentOdds,
             end: preview.currentOdds,
             dashed: true,
+            terminalOnly: true,
           },
           {
             id: "what-if",
@@ -212,14 +219,15 @@ export default function ImpactWorkspace({
             color: resultPositive ? BETTER_SERIES_COLOR : WORSE_SERIES_COLOR,
             start: preview.currentOdds,
             end: preview.scenarioOdds,
+            terminalOnly: true,
             note: pointsDelta == null ? undefined : `${pointsDelta >= 0 ? "+" : "−"}${Math.abs(pointsDelta).toFixed(1)} pts`,
           },
         ]
       : [];
   const changeChart = (
-    <div className="what-if-market-chart" aria-label="Published odds history and hypothetical scenario">
+    <div className={`what-if-market-chart${history.length ? "" : " no-history"}`} aria-label="Published odds history and hypothetical scenario">
       <div className="panel-head tight"><div><h2>Original vs. what if</h2></div></div>
-      {history.length || changeBranches.length ? (
+      {history.length ? (
         <OddsExplorer
           history={history}
           ranges={ODDS_EXPLORER_RANGES}
@@ -234,10 +242,18 @@ export default function ImpactWorkspace({
           showTimeAxis
           interactive
         />
+      ) : changeBranches.length ? (
+        <div className="terminal-comparison" aria-label="Terminal probability comparison">
+          <div><span>Current baseline</span><strong>{preciseOdds(preview.currentOdds)}</strong></div>
+          <div><span>What if</span><strong>{preciseOdds(preview.scenarioOdds)}</strong></div>
+          <p>No published history yet. These are terminal evaluations, not a time path.</p>
+        </div>
       ) : <p className="quiet-copy">No published forecast history is available for this market.</p>}
       <p className="what-if-chart-caption">
-        {changeBranches.length
-          ? "Original and hypothetical share today's recalculated baseline. The engine returns a terminal probability, so the colored branch shows where the odds land rather than a modeled daily path."
+        {changeBranches.length && history.length
+          ? "Original and hypothetical share today's recalculated baseline. The markers show terminal probabilities; no daily path was modeled."
+          : changeBranches.length
+            ? "Both values use today's recalculated baseline. No daily path was modeled."
           : "Run a scenario to draw its branch next to the original forecast."}
       </p>
     </div>
@@ -386,6 +402,12 @@ export default function ImpactWorkspace({
                   <div className="odds-arrow" aria-hidden="true">→</div>
                   <div><span>Hypothetical</span><strong>{preciseOdds(preview.scenarioOdds)}</strong></div>
                 </div>
+                {publishedRelation === "older_inputs" ? (
+                  <p className="quiet-copy">Published receipt: {publishedModelVersion ?? "earlier model"}. Current evaluation: {currentModelVersion ?? "current model"}. Evidence, assumptions, or elapsed time may differ; these are separate evaluations.</p>
+                ) : null}
+                {publishedRelation === "inconsistent" ? (
+                  <p className="quiet-copy">The current evaluation disagrees with its published receipt. Scenario pricing is paused until the forecast is reconciled.</p>
+                ) : null}
                 <div className={`delta ${deltaTone}`}>
                   <strong>
                     {preview.improvementPoints === null
@@ -422,7 +444,7 @@ export default function ImpactWorkspace({
           <div className="execution-strip" aria-label="Execution comparison">
             <div><span>Scenario baseline</span><strong>{formatProbabilityPercent(preview.currentOdds)}</strong></div>
             <div><span>If fully executed</span><strong>{formatProbabilityPercent(impact.fullExecutionOdds)}</strong></div>
-            <div><span>Estimated follow-through</span><strong>{followThroughLabel}</strong></div>
+            <div><span>{impact.followThroughLabel}</span><strong>{followThroughLabel}</strong></div>
             <div className="selected-metric">
               <span>Scenario odds</span>
               <strong>{formatProbabilityPercent(preview.scenarioOdds)}</strong>

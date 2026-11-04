@@ -916,6 +916,9 @@ export interface WhatIfBaselineState {
   published_probability?: number | null;
   published_model_version?: string | null;
   published_evidence_watermark?: string | null;
+  state_hash?: string | null;
+  evaluation_input_hash?: string | null;
+  published_relation?: "same_inputs" | "older_inputs" | "unverified" | "inconsistent";
   assumptions: WhatIfAssumption[];
   default_intervention?: Record<string, unknown> | null;
   model_family: string;

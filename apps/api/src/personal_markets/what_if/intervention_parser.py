@@ -138,7 +138,15 @@ def parse_intervention_text(text: str) -> ParsedIntervention:
             )
         )
 
-    if "invest" in cleaned.lower() or "contribution" in cleaned.lower() or "$" in cleaned:
+    savings_per_month = re.search(
+        r"\bsav(?:e|ed|ing|ings)\b.*\b(?:month|monthly)\b", cleaned, re.IGNORECASE
+    )
+    if (
+        "invest" in cleaned.lower()
+        or "contribution" in cleaned.lower()
+        or "$" in cleaned
+        or savings_per_month
+    ):
         money_match = _MONEY.search(cleaned)
         if money_match:
             period = (money_match.group(2) or "month").lower()

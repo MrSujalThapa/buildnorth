@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 from dataclasses import replace
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -15,13 +16,14 @@ from personal_markets.behavior.cohort import (
     is_synthetic_goal,
 )
 from personal_markets.behavior.commitments import get_commitment_store, trials_from_commitments
-from personal_markets.behavior.domain import CommitmentTrial
+from personal_markets.behavior.domain import BehaviorProfile, CommitmentTrial
 from personal_markets.behavior.features import context_from_text
 from personal_markets.behavior.service import BehaviorService
 from personal_markets.core.errors import ResourceNotFoundError
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
+from personal_markets.forecasting.identity import published_replay_time
 from personal_markets.forecasting.primitives import at_numerical_bound
 from personal_markets.forecasting.registry import ForecastModelRegistry
 from personal_markets.forecasting.repository import PublishedBaseline
@@ -151,45 +153,80 @@ class WhatIfService:
     async def _require_goal(self, goal_id: str) -> GoalContract:
         return await self._goals.get_goal_by_string(goal_id, owner_id=self._owner_id)
 
-    async def baseline_state(self, goal_id: str) -> WhatIfBaselineState:
+    async def baseline_state(
+        self, goal_id: str, *, now: datetime | None = None
+    ) -> WhatIfBaselineState:
         goal = await self._require_goal(goal_id)
         evidence: list = []
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(goal_id))
             if not is_synthetic_goal(goal):
                 evidence = authentic_evidence(evidence)
-        state = build_baseline_state(goal, evidence)
+        evaluation_time = (
+            now or await self._published_evaluation_time(goal, evidence) or datetime.now(UTC)
+        )
+        state = build_baseline_state(goal, evidence, now=evaluation_time)
         return await self._overlay_published_baseline(UUID(goal_id), state)
+
+    async def _published_evaluation_time(
+        self, goal: GoalContract, evidence: list[NormalizedEvidence]
+    ) -> datetime | None:
+        """Replay an unchanged publication at its recorded clock, including recency decay."""
+        if self._forecasts is None:
+            return None
+        rows = await self._forecasts.published_history(goal.goal_id)
+        if not rows:
+            return None
+        ids = [str(item.evidence_id) for item in evidence if item.evidence_id]
+        return published_replay_time(rows[-1].receipt, goal_version=goal.version, evidence_ids=ids)
 
     async def _overlay_published_baseline(
         self, goal_id: UUID, state: WhatIfBaselineState
     ) -> WhatIfBaselineState:
-        history = await self._repository.history(goal_id)
-        published = [point for point in history if point.source_kind == "published_forecast"]
-        if published:
-            latest = published[-1]
-            return state.model_copy(
-                update={
-                    "priced": True,
-                    "status": latest.forecast_status,
-                    "published_probability": latest.probability,
-                    "published_model_version": latest.model_version,
-                    "published_evidence_watermark": latest.evidence_watermark,
-                }
-            )
         if self._forecasts is not None:
             rows = await self._forecasts.published_history(goal_id)
             if rows:
-                latest_row = rows[-1]
+                latest = rows[-1]
+                receipt_hash = latest.receipt.get("evaluation_input_hash")
+                same_inputs = bool(
+                    receipt_hash
+                    and state.evaluation_input_hash
+                    and receipt_hash == state.evaluation_input_hash
+                )
+                relation = (
+                    "unverified" if not receipt_hash else
+                    "older_inputs" if not same_inputs else
+                    "same_inputs" if state.current_probability is not None
+                    and abs(state.current_probability - latest.probability) <= 1e-9 else
+                    "inconsistent"
+                )
                 return state.model_copy(
                     update={
-                        "priced": True,
-                        "status": latest_row.forecast_status,
-                        "published_probability": latest_row.probability,
-                        "published_model_version": latest_row.model_version,
-                        "published_evidence_watermark": latest_row.evidence_watermark,
+                        "published_probability": latest.probability,
+                        "published_model_version": latest.model_version,
+                        "published_evidence_watermark": latest.evidence_watermark,
+                        "published_relation": relation,
+                        **({
+                            "priced": False,
+                            "message": (
+                                "Current evaluation disagrees with an identical published "
+                                "receipt; scenario pricing is withheld."
+                            ),
+                        } if relation == "inconsistent" else {}),
                     }
                 )
+        history = await self._repository.history(goal_id)
+        published = [point for point in history if point.source_kind == "published_forecast"]
+        if published:
+            historical_latest = published[-1]
+            return state.model_copy(
+                update={
+                    "published_probability": historical_latest.probability,
+                    "published_model_version": historical_latest.model_version,
+                    "published_evidence_watermark": historical_latest.evidence_watermark,
+                    "published_relation": "unverified",
+                }
+            )
         return state
 
     async def simulate(self, request: WhatIfRequest) -> WhatIfResult:
@@ -229,7 +266,9 @@ class WhatIfService:
         return await self._simulate(request, persist=False)
 
     async def _simulate_composition(
-        self, goal: GoalContract, request: WhatIfRequest, evidence: list, *, persist: bool
+        self, goal: GoalContract, request: WhatIfRequest, evidence: list[NormalizedEvidence], *,
+        persist: bool, now: datetime | None = None,
+        behavior_profile: BehaviorProfile | None = None,
     ) -> WhatIfResult | None:
         from personal_markets.forecasting.compiler import spec_from_mapping
         from personal_markets.forecasting.composition import (
@@ -250,9 +289,11 @@ class WhatIfService:
             "n_draws": request.config.minimum_draws,
             "seed": request.config.seed,
         }
-        baseline_inputs = build_numeric_inputs(goal, proposal, evidence)
+        baseline_inputs = build_numeric_inputs(goal, proposal, evidence, now=now)
         if baseline_inputs is None:
-            baseline_inputs = composition_numeric_inputs(goal, evidence, overrides=draw_controls)
+            baseline_inputs = composition_numeric_inputs(
+                goal, evidence, overrides=draw_controls, now=now
+            )
         baseline = price_composition(goal, baseline_inputs or NumericInputs())
         if baseline is None:
             return None
@@ -273,7 +314,7 @@ class WhatIfService:
                 shared[item.name] = float(item.value)
         if shared:
             shared_inputs = composition_numeric_inputs(
-                goal, evidence, overrides={**draw_controls, **shared}
+                goal, evidence, overrides={**draw_controls, **shared}, now=now
             )
             shared_price = price_composition(goal, shared_inputs) if shared_inputs else None
             if shared_inputs is not None and shared_price is not None:
@@ -338,7 +379,7 @@ class WhatIfService:
             return result
         scenario_inputs = (
             composition_numeric_inputs(
-                goal, evidence, overrides={**draw_controls, **shared, **overrides}
+                goal, evidence, overrides={**draw_controls, **shared, **overrides}, now=now
             )
             or baseline_inputs
         )
@@ -358,7 +399,10 @@ class WhatIfService:
                 assumptions=request.assumptions,
             )
         conditional = scenario.raw_probability
-        profile = getattr(self, "_last_behavior_profile", None)
+        profile = behavior_profile
+        budget = budget_from_goal(goal)
+        usage = evaluate_resource_usage(request.intervention, budget)
+        execution, scale_notes = execution_scale_for_budget(execution, usage, budget)
         # Same follow-through rule as the other families: the changed rate only holds
         # on the share of futures where the plan is actually carried out.
         scenario_probability = baseline.raw_probability + execution * (
@@ -407,6 +451,7 @@ class WhatIfService:
                             **overrides,
                             rate_assumption.name: clamped,
                         },
+                        now=now,
                     )
                     probed_price = None
                     if probed_inputs is not None:
@@ -458,12 +503,21 @@ class WhatIfService:
                 )
         result = WhatIfResult(
             priced=True,
-            status="EXPLORATORY",
+            status="EXPLORATORY" if usage.within_budget else "EXPLORATORY_OVER_BUDGET",
             message=message,
             baseline_probability=baseline.raw_probability,
             scenario_probability=scenario_probability,
             conditional_on_execution_probability=conditional,
             execution_probability=execution,
+            resource_usage=usage,
+            resource_budget=budget,
+            resource_feasible=usage.within_budget,
+            opportunity_costs=(
+                opportunity_cost_messages(request.intervention, usage) + scale_notes
+                + (["Full execution requires displacement; the displaced outcome is unknown."]
+                   if not usage.within_budget else [])
+                if request.intervention is not None else []
+            ),
             distribution_bins=bins,
             outcome_quantiles=quantiles,
             sensitivity=sensitivity,
@@ -538,11 +592,28 @@ class WhatIfService:
     async def _simulate(self, request: WhatIfRequest, *, persist: bool) -> WhatIfResult:
         goal = await self._require_goal(request.goal_id)
         model = self._registry.select(goal)
+        evaluation_time = datetime.now(UTC)
 
         if self._evidence is not None:
             evidence = await self._evidence.list_for_goal(UUID(request.goal_id))
             if not is_synthetic_goal(goal):
                 evidence = authentic_evidence(evidence)
+            evaluation_time = (
+                await self._published_evaluation_time(goal, evidence) or evaluation_time
+            )
+            if self._forecasts is not None:
+                current = await self._overlay_published_baseline(
+                    UUID(request.goal_id),
+                    build_baseline_state(goal, evidence, now=evaluation_time),
+                )
+                if current.published_relation == "inconsistent":
+                    return WhatIfResult(
+                        priced=False,
+                        status="NOT_PRICED",
+                        message=current.message,
+                        assumptions=request.assumptions,
+                        receipt={"causal_status": "inconsistent_forecast_receipt"},
+                    )
             explicit_trials = []
             if self._owner_id is not None:
                 # Every owned goal's commitments form the person-level (global) level of
@@ -555,21 +626,26 @@ class WhatIfService:
                     self._owner_id, [item.goal_id for item in cohort]
                 )
                 explicit_trials = trials_from_commitments(plans, observations)
-            request = self._apply_behavior_execution(
+            request, behavior_profile = self._apply_behavior_execution(
                 goal, request, evidence, commitment_trials=explicit_trials
             )
-            composed = await self._simulate_composition(goal, request, evidence, persist=persist)
+            composed = await self._simulate_composition(
+                goal, request, evidence, persist=persist, now=evaluation_time,
+                behavior_profile=behavior_profile,
+            )
             if composed is not None:
                 return composed
             user_overrides = {item.name: item.value for item in request.assumptions}
             baseline_ctx = resolve_simulation_context(
-                goal, evidence, parsed_changes=[], assumption_overrides=user_overrides
+                goal, evidence, parsed_changes=[], assumption_overrides=user_overrides,
+                now=evaluation_time,
             )
             scenario_ctx = resolve_simulation_context(
                 goal,
                 evidence,
                 parsed_changes=request.parsed_changes,
                 assumption_overrides=user_overrides,
+                now=evaluation_time,
             )
             if baseline_ctx.priced:
                 unpriced = self._unmapped_changes_result(request, baseline_ctx.assumptions)
@@ -598,11 +674,13 @@ class WhatIfService:
                             },
                         )
                     return await self._simulate_deadline_event(
-                        goal, request, baseline_ctx, scenario_ctx, resolved_model, persist
+                        goal, request, baseline_ctx, scenario_ctx, resolved_model, persist,
+                        behavior_profile,
                     )
                 if baseline_ctx.mode == "continuous_target":
                     return await self._simulate_continuous_domain(
-                        goal, request, baseline_ctx, scenario_ctx, resolved_model, persist
+                        goal, request, baseline_ctx, scenario_ctx, resolved_model, persist,
+                        behavior_profile,
                     )
 
         if goal.goal_type not in {GoalType.CONTINUOUS_TARGET, GoalType.THRESHOLD}:
@@ -625,6 +703,7 @@ class WhatIfService:
         scenario_ctx: object,
         model: object,
         persist: bool,
+        behavior_profile: BehaviorProfile | None,
     ) -> WhatIfResult:
         from personal_markets.what_if.baseline_state import ResolvedSimulationContext
 
@@ -711,6 +790,7 @@ class WhatIfService:
             baseline_probability=baseline_ctx.baseline_probability,
             mode=baseline_ctx.mode,
             intervention_effect=raw_effect,
+            behavior_profile=behavior_profile,
         )
 
     async def _simulate_deadline_event(
@@ -721,6 +801,7 @@ class WhatIfService:
         scenario_ctx: object,
         model: object,
         persist: bool,
+        behavior_profile: BehaviorProfile | None,
     ) -> WhatIfResult:
         from personal_markets.what_if.baseline_state import ResolvedSimulationContext
 
@@ -763,6 +844,7 @@ class WhatIfService:
             mode=baseline_ctx.mode,
             scenario_override=scenario_prob,
             intervention_effect=0.0,
+            behavior_profile=behavior_profile,
         )
 
     async def _simulate_continuous_request(
@@ -864,6 +946,7 @@ class WhatIfService:
         baseline_probability: float | None = None,
         scenario_override: float | None = None,
         intervention_effect: float = 0.0,
+        behavior_profile: BehaviorProfile | None = None,
     ) -> WhatIfResult:
         assert isinstance(paired, PairedSimulation)
         assert isinstance(scenario_paired, PairedSimulation)
@@ -895,9 +978,6 @@ class WhatIfService:
         )
         if not usage.within_budget and execution_probability > 0:
             scenario = baseline + (scenario - baseline) * (scaled_execution / execution_probability)
-            conditional = baseline + (conditional - baseline) * (
-                scaled_execution / execution_probability
-            )
             execution_probability = scaled_execution
 
         delta = scenario_paired.scenario_success.astype(float) - paired.baseline_success.astype(
@@ -934,7 +1014,12 @@ class WhatIfService:
             if intervention is None
             else opportunity_cost_messages(intervention, usage) + scale_notes
         )
-        profile = getattr(self, "_last_behavior_profile", None)
+        if not usage.within_budget:
+            opportunity_costs.append(
+                "Full execution requires displacing existing time or increasing capacity; "
+                "the effect of displaced activities on this goal is unknown."
+            )
+        profile = behavior_profile
         interval = None
         if profile is not None:
             interval = list(profile.execution.interval)
@@ -1026,13 +1111,12 @@ class WhatIfService:
 
     async def history(self, goal_id: str) -> list[MarketHistoryPointResponse]:
         await self._require_goal(goal_id)
+        if self._forecasts is not None:
+            rows = await self._forecasts.published_history(UUID(goal_id))
+            if rows:
+                return [self._published_history_response(row) for row in rows]
         points = await self._repository.history(UUID(goal_id))
-        if points:
-            return [self._history_response(point) for point in points]
-        if self._forecasts is None:
-            return []
-        rows = await self._forecasts.published_history(UUID(goal_id))
-        return [self._published_history_response(row) for row in rows]
+        return [self._history_response(point) for point in points]
 
     async def histories(self, goal_ids: list[str]) -> dict[str, list[MarketHistoryPointResponse]]:
         unique: list[UUID] = []
@@ -1058,10 +1142,9 @@ class WhatIfService:
             return result
         for goal_id in goal_ids:
             key = str(goal_id)
-            if result[key]:
-                continue
             rows = await self._forecasts.published_history(goal_id)
-            result[key] = [self._published_history_response(row) for row in rows]
+            if rows:
+                result[key] = [self._published_history_response(row) for row in rows]
         return result
 
     async def explorations(self, goal_id: str) -> list[WhatIfExplorationResponse]:
@@ -1269,7 +1352,9 @@ class WhatIfService:
                     self._owner_id, [item.goal_id for item in cohort]
                 )
                 trials = trials_from_commitments(plans, observations)
-            base = self._apply_behavior_execution(goal, base, evidence, commitment_trials=trials)
+            base, _ = self._apply_behavior_execution(
+                goal, base, evidence, commitment_trials=trials
+            )
         execution = next(
             (item for item in base.assumptions if item.name == EXECUTION_ASSUMPTION), None
         )
@@ -1807,8 +1892,7 @@ class WhatIfService:
         request: WhatIfRequest,
         evidence: list,
         commitment_trials: list | None = None,
-    ) -> WhatIfRequest:
-        self._last_behavior_profile = None
+    ) -> tuple[WhatIfRequest, BehaviorProfile | None]:
         incoming = next(
             (item for item in request.assumptions if item.name == "execution_probability"), None
         )
@@ -1817,9 +1901,9 @@ class WhatIfService:
             and incoming.source == "USER_ASSUMPTION"
             and abs(incoming.value - 0.72) > 1e-6
         ):
-            return request
+            return request, None
         if not evidence and not commitment_trials:
-            return request
+            return request, None
         intervention = request.intervention
         context = context_from_text(
             " ".join(
@@ -1836,9 +1920,8 @@ class WhatIfService:
         profile = self._behavior.profile_from_evidence(
             evidence, goal, context, commitment_trials=commitment_trials
         )
-        self._last_behavior_profile = profile
         if not profile.execution.usable:
-            return request
+            return request, None
         updated = []
         replaced = False
         for item in request.assumptions:
@@ -1856,8 +1939,8 @@ class WhatIfService:
             else:
                 updated.append(item)
         if not replaced:
-            return request
-        return request.model_copy(update={"assumptions": updated})
+            return request, None
+        return request.model_copy(update={"assumptions": updated}), profile
 
     @staticmethod
     def _hash(value: object) -> str:

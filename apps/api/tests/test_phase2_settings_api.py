@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from helpers import isolated_app
-from personal_markets.core.config import get_settings
+from personal_markets.core.config import Settings, get_settings
 from personal_markets.identity.factory import get_credential_store
 from personal_markets.identity.testing import make_principal
 from personal_markets.integrations.inference_http import NativeInferenceAdapter
@@ -125,7 +125,9 @@ def test_settings_distinguishes_budget_from_missing_hosted_credential(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("PM_INFERENCE_PROVIDER", "openai")
+    monkeypatch.setenv("PM_INFERENCE_MODEL", "gpt-5.4-mini")
     monkeypatch.setenv("PM_OPENAI_API_KEY", "")
+    monkeypatch.setattr(Settings, "model_config", {**Settings.model_config, "env_file": None})
     get_settings.cache_clear()
     response = client.get("/api/v1/settings/inference")
     assert response.status_code == 200, response.text

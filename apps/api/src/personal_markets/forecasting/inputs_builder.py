@@ -6,6 +6,7 @@ from typing import Any
 from personal_markets.evidence.domain import NormalizedEvidence
 from personal_markets.forecasting.engine import NumericInputs
 from personal_markets.forecasting.finance import build_finance_numeric_inputs, is_finance_goal
+from personal_markets.forecasting.habit_evidence import habit_trials
 from personal_markets.forecasting.hiring import build_hiring_numeric_inputs, is_hiring_goal
 from personal_markets.forecasting.running import build_running_numeric_inputs, is_running_goal
 from personal_markets.forecasting.startup import build_startup_numeric_inputs, is_startup_goal
@@ -31,6 +32,8 @@ def build_numeric_inputs(
     composed_spec = spec_from_mapping(goal.model_requirements.get("forecast_spec"))
     if composed_spec is not None:
         return composition_numeric_inputs(goal, evidence, overrides=overrides, now=now)
+    if goal.goal_type == GoalType.HABIT:
+        return _habit_numeric_inputs(goal, evidence, now=now)
     # Ordered most specific first. Finance matches any money-denominated target, so it
     # must run after the domains that also happen to be measured in dollars.
     if is_hiring_goal(goal, proposal):
@@ -42,6 +45,35 @@ def build_numeric_inputs(
     if is_finance_goal(goal, proposal):
         return build_finance_numeric_inputs(goal, proposal, evidence, overrides=overrides, now=now)
     return composition_numeric_inputs(goal, evidence, overrides=overrides, now=now)
+
+
+def _habit_numeric_inputs(
+    goal: GoalContract, evidence: list[NormalizedEvidence], *, now: datetime | None
+) -> NumericInputs | None:
+    """Only explicit completed or missed trials become habit history.
+
+    A missing provider event, generic activity, or numerical progress reading does
+    not imply a completed or missed planned session.
+    """
+    from datetime import UTC
+
+    clock = now or datetime.now(UTC)
+    metric = str(goal.success_definition.get("metric") or "")
+    rows = habit_trials(evidence, metric, clock)
+    if not rows:
+        return None
+    # Uniform Beta(1, 1) exploration prior, not fitted population calibration.
+    return NumericInputs(
+        state={
+            "history": [completed for _, completed in rows],
+            "history_evidence_ids": [evidence_id for evidence_id, _ in rows],
+        },
+        assumptions={"prior_alpha": 1.0, "prior_beta": 1.0},
+        assumption_sources={
+            "prior_alpha": "EXPLORATION_ASSUMPTION",
+            "prior_beta": "EXPLORATION_ASSUMPTION",
+        },
+    )
 
 
 def proposal_from_goal(goal: GoalContract) -> GoalArchitectProposal:

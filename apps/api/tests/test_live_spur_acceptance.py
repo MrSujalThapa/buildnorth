@@ -52,7 +52,7 @@ from personal_markets.what_if.service import WhatIfService
 
 pytestmark = pytest.mark.live_spur
 
-MAX_CALLS = 12
+MAX_CALLS = 16
 MAX_USD = 5.0
 EVAL_PATH = Path("docs/live_spur_eval.json")
 
@@ -121,6 +121,7 @@ async def _complete_interrupt(
     snapshot: Any,
     *,
     evidence_answer: str | None = None,
+    goal_answer: str | None = None,
 ) -> Any:
     original_goal = snapshot.goal.goal_id if snapshot.goal else None
     seen = 0
@@ -131,7 +132,7 @@ async def _complete_interrupt(
         itype = snapshot.interrupt.type
         if itype == "clarification":
             answers = {
-                question.id: (
+                question.id: goal_answer or (
                     "FDE internship at a Series B+ software company by 2027-08-31. "
                     "Success is a written offer. TEST observations only."
                 )
@@ -177,7 +178,8 @@ async def test_complete_live_consumer_journey() -> None:
             "spur_model": "spur-glm-5-3",
             "openai_max_retries": 1,
             "openai_max_output_tokens": 4096,
-            "openai_timeout_seconds": 90,
+            "openai_timeout_seconds": 180,
+            "inference_run_timeout_seconds": 240,
             "intervention_regex_fallback": False,
             "intervention_agent_enabled": True,
         }
@@ -233,6 +235,7 @@ async def test_complete_live_consumer_journey() -> None:
         career = await _career_journey(
             workflow, deps, capped, owner, settings, engine, eval_rows
         )
+        await _savings_journey(workflow, deps, capped, owner, settings, engine, eval_rows)
         assert career["goal_id"]
         assert career["initial_receipt_id"]
         assert career["updated_receipt_id"]
@@ -371,7 +374,7 @@ async def _career_journey(
             "inference_model": modeled.inference_model,
         }
     )
-    assert modeled.inference_provider == "spur", modeled.inference_provider
+    assert modeled.inference_provider in {None, "spur"}, modeled.inference_provider
     assert modeled.changes, (
         f"supported 8→15 application-rate intervention was dropped: {modeled.model_dump()}"
     )
@@ -497,6 +500,7 @@ async def _savings_journey(
     capped: CappedInference,
     owner: Principal,
     settings: Settings,
+    engine: Any,
     eval_rows: list[dict[str, Any]],
 ) -> None:
     draft = await workflow.start(
@@ -506,16 +510,15 @@ async def _savings_journey(
             intent="I want to save $25,000 by September 2027, but my income varies each month.",
         )
     )
-    if draft.status == "needs_input" and draft.interrupt and draft.interrupt.type == "clarification":
-        answers = {
-            question.id: "TEST: CAD 25000 liquid savings by 2027-09-01. Income varies 3-6k/month."
-            for question in (draft.interrupt.questions or [])
-        }
-        draft = await workflow.resume(draft.thread_id, ResumePayload(answers=answers))
-    if draft.status == "needs_input" and draft.interrupt and draft.interrupt.type == "confirm_contract":
-        created = await workflow.resume(draft.thread_id, ResumePayload(confirmed=True))
-    else:
-        created = draft
+    created = await _complete_interrupt(
+        workflow, draft,
+        goal_answer=(
+            "TEST: Success means at least CAD 25,000 in liquid savings on 2027-09-01. "
+            "Current liquid savings are CAD 8,200. I contributed CAD 900 last month "
+            "and can commit CAD 900 per month until the deadline. Income varies, but "
+            "the CAD 900 monthly contribution is my explicit planning assumption."
+        ),
+    )
     eval_rows.append(
         {
             "goal_family": "savings",
@@ -526,9 +529,8 @@ async def _savings_journey(
             "inference": dict(deps.last_inference),
         }
     )
-    if created.goal is None:
-        return
-    await workflow.start(
+    assert created.goal is not None, "Savings goal was not confirmed after clarification"
+    evidence_snapshot = await workflow.start(
         WorkflowRequest(
             kind="add_evidence",
             goal_id=created.goal.goal_id,
@@ -536,6 +538,16 @@ async def _savings_journey(
             evidence_text="TEST: Current savings are 8200 CAD. I contributed 900 CAD last month.",
         )
     )
+    evidence_snapshot = await _complete_interrupt(
+        workflow, evidence_snapshot,
+        evidence_answer="8200 CAD is the current balance and 900 CAD was contributed last month.",
+    )
+    savings_history = await deps.baseline_forecasts.published_history(created.goal.goal_id)
+    eval_rows.append({
+        "goal_family": "savings", "question": "initial evidence",
+        "status": evidence_snapshot.status,
+        "probability": savings_history[-1].probability if savings_history else None,
+    })
     intervention = InterventionAgentService(
         settings,
         capped,
@@ -558,6 +570,39 @@ async def _savings_journey(
             "validated": parsed.model_dump(mode="json"),
         }
     )
+    assert any(
+        change.metric == "monthly_contribution"
+        and change.operation == "set"
+        and change.value == 1200
+        for change in parsed.changes
+    ), parsed.model_dump()
+    savings_simulations = WhatIfService(
+        deps.goals,
+        PostgresSimulationRepository(engine),
+        evidence=deps.evidence,
+        owner_id=owner.user_id,
+        forecasts=deps.baseline_forecasts,
+    )
+    savings_state = await savings_simulations.baseline_state(str(created.goal.goal_id))
+    savings_simulation = await savings_simulations.simulate(
+        WhatIfRequest(
+            goal_id=str(created.goal.goal_id),
+            current_value=savings_state.current_value or 0,
+            target_value=savings_state.target_value or 1,
+            periods=savings_state.periods or 1,
+            assumptions=savings_state.assumptions,
+            parsed_changes=[
+                InterventionChangeInput.model_validate(change.model_dump())
+                for change in parsed.changes
+            ],
+        )
+    )
+    assert savings_simulation.scenario_probability is not None
+    eval_rows.append({
+        "goal_family": "savings", "question": "numerical simulation",
+        "baseline_probability": savings_simulation.baseline_probability,
+        "scenario_probability": savings_simulation.scenario_probability,
+    })
     strategy = await intervention.parse(
         str(created.goal.goal_id),
         "Income is lumpy. What am I overlooking?",

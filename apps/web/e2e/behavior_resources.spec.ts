@@ -241,10 +241,12 @@ test.describe("Resource-specific evidence", () => {
     await page.route("**/api/v1/what-if/parse-intervention", (route) =>
       route.fulfill({
         json: {
-          raw_text: "What if I do LeetCode 2 hours per day?",
-          changes: [],
+          raw_text: "What if I send 10 applications per week?",
+          changes: [{ metric: "applications_per_week", operation: "set", value: 10, unit: "applications/week", scope: "goal_state", provenance: "USER_STATED" }],
           unsupported: [],
           effect_assigned: false,
+          pricing_status: "PRICED",
+          request_kind: "quantitative_scenario",
         },
       }),
     );
@@ -327,6 +329,14 @@ test.describe("Resource-specific evidence", () => {
   });
 
   test("GitHub repo selection stays goal-specific", async ({ page }) => {
+    let savedResources: string[] = [];
+    await page.route("**/api/v1/plugins/github/capabilities", (route) => route.fulfill({ json: [
+      { tool_name: "GITHUB_LIST_COMMITS", label: "Commits", operation: "read" },
+    ] }));
+    await page.route(`**/api/v1/goals/${CAREER}/evidence/sources/github/recipe`, (route) => {
+      savedResources = route.request().postDataJSON().resource_ids;
+      return route.fulfill({ json: { goal_id: CAREER, plugin_id: "github", label: "Selected repository", approved: true, steps: [] } });
+    });
     await page.route("**/api/v1/goals/*/evidence/sources/plan", (route) =>
       route.fulfill({
         json: {
@@ -375,7 +385,10 @@ test.describe("Resource-specific evidence", () => {
     await page.getByRole("button", { name: /GitHub/i }).first().click();
     await expect(page.getByText("MrSujalThapa/playitout")).toBeVisible();
     await page.getByText("MrSujalThapa/playitout").click();
-    await expect(page.getByRole("button", { name: /Save source/i })).toBeVisible();
+    await page.getByRole("checkbox", { name: "Commits" }).check();
+    await page.getByRole("button", { name: "Start tracking" }).click();
+    await expect(page.getByText("Source saved")).toBeVisible();
+    expect(savedResources).toEqual(["MrSujalThapa/playitout"]);
   });
 
   test("source sync status survives reload and reports completion", async ({ page }, testInfo) => {
@@ -437,7 +450,7 @@ test.describe("Resource-specific evidence", () => {
       return route.fulfill({ json: watch(resourceId) });
     });
     await page.goto(`/goals/${CAREER}/evidence`);
-    await page.getByRole("button", { name: "Watch 2 areas" }).click();
+    await page.getByRole("button", { name: "Include accessible subpages" }).click();
     await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
     expect([...statuses.values()]).toEqual(["active", "active"]);
     await page.getByRole("button", { name: "Pause" }).click();
@@ -466,7 +479,7 @@ test.describe("Resource-specific evidence", () => {
           outcome_quantiles: { p10: 0.4, p50: 0.5, p90: 0.62 },
           fan: [],
           distribution_bins: [{ lower: 0.4, upper: 0.6, mass: 1 }],
-          assumptions: [],
+          assumptions: [{ name: "execution_probability", value: 0.63, source: "FITTED" }],
           opportunity_costs: [],
           diagnostics: { n_draws: 2000, seed: 1, converged: true, achieved_mc_error: 0.01, duration_ms: 12 },
           sensitivity: [],
@@ -487,11 +500,13 @@ test.describe("Resource-specific evidence", () => {
       }),
     );
     await page.goto(`/goals/${CAREER}/what-if`);
-    await page.getByPlaceholder(/What if/i).fill("What if I do LeetCode 2 hours per day?");
+    await page.getByPlaceholder(/What if/i).fill("What if I send 10 applications per week?");
     await page.getByRole("button", { name: /Run scenario/i }).click();
+    await page.getByRole("tab", { name: "Deeper analysis" }).click();
     await expect(page.getByText("If fully executed")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Estimated follow-through")).toBeVisible();
     await expect(page.getByText("Scenario odds")).toBeVisible();
     await expect(page.getByText("Scenario baseline")).toBeVisible();
+    await page.screenshot({ path: "test-results/what-if-execution-desktop.png", fullPage: true });
   });
 });

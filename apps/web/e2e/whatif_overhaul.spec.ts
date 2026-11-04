@@ -118,10 +118,9 @@ test("Change reconciles published odds with a priced hypothetical", async ({ pag
   await expect(page.getByTestId("series-what-if")).toContainText("78%");
   await expect(page.getByTestId("series-what-if")).toContainText("+6.1 pts");
   await expect(page.getByText("Outcome range unavailable")).toHaveCount(0);
-  await expect(page.locator(".what-if-market-chart .recharts-line-curve")).toHaveCount(3);
+  await expect(page.locator(".what-if-market-chart .recharts-line-curve")).toHaveCount(1);
   await expect(page.locator(".what-if-market-chart .recharts-area-curve")).toHaveCount(0);
-  const whatIf = page.locator(".what-if-market-chart .recharts-line-curve").last();
-  await expect(whatIf).toHaveAttribute("stroke", "#2fb36d");
+  await expect(page.locator('.what-if-market-chart .recharts-reference-dot circle[fill="#2fb36d"]')).toHaveCount(1);
   await page.getByRole("tab", { name: "Deeper analysis" }).click();
   await page.getByRole("button", { name: "Run scenario" }).click();
   await expect(page.getByTestId("series-original")).toContainText("71.9%");
@@ -158,8 +157,7 @@ test("a lower modeled application rate makes a red negative scenario", async ({ 
   await page.getByRole("button", { name: "Run scenario" }).click();
   await expect(page.getByTestId("series-what-if")).toContainText("65%");
   await expect(page.getByTestId("series-what-if")).toContainText("6.9 pts");
-  await expect(page.locator(".what-if-market-chart .recharts-line-curve").last())
-    .toHaveAttribute("stroke", "#e5534b");
+  await expect(page.locator('.what-if-market-chart .recharts-reference-dot circle[fill="#e5534b"]')).toHaveCount(1);
   await capture(page, "change-negative");
 });
 

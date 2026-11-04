@@ -183,6 +183,9 @@ def history_point(goal: GoalContract, pricing: PricingResult) -> PublishedBaseli
             "probability": probability,
             "forecast_status": pricing.forecast_status,
             "evidence_watermark": watermark,
+            "normalized_evidence_ids": sorted(
+                str(value) for value in pricing.receipt.get("normalized_evidence_ids", [])
+            ),
             "assumption": assumption_payload,
         }
     )

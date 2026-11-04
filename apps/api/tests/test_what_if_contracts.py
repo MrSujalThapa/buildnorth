@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from helpers import isolated_app
 from personal_markets.evidence.service import EvidenceService
 from personal_markets.forecasting.families import AssumptionSource
+from personal_markets.forecasting.identity import published_replay_time
 from personal_markets.goals.adapters import InMemoryGoalRepository
 from personal_markets.goals.domain import GoalContract, GoalType
 from personal_markets.goals.service import GoalService
@@ -44,6 +45,24 @@ from test_pass4_remaining import (
     make_base,
     make_goal,
 )
+
+
+def test_receipt_replay_clock_requires_matching_version_and_evidence() -> None:
+    recorded = datetime.now(UTC)
+    receipt = {
+        "receipt_version": 2,
+        "goal_contract_version": 3,
+        "normalized_evidence_ids": ["a", "b"],
+        "evaluated_at": recorded.isoformat(),
+    }
+    assert published_replay_time(receipt, goal_version=3, evidence_ids=["a", "b"]) == recorded
+    assert published_replay_time(receipt, goal_version=4, evidence_ids=["a", "b"]) is None
+    assert published_replay_time(receipt, goal_version=3, evidence_ids=["a"]) is None
+    assert published_replay_time(
+        {**receipt, "evaluated_at": (recorded - timedelta(days=1)).isoformat()},
+        goal_version=3,
+        evidence_ids=["a", "b"],
+    ) is None
 
 
 def _finance_goal() -> GoalContract:
@@ -119,6 +138,30 @@ async def test_published_forecast_and_comparison_baseline_stay_distinct() -> Non
     assert combined.current_probability == pytest.approx(0.719)
     assert combined.published_probability == pytest.approx(0.7646)
     assert combined.published_model_version == "published-v1"
+
+
+@pytest.mark.asyncio
+async def test_historical_publication_does_not_price_unpriceable_current_state() -> None:
+    goal_id = uuid4()
+    repository = InMemorySimulationRepository()
+    repository._history[goal_id] = {
+        "published": MarketHistoryPoint(
+            id=uuid4(), goal_id=goal_id, probability=0.8,
+            forecast_status="ANCHORED", evidence_watermark="old-evidence",
+            model_family="hiring", model_version="old-v1",
+            assumption_hash="old", simulation_artifact_id=None,
+        )
+    }
+    state = WhatIfBaselineState(
+        goal_id=str(goal_id), priced=False, status="NOT_PRICED",
+        model_family="hiring", model_version="new-v2",
+    )
+    service = WhatIfService(GoalService(InMemoryGoalRepository()), repository)
+    combined = await service._overlay_published_baseline(goal_id, state)
+    assert not combined.priced
+    assert combined.status == "NOT_PRICED"
+    assert combined.current_probability is None
+    assert combined.published_probability == pytest.approx(0.8)
 
 
 @pytest.mark.asyncio
@@ -580,7 +623,10 @@ async def test_reverse_fills_empty_candidates_from_baseline() -> None:
     reach = action("reach", 0.3, 2)
 
     class ReverseFillService(LinearWhatIfService):
-        async def baseline_state(self, goal_id: str) -> WhatIfBaselineState:
+        async def baseline_state(
+            self, goal_id: str, *, now: datetime | None = None
+        ) -> WhatIfBaselineState:
+            _ = now
             return WhatIfBaselineState(
                 goal_id=goal_id,
                 priced=True,

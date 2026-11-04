@@ -10,7 +10,7 @@ from personal_markets.behavior.service import BehaviorService
 from personal_markets.evidence.domain import NormalizedEvidence, Provenance
 from personal_markets.forecasting.families import AssumptionSource
 from personal_markets.goals.adapters import InMemoryGoalRepository
-from personal_markets.goals.domain import GoalContract, GoalType
+from personal_markets.goals.domain import GoalContract, GoalType, ResourceConstraints
 from personal_markets.goals.service import GoalService
 from personal_markets.integrations.resource_ranker import rank_resources
 from personal_markets.what_if.domain import (
@@ -262,6 +262,20 @@ async def test_user_a_vs_user_b_execution_adjusted_what_if() -> None:
     assert (result_a.scenario_probability or 0) > (result_b.scenario_probability or 0)
     assert result_a.execution_breakdown is not None
     assert result_a.execution_breakdown["conditional_on_full_execution"] != result_a.execution_breakdown["execution_adjusted_probability"]
+
+    constrained = goal_a.model_copy(update={
+        "goal_id": uuid4(),
+        "resource_constraints": ResourceConstraints(hours_per_week=2),
+    })
+    await repo.create(constrained, user)
+    constrained_result = await service.simulate(request_a.model_copy(
+        update={"goal_id": str(constrained.goal_id)}
+    ))
+    assert constrained_result.resource_feasible is False
+    assert constrained_result.conditional_on_execution_probability == pytest.approx(
+        result_a.conditional_on_execution_probability
+    )
+    assert (constrained_result.scenario_probability or 0) < (result_a.scenario_probability or 0)
 
 
 def test_optimizer_uses_execution_adjusted_value() -> None:
